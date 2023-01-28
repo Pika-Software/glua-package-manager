@@ -74,6 +74,7 @@ do
 
 end
 
+-- Make JIT happy
 function debug.fempty()
 end
 

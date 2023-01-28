@@ -1,11 +1,12 @@
 local CRC = util.CRC
 local tostring = tostring
-local EmptyFunc = gpm.EmptyFunc
+local emptyFunc = debug.fempty
 
 module("gpm.unzip", package.seeall)
 
 function IterateZipFiles( fileHandle )
     if not isFile( fileHandle ) then
+        return emptyFunc
     end
 
     return function()
