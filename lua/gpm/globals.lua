@@ -44,6 +44,9 @@ do
 	end
 end
 
--- Make JIT happy
-function gpm.EmptyFunc()
+local TYPE_FILE = TYPE_FILE
+local TypeID = TypeID
+
+function isFile( any )
+	return TypeID( any ) == TYPE_FILE
 end
