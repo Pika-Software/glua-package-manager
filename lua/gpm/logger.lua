@@ -56,7 +56,6 @@ do
 
     local sideColor = colors.Get( SERVER and "server" or "client" )
     local color1 = colors.Get( "150" )
-    local color2 = colors.Get( "200" )
     local os_time = os.time
     local os_date = os.date
     local MsgC = MsgC
@@ -65,7 +64,7 @@ do
         ArgAssert( levelColor, 1, "table" )
         ArgAssert( level, 2, "string" )
 
-        MsgC( color1, os_date( "%d/%m/%Y %H:%M:%S ", os_time() ), levelColor, level, color1, " --- ", sideColor, "[" .. (SERVER and "SERVER" or "CLIENT") .. "] ", self:GetColor(), self:GetName(), color1, " : ", color2, string.format( str, ... ), "\n"  )
+        MsgC( color1, os_date( "%d/%m/%Y %H:%M:%S ", os_time() ), levelColor, level, color1, " --- ", sideColor, "[" .. (SERVER and "SERVER" or "CLIENT") .. "] ", self:GetColor(), self:GetName(), color1, " : ", self:GetTextColor(), string.format( str, ... ), "\n"  )
     end
 
 end
@@ -96,27 +95,31 @@ end
 
 -- Debug log
 do
-
-    local convar = GetConVar( "developer" )
     local color = colors.Get( "debug" )
-
     function meta:Debug( str, ... )
-        if (convar:GetInt() > 1) then
+        if self:DebugFilter() then
             self:Log( color, "DEBUG", str, ... )
         end
     end
-
 end
 
+local color200 = colors.Get( "200" )
 local setmetatable = setmetatable
 local white = colors.White
+
+local convar = GetConVar( "developer" )
+local function debugFilter()
+    return convar:GetInt() > 1
+end
 
 module( "gpm.logger" )
 
 function Create( name, color )
     ArgAssert( name, 1, "string" )
-    return setmetatable({
+    return setmetatable( {
+        ["DebugFilter"] = debugFilter,
         ["Color"] = color or white,
+        ["TextColor"] = color200,
         ["Name"] = name
-    }, meta)
+    }, meta )
 end
