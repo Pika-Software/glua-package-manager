@@ -1,19 +1,19 @@
 local ArgAssert = ArgAssert
 local Color = Color
 
-module( 'gpm.colors' )
+module( "gpm.colors" )
 
 local all = {
-    ['white'] = Color( 255, 255, 255 ),
-    ['client'] = Color( 225, 170, 10 ),
-    ['server'] = Color( 5, 170, 250 ),
-    ['200'] = Color( 200, 200, 200 ),
-    ['150'] = Color( 150, 150, 150 ),
-    ['menu'] = Color( 75, 175, 80 ),
-    ['green'] = Color( 0, 255, 0 ),
-    ['blue'] = Color( 0, 0, 255 ),
-    ['red'] = Color( 255, 0, 0 ),
-    ['black'] = Color( 0, 0, 0 )
+    ["white"] = Color( 255, 255, 255 ),
+    ["client"] = Color( 225, 170, 10 ),
+    ["server"] = Color( 5, 170, 250 ),
+    ["200"] = Color( 200, 200, 200 ),
+    ["150"] = Color( 150, 150, 150 ),
+    ["menu"] = Color( 75, 175, 80 ),
+    ["green"] = Color( 0, 255, 0 ),
+    ["blue"] = Color( 0, 0, 255 ),
+    ["red"] = Color( 255, 0, 0 ),
+    ["black"] = Color( 0, 0, 0 )
 }
 
 -- White & Black
@@ -41,8 +41,8 @@ end
 
 -- Set color by name
 function Set( name, value )
-    ArgAssert( name, 1, 'string' )
-    ArgAssert( value, 2, 'table' )
+    ArgAssert( name, 1, "string" )
+    ArgAssert( value, 2, "table" )
 
     local color = all[ name ]
     if (color) then

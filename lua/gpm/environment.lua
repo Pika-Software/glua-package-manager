@@ -9,20 +9,20 @@ local timer = timer
 local hook = hook
 local _G = _G
 
-module( 'gpm.environment' )
+module( "gpm.environment" )
 
 -- Create
 do
 
     local cache = {}
     function Create( func, env )
-        ArgAssert( func, 1, 'function' )
+        ArgAssert( func, 1, "function" )
         env = env or _G
 
         local meta = cache[ env ]
         if (meta == nil) then
             meta = {
-                ['__index'] = env
+                ["__index"] = env
             }
 
             cache[ env ] = meta
@@ -37,8 +37,8 @@ end
 
 -- Custom Hooks
 function CustomHooks( env, name )
-    ArgAssert( env, 1, 'table' )
-    ArgAssert( name, 2, 'string' )
+    ArgAssert( env, 1, "table" )
+    ArgAssert( name, 2, "string" )
 
     local lib = table_Copy( hook )
 
@@ -50,11 +50,11 @@ function CustomHooks( env, name )
         end
 
         function lib.Add( eventName, identifier, func, ... )
-            ArgAssert( eventName, 1, 'string' )
-            ArgAssert( func, 3, 'function' )
+            ArgAssert( eventName, 1, "string" )
+            ArgAssert( func, 3, "function" )
 
             if isstring( identifier ) then
-                hook.Add( eventName, name .. ' - ' .. identifier, func, ... )
+                hook.Add( eventName, name .. " - " .. identifier, func, ... )
             else
                 hook.Add( eventName, identifier, func, ... )
             end
@@ -67,10 +67,10 @@ function CustomHooks( env, name )
         end
 
         function lib.Remove( eventName, identifier, ... )
-            ArgAssert( eventName, 1, 'string' )
+            ArgAssert( eventName, 1, "string" )
 
             if isstring( identifier ) then
-                hook.Remove( eventName, name .. ' - ' .. identifier, ... )
+                hook.Remove( eventName, name .. " - " .. identifier, ... )
             else
                 hook.Remove( eventName, identifier, ... )
             end
@@ -91,7 +91,7 @@ function CustomHooks( env, name )
 end
 
 function RemoveCustomHooks( env )
-    ArgAssert( env, 1, 'table' )
+    ArgAssert( env, 1, "table" )
 
     local lib = env.hook
     if istable( lib ) and (lib ~= hook) then
@@ -105,60 +105,60 @@ end
 
 -- Custom Timers
 function CustomTimers( env, name )
-    ArgAssert( env, 1, 'table' )
-    ArgAssert( name, 2, 'string' )
+    ArgAssert( env, 1, "table" )
+    ArgAssert( name, 2, "string" )
 
     local lib = table_Copy( timer )
     lib.__Timers = {}
 
     function lib.Adjust( identifier, ... )
-        return timer.Adjust( name .. ' - ' .. identifier, ... )
+        return timer.Adjust( name .. " - " .. identifier, ... )
     end
 
     function lib.Create( identifier, ... )
-        identifier = name .. ' - ' .. identifier
+        identifier = name .. " - " .. identifier
         lib.__Timers[ identifier ] = true
 
         return timer.Create( identifier, ... )
     end
 
     function lib.Exists( identifier, ... )
-        return timer.Exists( name .. ' - ' .. identifier, ... )
+        return timer.Exists( name .. " - " .. identifier, ... )
     end
 
     function lib.Pause( identifier, ... )
-        return timer.Pause( name .. ' - ' .. identifier, ... )
+        return timer.Pause( name .. " - " .. identifier, ... )
     end
 
     function lib.Remove( identifier, ... )
-        identifier = name .. ' - ' .. identifier
+        identifier = name .. " - " .. identifier
         lib.__Timers[ identifier ] = nil
 
         return timer.Remove( identifier, ... )
     end
 
     function lib.RepsLeft( identifier, ... )
-        return timer.RepsLeft( name .. ' - ' .. identifier, ...)
+        return timer.RepsLeft( name .. " - " .. identifier, ...)
     end
 
     function lib.Start( identifier, ... )
-        return timer.Start( name .. ' - ' .. identifier, ... )
+        return timer.Start( name .. " - " .. identifier, ... )
     end
 
     function lib.Stop( identifier, ... )
-        return timer.Stop( name .. ' - ' .. identifier, ... )
+        return timer.Stop( name .. " - " .. identifier, ... )
     end
 
     function lib.TimeLeft( identifier, ... )
-        return timer.TimeLeft( name .. ' - ' .. identifier, ... )
+        return timer.TimeLeft( name .. " - " .. identifier, ... )
     end
 
     function lib.Toggle( identifier, ... )
-        return timer.Toggle( name .. ' - ' .. identifier, ... )
+        return timer.Toggle( name .. " - " .. identifier, ... )
     end
 
     function lib.UnPause( identifier, ... )
-        return timer.UnPause( name .. ' - ' .. identifier, ... )
+        return timer.UnPause( name .. " - " .. identifier, ... )
     end
 
     -- Alias
@@ -168,7 +168,7 @@ function CustomTimers( env, name )
 end
 
 function RemoveCustomTimers( env )
-    ArgAssert( env, 1, 'table' )
+    ArgAssert( env, 1, "table" )
 
     local lib = env.timer
     if istable( lib ) and (lib ~= timer) then

@@ -7,8 +7,8 @@ local function SearchGlobalName( searchable, nextTable, usedTables )
 	usedTables[ nextTable ] = true
 
 	for key, value in SortedPairs( nextTable ) do
-		if (key == '__index') then continue end
-		if (key == '_G') then continue end
+		if (key == "__index") then continue end
+		if (key == "_G") then continue end
 		if (value == searchable) then
 			return key
 		elseif istable( value ) then
@@ -16,7 +16,7 @@ local function SearchGlobalName( searchable, nextTable, usedTables )
 			local founded = SearchGlobalName( searchable, value, usedTables )
 			if isstring( founded ) then
 				if isstring( key ) then
-					return key .. '.' .. founded
+					return key .. "." .. founded
 				else
 					return founded
 				end
@@ -32,7 +32,7 @@ do
 	local assert = assert
 
 	function debug.getfname( searchable, level )
-		assert( searchable ~= nil, 'Searchable cannot be nil!' )
+		assert( searchable ~= nil, "Searchable cannot be nil!" )
 		local localTable = {}
 
 		local i = 1
@@ -84,7 +84,7 @@ do
 
 	local functions = {}
 	function debug.getf( name )
-		ArgAssert( name, 1, 'string' )
+		ArgAssert( name, 1, "string" )
 		local func = functions[ name ]
 		if isfunction( func ) then
 			return func
@@ -94,7 +94,7 @@ do
 	end
 
 	function debug.setf( func, override )
-		ArgAssert( func, 1, 'function' )
+		ArgAssert( func, 1, "function" )
 
 		local name = debug.getfname( func, 3 )
 		if override or (functions[ name ] == nil) then

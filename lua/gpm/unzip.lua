@@ -4,28 +4,34 @@ local EmptyFunc = gpm.EmptyFunc
 
 module("gpm.unzip", package.seeall)
 
-function IterateZipFiles(fileHandle)
-    if TypeID(fileHandle) ~= TYPE_FILE then return EmptyFunc end
+function IterateZipFiles( fileHandle )
+    if not isFile( fileHandle ) then
+    end
 
     return function()
-        if fileHandle:Read(4) ~= "PK\x03\x04" then return end
-        fileHandle:Skip(4)
+        if fileHandle:Read( 4 ) ~= "PK\x03\x04" then return end
+        fileHandle:Skip( 4 )
+
         local compressionMethod = fileHandle:ReadUShort()
-        fileHandle:Skip(4)
+        fileHandle:Skip( 4 )
+
         local crc = fileHandle:ReadULong()
         local compressedSize = fileHandle:ReadULong()
-        fileHandle:Skip(4)
+        fileHandle:Skip( 4 )
+
         local fileNameLen = fileHandle:ReadUShort()
         local extraLen = fileHandle:ReadUShort()
-        local fileName = fileHandle:Read(fileNameLen)
-        fileHandle:Skip(extraLen)
+        local fileName = fileHandle:Read( fileNameLen )
+        fileHandle:Skip( extraLen )
 
         local data
         if compressionMethod ~= 0 then
-            fileHandle:Skip(compressedSize)
+            fileHandle:Skip( compressedSize )
         else
-            data = fileHandle:Read(compressedSize)
-            if data and tostring(crc) ~= CRC(data) then data = nil end
+            data = fileHandle:Read( compressedSize )
+            if data and tostring( crc ) ~= CRC( data ) then
+                data = nil
+            end
         end
 
         return fileName, data

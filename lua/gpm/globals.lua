@@ -10,9 +10,9 @@ do
 		local valueType = string.lower( type( value ) )
 		if (valueType == argType) then return end
 
-		local dinfo = debug_getinfo( 2, 'n' )
-		local fname = dinfo and dinfo.name or 'func'
-		error( string.format( 'bad argument #%d to \'%s\' (%s expected, got %s)', argNum, fname, argType, valueType ), errorlevel or 3)
+		local dinfo = debug_getinfo( 2, "n" )
+		local fname = dinfo and dinfo.name or "func"
+		error( string.format( "bad argument #%d to \'%s\' (%s expected, got %s)", argNum, fname, argType, valueType ), errorlevel or 3)
 	end
 
 end
@@ -22,7 +22,7 @@ do
 	local tonumber = tonumber
 
 	function HEXToColor( str )
-		local hex = string.Replace( str, '#', '' )
+		local hex = string.Replace( str, "#", "" )
 		if (#hex > 3) then
 			return tonumber( '0x' .. string.sub( hex,  1, 2 ) ), tonumber( '0x' .. string.sub( hex,  3, 4 ) ), tonumber( '0x' .. string.sub( hex,  5, 6 ) )
 		else
@@ -33,13 +33,13 @@ do
 end
 
 function ColorToHEX( color )
-	return '#' .. string.format( '%x', (color.r * 0x10000) + (color.g * 0x100) + color.b )
+	return "#" .. string.format( "%x", (color.r * 0x10000) + (color.g * 0x100) + color.b )
 end
 
 do
 	local table_concat = table.concat
 	function file.Path( ... )
-		return table_concat( {...}, '/' )
+		return table_concat( {...}, "/" )
 	end
 end
 
