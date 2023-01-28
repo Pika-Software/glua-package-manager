@@ -37,7 +37,9 @@ function LoadPackageInfoFromFunc(func)
 end
 
 
-function ImportZIP(pathToArchive)
+function ImportZIP( pathToArchive )
+    local startTime = SysTime()
+
     local f
     if pathToArchive:StartWith("data/") then
         f = file.Open(pathToArchive:sub(6), "rb", "DATA")
@@ -55,13 +57,17 @@ function ImportZIP(pathToArchive)
             files[fileName] = func
         end
     end
+
     f:Close()
 
     if not packageInfo then return ErrorNoHaltWithStack("bad zip") end
     if not packageInfo.main or not files[packageInfo.main] then return ErrorNoHaltWithStack("no main file provided") end
 
-    local main = files[packageInfo.main]
+    local main = files[ packageInfo.main ]
+    -- gpm.environment.Create( main )
     main()
+
+    gpm.Logger:Info( "Package `%s` was successfully loaded! It took %.4f seconds.", packageInfo.name or pathToArchive, SysTime() - startTime )
 end
 
 function import(fileName)
