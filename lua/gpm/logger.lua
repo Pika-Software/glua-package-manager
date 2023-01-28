@@ -108,7 +108,12 @@ do
 
 end
 
+local setmetatable = setmetatable
 local white = colors.White
+
+module( "gpm.logger" )
+
+function Create( name, color )
     ArgAssert( name, 1, "string" )
     return setmetatable({
         ["Color"] = color or white,
