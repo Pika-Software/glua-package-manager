@@ -20,13 +20,14 @@ end
 do
 
 	local tonumber = tonumber
+	local Color = Color
 
 	function HEXToColor( str )
 		local hex = string.Replace( str, "#", "" )
 		if (#hex > 3) then
-			return tonumber( '0x' .. string.sub( hex,  1, 2 ) ), tonumber( '0x' .. string.sub( hex,  3, 4 ) ), tonumber( '0x' .. string.sub( hex,  5, 6 ) )
+			return Color( tonumber( "0x" .. string.sub( hex,  1, 2 ) ), tonumber( "0x" .. string.sub( hex,  3, 4 ) ), tonumber( "0x" .. string.sub( hex,  5, 6 ) ) )
 		else
-			return tonumber( '0x' .. string.sub( hex,  1, 1 ) ) * 17, tonumber( '0x' .. string.sub( hex,  2, 2 ) ) * 17, tonumber( '0x' .. string.sub( hex,  3, 3 ) ) * 17
+			return Color( tonumber( "0x" .. string.sub( hex,  1, 1 ) ) * 17, tonumber( "0x" .. string.sub( hex,  2, 2 ) ) * 17, tonumber( "0x" .. string.sub( hex,  3, 3 ) ) * 17 )
 		end
 	end
 
