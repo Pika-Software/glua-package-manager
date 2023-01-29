@@ -44,9 +44,18 @@ do
 	end
 end
 
-local TYPE_FILE = TYPE_FILE
-local TypeID = TypeID
+do
 
-function isFile( any )
-	return TypeID( any ) == TYPE_FILE
+	local TYPE_FILE = TYPE_FILE
+	local TypeID = TypeID
+
+	function isFile( any )
+		return TypeID( any ) == TYPE_FILE
+	end
+
+end
+
+function string.IsURL( str )
+	ArgAssert( str, 1, "string" )
+	return string.match( str, "^https?://.*" ) ~= nil
 end
