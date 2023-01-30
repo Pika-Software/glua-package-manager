@@ -1,1 +1,4 @@
-print("Hello World from mypkg")
+
+function MYMODULE.HelloWorld()
+    print("Hello World from mypkg")
+end
