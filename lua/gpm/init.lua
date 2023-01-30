@@ -1,26 +1,23 @@
 local AddCSLuaFile = AddCSLuaFile
 local include = include
-local SERVER = SERVER
 
 gpm = gpm or {}
-gpm._VERSION = '0.0.1'
+gpm._VERSION = "0.0.1"
 
 -- Include function
 local workFolder = "gpm/"
 local function includeShared( fileName )
-    if (SERVER) then
-        AddCSLuaFile( workFolder .. fileName )
-    end
-
-    include( workFolder .. fileName )
+    local filePath = workFolder .. fileName
+    AddCSLuaFile( filePath )
+    include( filePath )
 end
 
 -- Loading start time
 local startTime = SysTime()
 
--- Global & Debug functions
+-- Global functions & Promises
 includeShared( "globals.lua" )
-includeShared( "debug.lua" )
+includeShared( "promise.lua" )
 
 -- Colors & Logger modules
 includeShared( "colors.lua" )
