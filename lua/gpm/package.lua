@@ -2,6 +2,8 @@ local environment = gpm.environment
 local timer = timer
 local hook = hook
 local net = net
+local AddCSLuaFile = AddCSLuaFile
+local debug_setfenv = debug.setfenv
 
 gpm.Packages = gpm.Packages or {}
 
@@ -18,263 +20,249 @@ function GetAll()
 end
 
 -- Package Meta
-local meta = {}
-meta.__index = meta
+do
+    PACKAGE = PACKAGE or {}
+    PACKAGE.__index = PACKAGE
 
-function meta:GetName()
-    return self.Name
+    function PACKAGE:GetInfo()
+        return self.Info
+    end
+
+    function PACKAGE:GetName()
+        return self.Info.name
+    end
+
+    function PACKAGE:GetVersion()
+        return self.Info.version
+    end
+
+    function PACKAGE:GetIdentifier(name)
+        local identifier = ("%s@%s"):format( self:GetName(), self:GetVersion() )
+        if name then
+            if isstring(name) then return identifier .. "::" .. name end
+            return name
+        end
+        return identifier
+    end
+
+    function PACKAGE:__tostring()
+        return self:GetIdentifier()
+    end
+
+    function PACKAGE:GetEnvironment()
+        return self.Environment
+    end
+
+    function PACKAGE:GetLogger()
+        return self.Logger
+    end
+
+    function PACKAGE:GetResult()
+        return self.Result
+    end
 end
 
-function meta:GetEnvironment()
-    return self.Environment
-end
-
-function meta:GetFunction()
-    return self.Function
-end
-
-function meta:GetVersion()
-    return self.Version
-end
-
-function meta:GetLogger()
-    return self.Logger
-end
-
-function meta:GetFolder()
-    return self.Folder
-end
-
-function meta:GetResult()
-    return self.Result
-end
-
-local function FindFileInFiles(fileName, files, current_dir)
+local function FindFilePathInFiles(fileName, files)
     if not isstring(fileName) or not istable(files) then return end
 
-    if isstring(current_dir) then
-        local path = current_dir .. "/" .. fileName
-        if files[path] then return files[path] end
+    local currentDir = string.GetPathFromFilename( gpm.utils.LocalizePath( gpm.utils.GetCurrentFile() ) )
+
+    if isstring(currentDir) then
+        local path = string.gsub(currentDir .. "/" .. fileName, "//", "/")
+        if files[path] then return path end
     end
 
-    return files[fileName]
+    return files[fileName] and fileName
 end
 
-function Load( packageInfo, func, files, env )
-    local startTime = SysTime()
+function SetupHookLibrary(packageEnv)
+    local hook = hook
+    environment.SetLinkedTable( packageEnv, "hook", hook )
 
-    -- Getting Info
-    local packageName = packageInfo.name .. " (" .. packageInfo.version .. ")"
-    local function packageIdentifier( str )
-        return packageName .. " - " .. str
-    end
+    local hooks = {}
+    environment.SetFunction( packageEnv, "hook.GetTable", function()
+        return hooks
+    end )
 
-    -- Environment Create
-    local packageEnv = environment.Create( func, env )
+    environment.SetFunction( packageEnv, "hook.Add", function( eventName, identifier, value, ... )
+        hook.Add( eventName, gpm.Package:GetIdentifier(identifier), value, ... )
 
-    -- Hooks
-    do
+        if (hooks[ eventName ] == nil) then hooks[ eventName ] = {} end
+        hooks[ eventName ][ identifier ] = value
+    end )
 
-        environment.SetLinkedTable( packageEnv, "hook", hook )
-
-        local hooks = {}
-        environment.SetFunction( packageEnv, "hook.GetTable", function()
-            return hooks
-        end )
-
-        environment.SetFunction( packageEnv, "hook.Add", function( eventName, identifier, value, ... )
-            if isstring( identifier ) then
-                hook.Add( eventName, packageIdentifier( identifier ), value, ... )
-            else
-                hook.Add( eventName, identifier, value, ... )
-            end
-
-            if (hooks[ eventName ] == nil) then
-                hooks[ eventName ] = {}
-            end
-
-            hooks[ eventName ][ identifier ] = value
-        end )
-
-        environment.SetFunction( packageEnv, "hook.Remove", function( eventName, identifier, ... )
-            if isstring( identifier ) then
-                hook.Remove( eventName, packageIdentifier( identifier ), ... )
-            else
-                hook.Remove( eventName, identifier, ... )
-            end
-
-            if (hooks[ eventName ] == nil) then
-                return
-            end
-
-            hooks[ eventName ][ identifier ] = nil
-        end )
-
-        environment.Set( packageEnv, "hook.GetGlobalTable", hook.GetTable )
-
-    end
-
-    -- Network
-    do
-
-        environment.SetLinkedTable( packageEnv, "net", net )
-
-        environment.SetFunction( packageEnv, "Receive", function( messageName, ... )
-            return net.Receive( packageIdentifier( messageName ), ... )
-        end )
-
-        environment.SetFunction( packageEnv, "net.Start", function( messageName, ... )
-            return net.Start( packageIdentifier( messageName ), ... )
-        end )
-
-    end
-
-    -- Utils
-    if (SERVER) then
-
-        environment.SetLinkedTable( packageEnv, "util", util )
-
-        environment.SetFunction( packageEnv, "util.AddNetworkString", function( str, ... )
-            return util.AddNetworkString( packageIdentifier( str ), ... )
-        end )
-
-    end
-
-    -- Timers
-    do
-
-        environment.SetLinkedTable( packageEnv, "timer", timer )
-
-        -- Adjust
-        environment.SetFunction( packageEnv, "timer.Adjust", function( identifier, ... )
-            return timer.Adjust( packageIdentifier( identifier ), ... )
-        end )
-
-        -- Create
-        environment.SetFunction( packageEnv, "timer.Create", function( identifier, ... )
-            return timer.Create( packageIdentifier( identifier ), ... )
-        end )
-
-        -- Exists
-        environment.SetFunction( packageEnv, "timer.Exists", function( identifier, ... )
-            return timer.Exists( packageIdentifier( identifier ), ... )
-        end )
-
-        -- Pause
-        environment.SetFunction( packageEnv, "timer.Pause", function( identifier, ... )
-            return timer.Pause( packageIdentifier( identifier ), ... )
-        end )
-
-        environment.SetFunction( packageEnv, "timer.UnPause", function( identifier, ... )
-            return timer.UnPause( packageIdentifier( identifier ), ... )
-        end )
-
-        -- Remove
-        local timerRemove = function( identifier, ... )
-            return timer.Remove( packageIdentifier( identifier ), ... )
+    environment.SetFunction( packageEnv, "hook.Remove", function( eventName, identifier, ... )
+        if hooks[eventName] and hooks[eventName][identifier] then
+            identifier = gpm.Package:GetIdentifier(identifier)
         end
 
-        environment.SetFunction( packageEnv, "timer.Remove", timerRemove )
-        environment.SetFunction( packageEnv, "timer.Destroy", timerRemove )
+        hook.Remove( eventName, identifier, ... )
 
-        -- TimeLeft & RepsLeft
-        environment.SetFunction( packageEnv, "timer.TimeLeft", function( identifier, ... )
-            return timer.TimeLeft( packageIdentifier( identifier ), ... )
+        if hooks[eventName] then
+            hooks[eventName][identifier] = nil
+        end
+    end )
+
+    environment.Set( packageEnv, "hook.GetGlobalTable", hook.GetTable )
+end
+
+function SetupNetworkLibrary(packageEnv)
+    local util = util
+    local net = net
+    environment.SetLinkedTable( packageEnv, "net", net )
+    environment.SetLinkedTable( packageEnv, "util", util )
+
+    local networkStrings = {}
+
+    if SERVER then
+        environment.SetFunction( packageEnv, "util.AddNetworkString", function( str, ... )
+            local name = gpm.Package:GetIdentifier(str)
+            networkStrings[str] = name
+            return util.AddNetworkString( name, ... )
         end )
-
-        environment.SetFunction( packageEnv, "timer.RepsLeft", function( identifier, ... )
-            return timer.RepsLeft( packageIdentifier( identifier ), ... )
-        end )
-
-        -- Start, Stop & Toggle
-        environment.SetFunction( packageEnv, "timer.Start", function( identifier, ... )
-            return timer.Start( packageIdentifier( identifier ), ... )
-        end )
-
-        environment.SetFunction( packageEnv, "timer.Stop", function( identifier, ... )
-            return timer.Stop( packageIdentifier( identifier ), ... )
-        end )
-
-        environment.SetFunction( packageEnv, "timer.Toggle", function( identifier, ... )
-            return timer.Toggle( packageIdentifier( identifier ), ... )
-        end )
-
     end
 
-    -- Render Target
-    if (CLIENT) then
+    environment.SetFunction( packageEnv, "Receive", function( messageName, ... )
+        local name = gpm.Package:GetIdentifier(messageName)
+        networkStrings[messageName] = name
+        return net.Receive( name, ... )
+    end )
 
-        environment.SetFunction( packageEnv, "GetRenderTarget", function( name, ... )
-            return GetRenderTarget( packageIdentifier( name ), ... )
-        end )
+    environment.SetFunction( packageEnv, "net.Start", function( messageName, ... )
+        return net.Start( networkStrings[messageName] or messageName, ... )
+    end )
+end
 
-        environment.SetFunction( packageEnv, "GetRenderTargetEx", function( name, ... )
-            return GetRenderTargetEx( packageIdentifier( name ), ... )
-        end )
+function SetupNetworkLibrary(packageEnv)
+    local timer = timer
+    environment.SetLinkedTable( packageEnv, "timer", timer )
 
+    -- Adjust
+    environment.SetFunction( packageEnv, "timer.Adjust", function( identifier, ... )
+        return timer.Adjust( self.Package:GetIdentifier( identifier ), ... )
+    end )
+
+    -- Create
+    environment.SetFunction( packageEnv, "timer.Create", function( identifier, ... )
+        return timer.Create( self.Package:GetIdentifier( identifier ), ... )
+    end )
+
+    -- Exists
+    environment.SetFunction( packageEnv, "timer.Exists", function( identifier, ... )
+        return timer.Exists( self.Package:GetIdentifier( identifier ), ... )
+    end )
+
+    -- Pause
+    environment.SetFunction( packageEnv, "timer.Pause", function( identifier, ... )
+        return timer.Pause( self.Package:GetIdentifier( identifier ), ... )
+    end )
+
+    environment.SetFunction( packageEnv, "timer.UnPause", function( identifier, ... )
+        return timer.UnPause( self.Package:GetIdentifier( identifier ), ... )
+    end )
+
+    -- Remove
+    local timerRemove = function( identifier, ... )
+        return timer.Remove( self.Package:GetIdentifier( identifier ), ... )
     end
+
+    environment.SetFunction( packageEnv, "timer.Remove", timerRemove )
+    environment.SetFunction( packageEnv, "timer.Destroy", timerRemove )
+
+    -- TimeLeft & RepsLeft
+    environment.SetFunction( packageEnv, "timer.TimeLeft", function( identifier, ... )
+        return timer.TimeLeft( self.Package:GetIdentifier( identifier ), ... )
+    end )
+
+    environment.SetFunction( packageEnv, "timer.RepsLeft", function( identifier, ... )
+        return timer.RepsLeft( self.Package:GetIdentifier( identifier ), ... )
+    end )
+
+    -- Start, Stop & Toggle
+    environment.SetFunction( packageEnv, "timer.Start", function( identifier, ... )
+        return timer.Start( self.Package:GetIdentifier( identifier ), ... )
+    end )
+
+    environment.SetFunction( packageEnv, "timer.Stop", function( identifier, ... )
+        return timer.Stop( self.Package:GetIdentifier( identifier ), ... )
+    end )
+
+    environment.SetFunction( packageEnv, "timer.Toggle", function( identifier, ... )
+        return timer.Toggle( self.Package:GetIdentifier( identifier ), ... )
+    end )
+end
+
+function Run(package, func)
+    debug_setfenv(func, package:GetEnvironment())
+    return func()
+end
+
+function SafeRun(package, func, errorHandler)
+    return xpcall(Run, errorHandler, package, func)
+end
+
+function InitializePackage( packageInfo, func, files, env )
+    local startTime = SysTime()
+
+    -- Creating environment for package
+    local packageEnv = environment.Create( func, env )
+
+    -- Creating package object
+    local packageObject = setmetatable( {}, PACKAGE )
+    packageObject.Info = packageInfo
+    packageObject.Environment = packageEnv
+    packageObject.Logger = gpm.logger.Create( packageObject:GetIdentifier(), packageInfo.color )
+
+    -- Binding package object to gpm.Package
+    environment.SetLinkedTable( packageEnv, "gpm", gpm )
+    environment.Set( packageEnv, "gpm.Package", packageObject )
+    environment.Set( packageEnv, "gpm.Logger", packageObject:GetLogger() )
+
+    -- Setting up libraries
+    SetupHookLibrary( packageEnv )
+    SetupNetworkLibrary( packageEnv )
+    SetupNetworkLibrary( packageEnv )
 
     -- Include
     environment.SetFunction( packageEnv, "include", function( fileName )
-        ArgAssert( fileName, 1, "string" )
+        local path = FindFilePathInFiles(fileName, files)
 
-        PrintTable( debug.getinfo( 2 ) )
-        -- local fileFunc = files[ fileName ]
+        if path and files[path] then
+            return gpm.package.Run( gpm.Package, files[path] )
+        end
 
-        print( FindFileInFiles )
-
-        -- if (fileFunc) then
-        --     return fileFunc()
-        -- end
-
-        ErrorNoHaltWithStack( "Couldn't include file '" .. fileName .. "' - File not found" )
-        -- return include( fileName )
+        ErrorNoHaltWithStack( "Couldn't include file '" .. tostring(fileName) .. "' - File not found" )
     end )
 
     -- AddCSLuaFile
     if (SERVER) then
         environment.SetFunction( packageEnv, "AddCSLuaFile", function( fileName )
-            return AddCSLuaFile( fileName )
+            local path = FindFilePathInFiles( fileName, files )
+            if path then
+                return AddCSLuaFile( path )
+            end
+
+            ErrorNoHaltWithStack( "Couldn't include file '" .. tostring(fileName) .. "' - File not found" )
         end)
     end
 
-    -- GPM
-    environment.SetLinkedTable( packageEnv, "gpm", gpm )
-
-    -- Logger
-    local logger = gpm.logger.Create( packageName, packageInfo.color )
-    environment.Set( packageEnv, "gpm.Logger", logger )
-
-    -- Creating meta
-    local packageObject = setmetatable( {
-        ["Folder"] = string.GetPathFromFilename( packageInfo.main ),
-        ["Version"] = packageInfo.version,
-        ["Environment"] = packageEnv,
-        ["Name"] = packageInfo.name,
-        ["Function"] = func,
-        ["Logger"] = logger
-    }, meta )
-
-    -- Package
-    environment.Set( packageEnv, "gpm.Package", packageObject )
-
     -- Run
-    local result = { xpcall( func, function( str )
-        logger:Error( str )
-    end ) }
+    local ok, result = SafeRun( packageObject, func, function(str)
+        packageObject.Logger:Error( str )
+    end )
 
-    if not result[1] then
-        gpm.Logger:Warn( "Package `%s` loading failed, see above for the reason, it took %.4f seconds.", packageName, SysTime() - startTime )
+    if not ok then
+        gpm.Logger:Warn( "Package `%s` failed to load, see above for the reason, it took %.4f seconds.", packageObject, SysTime() - startTime )
         return
     end
 
-    -- Result Saving
-    table.remove( result, 1 )
-    packageObject.Return = result
+    -- Saving result to packageObject
+    packageObject.Result = result
 
     -- Saving in global table & final log
-    gpm.Logger:Info( "Package `%s` was successfully loaded, it took %.4f seconds.", packageName, SysTime() - startTime )
-    gpm.Packages[ packageName ] = packageObject
-    return packageObject
-end
+    gpm.Logger:Info( "Package `%s` was successfully loaded, it took %.4f seconds.", packageObject, SysTime() - startTime )
+    if not gpm.Packages[ packageObject:GetName() ] then gpm.Packages[ packageObject:GetName() ] = {} end
+    gpm.Packages[ packageObject:GetName() ][ packageObject:GetVersion() ] = packageObject
 
+    return result
+end
