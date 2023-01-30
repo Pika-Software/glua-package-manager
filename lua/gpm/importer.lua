@@ -71,7 +71,7 @@ function ImportZIP( pathToArchive )
     packageInfo.ImportedExtra = nil
 
     local main = files[ packageInfo.main ]
-    return gpm.package.Load( packageInfo, main, files )
+    return gpm.package.InitializePackage( packageInfo, main, files )
 end
 
 LocalFilesFinderMeta = LocalFilesFinderMeta or {}
@@ -102,13 +102,10 @@ function ImportLocal(fileName)
     packageInfo.ImportedFrom = "Local"
     packageInfo.ImportedExtra = nil
 
-    return gpm.package.Load( packageInfo, mainFile, files )
+    return gpm.package.InitializePackage( packageInfo, mainFile, files )
 end
 
-function import( fileName, async )
-    ArgAssert( fileName, 1, "string" )
-    assert( promise.RunningInAsync(), "import supposed to be running in coroutine/async function (do you running it from package)" )
-
+AsyncImport = promise.Async(function( fileName)
     if fileName:StartWith("data/") then
         if fileName:EndsWith(".zip.dat") then
             return ImportZIP(fileName)
@@ -119,6 +116,15 @@ function import( fileName, async )
         fileName = fileName:sub(5)
         return ImportLocal(fileName)
     end
+end )
+
+function import( fileName, async )
+    ArgAssert( fileName, 1, "string" )
+    assert( async or promise.RunningInAsync(), "import supposed to be running in coroutine/async function (do you running it from package)" )
+
+    local p = AsyncImport( fileName )
+    if not async then return p:Await() end
+    return p
 end
 
 _G.import = import
@@ -128,13 +134,16 @@ if false then return end
 
 local Test = promise.Async(function(...)
 
-    import "data/test.zip.dat"
+    --local test = import "data/test.zip.dat"
+
+
+    local mypkg = import "lua/packages/mypkg"
+    mypkg.HelloWorld()
 
 end)
 
 concommand.Add("imp", function()
     Test()
-
     -- coroutine.wrap(function()
     --     xpcall(function()
     --         --import "lua/packages/mypkg"
