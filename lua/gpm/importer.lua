@@ -2,6 +2,7 @@
 local IterateZipFiles = gpm.unzip.IterateZipFiles
 local CompileString = CompileString
 local ArgAssert = ArgAssert
+local promise = gpm.promise
 
 module("gpm.importer", package.seeall)
 
@@ -104,8 +105,9 @@ function ImportLocal(fileName)
     return gpm.package.Load( packageInfo, mainFile, files )
 end
 
-function import( fileName )
+function import( fileName, async )
     ArgAssert( fileName, 1, "string" )
+    assert( promise.RunningInAsync(), "import supposed to be running in coroutine/async function (do you running it from package)" )
 
     if fileName:StartWith("data/") then
         if fileName:EndsWith(".zip.dat") then
@@ -124,12 +126,10 @@ _G.import = import
 -- Tests
 if false then return end
 
-local Test = gpm.promise.Async(function(...)
-    print("START", SysTime())
+local Test = promise.Async(function(...)
 
-    gpm.promise.Delay(1):Await()
+    import "data/test.zip.dat"
 
-    print("END", SysTime())
 end)
 
 concommand.Add("imp", function()
