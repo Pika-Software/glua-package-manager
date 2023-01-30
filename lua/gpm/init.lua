@@ -17,6 +17,7 @@ local startTime = SysTime()
 
 -- Global functions & Promises
 includeShared( "globals.lua" )
+includeShared( "utils.lua" )
 includeShared( "promise.lua" )
 
 -- Colors & Logger modules
