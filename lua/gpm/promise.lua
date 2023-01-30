@@ -1,22 +1,20 @@
-local error = error
-local pcall = pcall
-local tostring = tostring
-local ipairs = ipars
+-- Promise implementation from Lua close to a specification Promise/A+
+-- made by Retro ;)
 local string_format = string.format
-local timer_Simple = timer.Simple
 local getmetatable = getmetatable
 local setmetatable = setmetatable
-local istable = istable
+local timer_Simple = timer.Simple
+local table_insert = table.insert
+local ErrorNoHalt = ErrorNoHalt
 local isfunction = isfunction
-local coroutine_running = coroutine.running
-local coroutine_resume = coroutine.resume
-local coroutine_yield = coroutine.yield
-local coroutine_create = coroutine.create
+local coroutine = coroutine
+local tostring = tostring
+local istable = istable
+local ipairs = ipairs
 local assert = assert
 local error = error
-local table_insert = table.insert
-local ipairs = ipairs
-local print = print
+local pcall = pcall
+local error = error
 
 module( "gpm.promise" )
 
@@ -45,8 +43,8 @@ do -- Promise object
     end
 
     function PROMISE:__tostring()
-        if self:IsPending() then return string_format("Promise %p {<pending>}", self) end
-        return string_format("Promise %p {<%s>: %s}"):format(self, self:GetState(), tostring(self:GetResult()))
+        if self:GetResult() == nil then return string_format("Promise %p {<%s>}", self, self:GetState()) end
+        return string_format( "Promise %p {<%s>: %s}", self, self:GetState(), tostring(self:GetResult()) )
     end
 
     function PROMISE:_ProcessQueue()
@@ -141,17 +139,17 @@ do -- Promise object
     end
 
     function PROMISE:Await()
-        local co = coroutine_running()
+        local co = coroutine.running()
         assert(co, ":Await() only works in coroutines or async functions!")
 
         if self:IsPending() then
             local function resume()
-                coroutine_resume(co)
+                coroutine.resume(co)
             end
 
             self:Then(resume, resume)
 
-            coroutine_yield()
+            coroutine.yield()
         end
 
         local result = self:GetResult()
@@ -207,8 +205,8 @@ function Async(func)
     return function(...)
         local p = New()
 
-        local co = coroutine_create(run)
-        coroutine_resume(co, p, ...)
+        local co = coroutine.create(run)
+        coroutine.resume(co, p, ...)
 
         return p
     end
