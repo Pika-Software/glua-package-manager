@@ -1,11 +1,13 @@
+local string_Split = string.Split
 local isfunction = isfunction
 local ArgAssert = ArgAssert
 local istable = istable
+local ipairs = ipairs
 local debug = debug
 local pairs = pairs
 local _G = _G
 
-module( "gpm.environment", package.seeall )
+module( "gpm.environment" )
 
 --
 do
@@ -52,7 +54,7 @@ function Set( env, path, object )
     ArgAssert( env, 1, "table" )
     ArgAssert( path, 2, "string" )
 
-    local levels = string.Split( path, "." )
+    local levels = string_Split( path, "." )
     local len = #levels
     local last = env
 
