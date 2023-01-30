@@ -12,16 +12,12 @@ local tostring = tostring
 local istable = istable
 local ipairs = ipairs
 local assert = assert
-local error = error
+local Either = Either
 local pcall = pcall
-local error = error
 
 module( "gpm.promise" )
 
 do -- Promise object
-    local function DefaultFulfillCallback(value) return value end
-    local function DefaultRejectCallback(err) error(err) end
-
     local VALID_STATES = {
         ["pending"] = true,
         ["fulfilled"] = true,
@@ -49,7 +45,7 @@ do -- Promise object
 
     function PROMISE:_ProcessQueue()
         if self:IsPending() then return end
-        if not self._processed and #self._queue == 0 then
+        if not self._processed and #self._queue == 0 and self:GetResult() ~= nil then
             if self:IsRejected() then ErrorNoHalt("Unhandler promise error: " .. tostring(self:GetResult()) .. "\n\n") end
             return
         end
@@ -58,10 +54,16 @@ do -- Promise object
 
         for i, promise in ipairs(self._queue) do
             self._queue[i] = nil
-            local handler = self:IsFulfilled() and (promise._OnFulfill or DefaultFulfillCallback) or (promise._OnReject or DefaultRejectCallback)
+            local handler = Either(self:IsFulfilled(), promise._OnFulfill, promise._OnReject)
 
-            local ok, result = pcall(handler, self:GetResult())
-            if ok then
+            local ok, result
+            if handler then
+                ok, result = pcall(handler, self:GetResult())
+            else
+                ok, result = self:IsFulfilled(), self:GetResult()
+            end
+
+            if ok and self:IsFulfilled() then
                 promise:Resolve(result)
             else
                 promise:Reject(result)
@@ -77,8 +79,12 @@ do -- Promise object
         if self:IsFulfilled() then
             self:_ProcessQueue()
         else
-            -- We must wait for reject handlers
-            timer_Simple(0, function() self:_ProcessQueue() end)
+            -- We must wait for reject handlers, so we won't throw error about unhandler error
+            timer_Simple(0, function()
+                if not self._processed then
+                    self:_ProcessQueue()
+                end
+            end)
         end
     end
 
@@ -169,6 +175,10 @@ end
 
 function IsPromise(obj)
     return getmetatable(obj) == PROMISE
+end
+
+function RunningInAsync()
+    return coroutine.running()
 end
 
 function New(func)
