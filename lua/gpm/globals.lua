@@ -59,3 +59,7 @@ function string.IsURL( str )
 	ArgAssert( str, 1, "string" )
 	return string.match( str, "^https?://.*" ) ~= nil
 end
+
+-- Make JIT happy
+function debug.fempty()
+end
