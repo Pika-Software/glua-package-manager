@@ -1,5 +1,34 @@
--- Promise implementation from Lua close to a specification Promise/A+
--- made by Retro ;)
+--[[
+    MIT License
+
+    Copyright (c) 2023 Retro
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.
+]]
+
+--[[
+    A library that mostly implements Promise/A+ specification for GLua
+    https://github.com/dankmolot/gm_promise
+
+    Documentation can be found at: https://github.com/dankmolot/gm_promise
+]]
+
 local string_format = string.format
 local getmetatable = getmetatable
 local setmetatable = setmetatable
@@ -11,13 +40,18 @@ local coroutine = coroutine
 local tostring = tostring
 local istable = istable
 local ipairs = ipairs
-local assert = assert
 local Either = Either
 local pcall = pcall
+local error = error
+local _HTTP = HTTP
 
-module( "gpm.promise" )
+module( "promise" )
 
-do -- Promise object
+_VERSION = "1.2.0" -- major.minor.patch
+_VERSION_NUM = 010200 -- _VERSION in number format: 1.2.3 -> 010203 | 99.56.13 -> 995613
+
+-- Promise object
+do
     local VALID_STATES = {
         ["pending"] = true,
         ["fulfilled"] = true,
@@ -45,8 +79,8 @@ do -- Promise object
 
     function PROMISE:_ProcessQueue()
         if self:IsPending() then return end
-        if not self._processed and #self._queue == 0 and self:GetResult() ~= nil then
-            if self:IsRejected() then ErrorNoHalt("Unhandler promise error: " .. tostring(self:GetResult()) .. "\n\n") end
+        if not self._processed and #self._queue == 0 then
+            if self:IsRejected() then ErrorNoHalt("Unhandled promise error: " .. tostring(self:GetResult()) .. "\n\n") end
             return
         end
 
@@ -63,7 +97,7 @@ do -- Promise object
                 ok, result = self:IsFulfilled(), self:GetResult()
             end
 
-            if ok and self:IsFulfilled() then
+            if ok then
                 promise:Resolve(result)
             else
                 promise:Reject(result)
@@ -144,9 +178,9 @@ do -- Promise object
         return self:Then(nil, onReject)
     end
 
-    function PROMISE:Await()
+    function PROMISE:SafeAwait()
         local co = coroutine.running()
-        assert(co, ":Await() only works in coroutines or async functions!")
+        if not co then return false, ":Await() only works in coroutines or async functions!" end
 
         if self:IsPending() then
             local function resume()
@@ -158,12 +192,19 @@ do -- Promise object
             coroutine.yield()
         end
 
-        local result = self:GetResult()
-        assert(self:IsFulfilled(), result)
+        self._processed = true
+        return self:IsFulfilled(), self:GetResult()
+    end
+
+    function PROMISE:Await(ignoreErrors)
+        local ok, result = self:SafeAwait()
+        if not ok then
+            if not ignoreErrors then return error(result, 2) end
+        return end
 
         return result
     end
-end -- Promise object
+end
 
 function IsThenable(obj)
     return istable(obj) and isfunction(obj.Then)
@@ -181,6 +222,7 @@ function RunningInAsync()
     return coroutine.running()
 end
 
+-- Creates new promise object
 function New(func)
     local promise = setmetatable({}, PROMISE)
     promise._queue = {}
@@ -222,8 +264,14 @@ function Async(func)
     end
 end
 
-function Await(p)
-    if IsAwaitable(p) then return p:Await() end
+function SafeAwait(p)
+    if IsPromise(p) then return p:SafeAwait() end
+    return true, p
+end
+
+function Await(p, ignoreErrors)
+    if IsAwaitable(p) then return p:Await(ignoreErrors) end
+    return p
 end
 
 function Delay(time)
@@ -232,12 +280,12 @@ end
 
 function Resolve(value)
     if IsPromise(value) then return value end
-    return Promise(function(resolve) resolve(value) end)
+    return New(function(resolve) resolve(value) end)
 end
 
 function Reject(err)
     if IsPromise(value) then return value end
-    return Promise(function(_, reject) reject(err) end)
+    return New(function(_, reject) reject(err) end)
 end
 
 function All(promises)
@@ -275,4 +323,46 @@ function All(promises)
     end
 
     return new_promise
+end
+
+function Race(promises)
+    if #promises == 0 then return Resolve({}) end
+
+    local new_promise = New()
+
+    local onFulfill = function(result)
+        if new_promise:IsPending() then new_promise:Resolve(result) end
+    end
+
+    local onReject = function(err)
+        if new_promise:IsPending() then new_promise:Reject(err) end
+    end
+
+    for i, p in ipairs(promises) do
+        if IsThenable(p) then
+            p:Then(onFulfill, onReject)
+        end
+    end
+
+    return new_promise
+end
+
+-- Async version of HTTP
+function HTTP(parameters)
+    local p = New()
+
+    parameters.success = function(code, body, headers)
+        p:Resolve({
+            code = code,
+            body = body,
+            headers = headers
+        })
+    end
+    parameters.failed = function(err)
+        p:Reject(err)
+    end
+
+    local ok = _HTTP(parameters)
+    if not ok then p:Reject("failed to make http request") end
+    return p
 end
