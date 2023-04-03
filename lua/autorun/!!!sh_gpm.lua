@@ -1,6 +1,6 @@
-if (SERVER) then
+if SERVER then
 
-    MsgN([[
+    MsgN( [[
       ____    _____    ___ ___
      /'_ `\ /\ '__`\ /' __` __`\
     /\ \L\ \\ \ \L\ \/\ \/\ \/\ \
@@ -13,10 +13,10 @@ if (SERVER) then
     Discord: https://discord.gg/3UVxhZ
     Developers: Retro & PrikolMen:-b
     License: MIT
-    ]])
+    ]] )
 
-    AddCSLuaFile( "gpm/init.lua" )
+    AddCSLuaFile "gpm/init.lua"
 
 end
 
-include( "gpm/init.lua" )
+include "gpm/init.lua"
