@@ -106,7 +106,7 @@ do
     end
 
     function PACKAGE:GetResult()
-        return self.Result
+        return self.result
     end
 
     function PACKAGE:GetFiles()
@@ -147,7 +147,16 @@ local function FindFilePathInFiles( fileName, files )
 end
 
 function InitializePackage( metadata, func, files, env )
-    local startTime = SysTime()
+    local versions = packages[ metadata.name ]
+    if ( versions ~= nil ) then
+        local gPackage = versions[ metadata.version ]
+        if ( gPackage ~= nil ) then
+            return gPackage.result
+        end
+    end
+
+    -- Measuring package startup time
+    local stopwatch = SysTime()
 
     -- Creating environment for package
     local packageEnv = environment.Create( func, env )
@@ -189,15 +198,15 @@ function InitializePackage( metadata, func, files, env )
     -- Run
     local ok, result = SafeRun( gPackage, func, ErrorNoHaltWithStack )
     if not ok then
-        gpm.Logger:Warn( "Package `%s` failed to load, see above for the reason, it took %.4f seconds.", gPackage, SysTime() - startTime )
+        gpm.Logger:Warn( "Package `%s` failed to load, see above for the reason, it took %.4f seconds.", gPackage, SysTime() - stopwatch )
         return
     end
 
     -- Saving result to gPackage
-    gPackage.Result = result
+    gPackage.result = result
 
     -- Saving in global table & final log
-    gpm.Logger:Info( "Package `%s` was successfully loaded, it took %.4f seconds.", gPackage, SysTime() - startTime )
+    gpm.Logger:Info( "Package `%s` was successfully loaded, it took %.4f seconds.", gPackage, SysTime() - stopwatch )
 
     local packageName = gPackage:GetName()
     packages[ packageName ] = packages[ packageName ] or {}
