@@ -1,9 +1,10 @@
-local string_Split = string.Split
+local table_SetValue = table.SetValue
+local setmetatable = setmetatable
+local debug_fcopy = debug.fcopy
 local isfunction = isfunction
 local ArgAssert = ArgAssert
 local istable = istable
-local ipairs = ipairs
-local debug = debug
+local setfenv = setfenv
 local pairs = pairs
 local _G = _G
 
@@ -26,7 +27,7 @@ do
             metaCache[ b ] = meta
         end
 
-        debug.setmetatable( a, meta )
+        setmetatable( a, meta )
         return a
     end
 
@@ -37,45 +38,11 @@ function Create( func, env )
     ArgAssert( func, 1, "function" )
 
     local new = {}
-    debug.setfenv( func, LinkTables( new, env or _G ) )
+    setfenv( func, LinkTables( new, env or _G ) )
     return new, func
 end
 
 --
-function CopyFunction( func )
-    ArgAssert( func, 1, "function" )
-    return function( ... )
-        return func( ... )
-    end
-end
-
---
-function Set( env, path, object )
-    ArgAssert( env, 1, "table" )
-    ArgAssert( path, 2, "string" )
-
-    local levels = string_Split( path, "." )
-    local len = #levels
-    local last = env
-
-    for num, level in ipairs( levels ) do
-        if (num == len) then
-            last[ level ] = object
-            return true
-        end
-
-        local tbl = last[ level ]
-        if (tbl == nil) then
-            last[ level ] = {}
-        elseif not istable( tbl ) then
-            return
-        end
-
-        last = last[ level ]
-    end
-
-    return false
-end
 
 --
 do
@@ -83,11 +50,10 @@ do
     function SetFunction( env, path, func, makeCopy )
         ArgAssert( func, 1, "function" )
         if (makeCopy) then
-            func = CopyFunction( func )
+            func = debug_fcopy( func )
         end
 
-        debug.setfenv( func, env )
-        return Set( env, path, func )
+        return table_SetValue( env, path, setfenv( func, env ) )
     end
 
 end
@@ -102,22 +68,20 @@ function SetTable( env, path, tbl, makeCopy )
         if istable( key ) then
             key = SetTable( env, nil, tbl, makeCopy )
         elseif makeCopy and isfunction( key ) then
-            debug.setfenv( key, env )
-            key = CopyFunction( key )
+            key = debug_fcopy( setfenv( key, env ) )
         end
 
         if istable( value ) then
             value = SetTable( env, nil, tbl, makeCopy )
         elseif makeCopy and isfunction( value ) then
-            debug.setfenv( value, env )
-            value = CopyFunction( value )
+            value = debug_fcopy( setfenv( value, env ) )
         end
 
         object[ key ] = value
     end
 
     if (path) then
-        return Set( env, path, object )
+        return table_SetValue( env, path, object )
     else
         return object
     end
@@ -125,5 +89,5 @@ end
 
 --
 function SetLinkedTable( env, path, tbl )
-    return Set( env, path, LinkTables( {}, tbl ) )
+    return table_SetValue( env, path, LinkTables( {}, tbl ) )
 end
