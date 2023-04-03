@@ -1,12 +1,25 @@
+-- Functions
 local AddCSLuaFile = AddCSLuaFile
 local include = include
+local file = file
 
 gpm = gpm or {}
-gpm._VERSION = "0.0.1"
+gpm._VERSION = 000001
 
 -- Include function
-local function includeShared( fileName )
-    local filePath = "gpm/" .. fileName .. ".lua"
+function includeShared( fileName )
+    local filePath = "gpm/" .. fileName
+    if file.IsDir( filePath, "LUA" ) then
+        for _, fileName in ipairs( file.Find( filePath .. "/*", "LUA" ) ) do
+            fileName = filePath .. "/" .. fileName
+            AddCSLuaFile( fileName )
+            include( fileName )
+        end
+
+        return
+    end
+
+    filePath = filePath .. ".lua"
     AddCSLuaFile( filePath )
     include( filePath )
 end
@@ -14,9 +27,10 @@ end
 -- Loading start time
 local startTime = SysTime()
 
--- Global functions & Promises
-includeShared "globals"
+-- Utils
 includeShared "utils"
+
+-- Promises
 includeShared "promise"
 
 -- Colors & Logger modules
@@ -31,12 +45,11 @@ gpm.Logger = gpm.logger.Create( "Glua Package Manager (" .. gpm._VERSION  .. ")"
 includeShared "environment"
 includeShared "unzip"
 
-includeShared "package"
+includeShared "packages"
 
--- Loaders
-gpm.loaders = gpm.loaders or {}
-includeShared "loaders/lua"
-includeShared "loaders/zip"
+-- Sources
+gpm.sources = gpm.sources or {}
+includeShared "sources"
 
 -- Importer module
 includeShared "importer"
