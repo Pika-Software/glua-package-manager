@@ -9,6 +9,24 @@ gpm.Packages = gpm.Packages or {}
 
 module( "gpm.package", package.seeall )
 
+function ParseTable(tbl)
+    if not istable(tbl) then return end
+
+    local info = {}
+    info.name = isstring(tbl.name) and tbl.name or "no name"
+    info.version = isstring(tbl.version) and tbl.version or "0.0.1"
+    info.main = isstring(tbl.main) and tbl.main or nil
+
+    return info
+end
+
+function ParseTableFromFunc(func)
+    if isfunction(func) then
+        local ok, data = pcall(func)
+        return ok and ParseTable(data)
+    end
+end
+
 -- Get one existing package
 function Get( packageName )
     return gpm.Packages[ packageName ]

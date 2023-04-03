@@ -1,6 +1,6 @@
 local debug_getinfo = debug.getinfo
-local select = select
 local table = table
+local gpm = gpm
 
 module( "gpm.utils" )
 
@@ -29,4 +29,6 @@ do -- Path utils
     function path.Join(dir, ...)
         return path.Fix( table.concat({ dir, ... }, "/") )
     end
+
+    gpm.path = path
 end

@@ -114,7 +114,7 @@ AsyncImport = promise.Async(function( fileName)
         end
     elseif fileName:StartWith("lua/") then
         fileName = fileName:sub(5)
-        return ImportLocal(fileName)
+        return gpm.loaders.lua.Import(fileName)
     end
 end )
 
