@@ -1,7 +1,7 @@
 
 local promise = gpm.promise
 
-module( "gpm.loaders.zip", package.seeall )
+module( "gpm.sources.zip", package.seeall )
 
 Import = promise.Async(function(path)
     return promise.Reject("not implemented")
