@@ -55,6 +55,11 @@ function gpm.Reload()
         end
     end
 
+    local packages = gpm.Packages
+    for packageName in pairs( packages ) do
+        packages[ packageName ] = nil
+    end
+
     gpm.ImportFolder( "gpm/packages" )
     gpm.ImportFolder( "packages" )
 end
