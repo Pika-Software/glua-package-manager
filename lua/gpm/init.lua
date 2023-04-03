@@ -6,9 +6,7 @@ local AddCSLuaFile = AddCSLuaFile
 local include = include
 local SysTime = SysTime
 local ipairs = ipairs
-
--- Logs color
-local color = Color( 174, 197, 235 )
+local Color = Color
 
 module( "gpm" )
 
@@ -42,12 +40,10 @@ includeShared "utils"
 includeShared "fixes"
 
 -- Colors & Logger modules
-includeShared "colors"
 includeShared "logger"
 
 -- Global GPM Logger Creating
-colors.Set( "gpm", color )
-Logger = logger.Create( "GPM (" .. utils.Version( _VERSION ) .. ")", color )
+Logger = logger.Create( "GPM (" .. utils.Version( _VERSION ) .. ")", Color( 180, 200, 235 ) )
 
 -- Promises
 includeShared "promise"

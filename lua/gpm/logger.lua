@@ -1,11 +1,6 @@
+local setmetatable = setmetatable
 local ArgAssert = ArgAssert
-local colors = gpm.colors
-
--- Default Colors
-colors.Set( "info", Color( 70, 135, 255 ) )
-colors.Set( "warn", Color( 255, 130, 90 ) )
-colors.Set( "error", Color( 250, 55, 40 ) )
-colors.Set( "debug", Color( 0, 200, 150 ) )
+local Color = Color
 
 -- Metatable
 local meta = {}
@@ -54,8 +49,17 @@ end
 -- Console log
 do
 
-    local sideColor = colors.Get( SERVER and "server" or "client" )
-    local color1 = colors.Get( "150" )
+    local dateColor = Color( 150, 150, 150 )
+    local realmColor = nil
+
+    if SERVER then
+        realmColor = Color( 5, 170, 250 )
+    elseif MENU_DLL then
+        realmColor = Color( 75, 175, 80 )
+    else
+        realmColor = Color( 225, 170, 10 )
+    end
+
     local os_time = os.time
     local os_date = os.date
     local MsgC = MsgC
@@ -64,48 +68,10 @@ do
         ArgAssert( levelColor, 1, "table" )
         ArgAssert( level, 2, "string" )
 
-        MsgC( color1, os_date( "%d/%m/%Y %H:%M:%S ", os_time() ), levelColor, level, color1, " --- ", sideColor, "[" .. (SERVER and "SERVER" or "CLIENT") .. "] ", self:GetColor(), self:GetName(), color1, " : ", self:GetTextColor(), string.format( str, ... ), "\n"  )
+        MsgC( dateColor, os_date( "%d/%m/%Y %H:%M:%S ", os_time() ), levelColor, level, dateColor, " --- ", realmColor, "[" .. (SERVER and "SERVER" or "CLIENT") .. "] ", self:GetColor(), self:GetName(), dateColor, " : ", self:GetTextColor(), string.format( str, ... ), "\n"  )
     end
 
 end
-
--- Info log
-do
-    local color = colors.Get( "info" )
-    function meta:Info( str, ... )
-        self:Log( color, " INFO", str, ... )
-    end
-end
-
--- Warn log
-do
-    local color = colors.Get( "warn" )
-    function meta:Warn( str, ... )
-        self:Log( color, " WARN", str, ... )
-    end
-end
-
--- Error log
-do
-    local color = colors.Get( "error" )
-    function meta:Error( str, ... )
-        self:Log( color, "ERROR", str, ... )
-    end
-end
-
--- Debug log
-do
-    local color = colors.Get( "debug" )
-    function meta:Debug( str, ... )
-        if self:DebugFilter() then
-            self:Log( color, "DEBUG", str, ... )
-        end
-    end
-end
-
-local color200 = colors.Get( "200" )
-local setmetatable = setmetatable
-local white = colors.White
 
 local convar = GetConVar( "developer" )
 local function debugFilter()
@@ -114,12 +80,42 @@ end
 
 module( "gpm.logger" )
 
+LOGGER = meta
+
+INFO_COLOR = Color( 70, 135, 255 )
+WARN_COLOR = Color( 255, 130, 90 )
+ERROR_COLOR = Color( 250, 55, 40 )
+DEBUG_COLOR = Color( 0, 200, 150 )
+TEXT_COLOR = Color( 200, 200, 200 )
+WHITE_COLOR = Color( 255, 255, 255 )
+
+-- Info log
+function meta:Info( str, ... )
+    self:Log( INFO_COLOR, " INFO", str, ... )
+end
+
+-- Warn log
+function meta:Warn( str, ... )
+    self:Log( WARN_COLOR, " WARN", str, ... )
+end
+
+-- Error log
+function meta:Error( str, ... )
+    self:Log( ERROR_COLOR, "ERROR", str, ... )
+end
+
+-- Debug log
+function meta:Debug( str, ... )
+    if not self:DebugFilter( str, ... ) then return end
+    self:Log( DEBUG_COLOR, "DEBUG", str, ... )
+end
+
 function Create( name, color )
     ArgAssert( name, 1, "string" )
     return setmetatable( {
         ["DebugFilter"] = debugFilter,
-        ["Color"] = color or white,
-        ["TextColor"] = color200,
+        ["Color"] = color or WHITE_COLOR,
+        ["TextColor"] = TEXT_COLOR,
         ["Name"] = name
     }, meta )
 end
