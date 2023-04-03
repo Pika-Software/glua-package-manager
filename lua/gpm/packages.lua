@@ -1,5 +1,7 @@
 -- Libraries
 local environment = gpm.environment
+local paths = gpm.paths
+local utils = gpm.utils
 local string = string
 
 -- Functions
@@ -32,23 +34,27 @@ function GetMetaData( source )
 
         local version = source.version
         if isnumber( version ) then
-            metadata.version = gpm.utils.Version( version )
+            metadata.version = utils.Version( version )
         else
             metadata.version = "0.0.1"
         end
 
-        metadata.server = metadata.server == true
-        metadata.client = metadata.client == true
+        if ( source.client ~= false ) then
+            metadata.client = true
+        end
+
+        if ( source.server ~= false ) then
+            metadata.server = true
+        end
 
         return metadata
     elseif isfunction( source ) then
         local env = {}
-        setfenv( source, env )
 
-        local ok, result = xpcall( source, ErrorNoHaltWithStack )
+        local ok, result = xpcall( setfenv( source, env ), ErrorNoHaltWithStack )
         if ( ok and result ~= nil ) then
             if not istable( result ) then
-                env = gpm.utils.LowerTableKeys( env )
+                env = utils.LowerTableKeys( env )
                 if not env.package then return env end
                 return env.package
             end
@@ -64,16 +70,16 @@ do
     PACKAGE = PACKAGE or {}
     PACKAGE.__index = PACKAGE
 
-    function PACKAGE:GetInfo()
-        return self.Info
+    function PACKAGE:GetMetaData()
+        return self.metadata
     end
 
     function PACKAGE:GetName()
-        return self.Info.name
+        return self.metadata.name
     end
 
     function PACKAGE:GetVersion()
-        return self.Info.version
+        return self.metadata.version
     end
 
     function PACKAGE:GetIdentifier( name )
@@ -89,20 +95,32 @@ do
         return identifier
     end
 
-    function PACKAGE:__tostring()
-        return self:GetIdentifier()
-    end
+    PACKAGE.__tostring = PACKAGE.GetIdentifier
 
     function PACKAGE:GetEnvironment()
-        return self.Environment
+        return self.environment
     end
 
     function PACKAGE:GetLogger()
-        return self.Logger
+        return self.logger
     end
 
     function PACKAGE:GetResult()
         return self.Result
+    end
+
+    function PACKAGE:GetFiles()
+        return self.files
+    end
+
+    function PACKAGE:GetFileList()
+        local fileList = {}
+
+        for filePath in pairs( self.files ) do
+            fileList[ #fileList + 1 ] = filePath
+        end
+
+        return fileList
     end
 
 end
@@ -119,7 +137,7 @@ end
 local function FindFilePathInFiles( fileName, files )
     if not isstring( fileName ) or not istable( files ) then return end
 
-    local currentDir = string.GetPathFromFilename( gpm.path.Localize( gpm.utils.GetCurrentFile() ) )
+    local currentDir = string.GetPathFromFilename( paths.Localize( utils.GetCurrentFile() ) )
     if isstring( currentDir ) then
         local path = string.gsub( currentDir .. "/" .. fileName, "//", "/" )
         if files[ path ] then return path end
@@ -136,18 +154,16 @@ function InitializePackage( metadata, func, files, env )
 
     -- Creating package object
     local gPackage = setmetatable( {}, PACKAGE )
-    gPackage.Environment = packageEnv
-    gPackage.Info = metadata
-    gPackage.Files = files
+    gPackage.environment = packageEnv
+    gPackage.metadata = metadata
+    gPackage.files = files
 
-    print( gPackage:GetIdentifier() )
-
-    gPackage.Logger = gpm.logger.Create( gPackage:GetIdentifier(), metadata.color )
+    gPackage.logger = gpm.logger.Create( gPackage:GetIdentifier(), metadata.color )
 
     -- Binding package object to gpm.Package
     environment.SetLinkedTable( packageEnv, "gpm", gpm )
-    environment.Set( packageEnv, "gpm.Package", gPackage )
-    environment.Set( packageEnv, "gpm.Logger", gPackage:GetLogger() )
+    table.SetValue( packageEnv, "gpm.Package", gPackage, true )
+    table.SetValue( packageEnv, "gpm.Logger", gPackage.logger, true )
 
     -- Include
     environment.SetFunction( packageEnv, "include", function( fileName )
@@ -161,22 +177,17 @@ function InitializePackage( metadata, func, files, env )
     end )
 
     -- AddCSLuaFile
-    if (SERVER) then
+    if SERVER then
         environment.SetFunction( packageEnv, "AddCSLuaFile", function( fileName )
             local path = FindFilePathInFiles( fileName, files )
-            if path then
-                return AddCSLuaFile( path )
-            end
+            if path then return AddCSLuaFile( path ) end
 
             ErrorNoHaltWithStack( "Couldn't include file '" .. tostring( fileName ) .. "' - File not found" )
         end )
     end
 
     -- Run
-    local ok, result = SafeRun( gPackage, func, function( str )
-        gPackage.Logger:Error( str )
-    end )
-
+    local ok, result = SafeRun( gPackage, func, ErrorNoHaltWithStack )
     if not ok then
         gpm.Logger:Warn( "Package `%s` failed to load, see above for the reason, it took %.4f seconds.", gPackage, SysTime() - startTime )
         return
