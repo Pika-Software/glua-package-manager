@@ -1,9 +1,9 @@
 -- Libraries
 local string = string
+local debug = debug
 local table = table
 
 -- Functions
-local debug_getinfo = debug.getinfo
 local tonumber = tonumber
 local module = module
 local error = error
@@ -15,17 +15,17 @@ function ArgAssert( value, argNum, expected, errorlevel )
     local valueType = type( value )
     if valueType == expected then return end
 
-    local dinfo = debug_getinfo( 2, "n" )
+    local dinfo = debug.getinfo( 2, "n" )
     error( string.format( "bad argument #%d to \'%s\' (%s expected, got %s)", argNum, dinfo and dinfo.name or "func", expected, valueType ), errorlevel or 3 )
 end
 
---
+-- Is File check
 do
 
     local TYPE_FILE = TYPE_FILE
     local TypeID = TypeID
 
-    function isFile( any )
+    function IsFile( any )
         return TypeID( any ) == TYPE_FILE
     end
 
@@ -33,6 +33,66 @@ end
 
 -- Make JIT happy
 function debug.fempty()
+end
+
+-- Returns copy of function
+function debug.fcopy( func )
+    return function( ... )
+        return func( ... )
+    end
+end
+
+--
+function table.GetValue( source, path )
+    ArgAssert( source, 1, "table" )
+
+    local levels = string.Split( path, "." )
+    local count = #levels
+    local tbl = source
+
+    for num, key in ipairs( levels ) do
+        if ( num == count ) then
+            return tbl[ key ]
+        end
+
+        local nextTable = tbl[ key ]
+        if type( nextTable ) ~= "table" then
+            return
+        end
+
+        tbl = tbl[ key ]
+    end
+end
+
+function table.SetValue( source, path, value, ifEmpty )
+    ArgAssert( source, 1, "table" )
+
+    local levels = string.Split( path, "." )
+    local count = #levels
+    local tbl = source
+
+    for num, key in ipairs( levels ) do
+        if ( num == count ) then
+            local oldValue = tbl[ key ]
+            if ( oldValue ~= nil and ifEmpty ) then
+                return oldValue
+            end
+
+            tbl[ key ] = value
+            return value
+        end
+
+        local nextTable = tbl[ key ]
+        if ( nextTable == nil ) then
+            tbl[ key ] = {}
+        elseif type( nextTable ) ~= "table" then
+            return
+        end
+
+        tbl = tbl[ key ]
+    end
+
+    return
 end
 
 module( "gpm.utils" )
@@ -53,13 +113,13 @@ end
 
 function GetCurrentFile()
     for i = 2, 6 do
-        local info = debug_getinfo( i, "S" )
+        local info = debug.getinfo( i, "S" )
         if not info then break end
         if info.what == "main" then return info.short_src end
     end
 end
 
-module( "gpm.path" )
+module( "gpm.paths" )
 
 -- File path fix
 function Fix( filePath )
