@@ -1,19 +1,23 @@
 local table_SetValue = table.SetValue
 local setmetatable = setmetatable
 local debug_fcopy = debug.fcopy
-local isfunction = isfunction
 local ArgAssert = ArgAssert
-local istable = istable
 local setfenv = setfenv
 local pairs = pairs
+local type = type
 local _G = _G
 
 module( "gpm.environment" )
 
---
+function SetFunction( env, path, func, makeCopy )
+    ArgAssert( func, 1, "function" )
+    return table_SetValue( env, path, setfenv( makeCopy and debug_fcopy( func ) or func, env ) )
+end
+
 do
 
     local metaCache = {}
+
     function LinkTables( a, b )
         ArgAssert( a, 1, "table" )
         ArgAssert( b, 2, "table" )
@@ -33,61 +37,41 @@ do
 
 end
 
---
+function SetLinkedTable( env, path, tbl )
+    return table_SetValue( env, path, LinkTables( {}, tbl ) )
+end
+
 function Create( func, env )
     ArgAssert( func, 1, "function" )
 
     local new = {}
-    setfenv( func, LinkTables( new, env or _G ) )
-    return new, func
+    return new, setfenv( func, LinkTables( new, env or _G ) )
 end
 
---
-
---
-do
-
-    function SetFunction( env, path, func, makeCopy )
-        ArgAssert( func, 1, "function" )
-        if (makeCopy) then
-            func = debug_fcopy( func )
-        end
-
-        return table_SetValue( env, path, setfenv( func, env ) )
-    end
-
-end
-
---
 function SetTable( env, path, tbl, makeCopy )
     ArgAssert( env, 1, "table" )
     ArgAssert( tbl, 3, "table" )
 
     local object = {}
     for key, value in pairs( tbl ) do
-        if istable( key ) then
+        if type( key ) == "table" then
             key = SetTable( env, nil, tbl, makeCopy )
-        elseif makeCopy and isfunction( key ) then
+        elseif makeCopy and type( key ) == "function" then
             key = debug_fcopy( setfenv( key, env ) )
         end
 
-        if istable( value ) then
+        if type( value ) == "table" then
             value = SetTable( env, nil, tbl, makeCopy )
-        elseif makeCopy and isfunction( value ) then
+        elseif makeCopy and type( value ) == "function" then
             value = debug_fcopy( setfenv( value, env ) )
         end
 
         object[ key ] = value
     end
 
-    if (path) then
+    if path ~= nil then
         return table_SetValue( env, path, object )
     else
         return object
     end
-end
-
---
-function SetLinkedTable( env, path, tbl )
-    return table_SetValue( env, path, LinkTables( {}, tbl ) )
 end
