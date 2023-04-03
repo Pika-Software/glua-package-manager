@@ -1,8 +1,8 @@
-local CRC = util.CRC
-local tostring = tostring
 local emptyFunc = debug.fempty
+local tostring = tostring
+local util_CRC = util.CRC
 
-module("gpm.unzip", package.seeall)
+module( "gpm.unzip", package.seeall )
 
 function IterateZipFiles( fileHandle )
     if not isFile( fileHandle ) then
@@ -30,7 +30,7 @@ function IterateZipFiles( fileHandle )
             fileHandle:Skip( compressedSize )
         else
             data = fileHandle:Read( compressedSize )
-            if data and tostring( crc ) ~= CRC( data ) then
+            if data and tostring( crc ) ~= util_CRC( data ) then
                 data = nil
             end
         end
