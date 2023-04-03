@@ -20,3 +20,4 @@ if SERVER then
 end
 
 include "gpm/init.lua"
+hook.Run( "GPM - Loaded" )
