@@ -4,8 +4,14 @@ local file = file
 -- Functions
 local AddCSLuaFile = AddCSLuaFile
 local include = include
+local SysTime = SysTime
+local ipairs = ipairs
+
+-- Logs color
+local color = Color( 174, 197, 235 )
 
 module( "gpm" )
+
 _VERSION = 000001
 
 -- Include function
@@ -27,17 +33,20 @@ function includeShared( fileName )
 end
 
 -- Loading start time
-local startTime = SysTime()
+local stopwatch = SysTime()
 
 -- Utils
 includeShared "utils"
+
+-- GLua fixes
+includeShared "fixes"
 
 -- Colors & Logger modules
 includeShared "colors"
 includeShared "logger"
 
 -- Global GPM Logger Creating
-colors.Set( "gpm", Color(174, 197, 235) )
+colors.Set( "gpm", color )
 Logger = logger.Create( "GPM (" .. utils.Version( _VERSION ) .. ")", color )
 
 -- Promises
@@ -57,5 +66,8 @@ includeShared "sources"
 -- Importer module
 includeShared "importer"
 
+-- Reloading all packages
+Reload()
+
 -- Finish log
-Logger:Info( "Time taken to start-up: %.4f sec.", SysTime() - startTime )
+Logger:Info( "Time taken to start-up: %.4f sec.", SysTime() - stopwatch )
