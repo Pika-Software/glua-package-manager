@@ -1,6 +1,7 @@
 local debug_getinfo = debug.getinfo
+local module = module
+local string = string
 local table = table
-local gpm = gpm
 
 module( "gpm.utils" )
 
@@ -12,23 +13,24 @@ function GetCurrentFile()
     end
 end
 
--- Localises
-function LocalizePath(path)
-    if path then
-        return path:gsub("^addons/[%w%-_]-/", ""):gsub("^lua/", "")
-    end
+module( "gpm.path" )
+
+-- File path fix
+function Fix( filePath )
+    filePath = string.lower( filePath )
+    filePath = string.gsub( filePath, "\\", "/" )
+    filePath = string.gsub( filePath, "/+", "/" )
+    return filePath
 end
 
-do -- Path utils
-    path = path or {}
+-- File path join
+function Join( filePath, ... )
+    return path.Fix( table.concat( { filePath, ... }, "/" ) )
+end
 
-    function path.Fix(path)
-        return path:lower():gsub("\\", "/"):gsub("/+", "/")
-    end
-
-    function path.Join(dir, ...)
-        return path.Fix( table.concat({ dir, ... }, "/") )
-    end
-
-    gpm.path = path
+-- File path localization
+function Localize( filePath )
+    filePath = string.gsub( filePath, "^addons/[%w%-_]-/", "" )
+    filePath = string.gsub( filePath, "^lua/", "" )
+    return filePath
 end

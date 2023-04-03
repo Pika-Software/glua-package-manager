@@ -83,7 +83,7 @@ end
 local function FindFilePathInFiles(fileName, files)
     if not isstring(fileName) or not istable(files) then return end
 
-    local currentDir = string.GetPathFromFilename( gpm.utils.LocalizePath( gpm.utils.GetCurrentFile() ) )
+    local currentDir = string.GetPathFromFilename( gpm.path.Localize( gpm.utils.GetCurrentFile() ) )
 
     if isstring(currentDir) then
         local path = string.gsub(currentDir .. "/" .. fileName, "//", "/")
