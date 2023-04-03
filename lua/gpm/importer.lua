@@ -64,7 +64,13 @@ function gpm.Reload()
     gpm.ImportFolder( "packages" )
 end
 
-concommand.Add( "gpm_reload", function( ply )
-    if IsValid( ply ) and not ply:IsSuperAdmin() then return end
-    gpm.Reload()
-end )
+if SERVER then
+
+    concommand.Add( "gpm_reload", function( ply )
+        if ply == nil or ( IsValid( ply ) and ply:IsSuperAdmin() ) then
+            BroadcastLua( "gpm.Reload()" )
+            gpm.Reload()
+        end
+    end )
+
+end
