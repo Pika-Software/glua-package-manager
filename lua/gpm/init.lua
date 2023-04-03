@@ -30,7 +30,7 @@ function includeShared( fileName )
     include( filePath )
 end
 
--- Loading start time
+-- Measuring startup time
 local stopwatch = SysTime()
 
 -- Utils
