@@ -6,12 +6,13 @@ local string = string
 local file = file
 
 -- Functions
+local setmetatable = setmetatable
+local CompileFile = CompileFile
 local rawset = rawset
 local pcall = pcall
 local type = type
 
-
-module( "gpm.sources.lua", package.seeall )
+module( "gpm.sources.lua" )
 
 if SERVER then
     LuaRealm = "lsv"
@@ -39,19 +40,6 @@ Files = setmetatable( {}, {
         return false
     end
 } )
-
-function ImportLocal( fileName )
-    AddCSLuaFile( packageFileName )
-    AddCSLuaFile( packageInfo.main )
-
-    local files = setmetatable( {}, LocalFilesFinderMeta )
-    files[ packageInfo.main ] = mainFile
-
-    packageInfo.ImportedFrom = "Local"
-    packageInfo.ImportedExtra = nil
-
-    return gpm.packages.InitializePackage( packageInfo, mainFile, files )
-end
 
 Import = promise.Async( function( packagePath )
     local packageFilePath = packagePath
@@ -103,16 +91,9 @@ Import = promise.Async( function( packagePath )
         func = CompileFile( mainFilePath ); Files[ mainFilePath ] = func
     end
 
-    if not func then return promise.Reject( "main file compilation failed" ) end
+    if not func then
+        return promise.Reject( "main file compilation failed" )
+    end
 
-    -- print( "gpm.Package", gpm.Package )
-    -- PrintTable( debug.getfenv() )
-
-    -- local gPackage, env = gpm.Package, nil
-    -- if istable( gPackage ) then
-    --     print( gPackage )
-    --     -- env = gPackage:GetEnvironment()
-    -- end
-
-    return packages.InitializePackage( metadata, func, Files --[[, env ]] )
+    return packages.InitializePackage( metadata, func, Files )
 end )
