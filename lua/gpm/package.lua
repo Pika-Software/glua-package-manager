@@ -50,9 +50,8 @@ function GetMetaData( source )
 
         return metadata
     elseif isfunction( source ) then
-        local env = {}
-        setmetatable( env, {__index = _G})
-        local ok, result = xpcall( setfenv( source, env ), ErrorNoHaltWithStack )
+        local env = environment.Create( source )
+        local ok, result = xpcall( source, ErrorNoHaltWithStack )
         if ( ok and result ~= nil ) then
             if not istable( result ) then
                 env = utils.LowerTableKeys( env )
@@ -126,15 +125,13 @@ do
 
 end
 
-local function runFunction( gPackage, func )
+function Run( gPackage, func )
     debug_setfenv( func, gPackage:GetEnvironment() )
     return func()
 end
 
-Run = runFunction
-
 function SafeRun( gPackage, func, errorHandler )
-    return xpcall( runFunction, errorHandler, gPackage, func )
+    return xpcall( Run, errorHandler, gPackage, func )
 end
 
 local function FindFilePathInFiles( fileName, files )
@@ -149,7 +146,7 @@ local function FindFilePathInFiles( fileName, files )
     return files[ fileName ] and fileName
 end
 
-function InitializePackage( metadata, func, files, env )
+function Initialize( metadata, func, files, env )
     local versions = packages[ metadata.name ]
     if ( versions ~= nil ) then
         local gPackage = versions[ metadata.version ]
@@ -182,7 +179,7 @@ function InitializePackage( metadata, func, files, env )
         local path = FindFilePathInFiles( fileName, files )
 
         if path and files[ path ] then
-            return runFunction( gpm.Package, files[ path ] )
+            return gpm.package.Run( gpm.Package, files[ path ] )
         end
 
         ErrorNoHaltWithStack( "Couldn't include file '" .. tostring( fileName ) .. "' - File not found" )

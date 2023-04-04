@@ -24,7 +24,7 @@ do
         ArgAssert( b, 2, "table" )
 
         local meta = metaCache[ b ]
-        if (meta == nil) then
+        if meta == nil then
             meta = {
                 ["__index"] = b
             }

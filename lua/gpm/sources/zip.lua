@@ -55,5 +55,5 @@
 --     packageInfo.ImportedExtra = nil
 
 --     local main = files[ packageInfo.main ]
---     return gpm.package.InitializePackage( packageInfo, main, files )
+--     return gpm.package.Initialize( packageInfo, main, files )
 -- end
