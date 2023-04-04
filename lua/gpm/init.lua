@@ -51,7 +51,7 @@ Logger:Info( "Promise the library version %s is initialized.", utils.Version( pr
 
 -- Environment & Packages
 includeShared "environment"
-includeShared "packages"
+includeShared "package"
 
 -- Filesystem, HTTP & GMAD
 includeShared "http"

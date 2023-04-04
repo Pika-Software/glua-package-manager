@@ -7,14 +7,15 @@ local string = string
 -- Variables
 local debug_setfenv = debug.setfenv
 local AddCSLuaFile = AddCSLuaFile
+local type = type
 
 -- Packages table
 local packages = gpm.Packages
-if not istable( packages ) then
+if type( packages ) ~= "table" then
     packages = {}; gpm.Packages = packages
 end
 
-module( "gpm.packages", package.seeall )
+module( "gpm.package", package.seeall )
 
 -- Get all registered packages
 function GetAll()
@@ -50,7 +51,7 @@ function GetMetaData( source )
         return metadata
     elseif isfunction( source ) then
         local env = {}
-
+        setmetatable( env, {__index = _G})
         local ok, result = xpcall( setfenv( source, env ), ErrorNoHaltWithStack )
         if ( ok and result ~= nil ) then
             if not istable( result ) then
@@ -125,13 +126,15 @@ do
 
 end
 
-function Run( gPackage, func )
+local function runFunction( gPackage, func )
     debug_setfenv( func, gPackage:GetEnvironment() )
     return func()
 end
 
+Run = runFunction
+
 function SafeRun( gPackage, func, errorHandler )
-    return xpcall( Run, errorHandler, gPackage, func )
+    return xpcall( runFunction, errorHandler, gPackage, func )
 end
 
 local function FindFilePathInFiles( fileName, files )
@@ -179,7 +182,7 @@ function InitializePackage( metadata, func, files, env )
         local path = FindFilePathInFiles( fileName, files )
 
         if path and files[ path ] then
-            return gpm.packages.Run( gpm.Package, files[ path ] )
+            return runFunction( gpm.Package, files[ path ] )
         end
 
         ErrorNoHaltWithStack( "Couldn't include file '" .. tostring( fileName ) .. "' - File not found" )

@@ -1,33 +1,33 @@
 -- Libraries
-local packages = gpm.packages
+local package = gpm.package
 local promise = gpm.promise
 local paths = gpm.paths
 local string = string
 local file = file
 
 -- Variables
-local CLIENT, SERVER = CLIENT, SERVER
+local CLIENT, SERVER, MENU_DLL = CLIENT, SERVER, MENU_DLL
 local AddCSLuaFile = AddCSLuaFile
 local setmetatable = setmetatable
 local CompileFile = CompileFile
-local setfenv = setfenv
 local rawset = rawset
 local pcall = pcall
 local type = type
 
-local luaRealm = "LUA"
-if SERVER then
-    luaRealm = "lsv"
-elseif MENU_DLL then
-    luaRealm = "LUA"
-elseif CLIENT then
-    luaRealm = "lcl"
-end
-
 module( "gpm.sources.lua" )
 
+LuaRealm = "LUA"
+
+if SERVER then
+    LuaRealm = "lsv"
+elseif MENU_DLL then
+    LuaRealm = "LUA"
+elseif CLIENT then
+    LuaRealm = "lcl"
+end
+
 function CanImport( filePath )
-    return file.Exists( filePath, luaRealm ) and string.EndsWith( filePath, ".lua" ) or file.IsDir( filePath, luaRealm )
+    return file.Exists( filePath, LuaRealm ) and string.EndsWith( filePath, ".lua" ) or file.IsDir( filePath, LuaRealm )
 end
 
 Files = setmetatable( {}, {
@@ -35,7 +35,7 @@ Files = setmetatable( {}, {
         if type( filePath ) == "string" then
             filePath = paths.Fix( filePath )
 
-            if file.Exists( filePath, luaRealm ) and string.EndsWith( filePath, ".lua" ) then
+            if file.Exists( filePath, LuaRealm ) and string.EndsWith( filePath, ".lua" ) then
                 local ok, result = pcall( CompileFile, filePath )
                 if ok then
                     rawset( self, filePath, result )
@@ -61,11 +61,10 @@ Import = promise.Async( function( filePath )
 
     local packageFile, metadata = Files[ packageFilePath ], nil
     if packageFile then
-        setfenv( packageFile, {} )
-        metadata = packages.GetMetaData( packageFile )
+        metadata = package.GetMetaData( packageFile )
         if SERVER and metadata.client then AddCSLuaFile( packageFilePath ) end
     else
-        metadata = packages.GetMetaData( {} )
+        metadata = package.GetMetaData( {} )
     end
 
     if CLIENT and not metadata.client then return end
@@ -76,7 +75,7 @@ Import = promise.Async( function( filePath )
         mainFilePath = paths.Join( packagePath, "init.lua" )
     end
 
-    if not file.Exists( mainFilePath, luaRealm ) then return promise.Reject( "main file '" .. mainFilePath .. "' is missing" ) end
+    if not file.Exists( mainFilePath, LuaRealm ) then return promise.Reject( "main file '" .. mainFilePath .. "' is missing" ) end
     if SERVER and metadata.client then AddCSLuaFile( mainFilePath ) end
 
     metadata.source = "local"
@@ -86,5 +85,5 @@ Import = promise.Async( function( filePath )
     local mainFile = Files[ mainFilePath ]
     if not mainFile then return promise.Reject( "main file compilation failed" ) end
 
-    return packages.InitializePackage( metadata, mainFile, Files )
+    return package.InitializePackage( metadata, mainFile, Files )
 end )

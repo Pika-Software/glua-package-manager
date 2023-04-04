@@ -60,8 +60,10 @@ end
 
 function gpm.Reload()
     local packages = gpm.Packages
-    for packageName in pairs( packages ) do
-        packages[ packageName ] = nil
+    if type( packages ) == "table" then
+        for packageName in pairs( packages ) do
+            packages[ packageName ] = nil
+        end
     end
 
     gpm.ImportFolder( "gpm/packages" )
