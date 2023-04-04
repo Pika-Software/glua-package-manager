@@ -2,9 +2,10 @@
 local file = file
 
 -- Variables
-local AddCSLuaFile = AddCSLuaFile
+local AddCSLuaFile = SERVER and AddCSLuaFile
 local include = include
 local SysTime = SysTime
+local SERVER = SERVER
 local ipairs = ipairs
 local Color = Color
 
@@ -13,21 +14,14 @@ module( "gpm" )
 _VERSION = 000001
 
 -- Include function
-function includeShared( fileName )
-    local filePath = "gpm/" .. fileName
-    if file.IsDir( filePath, "LUA" ) then
-        for _, fileName in ipairs( file.Find( filePath .. "/*", "LUA" ) ) do
-            fileName = filePath .. "/" .. fileName
-            AddCSLuaFile( fileName )
-            include( fileName )
-        end
+function includeShared( filePath )
+    filePath = "gpm/" .. filePath  .. ".lua"
 
-        return
+    if SERVER then
+        AddCSLuaFile( filePath )
     end
 
-    filePath = filePath .. ".lua"
-    AddCSLuaFile( filePath )
-    include( filePath )
+    return include( filePath )
 end
 
 -- Measuring startup time
@@ -62,7 +56,16 @@ utils.CreateFolder( "gpm" )
 
 -- Sources
 sources = sources or {}
-includeShared "sources"
+
+for _, filePath in ipairs( file.Find( "gpm/sources/*", "LUA" ) ) do
+    filePath = "gpm/sources/" .. filePath
+
+    if SERVER then
+        AddCSLuaFile( filePath )
+    end
+
+    include( filePath )
+end
 
 -- Importer module
 includeShared "importer"
