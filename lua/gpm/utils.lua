@@ -173,10 +173,7 @@ module( "gpm.paths" )
 
 -- File path fix
 function Fix( filePath )
-    filePath = string.lower( filePath )
-    filePath = string.gsub( filePath, "\\", "/" )
-    filePath = string.gsub( filePath, "/+", "/" )
-    return filePath
+    return string.lower( string.gsub( filePath, "[/\\]+", "/" ) )
 end
 
 -- File path join
