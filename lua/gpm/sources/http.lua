@@ -7,6 +7,7 @@ local file = file
 local util = util
 
 -- Variables
+local CompileString = CompileString
 local string_IsURL = string.IsURL
 local pairs = pairs
 local pcall = pcall
@@ -17,7 +18,7 @@ function CanImport( filePath )
     return string_IsURL( filePath )
 end
 
-local realmFolder = "gpm/package" .. "/" .. ( SERVER and "server" or "client" )
+local realmFolder = "gpm/packages" .. "/" .. ( SERVER and "server" or "client" )
 utils.CreateFolder( realmFolder )
 
 PackageLifeTime = 60 * 60 * 24
@@ -27,11 +28,25 @@ Import = promise.Async( function( url )
 
     local cachePath = realmFolder .. "/" .. packageName
     if file.Exists( cachePath, "DATA" ) and file.Time( cachePath, "DATA" ) <= PackageLifeTime then
-        local ok, result = pcall( CompileString, code, filePath )
-        if not ok then return promise.Reject( result ) end
-        return packages.Initialize( packages.GetMetaData( {
-            ["name"] = packageName
-        } ), result, {} )
+        local fileClass = file.Open( cachePath, "rb", "DATA" )
+        if fileClass ~= nil then
+            if fileClass:Read( 4 ) == "GPMP" then
+
+                return
+            end
+
+            fileClass:Seek( -4 )
+            local code = fileClass:Read( fileClass:Size() )
+            fileClass:Close()
+
+            if not code then return promise.Reject( "no data" ) end
+
+            local ok, result = pcall( CompileString, code, cachePath )
+            if not ok then return promise.Reject( result ) end
+            return packages.Initialize( packages.GetMetaData( {
+                ["name"] = packageName
+            } ), result, {} )
+        end
     end
 
     local ok, result = http.Fetch( url, nil, 120 ):SafeAwait()
@@ -41,8 +56,13 @@ Import = promise.Async( function( url )
 
     local metadata = util.JSONToTable( result.body )
     if not metadata then
-        local ok, result = pcall( CompileString, result.body, filePath )
-        if not ok then return promise.Reject( "package metadata is damaged" ) end
+        local code = result.body
+
+        local ok, result = pcall( CompileString, code, cachePath )
+        if not ok then return promise.Reject( result ) end
+
+        file.Write( cachePath, code )
+
         return packages.Initialize( packages.GetMetaData( {
             ["name"] = packageName
         } ), result, {} )
