@@ -2,7 +2,14 @@
 local packages = gpm.packages
 local promise = gpm.promise
 local paths = gpm.paths
+local string = string
 local file = file
+
+-- Functions
+local rawset = rawset
+local pcall = pcall
+local type = type
+
 
 module( "gpm.sources.lua", package.seeall )
 
@@ -20,15 +27,15 @@ end
 
 Files = Files or setmetatable( {}, {
     ["__index"] = function( self, filePath )
-        if isstring( filePath ) and string.EndsWith( filePath, ".lua" ) and file.Exists( filePath, LuaRealm ) then
+        if type( filePath ) == "string" and string.EndsWith( filePath, ".lua" ) and file.Exists( filePath, LuaRealm ) then
             local ok, result = pcall( CompileFile, filePath )
             if ok then
-                self[ filePath ] = result
+                rawset( self, filePath, result )
                 return result
             end
         end
 
-        self[ filePath ] = false
+        rawset( self, filePath, false )
         return false
     end
 } )
@@ -93,10 +100,14 @@ Import = promise.Async( function( packagePath )
     if not func then return promise.Reject( "main file compilation failed" ) end
     Files[ mainFilePath ] = func
 
-    local env = nil
-    if istable( gpm.Package ) then
-        env = gpm.Package:GetEnvironment()
-    end
+    -- print( "gpm.Package", gpm.Package )
+    -- PrintTable( debug.getfenv() )
 
-    return packages.InitializePackage( metadata, func, Files, env )
+    -- local gPackage, env = gpm.Package, nil
+    -- if istable( gPackage ) then
+    --     print( gPackage )
+    --     -- env = gPackage:GetEnvironment()
+    -- end
+
+    return packages.InitializePackage( metadata, func, Files --[[, env ]] )
 end )
