@@ -30,26 +30,25 @@ end
 
 function GetMetaData( source )
     if type( source ) == "table" then
-        local metadata = {}
-        metadata.name = isstring( source.name ) and source.name or nil
-        metadata.main = isstring( source.main ) and source.main or nil
+        source.name = isstring( source.name ) and source.name or nil
+        source.main = isstring( source.main ) and source.main or nil
 
         local version = source.version
         if isnumber( version ) then
-            metadata.version = utils.Version( version )
+            source.version = utils.Version( version )
         else
-            metadata.version = "0.0.1"
+            source.version = "0.0.1"
         end
 
         if ( source.client ~= false ) then
-            metadata.client = true
+            source.client = true
         end
 
         if ( source.server ~= false ) then
-            metadata.server = true
+            source.server = true
         end
 
-        return metadata
+        return source
     elseif type( source ) == "function" then
         local env = environment.Create( source )
         local ok, result = xpcall( source, ErrorNoHaltWithStack )
