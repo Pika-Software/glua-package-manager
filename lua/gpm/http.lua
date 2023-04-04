@@ -63,8 +63,8 @@ function Post( url, parameters, headers, timeout )
 end
 
 Download = promise.Async( function( url, filePath, headers, lifeTime )
-    if ( lifeTime ~= nil ) and filesystem.Exists( filePath ) and ( os_time() - filesystem.Time( filePath ) ) < lifeTime then
-        local ok, result = filesystem.AsyncRead( filePath ):SafeAwait()
+    if ( lifeTime ~= nil ) and filesystem.Exists( filePath, "DATA" ) and ( os_time() - filesystem.Time( filePath, "DATA" ) ) < lifeTime then
+        local ok, result = filesystem.AsyncRead( filePath, "DATA" ):SafeAwait()
         if ok then
             return {
                 ["filePath"] = filePath,
@@ -77,8 +77,7 @@ Download = promise.Async( function( url, filePath, headers, lifeTime )
     if not ok then return promise.Reject( result ) end
     if result.code ~= 200 then return promise.Reject( "invalid response http code - " .. result.code ) end
 
-    local ok, err = filesystem.AsyncWrite( filePath, result.body ):SafeAwait()
-    if not ok then return promise.Reject( err ) end
+    filesystem.Write( filePath, result.body )
 
     return {
         ["filePath"] = filePath,
