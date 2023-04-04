@@ -2,8 +2,13 @@
 local string = string
 local debug = debug
 local table = table
+local file = file
 
 -- Variables
+local tonumber = tonumber
+local module = module
+local ipairs = ipairs
+local pairs = pairs
 local type = type
 
 -- Checks if argument have valid type
@@ -35,6 +40,39 @@ function debug.fcopy( func )
     return function( ... )
         return func( ... )
     end
+end
+
+-- FileClass extensions
+do
+
+    local meta = FindMetaTable( "File" )
+
+    function meta:SkipEmpty()
+        while not self:EndOfFile() do
+            if self:ReadByte() ~= 0 then self:Skip( -1 ) break end
+        end
+    end
+
+    function meta:ReadString()
+        local startPos = self:Tell()
+        local len = 0
+
+        while not self:EndOfFile() and self:ReadByte() ~= 0 do
+            len = len + 1
+        end
+
+        self:Seek( startPos )
+        local data = self:Read( len )
+        self:Skip( 1 )
+
+        return data
+    end
+
+    function meta:WriteString( str )
+        self:Write( str )
+        self:WriteByte( 0 )
+    end
+
 end
 
 -- util.NextTick( func, ... )
@@ -112,44 +150,19 @@ function table.SetValue( source, path, value, ifEmpty )
     return
 end
 
--- FileClass extensions
-do
+module( "gpm.utils" )
 
-    local meta = FindMetaTable( "File" )
-
-    function meta:SkipEmpty()
-        while not self:EndOfFile() do
-            if self:ReadByte() ~= 0 then self:Skip( -1 ) break end
+function CreateFolder( folderPath )
+    local currentPath = ""
+    for _, folderName in ipairs( string.Split( folderPath, "/" ) ) do
+        currentPath = currentPath .. "/" .. folderName
+        if not file.IsDir( currentPath, "DATA" ) then
+            file.Delete( currentPath )
+            file.CreateDir( currentPath )
         end
-    end
-
-    function meta:ReadString()
-        local startPos = self:Tell()
-        local len = 0
-
-        while not self:EndOfFile() and self:ReadByte() ~= 0 do
-            len = len + 1
-        end
-
-        self:Seek( startPos )
-        local data = self:Read( len )
-        self:Skip( 1 )
-
-        return data
-    end
-
-    function meta:WriteString( str )
-        self:Write( str )
-        self:WriteByte( 0 )
     end
 
 end
-
-local tonumber = tonumber
-local module = module
-local pairs = pairs
-
-module( "gpm.utils" )
 
 function LowerTableKeys( tbl )
     for key, value in pairs( tbl ) do

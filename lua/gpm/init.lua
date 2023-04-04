@@ -58,10 +58,7 @@ includeShared "http"
 includeShared "gmad"
 
 -- Creating folder in data
-if not file.IsDir( "gpm", "DATA" ) then
-    file.Delete( "gpm" )
-    file.CreateDir( "gpm" )
-end
+utils.CreateFolder( "gpm" )
 
 -- Sources
 sources = sources or {}
