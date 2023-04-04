@@ -43,7 +43,7 @@ includeShared "fixes"
 includeShared "logger"
 
 -- Global GPM Logger Creating
-Logger = logger.Create( "GPM (" .. utils.Version( _VERSION ) .. ")", Color( 180, 200, 235 ) )
+Logger = logger.Create( "GPM (" .. utils.Version( _VERSION ) .. ")", Color( 180, 180, 255 ) )
 
 -- Promises
 includeShared "promise"

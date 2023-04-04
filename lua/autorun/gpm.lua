@@ -11,7 +11,7 @@ if SERVER then
 
     GitHub: https://github.com/Pika-Software
     Discord: https://discord.gg/3UVxhZ
-    Developers: Retro & PrikolMen:-b
+    Developers: Retr0 & PrikolMen:-b
     License: MIT
     ]] )
 

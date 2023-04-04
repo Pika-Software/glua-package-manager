@@ -5,6 +5,7 @@ local utils = gpm.utils
 local string = string
 
 -- Variables
+local ErrorNoHaltWithStack = ErrorNoHaltWithStack
 local debug_setfenv = debug.setfenv
 local AddCSLuaFile = AddCSLuaFile
 local type = type
@@ -28,7 +29,7 @@ function Get( packageName )
 end
 
 function GetMetaData( source )
-    if istable( source ) then
+    if type( source ) == "table" then
         local metadata = {}
         metadata.name = isstring( source.name ) and source.name or nil
         metadata.main = isstring( source.main ) and source.main or nil
@@ -49,11 +50,11 @@ function GetMetaData( source )
         end
 
         return metadata
-    elseif isfunction( source ) then
+    elseif type( source ) == "function" then
         local env = environment.Create( source )
         local ok, result = xpcall( source, ErrorNoHaltWithStack )
         if ( ok and result ~= nil ) then
-            if not istable( result ) then
+            if type( result ) ~= "table" then
                 env = utils.LowerTableKeys( env )
                 if not env.package then return env end
                 return env.package
@@ -135,11 +136,11 @@ function SafeRun( gPackage, func, errorHandler )
 end
 
 local function FindFilePathInFiles( fileName, files )
-    if not isstring( fileName ) or not istable( files ) then return end
+    if type( fileName ) ~= "string" or type( files ) ~= "table" then return end
 
-    local currentDir = string.GetPathFromFilename( paths.Localize( utils.GetCurrentFile() ) )
-    if isstring( currentDir ) then
-        local path = string.gsub( currentDir .. "/" .. fileName, "//", "/" )
+    local folder = string.GetPathFromFilename( paths.Localize( utils.GetCurrentFile() ) )
+    if type( folder ) == "string" then
+        local path = string.gsub( folder .. "/" .. fileName, "//", "/" )
         if files[ path ] then return path end
     end
 
