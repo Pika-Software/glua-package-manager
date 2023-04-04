@@ -3,7 +3,7 @@ local string = string
 local debug = debug
 local table = table
 
--- Functions
+-- Variables
 local tonumber = tonumber
 local module = module
 local error = error
@@ -17,6 +17,11 @@ function ArgAssert( value, argNum, expected, errorlevel )
 
     local dinfo = debug.getinfo( 2, "n" )
     error( string.format( "bad argument #%d to \'%s\' (%s expected, got %s)", argNum, dinfo and dinfo.name or "func", expected, valueType ), errorlevel or 3 )
+end
+
+-- Returns true if string is url
+function string.IsURL( str )
+    return string.match( str, "^https?://.*" ) ~= nil
 end
 
 -- Make JIT happy

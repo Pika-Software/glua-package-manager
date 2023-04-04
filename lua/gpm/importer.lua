@@ -14,7 +14,7 @@ for _, source in pairs( gpm.sources ) do
 end
 
 gpm.AsyncImport = promise.Async( function( filePath )
-    filePath = paths.Fix( filePath )
+    ArgAssert( filePath, 1, "string" )
 
     for _, source in ipairs( sources ) do
         if type( source.CanImport ) ~= "function" then continue end

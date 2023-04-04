@@ -1,3 +1,4 @@
+-- Variables
 local table_SetValue = table.SetValue
 local setmetatable = setmetatable
 local debug_fcopy = debug.fcopy

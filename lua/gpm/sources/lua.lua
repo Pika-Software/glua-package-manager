@@ -23,21 +23,21 @@ end
 
 module( "gpm.sources.lua" )
 
-local function isFileExists( filePath )
-    return type( filePath ) == "string" and file.Exists( filePath, luaRealm )
-end
-
 function CanImport( filePath )
-    return isFileExists( filePath ) and string.EndsWith( filePath, ".lua" ) or file.IsDir( filePath, luaRealm )
+    return file.Exists( filePath, luaRealm ) and string.EndsWith( filePath, ".lua" ) or file.IsDir( filePath, luaRealm )
 end
 
 Files = setmetatable( {}, {
     ["__index"] = function( self, filePath )
-        if isFileExists( filePath ) and string.EndsWith( filePath, ".lua" ) then
-            local ok, result = pcall( CompileFile, filePath )
-            if ok then
-                rawset( self, filePath, result )
-                return result
+        if type( filePath ) == "string" then
+            filePath = paths.Fix( filePath )
+
+            if file.Exists( filePath, luaRealm ) and string.EndsWith( filePath, ".lua" ) then
+                local ok, result = pcall( CompileFile, filePath )
+                if ok then
+                    rawset( self, filePath, result )
+                    return result
+                end
             end
         end
 
@@ -46,7 +46,9 @@ Files = setmetatable( {}, {
     end
 } )
 
-Import = promise.Async( function( packagePath )
+Import = promise.Async( function( filePath )
+    local packagePath = paths.Fix( filePath )
+
     local packageFilePath = packagePath
     if string.EndsWith( packagePath, ".lua" ) then
         packagePath = string.GetPathFromFilename( packageFilePath )
