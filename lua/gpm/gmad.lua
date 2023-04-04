@@ -337,20 +337,3 @@ function Create( filePath )
 
     return instance
 end
-
-function Extract( filePath, gamePath, outputPath )
-    local instance = Open( filePath, gamePath )
-    if not instance then return false end
-
-    outputPath = outputPath .. "/" .. string.match( filePath, "[/\\]?([%w-_]+).gma[d]?$" ) .. "/"
-
-    for _, entry in ipairs( instance:ReadAllFiles() ) do
-        local content = entry.Content
-        if not content then continue end
-
-        file.CreateDir( outputPath .. string.GetPathFromFilename( entry.Path ), "DATA" )
-        file.Write( outputPath .. entry.Path, content, "DATA" )
-    end
-
-    return true
-end
