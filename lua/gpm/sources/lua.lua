@@ -5,9 +5,12 @@ local paths = gpm.paths
 local string = string
 local file = file
 
--- Functions
+-- Variables
+local CLIENT, SERVER = CLIENT, SERVER
+local AddCSLuaFile = AddCSLuaFile
 local setmetatable = setmetatable
 local CompileFile = CompileFile
+local setfenv = setfenv
 local rawset = rawset
 local pcall = pcall
 local type = type
@@ -56,51 +59,32 @@ Import = promise.Async( function( filePath )
         packageFilePath = paths.Join( packagePath, "package.lua" )
     end
 
-    local metadata = nil
-    if file.Exists( packageFilePath, luaRealm ) then
-        local func = Files[ packageFilePath ]
-        if not func then
-            func = CompileFile( packageFilePath ); Files[ packageFilePath ] = func
-        end
-
-        if not func then return promise.Reject( "package.lua file compilation failed" ) end
-        metadata = packages.GetMetaData( setfenv( func, {} ) )
+    local packageFile, metadata = Files[ packageFilePath ], nil
+    if packageFile then
+        setfenv( packageFile, {} )
+        metadata = packages.GetMetaData( packageFile )
+        if SERVER and metadata.client then AddCSLuaFile( packageFilePath ) end
     else
         metadata = packages.GetMetaData( {} )
     end
 
     if CLIENT and not metadata.client then return end
-
-    if not metadata.name then
-        metadata.name = string.GetFileFromFilename( packagePath )
-    end
+    if not metadata.name then metadata.name = string.GetFileFromFilename( packagePath ) end
 
     local mainFilePath = metadata.main
     if not mainFilePath then
         mainFilePath = paths.Join( packagePath, "init.lua" )
     end
 
-    if SERVER then
-        if metadata.client then
-            AddCSLuaFile( packageFilePath )
-            AddCSLuaFile( mainFilePath )
-        end
-
-        if not metadata.server then return end
-    end
-
-    if not file.Exists( mainFilePath, luaRealm ) then return promise.Reject( "main file is missing" ) end
+    if not file.Exists( mainFilePath, luaRealm ) then return promise.Reject( "main file '" .. mainFilePath .. "' is missing" ) end
+    if SERVER and metadata.client then AddCSLuaFile( mainFilePath ) end
 
     metadata.source = "local"
 
-    local func = Files[ mainFilePath ]
-    if not func then
-        func = CompileFile( mainFilePath ); Files[ mainFilePath ] = func
-    end
+    if SERVER and not metadata.server then return end
 
-    if not func then
-        return promise.Reject( "main file compilation failed" )
-    end
+    local mainFile = Files[ mainFilePath ]
+    if not mainFile then return promise.Reject( "main file compilation failed" ) end
 
-    return packages.InitializePackage( metadata, func, Files )
+    return packages.InitializePackage( metadata, mainFile, Files )
 end )
