@@ -64,9 +64,9 @@ Import = promise.Async( function( filePath )
         end
 
         if not func then return promise.Reject( "package.lua file compilation failed" ) end
-        metadata = gpm.packages.GetMetaData( setfenv( func, {} ) )
+        metadata = packages.GetMetaData( setfenv( func, {} ) )
     else
-        metadata = gpm.packages.GetMetaData( {} )
+        metadata = packages.GetMetaData( {} )
     end
 
     if CLIENT and not metadata.client then return end
