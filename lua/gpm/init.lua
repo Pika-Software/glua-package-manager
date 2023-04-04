@@ -49,9 +49,13 @@ Logger = logger.Create( "GPM (" .. utils.Version( _VERSION ) .. ")", Color( 180,
 includeShared "promise"
 Logger:Info( "Promise the library version %s is initialized.", utils.Version( promise._VERSION_NUM ) )
 
--- Environment & packages
+-- Environment & Packages
 includeShared "environment"
 includeShared "packages"
+
+-- Filesystem & HTTP
+includeShared "filesystem"
+includeShared "http"
 
 -- Sources
 sources = sources or {}
