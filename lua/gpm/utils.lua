@@ -118,6 +118,8 @@ function LowerTableKeys( tbl )
         if type( key ) ~= "string" then continue end
         tbl[ key ] = nil; tbl[ string.lower( key ) ] = value
     end
+
+    return tbl
 end
 
 function Version( number )

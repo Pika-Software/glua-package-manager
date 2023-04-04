@@ -1,6 +1,6 @@
 -- Libraries
-local filesystem = gpm.filesystem
 local string = string
+local file = file
 local util = util
 
 -- Variables
@@ -146,7 +146,7 @@ function GMAD:AddFolder( filePath, gamePath )
     local files = self:GetFiles()
     if not files then return end
 
-    local files, folders = filesystem.Find( filePath .. "/*", gamePath )
+    local files, folders = file.Find( filePath .. "/*", gamePath )
     for _, folderName in ipairs( folders ) do
         folderName = filePath .. "/" .. folderName
         self:AddFolder( folderName, gamePath )
@@ -154,7 +154,7 @@ function GMAD:AddFolder( filePath, gamePath )
 
     for _, fileName in ipairs( files ) do
         fileName = filePath .. "/" .. fileName
-        self:AddFile( fileName, filesystem.Read( fileName, gamePath ) )
+        self:AddFile( fileName, file.Read( fileName, gamePath ) )
     end
 end
 
@@ -307,7 +307,7 @@ function Parse( fileClass )
 end
 
 function Open( filePath, gamePath )
-    local fileClass = filesystem.Open( filePath, "rb", gamePath )
+    local fileClass = file.Open( filePath, "rb", gamePath )
     if not fileClass then return end
 
     local instance = setmetatable( {}, GMAD )
@@ -321,7 +321,7 @@ function Open( filePath, gamePath )
 end
 
 function Create( filePath )
-    local fileClass = filesystem.Open( filePath, "wb", "DATA" )
+    local fileClass = file.Open( filePath, "wb", "DATA" )
     if not fileClass then return end
 
     local instance = setmetatable( {}, GMAD )
@@ -348,8 +348,8 @@ function Extract( filePath, gamePath, outputPath )
         local content = entry.Content
         if not content then continue end
 
-        filesystem.CreateDir( outputPath .. string.GetPathFromFilename( entry.Path ), "DATA" )
-        filesystem.Write( outputPath .. entry.Path, content, "DATA" )
+        file.CreateDir( outputPath .. string.GetPathFromFilename( entry.Path ), "DATA" )
+        file.Write( outputPath .. entry.Path, content, "DATA" )
     end
 
     return true

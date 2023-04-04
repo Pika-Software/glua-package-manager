@@ -1,2 +1,2 @@
 
-module( "gpm.sources.workshop", package.seeall )
+-- module( "gpm.sources.workshop", package.seeall )

@@ -1,7 +1,7 @@
 -- Libraries
 local file = file
 
--- Functions
+-- Variables
 local AddCSLuaFile = AddCSLuaFile
 local include = include
 local SysTime = SysTime
@@ -54,9 +54,14 @@ includeShared "environment"
 includeShared "packages"
 
 -- Filesystem, HTTP & GMAD
-includeShared "filesystem"
 includeShared "http"
 includeShared "gmad"
+
+-- Creating folder in data
+if not file.IsDir( "gpm", "DATA" ) then
+    file.Delete( "gpm" )
+    file.CreateDir( "gpm" )
+end
 
 -- Sources
 sources = sources or {}
