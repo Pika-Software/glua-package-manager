@@ -153,9 +153,14 @@ end
 module( "gpm.utils" )
 
 function CreateFolder( folderPath )
-    local currentPath = ""
+    local currentPath = nil
     for _, folderName in ipairs( string.Split( folderPath, "/" ) ) do
-        currentPath = currentPath .. "/" .. folderName
+        if currentPath == nil then
+            currentPath = folderName
+        else
+            currentPath = currentPath .. "/" .. folderName
+        end
+
         if not file.IsDir( currentPath, "DATA" ) then
             file.Delete( currentPath )
             file.CreateDir( currentPath )
