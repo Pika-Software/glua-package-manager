@@ -35,6 +35,28 @@ function debug.fcopy( func )
     end
 end
 
+-- util.NextTick( func, ... )
+do
+
+    local timer_Simple = timer.Simple
+    local unpack = unpack
+
+    function util.NextTick( func, ... )
+        ArgAssert( func, 1, "function" )
+
+        local args = {...}
+        timer_Simple( 0, function()
+            if ( #args ~= 0 ) then
+                func( unpack( args ) )
+                return
+            end
+
+            func()
+        end )
+    end
+
+end
+
 --
 function table.GetValue( source, path )
     ArgAssert( source, 1, "table" )
