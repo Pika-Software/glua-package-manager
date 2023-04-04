@@ -110,6 +110,39 @@ function table.SetValue( source, path, value, ifEmpty )
     return
 end
 
+-- FileClass extensions
+do
+
+    local meta = FindMetaTable( "File" )
+
+    function meta:SkipEmpty()
+        while not self:EndOfFile() do
+            if self:ReadByte() ~= 0 then self:Skip( -1 ) break end
+        end
+    end
+
+    function meta:ReadString()
+        local startPos = self:Tell()
+        local len = 0
+
+        while not self:EndOfFile() and self:ReadByte() ~= 0 do
+            len = len + 1
+        end
+
+        self:Seek( startPos )
+        local data = self:Read( len )
+        self:Skip( 1 )
+
+        return data
+    end
+
+    function meta:WriteString( str )
+        self:Write( str )
+        self:WriteByte( 0 )
+    end
+
+end
+
 module( "gpm.utils" )
 
 function LowerTableKeys( tbl )
