@@ -59,16 +59,6 @@ do
 end
 
 function gpm.Reload()
-    local luaSource = sources.lua
-    if ( luaSource ~= nil ) then
-        local files = luaSource.Files
-        if ( files ~= nil ) then
-            for filePath in pairs( luaSource.Files ) do
-                files[ filePath ] = nil
-            end
-        end
-    end
-
     local packages = gpm.Packages
     for packageName in pairs( packages ) do
         packages[ packageName ] = nil

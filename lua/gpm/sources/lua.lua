@@ -25,7 +25,7 @@ function CanImport( filePath )
     return file.Exists( filePath, LuaRealm )
 end
 
-Files = Files or setmetatable( {}, {
+Files = setmetatable( {}, {
     ["__index"] = function( self, filePath )
         if type( filePath ) == "string" and string.EndsWith( filePath, ".lua" ) and file.Exists( filePath, LuaRealm ) then
             local ok, result = pcall( CompileFile, filePath )
@@ -63,11 +63,13 @@ Import = promise.Async( function( packagePath )
 
     local metadata = nil
     if file.Exists( packageFilePath, LuaRealm ) then
-        local func = CompileFile( packageFilePath )
-        if not func then return promise.Reject( "package.lua file compilation failed" ) end
+        local func = Files[ packageFilePath ]
+        if not func then
+            func = CompileFile( packageFilePath ); Files[ packageFilePath ] = func
+        end
 
+        if not func then return promise.Reject( "package.lua file compilation failed" ) end
         metadata = gpm.packages.GetMetaData( setfenv( func, {} ) )
-        Files[ packageFilePath ] = func
     else
         metadata = gpm.packages.GetMetaData( {} )
     end
@@ -96,9 +98,12 @@ Import = promise.Async( function( packagePath )
 
     metadata.source = "local"
 
-    local func = CompileFile( mainFilePath )
+    local func = Files[ mainFilePath ]
+    if not func then
+        func = CompileFile( mainFilePath ); Files[ mainFilePath ] = func
+    end
+
     if not func then return promise.Reject( "main file compilation failed" ) end
-    Files[ mainFilePath ] = func
 
     -- print( "gpm.Package", gpm.Package )
     -- PrintTable( debug.getfenv() )
