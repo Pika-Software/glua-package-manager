@@ -1,5 +1,5 @@
 -- Libraries
-local package = gpm.package
+local packages = gpm.packages
 local promise = gpm.promise
 local paths = gpm.paths
 local string = string
@@ -7,6 +7,8 @@ local file = file
 
 -- Variables
 local CLIENT, SERVER, MENU_DLL = CLIENT, SERVER, MENU_DLL
+local ErrorNoHaltWithStack = ErrorNoHaltWithStack
+local CompileString = CompileString
 local AddCSLuaFile = AddCSLuaFile
 local setmetatable = setmetatable
 local CompileFile = CompileFile
@@ -32,15 +34,22 @@ end
 
 Files = setmetatable( {}, {
     ["__index"] = function( self, filePath )
-        if type( filePath ) == "string" then
-            filePath = paths.Fix( filePath )
+        if type( filePath ) == "string" and file.Exists( filePath, LuaRealm ) and string.EndsWith( filePath, ".lua" ) then
+            local code, func = file.Read( filePath, "LUA" ), nil
+            if code then
+                func = CompileString( code, filePath, ErrorNoHaltWithStack )
+            end
 
-            if file.Exists( filePath, LuaRealm ) and string.EndsWith( filePath, ".lua" ) then
+            if not func then
                 local ok, result = pcall( CompileFile, filePath )
                 if ok then
-                    rawset( self, filePath, result )
-                    return result
+                    func = result
                 end
+            end
+
+            if func ~= nil then
+                rawset( self, filePath, func )
+                return func
             end
         end
 
@@ -61,10 +70,10 @@ Import = promise.Async( function( filePath )
 
     local packageFile, metadata = Files[ packageFilePath ], nil
     if packageFile then
-        metadata = package.GetMetaData( packageFile )
+        metadata = packages.GetMetaData( packageFile )
         if SERVER and metadata.client then AddCSLuaFile( packageFilePath ) end
     else
-        metadata = package.GetMetaData( {} )
+        metadata = packages.GetMetaData( {} )
     end
 
     if CLIENT and not metadata.client then return end
@@ -78,12 +87,12 @@ Import = promise.Async( function( filePath )
     if not file.Exists( mainFilePath, LuaRealm ) then return promise.Reject( "main file '" .. mainFilePath .. "' is missing" ) end
     if SERVER and metadata.client then AddCSLuaFile( mainFilePath ) end
 
-    metadata.source = "local"
+    metadata.source = metadata.source or "local"
 
     if SERVER and not metadata.server then return end
 
     local mainFile = Files[ mainFilePath ]
     if not mainFile then return promise.Reject( "main file compilation failed" ) end
 
-    return package.InitializePackage( metadata, mainFile, Files )
+    return packages.Initialize( metadata, mainFile, Files )
 end )

@@ -38,7 +38,7 @@
 --         if string.StartWith( fileName, "lua/" ) then fileName = string.sub( fileName, 5 ) end
 
 --         if ( fileName == "package.lua" ) then
---             packageInfo = package.GetMetaData( func )
+--             packageInfo = packages.GetMetaData( func )
 --         else
 --             files[ fileName ] = func
 --         end
@@ -55,5 +55,5 @@
 --     packageInfo.ImportedExtra = nil
 
 --     local main = files[ packageInfo.main ]
---     return gpm.package.Initialize( packageInfo, main, files )
+--     return gpm.packages.Initialize( packageInfo, main, files )
 -- end

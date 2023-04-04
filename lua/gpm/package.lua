@@ -15,7 +15,7 @@ if type( packages ) ~= "table" then
     packages = {}; gpm.Packages = packages
 end
 
-module( "gpm.package", package.seeall )
+module( "gpm.packages", package.seeall )
 
 -- Get all registered packages
 function GetAll()
@@ -179,7 +179,7 @@ function Initialize( metadata, func, files, env )
         local path = FindFilePathInFiles( fileName, files )
 
         if path and files[ path ] then
-            return gpm.package.Run( gpm.Package, files[ path ] )
+            return gpm.packages.Run( gpm.Package, files[ path ] )
         end
 
         ErrorNoHaltWithStack( "Couldn't include file '" .. tostring( fileName ) .. "' - File not found" )

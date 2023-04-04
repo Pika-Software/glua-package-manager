@@ -4,19 +4,21 @@ local debug = debug
 local table = table
 
 -- Variables
-local tonumber = tonumber
-local module = module
-local error = error
-local pairs = pairs
 local type = type
 
 -- Checks if argument have valid type
-function ArgAssert( value, argNum, expected, errorlevel )
-    local valueType = type( value )
-    if valueType == expected then return end
+do
 
-    local dinfo = debug.getinfo( 2, "n" )
-    error( string.format( "bad argument #%d to \'%s\' (%s expected, got %s)", argNum, dinfo and dinfo.name or "func", expected, valueType ), errorlevel or 3 )
+    local error = error
+
+    function ArgAssert( value, argNum, expected, errorlevel )
+        local valueType = type( value )
+        if valueType == expected then return end
+
+        local dinfo = debug.getinfo( 2, "n" )
+        error( string.format( "bad argument #%d to \'%s\' (%s expected, got %s)", argNum, dinfo and dinfo.name or "func", expected, valueType ), errorlevel or 3 )
+    end
+
 end
 
 -- Returns true if string is url
@@ -142,6 +144,10 @@ do
     end
 
 end
+
+local tonumber = tonumber
+local module = module
+local pairs = pairs
 
 module( "gpm.utils" )
 
