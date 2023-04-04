@@ -12,23 +12,27 @@ local rawset = rawset
 local pcall = pcall
 local type = type
 
+local luaRealm = "LUA"
+if SERVER then
+    luaRealm = "lsv"
+elseif MENU_DLL then
+    luaRealm = "LUA"
+elseif CLIENT then
+    luaRealm = "lcl"
+end
+
 module( "gpm.sources.lua" )
 
-if SERVER then
-    LuaRealm = "lsv"
-elseif MENU_DLL then
-    LuaRealm = "LUA"
-elseif CLIENT then
-    LuaRealm = "lcl"
+local function isAllowedFilePath( filePath )
+    local extension = string.GetExtensionFromFilename( filePath )
+    return type( filePath ) == "string" and ( extension == nil or extension == "lua" ) and file.Exists( filePath, luaRealm )
 end
 
-function CanImport( filePath )
-    return file.Exists( filePath, LuaRealm )
-end
+CanImport = isAllowedFilePath
 
 Files = setmetatable( {}, {
     ["__index"] = function( self, filePath )
-        if type( filePath ) == "string" and string.EndsWith( filePath, ".lua" ) and file.Exists( filePath, LuaRealm ) then
+        if isAllowedFilePath( filePath ) then
             local ok, result = pcall( CompileFile, filePath )
             if ok then
                 rawset( self, filePath, result )
@@ -50,7 +54,7 @@ Import = promise.Async( function( packagePath )
     end
 
     local metadata = nil
-    if file.Exists( packageFilePath, LuaRealm ) then
+    if file.Exists( packageFilePath, luaRealm ) then
         local func = Files[ packageFilePath ]
         if not func then
             func = CompileFile( packageFilePath ); Files[ packageFilePath ] = func
@@ -82,7 +86,7 @@ Import = promise.Async( function( packagePath )
         if not metadata.server then return end
     end
 
-    if not file.Exists( mainFilePath, LuaRealm ) then return promise.Reject( "main file is missing" ) end
+    if not file.Exists( mainFilePath, luaRealm ) then return promise.Reject( "main file is missing" ) end
 
     metadata.source = "local"
 
