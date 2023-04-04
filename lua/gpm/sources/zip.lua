@@ -1,11 +1,11 @@
 
-local promise = gpm.promise
+-- local promise = gpm.promise
 
-module( "gpm.sources.zip", package.seeall )
+-- module( "gpm.sources.zip", package.seeall )
 
-Import = promise.Async( function(path)
-    return promise.Reject("not implemented")
-end )
+-- Import = promise.Async( function(path)
+--     return promise.Reject("not implemented")
+-- end )
 
 -- local IterateZipFiles = gpm.unzip.IterateZipFiles
 
