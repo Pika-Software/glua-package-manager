@@ -4,7 +4,7 @@ local paths = gpm.paths
 local utils = gpm.utils
 local string = string
 
--- Functions
+-- Variables
 local debug_setfenv = debug.setfenv
 local AddCSLuaFile = AddCSLuaFile
 
