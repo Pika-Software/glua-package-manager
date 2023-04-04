@@ -3,8 +3,10 @@ local promise = gpm.promise
 local paths = gpm.paths
 local gpm = gpm
 
--- Functions
+-- Variables
+local ipairs = ipairs
 local pairs = pairs
+local type = type
 
 local sources = {}
 for _, source in pairs( gpm.sources ) do
@@ -15,34 +17,46 @@ gpm.AsyncImport = promise.Async( function( filePath )
     filePath = paths.Fix( filePath )
 
     for _, source in ipairs( sources ) do
-        if not isfunction( source.CanImport ) then continue end
+        if type( source.CanImport ) ~= "function" then continue end
         if not source.CanImport( filePath ) then continue end
         return source.Import( filePath )
     end
 end )
 
-function gpm.Import( filePath, async )
-    assert( async or promise.RunningInAsync(), "import supposed to be running in coroutine/async function (do you running it from package)" )
+do
 
-    local p = gpm.AsyncImport( filePath )
-    if not async then return p:Await() end
-    return p
+    local assert = assert
+
+    function gpm.Import( filePath, async )
+        assert( async or promise.RunningInAsync(), "import supposed to be running in coroutine/async function (do you running it from package)" )
+
+        local p = gpm.AsyncImport( filePath )
+        if not async then return p:Await() end
+        return p
+    end
+
 end
 
 _G.import = gpm.Import
 
-gpm.ImportFolder = promise.Async( function( luaPath )
-    luaPath = paths.Fix( luaPath )
+do
 
-    local files, folders = file.Find( luaPath .. "/*", "LUA" )
-    for _, folderName in ipairs( folders ) do
-        gpm.AsyncImport( luaPath .. "/" .. folderName )
-    end
+    local file_Find = file.Find
 
-    for _, fileName in ipairs( files ) do
-        gpm.AsyncImport( luaPath .. "/" .. fileName )
-    end
-end )
+    gpm.ImportFolder = promise.Async( function( luaPath )
+        luaPath = paths.Fix( luaPath )
+
+        local files, folders = file_Find( luaPath .. "/*", "LUA" )
+        for _, folderName in ipairs( folders ) do
+            gpm.AsyncImport( luaPath .. "/" .. folderName )
+        end
+
+        for _, fileName in ipairs( files ) do
+            gpm.AsyncImport( luaPath .. "/" .. fileName )
+        end
+    end )
+
+end
 
 function gpm.Reload()
     local luaSource = sources.lua
@@ -65,6 +79,9 @@ function gpm.Reload()
 end
 
 if SERVER then
+
+    local BroadcastLua = BroadcastLua
+    local IsValid = IsValid
 
     concommand.Add( "gpm_reload", function( ply )
         if ply == nil or ( IsValid( ply ) and ply:IsSuperAdmin() ) then
