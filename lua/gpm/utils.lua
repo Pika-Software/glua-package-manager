@@ -19,18 +19,6 @@ function ArgAssert( value, argNum, expected, errorlevel )
     error( string.format( "bad argument #%d to \'%s\' (%s expected, got %s)", argNum, dinfo and dinfo.name or "func", expected, valueType ), errorlevel or 3 )
 end
 
--- Is File check
-do
-
-    local TYPE_FILE = TYPE_FILE
-    local TypeID = TypeID
-
-    function IsFile( any )
-        return TypeID( any ) == TYPE_FILE
-    end
-
-end
-
 -- Make JIT happy
 function debug.fempty()
 end

@@ -1,2 +1,2 @@
 
-module( "gpm.sources.gmad", package.seeall )
+module( "gpm.sources.workshop", package.seeall )
