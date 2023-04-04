@@ -23,16 +23,17 @@ end
 
 module( "gpm.sources.lua" )
 
-local function isAllowedFilePath( filePath )
-    local extension = string.GetExtensionFromFilename( filePath )
-    return type( filePath ) == "string" and ( extension == nil or extension == "lua" ) and file.Exists( filePath, luaRealm )
+local function isFileExists( filePath )
+    return type( filePath ) == "string" and file.Exists( filePath, luaRealm )
 end
 
-CanImport = isAllowedFilePath
+function CanImport( filePath )
+    return isFileExists( filePath ) and string.EndsWith( filePath, ".lua" ) or file.IsDir( filePath, luaRealm )
+end
 
 Files = setmetatable( {}, {
     ["__index"] = function( self, filePath )
-        if isAllowedFilePath( filePath ) then
+        if isFileExists( filePath ) and string.EndsWith( filePath, ".lua" ) then
             local ok, result = pcall( CompileFile, filePath )
             if ok then
                 rawset( self, filePath, result )
