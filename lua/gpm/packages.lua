@@ -123,6 +123,10 @@ do
         return fileList
     end
 
+    function IsPackage( any )
+        return getmetatable( any ) == PACKAGE
+    end
+
 end
 
 function Run( gPackage, func )
@@ -149,7 +153,7 @@ function FindFilePath( fileName, files )
     return files[ fileName ] and fileName
 end
 
-function Initialize( metadata, func, files, env )
+function Initialize( metadata, func, files, parent )
     local versions = packages[ metadata.name ]
     if ( versions ~= nil ) then
         local gPackage = versions[ metadata.version ]
@@ -162,7 +166,11 @@ function Initialize( metadata, func, files, env )
     local stopwatch = SysTime()
 
     -- Creating environment for package
-    local packageEnv = environment.Create( func, env )
+    local packageEnv = environment.Create( func )
+
+    if IsPackage( parent ) then
+        setmetatable( parent:GetEnvironment(), { __index = packageEnv } )
+    end
 
     -- Creating package object
     local gPackage = setmetatable( {}, PACKAGE )
