@@ -300,14 +300,15 @@ function Parse( fileClass )
 
     gmad.DataPos = fileClass:Tell()
 
-    local jsonData = util.JSONToTable( gmad.Description )
-    gmad.Description = jsonData or gmad.Description
+    local description = gmad.Description
+    if ( description ~= nil ) then
+        gmad.Description = util.JSONToTable( description ) or description
+    end
 
     return gmad
 end
 
-function Open( filePath, gamePath )
-    local fileClass = file.Open( filePath, "rb", gamePath )
+function Read( fileClass )
     if not fileClass then return end
 
     local instance = setmetatable( {}, GMAD )
@@ -318,6 +319,10 @@ function Open( filePath, gamePath )
     util.NextTick( instance.Close, instance )
 
     return instance
+end
+
+function Open( filePath, gamePath )
+    return Read( file.Open( filePath, "rb", gamePath ) )
 end
 
 function Create( filePath )
