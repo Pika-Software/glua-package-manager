@@ -1,5 +1,5 @@
 return {
     name = "My really cool package",
-    main = "packages/mypkg/init.lua",
+    main = "init.lua",
     version = 000100
 }
