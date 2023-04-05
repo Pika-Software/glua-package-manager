@@ -35,7 +35,7 @@ end
 Files = setmetatable( {}, {
     ["__index"] = function( self, filePath )
         if type( filePath ) == "string" and file.Exists( filePath, LuaRealm ) and string.EndsWith( filePath, ".lua" ) then
-            local code, func = file.Read( filePath, "LUA" ), nil
+            local code, func = file.Read( filePath, LuaRealm ), nil
             if code then
                 func = CompileString( code, filePath, ErrorNoHaltWithStack )
             end
@@ -81,7 +81,7 @@ Import = promise.Async( function( filePath )
                 } ), packageFile, Files )
             end
 
-            return promise.Reject( "package.lua is completely corrupted" )
+            return promise.Reject( "package file is missing (" .. metadata.name .. "@" .. metadata.version .. ")" )
         end
 
         if SERVER and metadata.client then
@@ -94,20 +94,27 @@ Import = promise.Async( function( filePath )
     if CLIENT and not metadata.client then return end
     if not metadata.name then metadata.name = string.GetFileFromFilename( packagePath ) end
 
-    local mainFilePath = metadata.main
-    if not mainFilePath then
-        mainFilePath = paths.Join( packagePath, "init.lua" )
+    local mainFile = metadata.main
+    if not mainFile then
+        mainFile = paths.Join( packagePath, "init.lua" )
     end
 
-    if not file.Exists( mainFilePath, LuaRealm ) then return promise.Reject( "main file '" .. mainFilePath .. "' is missing" ) end
-    if SERVER and metadata.client then AddCSLuaFile( mainFilePath ) end
+    local func = Files[ mainFile ]
+    if not func then
+        mainFile = paths.Join( packagePath, mainFile )
+        func = Files[ mainFile ]
+    end
+
+    if not func then
+        return promise.Reject( "main file is missing (" .. metadata.name .. "@" .. metadata.version .. ")" )
+    end
 
     metadata.source = metadata.source or "local"
 
-    if SERVER and not metadata.server then return end
+    if SERVER then
+        if metadata.client then AddCSLuaFile( mainFile ) end
+        if not metadata.server then return end
+    end
 
-    local mainFile = Files[ mainFilePath ]
-    if not mainFile then return promise.Reject( "main file compilation failed" ) end
-
-    return packages.Initialize( metadata, mainFile, Files )
+    return packages.Initialize( metadata, func, Files )
 end )
