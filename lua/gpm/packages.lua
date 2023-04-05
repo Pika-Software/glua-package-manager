@@ -134,13 +134,16 @@ function SafeRun( gPackage, func, errorHandler )
     return xpcall( Run, errorHandler, gPackage, func )
 end
 
-local function FindFilePathInFiles( fileName, files )
+function FindFilePath( fileName, files )
     if type( fileName ) ~= "string" or type( files ) ~= "table" then return end
 
-    local folder = string.GetPathFromFilename( paths.Localize( utils.GetCurrentFile() ) )
-    if type( folder ) == "string" then
-        local path = string.gsub( folder .. "/" .. fileName, "//", "/" )
-        if files[ path ] then return path end
+    local currentFile = utils.GetCurrentFile()
+    if currentFile ~= nil then
+        local folder = string.GetPathFromFilename( paths.Localize( currentFile ) )
+        if type( folder ) == "string" then
+            local path = paths.Join( folder, fileName )
+            if files[ path ] then return path end
+        end
     end
 
     return files[ fileName ] and fileName
@@ -173,27 +176,36 @@ function Initialize( metadata, func, files, env )
     environment.SetLinkedTable( packageEnv, "gpm", gpm )
     table.SetValue( packageEnv, "gpm.Package", gPackage, true )
     table.SetValue( packageEnv, "gpm.Logger", gPackage.logger, true )
-
-    -- Include
-    environment.SetFunction( packageEnv, "include", function( fileName )
-        local path = FindFilePathInFiles( fileName, files )
-
-        if path and files[ path ] then
-            return gpm.packages.Run( gpm.Package, files[ path ] )
-        end
-
-        ErrorNoHaltWithStack( "Couldn't include file '" .. tostring( fileName ) .. "' - File not found" )
+    environment.SetValue( packageEnv, "import", function( filePath, async, env )
+        return gpm.Import( filePath, async, env or gpm.Package )
     end )
 
-    -- AddCSLuaFile
-    if SERVER then
-        environment.SetFunction( packageEnv, "AddCSLuaFile", function( fileName )
-            if fileName == nil then fileName = paths.Localize( utils.GetCurrentFile() ) end
-            local path = FindFilePathInFiles( fileName, files )
-            if path then return AddCSLuaFile( path ) end
+    do
 
-            ErrorNoHaltWithStack( "Couldn't AddCSLuaFile file '" .. tostring( fileName ) .. "' - File not found" )
+        local packages = gpm.packages
+
+        -- Include
+        environment.SetValue( packageEnv, "include", function( fileName )
+            local path = packages.FindFilePath( fileName, files )
+
+            if path and files[ path ] then
+                return packages.Run( gpm.Package, files[ path ] )
+            end
+
+            ErrorNoHaltWithStack( "Couldn't include file '" .. tostring( fileName ) .. "' - File not found" )
         end )
+
+        -- AddCSLuaFile
+        if SERVER then
+            environment.SetValue( packageEnv, "AddCSLuaFile", function( fileName )
+                if fileName == nil then fileName = paths.Localize( utils.GetCurrentFile() ) end
+                local path = packages.FindFilePath( fileName, files )
+                if path then return AddCSLuaFile( path ) end
+
+                ErrorNoHaltWithStack( "Couldn't AddCSLuaFile file '" .. tostring( fileName ) .. "' - File not found" )
+            end )
+        end
+
     end
 
     -- Run
