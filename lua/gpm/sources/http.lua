@@ -26,7 +26,7 @@ utils.CreateFolder( realmFolder )
 
 PackageLifeTime = 60 * 60 * 24
 
-Import = promise.Async( function( url, env )
+Import = promise.Async( function( url, parent )
     local packageName = util.CRC( url )
 
     local cachePath = realmFolder .. "/" .. packageName .. ".dat"
@@ -69,7 +69,7 @@ Import = promise.Async( function( url, env )
                         local func = files[ metadata.main ]
                         if not func then return promise.Reject( "main file is missing" ) end
 
-                        return packages.Initialize( metadata, func, files, env )
+                        return packages.Initialize( metadata, func, files, parent )
                     end
                 end
 
@@ -88,7 +88,7 @@ Import = promise.Async( function( url, env )
             if not ok then return promise.Reject( result ) end
             return packages.Initialize( packages.GetMetaData( {
                 ["name"] = packageName
-            } ), result, {}, env )
+            } ), result, {}, parent )
         end
     end
 
@@ -108,7 +108,7 @@ Import = promise.Async( function( url, env )
 
         return packages.Initialize( packages.GetMetaData( {
             ["name"] = packageName
-        } ), result, {}, env )
+        } ), result, {}, parent )
     end
 
     metadata = packages.GetMetaData( utils.LowerTableKeys( metadata ) )
@@ -164,5 +164,5 @@ Import = promise.Async( function( url, env )
         fileClass:Close()
     end
 
-    return packages.Initialize( metadata, func, files, env )
+    return packages.Initialize( metadata, func, files, parent )
 end )
