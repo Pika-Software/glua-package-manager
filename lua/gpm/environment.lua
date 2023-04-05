@@ -25,11 +25,7 @@ do
 
         local meta = metaCache[ b ]
         if meta == nil then
-            meta = {
-                ["__index"] = b
-            }
-
-            metaCache[ b ] = meta
+            meta = {__index = b}; metaCache[ b ] = meta
         end
 
         setmetatable( a, meta )
@@ -38,15 +34,15 @@ do
 
 end
 
-function SetLinkedTable( env, path, tbl )
-    return table_SetValue( env, path, LinkTables( {}, tbl ) )
-end
-
 function Create( func, env )
     ArgAssert( func, 1, "function" )
 
     local new = {}
     return new, setfenv( func, LinkTables( new, env or _G ) )
+end
+
+function SetLinkedTable( env, path, tbl )
+    return table_SetValue( env, path, LinkTables( {}, tbl ) )
 end
 
 function SetTable( env, path, tbl, makeCopy )
