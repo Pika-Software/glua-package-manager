@@ -25,7 +25,7 @@ for filePath, pathType in pairs( autorunTypes ) do
     autorunBuilder[ #autorunBuilder + 1 ] = { #filePath, filePath, pathType }
 end
 
-Import = promise.Async( function( filePath )
+Import = promise.Async( function( filePath, env )
     local gma = gmad.Open( filePath, "GAME" )
     if not gma then return promise.Reject( "gma file cannot be read" ) end
 
@@ -211,5 +211,5 @@ Import = promise.Async( function( filePath )
                 SWEP = nil
             end
         end
-    end, luaFiles )
+    end, luaFiles, env )
 end )

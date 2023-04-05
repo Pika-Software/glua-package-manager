@@ -58,7 +58,7 @@ Files = setmetatable( {}, {
     end
 } )
 
-Import = promise.Async( function( filePath )
+Import = promise.Async( function( filePath, env )
     local packagePath = paths.Fix( filePath )
 
     local packageFilePath = packagePath
@@ -78,7 +78,7 @@ Import = promise.Async( function( filePath )
                 return packages.Initialize( packages.GetMetaData( {
                     ["name"] = packageFilePath,
                     ["main"] = packageFilePath
-                } ), packageFile, Files )
+                } ), packageFile, Files, env )
             end
 
             return promise.Reject( "package file is missing (" .. metadata.name .. "@" .. metadata.version .. ")" )
@@ -116,5 +116,5 @@ Import = promise.Async( function( filePath )
         if not metadata.server then return end
     end
 
-    return packages.Initialize( metadata, func, Files )
+    return packages.Initialize( metadata, func, Files, env )
 end )
