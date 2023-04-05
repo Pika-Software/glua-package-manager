@@ -10,7 +10,7 @@ local _G = _G
 
 module( "gpm.environment" )
 
-function SetFunction( env, path, func, makeCopy )
+function SetValue( env, path, func, makeCopy )
     ArgAssert( func, 1, "function" )
     return table_SetValue( env, path, setfenv( makeCopy and debug_fcopy( func ) or func, env ) )
 end
