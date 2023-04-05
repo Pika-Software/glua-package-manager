@@ -51,7 +51,7 @@ function GetMetaData( source )
         return source
     elseif type( source ) == "function" then
         local env = environment.Create( source )
-        local ok, result = xpcall( source, ErrorNoHaltWithStack )
+        local ok, result = pcall( source )
         if ( ok and result ~= nil ) then
             if type( result ) ~= "table" then
                 env = utils.LowerTableKeys( env )
@@ -188,10 +188,11 @@ function Initialize( metadata, func, files, env )
     -- AddCSLuaFile
     if SERVER then
         environment.SetFunction( packageEnv, "AddCSLuaFile", function( fileName )
+            if fileName == nil then fileName = paths.Localize( utils.GetCurrentFile() ) end
             local path = FindFilePathInFiles( fileName, files )
             if path then return AddCSLuaFile( path ) end
 
-            ErrorNoHaltWithStack( "Couldn't include file '" .. tostring( fileName ) .. "' - File not found" )
+            ErrorNoHaltWithStack( "Couldn't AddCSLuaFile file '" .. tostring( fileName ) .. "' - File not found" )
         end )
     end
 
