@@ -154,7 +154,9 @@ function GMAD:AddFolder( filePath, gamePath )
 
     for _, fileName in ipairs( files ) do
         fileName = filePath .. "/" .. fileName
-        self:AddFile( fileName, file.Read( fileName, gamePath ) )
+        local content = file.Read( fileName, gamePath )
+        if not content then continue end
+        self:AddFile( fileName, content )
     end
 end
 
