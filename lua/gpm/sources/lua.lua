@@ -62,7 +62,9 @@ Import = promise.Async( function( filePath )
     local packagePath = paths.Fix( filePath )
 
     local packageFilePath = packagePath
-    if string.EndsWith( packagePath, ".lua" ) then
+
+    local packagePathIsLuaFile = string.EndsWith( packagePath, ".lua" )
+    if packagePathIsLuaFile then
         packagePath = string.GetPathFromFilename( packageFilePath )
     else
         packageFilePath = paths.Join( packagePath, "package.lua" )
@@ -71,7 +73,20 @@ Import = promise.Async( function( filePath )
     local packageFile, metadata = Files[ packageFilePath ], nil
     if packageFile then
         metadata = packages.GetMetaData( packageFile )
-        if SERVER and metadata.client then AddCSLuaFile( packageFilePath ) end
+        if not metadata then
+            if packagePathIsLuaFile then
+                return packages.Initialize( packages.GetMetaData( {
+                    ["name"] = packageFilePath,
+                    ["main"] = packageFilePath
+                } ), packageFile, Files )
+            end
+
+            return promise.Reject( "package.lua is completely corrupted" )
+        end
+
+        if SERVER and metadata.client then
+            AddCSLuaFile( packageFilePath )
+        end
     else
         metadata = packages.GetMetaData( {} )
     end
