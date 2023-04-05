@@ -135,6 +135,17 @@ Import = promise.Async( function( filePath )
             end
         end
 
+        if not GAMEMODE then
+            local p = promise.New()
+
+            hook.Add( "PostGamemodeLoaded", filePath, function()
+                hook.Remove( "PostGamemodeLoaded", filePath )
+                p:Resolve()
+            end )
+
+            p:Await( true )
+        end
+
         local entities = autorun.entities
         if ( entities ~= nil ) then
             for _, filePath in ipairs( entities ) do
