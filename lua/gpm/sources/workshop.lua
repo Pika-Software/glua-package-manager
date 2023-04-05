@@ -7,6 +7,11 @@ local gmad = gpm.gmad
 -- Variables
 local type = type
 
+-- https://github.com/WilliamVenner/gmsv_workshop
+if SERVER and not steamworks and util.IsBinaryModuleInstalled( "workshop" ) then
+    require( "workshop" )
+end
+
 module( "gpm.sources.workshop", package.seeall )
 
 function CanImport( filePath )
@@ -22,7 +27,6 @@ Import = promise.Async( function( wsid )
     local p = promise.New()
 
     steamworks.DownloadUGC( wsid, function( filePath, fileClass )
-        print( filePath, fileClass )
         if not file.Exists( filePath, "GAME" ) then
             if not fileClass then return p:Reject( "there is no data to read..." ) end
 
