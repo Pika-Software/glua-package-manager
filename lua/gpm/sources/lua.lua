@@ -74,11 +74,13 @@ Import = promise.Async( function( filePath, parentPackage )
     if packageFile then
         metadata = packages.GetMetaData( packageFile )
         if not metadata then
+            metadata = packages.GetMetaData( {
+                ["name"] = packageFilePath,
+                ["main"] = packageFilePath
+            } )
+
             if packagePathIsLuaFile then
-                return packages.Initialize( packages.GetMetaData( {
-                    ["name"] = packageFilePath,
-                    ["main"] = packageFilePath
-                } ), packageFile, Files, parentPackage )
+                return packages.Initialize( metadata, packageFile, Files, parentPackage )
             end
 
             return promise.Reject( "package file is missing (" .. metadata.name .. "@" .. metadata.version .. ")" )
