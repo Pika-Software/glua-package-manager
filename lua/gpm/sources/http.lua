@@ -1,14 +1,15 @@
 -- Libraries
 local packages = gpm.packages
+local sources = gpm.sources
 local promise = gpm.promise
 local utils = gpm.utils
 local http = gpm.http
+local string = string
 local file = file
 local util = util
 
 -- Variables
 local CompileString = CompileString
-local string_IsURL = string.IsURL
 local SERVER = SERVER
 local ipairs = ipairs
 local pairs = pairs
@@ -18,7 +19,7 @@ local type = type
 module( "gpm.sources.http" )
 
 function CanImport( filePath )
-    return string_IsURL( filePath )
+    return string.IsURL( filePath )
 end
 
 local realmFolder = "gpm/packages" .. "/" .. ( SERVER and "server" or "client" )
@@ -27,6 +28,9 @@ utils.CreateFolder( realmFolder )
 PackageLifeTime = 60 * 60 * 24
 
 Import = promise.Async( function( url, parent )
+    local wsid = string.match( url, "steamcommunity%.com/sharedfiles/filedetails/%?id=(%d+)" )
+    if wsid ~= nil then return sources.workshop.Import( wsid, parent ) end
+
     local packageName = util.CRC( url )
 
     local cachePath = realmFolder .. "/" .. packageName .. ".dat"
