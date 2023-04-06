@@ -58,10 +58,10 @@ do
 
 end
 
-local packages = gpm.Packages
-if type( packages ) == "table" then
-    for packageName in pairs( packages ) do
-        packages[ packageName ] = nil
+local pkgs = gpm.Packages
+if type( pkgs ) == "table" then
+    for packageName in pairs( pkgs ) do
+        pkgs[ packageName ] = nil
     end
 end
 
