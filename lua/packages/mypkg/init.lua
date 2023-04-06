@@ -1,5 +1,5 @@
 import( "packages/mypkg2" )
-PrintTable( MYMODULE )
+-- PrintTable( MYMODULE )
 
 MYMODULE = MYMODULE or {}
 
@@ -8,5 +8,7 @@ if SERVER then
 end
 
 include("helloworld.lua")
+
+PrintTable( MYMODULE )
 
 return MYMODULE
