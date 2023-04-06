@@ -52,17 +52,21 @@ function GetMetaData( source )
 
         return source
     elseif type( source ) == "function" then
-        local env = environment.Create( source )
-        local ok, result = pcall( source )
-        if ( ok and result ~= nil ) then
-            if type( result ) ~= "table" then
-                env = utils.LowerTableKeys( env )
-                if not env.package then return env end
-                return env.package
-            end
+        local env = {}
+        setfenv( source, env )
 
+        local ok, result = xpcall( source, ErrorNoHaltWithStack )
+        if not ok then return end
+        result = result or env
+
+        if type( result ) ~= "table" then return end
+        result = utils.LowerTableKeys( result )
+
+        if type( result.package ) ~= "table" then
             return GetMetaData( result )
         end
+
+        return GetMetaData( result.package )
     end
 end
 
@@ -196,6 +200,7 @@ function Initialize( metadata, func, files, parentPackage )
     table.SetValue( packageEnv, "gpm.Logger", gPackage.logger, true )
     table.SetValue( packageEnv, "gpm.Package", gPackage, true )
     table.SetValue( packageEnv, "_VERSION", metadata.version )
+    table.SetValue( packageEnv, "promise", gpm.promise )
     table.SetValue( packageEnv, "TypeID", gpm.TypeID )
     table.SetValue( packageEnv, "type", gpm.type )
 
