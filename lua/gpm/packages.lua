@@ -11,9 +11,9 @@ local AddCSLuaFile = AddCSLuaFile
 local type = type
 
 -- Packages table
-local packages = gpm.Packages
-if type( packages ) ~= "table" then
-    packages = {}; gpm.Packages = packages
+local pkgs = gpm.Packages
+if type( pkgs ) ~= "table" then
+    pkgs = {}; gpm.Packages = pkgs
 end
 
 TYPE_PACKAGE = 256
@@ -22,12 +22,12 @@ module( "gpm.packages", package.seeall )
 
 -- Get all registered packages
 function GetAll()
-    return packages
+    return pkgs
 end
 
 -- Get one registered package
 function Get( packageName )
-    return packages[ packageName ]
+    return pkgs[ packageName ]
 end
 
 function GetMetaData( source )
@@ -167,10 +167,14 @@ function Initialize( metadata, func, files, parentPackage )
     ArgAssert( func, 2, "function" )
     ArgAssert( files, 3, "table" )
 
-    local versions = packages[ metadata.name ]
-    if ( versions ~= nil ) then
+    local versions = pkgs[ metadata.name ]
+    if versions ~= nil then
         local gPackage = versions[ metadata.version ]
-        if ( gPackage ~= nil ) then
+        if IsPackage( gPackage ) then
+            if IsPackage( parentPackage ) then
+                environment.LinkMetaTables( parentPackage.environment, gPackage.environment )
+            end
+
             return gPackage.result
         end
     end
@@ -182,7 +186,7 @@ function Initialize( metadata, func, files, parentPackage )
     local packageEnv = environment.Create( func )
 
     if IsPackage( parentPackage ) then
-        setmetatable( parentPackage:GetEnvironment(), { __index = packageEnv } )
+        environment.LinkMetaTables( parentPackage.environment, packageEnv )
     end
 
     -- Creating package object
@@ -250,8 +254,8 @@ function Initialize( metadata, func, files, parentPackage )
     gpm.Logger:Info( "Package `%s` was successfully loaded, it took %.4f seconds.", gPackage, SysTime() - stopwatch )
 
     local packageName = gPackage:GetName()
-    packages[ packageName ] = packages[ packageName ] or {}
-    packages[ packageName ][ gPackage:GetVersion() ] = gPackage
+    pkgs[ packageName ] = pkgs[ packageName ] or {}
+    pkgs[ packageName ][ gPackage:GetVersion() ] = gPackage
 
     return result
 end
