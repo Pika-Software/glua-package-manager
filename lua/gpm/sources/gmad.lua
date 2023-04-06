@@ -14,6 +14,8 @@ end
 local autorunTypes = {
     ["lua/autorun/server/"] = "server",
     ["lua/autorun/client/"] = "client",
+    ["lua/gpm/packages/"] = "packages",
+    ["lua/packages/"] = "packages",
     ["lua/entities/"] = "entities",
     ["lua/effects/"] = "effects",
     ["lua/autorun/"] = "shared",
@@ -23,6 +25,20 @@ local autorunTypes = {
 local autorunBuilder = {}
 for filePath, pathType in pairs( autorunTypes ) do
     autorunBuilder[ #autorunBuilder + 1 ] = { #filePath, filePath, pathType }
+end
+
+local gamemodeResult
+local function waitGamemode()
+    if gamemodeResult then return gamemodeResult end
+    if GAMEMODE then return promise.Resolve() end
+    gamemodeResult = promise.New()
+
+    hook.Add( "PostGamemodeLoaded", "gpm.sources.gmad", function()
+        hook.Remove( "PostGamemodeLoaded", "gpm.sources.gmad" )
+        gamemodeResult:Resolve()
+    end )
+
+    return gamemodeResult
 end
 
 Import = promise.Async( function( filePath, parent )
@@ -135,16 +151,26 @@ Import = promise.Async( function( filePath, parent )
             end
         end
 
-        if not GAMEMODE then
-            local p = promise.New()
+        local packageList = autorun.packages
+        if ( packageList ~= nil ) then
+            local packages = {}
 
-            hook.Add( "PostGamemodeLoaded", filePath, function()
-                hook.Remove( "PostGamemodeLoaded", filePath )
-                p:Resolve()
-            end )
+            for _, filePath in ipairs( packageList ) do
+                local packageName = string.match( filePath, "packages/([%w%s_]+)/" )
+                if not packageName then continue end
 
-            p:Await( true )
+                local packagePath = string.match( filePath, "^([%w%s_]+)/" .. packageName .. "/" ) .. "/" .. packageName
+                if not packagePath then continue end
+
+                if packages[ packagePath ] then continue end
+                packages[ packagePath ] = true
+
+                sources.lua.Import( packagePath, gpm.Package or parent )
+            end
         end
+
+        -- Waiting a gamemode
+        waitGamemode():Await()
 
         local entities = autorun.entities
         if ( entities ~= nil ) then
