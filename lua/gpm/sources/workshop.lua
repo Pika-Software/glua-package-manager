@@ -3,6 +3,7 @@ local sources = gpm.sources
 local promise = gpm.promise
 local utils = gpm.utils
 local gmad = gpm.gmad
+local file = file
 
 -- https://github.com/WilliamVenner/gmsv_workshop
 if SERVER and not steamworks and util.IsBinaryModuleInstalled( "workshop" ) then
