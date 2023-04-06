@@ -4,26 +4,28 @@ local promise = gpm.promise
 local utils = gpm.utils
 local gmad = gpm.gmad
 
--- Variables
-local type = type
-
 -- https://github.com/WilliamVenner/gmsv_workshop
 if SERVER and not steamworks and util.IsBinaryModuleInstalled( "workshop" ) then
     require( "workshop" )
 end
 
-module( "gpm.sources.workshop", package.seeall )
+-- Variables
+local steamworks = steamworks
+local tonumber = tonumber
+local type = type
+
+local realmFolder = "gpm/packages" .. "/" .. ( SERVER and "server" or "client" )
+utils.CreateFolder( realmFolder )
+
+module( "gpm.sources.workshop" )
 
 function CanImport( filePath )
     return type( tonumber( filePath ) ) == "number"
 end
 
-local realmFolder = "gpm/packages" .. "/" .. ( SERVER and "server" or "client" )
-utils.CreateFolder( realmFolder )
-
 PackageLifeTime = 60 * 60 * 24
 
-Import = promise.Async( function( wsid )
+Import = promise.Async( function( wsid, parent )
     local p = promise.New()
 
     steamworks.DownloadUGC( wsid, function( filePath, fileClass )
@@ -57,5 +59,5 @@ Import = promise.Async( function( wsid )
     local ok, result = p:SafeAwait()
     if not ok then return promise.Reject( result ) end
 
-    return sources.gmad.Import( result )
+    return sources.gmad.Import( result, parent )
 end )
