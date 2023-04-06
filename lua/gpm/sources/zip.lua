@@ -1,9 +1,13 @@
-
+-- -- Libraries
 -- local promise = gpm.promise
 
 -- module( "gpm.sources.zip", package.seeall )
 
--- Import = promise.Async( function(path)
+-- function CanImport( filePath )
+--     return file.Exists( filePath, "GAME" ) and string.EndsWith( filePath, ".zip.dat" ) or string.EndsWith( filePath, ".zip" )
+-- end
+
+-- Import = promise.Async( function( filePath, parentPackage )
 --     return promise.Reject("not implemented")
 -- end )
 
