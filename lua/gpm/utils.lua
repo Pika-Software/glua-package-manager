@@ -3,13 +3,93 @@ local string = string
 local debug = debug
 local table = table
 local file = file
+local gpm = gpm
 
 -- Variables
 local tonumber = tonumber
 local module = module
 local ipairs = ipairs
 local pairs = pairs
-local type = type
+
+-- https://wiki.facepunch.com/gmod/Global.TypeID
+do
+
+    local TYPE_COLOR = TYPE_COLOR
+    local IsColor = IsColor
+    local TypeID = TypeID
+
+    function gpm.TypeID( any )
+        if IsColor( any ) then return TYPE_COLOR end
+        return TypeID( any )
+    end
+
+end
+
+-- https://wiki.facepunch.com/gmod/Global.type
+do
+
+    local TYPE_NONE = TYPE_NONE
+    local list = list
+
+    -- https://wiki.facepunch.com/gmod/Enums/TYPE
+    list.Set( "GPM - Variable Types", TYPE_PARTICLESYSTEM, "CNewParticleEffect" )
+    list.Set( "GPM - Variable Types", TYPE_PROJECTEDTEXTURE, "ProjectedTexture" )
+    list.Set( "GPM - Variable Types", TYPE_PIXELVISHANDLE, "pixelvis_handle_t" )
+    list.Set( "GPM - Variable Types", TYPE_RECIPIENTFILTER, "CRecipientFilter" )
+    list.Set( "GPM - Variable Types", TYPE_SOUNDHANDLE, "IGModAudioChannel" )
+    list.Set( "GPM - Variable Types", TYPE_LIGHTUSERDATA, "light userdata" )
+    list.Set( "GPM - Variable Types", TYPE_PARTICLEEMITTER, "CLuaEmitter" )
+    list.Set( "GPM - Variable Types", TYPE_DAMAGEINFO, "CTakeDamageInfo" )
+    list.Set( "GPM - Variable Types", TYPE_LOCOMOTION, "CLuaLocomotion" )
+    list.Set( "GPM - Variable Types", TYPE_SURFACEINFO, "SurfaceInfo" )
+    list.Set( "GPM - Variable Types", TYPE_PHYSCOLLIDE, "PhysCollide" )
+    list.Set( "GPM - Variable Types", TYPE_EFFECTDATA, "CEffectData" )
+    list.Set( "GPM - Variable Types", TYPE_PARTICLE, "CLuaParticle" )
+    list.Set( "GPM - Variable Types", TYPE_NAVLADDER, "CNavLadder" )
+    list.Set( "GPM - Variable Types", TYPE_VIDEO, "IVideoWriter" )
+    list.Set( "GPM - Variable Types", TYPE_MATERIAL, "IMaterial" )
+    list.Set( "GPM - Variable Types", TYPE_MOVEDATA, "CMoveData" )
+    list.Set( "GPM - Variable Types", TYPE_PATH, "PathFollower" )
+    list.Set( "GPM - Variable Types", TYPE_SOUND, "CSoundPatch" )
+    list.Set( "GPM - Variable Types", TYPE_USERDATA, "userdata" )
+    list.Set( "GPM - Variable Types", TYPE_FUNCTION, "function" )
+    list.Set( "GPM - Variable Types", TYPE_TEXTURE, "ITexture" )
+    list.Set( "GPM - Variable Types", TYPE_USERCMD, "CUserCmd" )
+    list.Set( "GPM - Variable Types", TYPE_RESTORE, "IRestore" )
+    list.Set( "GPM - Variable Types", TYPE_NAVAREA, "CNavArea" )
+    list.Set( "GPM - Variable Types", TYPE_PHYSOBJ, "PhysObj" )
+    list.Set( "GPM - Variable Types", TYPE_DLIGHT, "dlight_t" )
+    list.Set( "GPM - Variable Types", TYPE_USERMSG, "bf_read" )
+    list.Set( "GPM - Variable Types", TYPE_MATRIX, "VMatrix" )
+    list.Set( "GPM - Variable Types", TYPE_CONVAR, "ConVar" )
+    list.Set( "GPM - Variable Types", TYPE_VECTOR, "Vector" )
+    list.Set( "GPM - Variable Types", TYPE_ENTITY, "Entity" )
+    list.Set( "GPM - Variable Types", TYPE_THREAD, "thread" )
+    list.Set( "GPM - Variable Types", TYPE_STRING, "string" )
+    list.Set( "GPM - Variable Types", TYPE_NUMBER, "number" )
+    list.Set( "GPM - Variable Types", TYPE_NONE, "unknown" )
+    list.Set( "GPM - Variable Types", TYPE_BOOL, "boolean" )
+    list.Set( "GPM - Variable Types", TYPE_IMESH, "IMesh" )
+    list.Set( "GPM - Variable Types", TYPE_PANEL, "Panel" )
+    list.Set( "GPM - Variable Types", TYPE_ANGLE, "Angle" )
+    list.Set( "GPM - Variable Types", TYPE_COLOR, "Color" )
+    list.Set( "GPM - Variable Types", TYPE_TABLE, "table" )
+    list.Set( "GPM - Variable Types", TYPE_SAVE, "ISave" )
+    list.Set( "GPM - Variable Types", TYPE_FILE, "File" )
+    list.Set( "GPM - Variable Types", TYPE_NIL, "nil" )
+
+    local types = list.Get( "GPM - Variable Types" )
+
+    function gpm.type( any )
+        local str = types[ gpm.TypeID( any ) ]
+        if ( str ~= nil ) then
+            return str
+        end
+
+        return types[ TYPE_NONE ] or "unknown"
+    end
+
+end
 
 -- Checks if argument have valid type
 do
@@ -17,7 +97,7 @@ do
     local error = error
 
     function ArgAssert( value, argNum, expected, errorlevel )
-        local valueType = type( value )
+        local valueType = gpm.type( value )
         if valueType == expected then return end
 
         local dinfo = debug.getinfo( 2, "n" )
@@ -111,7 +191,7 @@ function table.GetValue( source, path )
         end
 
         local nextTable = tbl[ key ]
-        if type( nextTable ) ~= "table" then
+        if gpm.type( nextTable ) ~= "table" then
             return
         end
 
@@ -140,7 +220,7 @@ function table.SetValue( source, path, value, ifEmpty )
         local nextTable = tbl[ key ]
         if ( nextTable == nil ) then
             tbl[ key ] = {}
-        elseif type( nextTable ) ~= "table" then
+        elseif gpm.type( nextTable ) ~= "table" then
             return
         end
 
@@ -171,8 +251,8 @@ end
 
 function LowerTableKeys( tbl )
     for key, value in pairs( tbl ) do
-        if type( value ) == "table" then value = LowerTableKeys( value ) end
-        if type( key ) ~= "string" then continue end
+        if gpm.type( value ) == "table" then value = LowerTableKeys( value ) end
+        if gpm.type( key ) ~= "string" then continue end
         tbl[ key ] = nil; tbl[ string.lower( key ) ] = value
     end
 
