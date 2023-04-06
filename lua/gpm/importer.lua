@@ -13,13 +13,13 @@ for _, source in pairs( gpm.sources ) do
     sources[ #sources + 1 ] = source
 end
 
-gpm.AsyncImport = promise.Async( function( filePath, parent )
+gpm.AsyncImport = promise.Async( function( filePath, parentPackage )
     ArgAssert( filePath, 1, "string" )
 
     for _, source in ipairs( sources ) do
         if type( source.CanImport ) ~= "function" then continue end
-        if not source.CanImport( filePath, parent ) then continue end
-        return source.Import( filePath, parent )
+        if not source.CanImport( filePath, parentPackage ) then continue end
+        return source.Import( filePath, parentPackage )
     end
 end )
 
@@ -27,10 +27,10 @@ do
 
     local assert = assert
 
-    function gpm.Import( filePath, async, parent )
+    function gpm.Import( filePath, async, parentPackage )
         assert( async or promise.RunningInAsync(), "import supposed to be running in coroutine/async function (do you running it from package)" )
 
-        local p = gpm.AsyncImport( filePath, parent )
+        local p = gpm.AsyncImport( filePath, parentPackage )
         if not async then return p:Await() end
         return p
     end

@@ -53,7 +53,7 @@ function CanImport( filePath )
     return file.Exists( filePath, "GAME" ) and string.EndsWith( filePath, ".gma.dat" ) or string.EndsWith( filePath, ".gma" )
 end
 
-Import = promise.Async( function( filePath, parent )
+Import = promise.Async( function( filePath, parentPackage )
     local gma = gmad.Open( filePath, "GAME" )
     if not gma then return promise.Reject( "gma file cannot be read" ) end
 
@@ -177,7 +177,7 @@ Import = promise.Async( function( filePath, parent )
                 if packages[ packagePath ] then continue end
                 packages[ packagePath ] = true
 
-                sources.lua.Import( packagePath, gpm.Package or parent )
+                sources.lua.Import( packagePath, gpm.Package or parentPackage )
             end
         end
 
@@ -282,5 +282,5 @@ Import = promise.Async( function( filePath, parent )
                 SWEP = nil
             end
         end
-    end, luaFiles, parent )
+    end, luaFiles, parentPackage )
 end )

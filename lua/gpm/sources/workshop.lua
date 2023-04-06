@@ -26,7 +26,7 @@ end
 
 PackageLifeTime = 60 * 60 * 24
 
-Import = promise.Async( function( wsid, parent )
+Import = promise.Async( function( wsid, parentPackage )
     local p = promise.New()
 
     steamworks.DownloadUGC( wsid, function( filePath, fileClass )
@@ -60,5 +60,5 @@ Import = promise.Async( function( wsid, parent )
     local ok, result = p:SafeAwait()
     if not ok then return promise.Reject( result ) end
 
-    return sources.gmad.Import( result, parent )
+    return sources.gmad.Import( result, parentPackage )
 end )

@@ -27,9 +27,9 @@ utils.CreateFolder( realmFolder )
 
 PackageLifeTime = 60 * 60 * 24
 
-Import = promise.Async( function( url, parent )
+Import = promise.Async( function( url, parentPackage )
     local wsid = string.match( url, "steamcommunity%.com/sharedfiles/filedetails/%?id=(%d+)" )
-    if wsid ~= nil then return sources.workshop.Import( wsid, parent ) end
+    if wsid ~= nil then return sources.workshop.Import( wsid, parentPackage ) end
 
     local packageName = util.CRC( url )
 
@@ -73,7 +73,7 @@ Import = promise.Async( function( url, parent )
                         local func = files[ metadata.main ]
                         if not func then return promise.Reject( "main file is missing" ) end
 
-                        return packages.Initialize( metadata, func, files, parent )
+                        return packages.Initialize( metadata, func, files, parentPackage )
                     end
                 end
 
@@ -92,7 +92,7 @@ Import = promise.Async( function( url, parent )
             if not ok then return promise.Reject( result ) end
             return packages.Initialize( packages.GetMetaData( {
                 ["name"] = packageName
-            } ), result, {}, parent )
+            } ), result, {}, parentPackage )
         end
     end
 
@@ -113,7 +113,7 @@ Import = promise.Async( function( url, parent )
 
         return packages.Initialize( packages.GetMetaData( {
             ["name"] = packageName
-        } ), result, {}, parent )
+        } ), result, {}, parentPackage )
     end
 
     metadata = packages.GetMetaData( utils.LowerTableKeys( metadata ) )
@@ -169,5 +169,5 @@ Import = promise.Async( function( url, parent )
         fileClass:Close()
     end
 
-    return packages.Initialize( metadata, func, files, parent )
+    return packages.Initialize( metadata, func, files, parentPackage )
 end )

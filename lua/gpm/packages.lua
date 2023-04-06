@@ -158,7 +158,7 @@ function FindFilePath( fileName, files )
     return files[ fileName ] and fileName
 end
 
-function Initialize( metadata, func, files, parent )
+function Initialize( metadata, func, files, parentPackage )
     ArgAssert( metadata, 1, "table" )
     ArgAssert( func, 2, "function" )
     ArgAssert( files, 3, "table" )
@@ -177,8 +177,8 @@ function Initialize( metadata, func, files, parent )
     -- Creating environment for package
     local packageEnv = environment.Create( func )
 
-    if IsPackage( parent ) then
-        setmetatable( parent:GetEnvironment(), { __index = packageEnv } )
+    if IsPackage( parentPackage ) then
+        setmetatable( parentPackage:GetEnvironment(), { __index = packageEnv } )
     end
 
     -- Creating package object
@@ -199,8 +199,8 @@ function Initialize( metadata, func, files, parent )
     table.SetValue( packageEnv, "TypeID", gpm.TypeID )
     table.SetValue( packageEnv, "type", gpm.type )
 
-    environment.SetValue( packageEnv, "import", function( filePath, async, parent )
-        return gpm.Import( filePath, async, parent or gpm.Package )
+    environment.SetValue( packageEnv, "import", function( filePath, async, parentPackage )
+        return gpm.Import( filePath, async, parentPackage or gpm.Package )
     end )
 
     do
