@@ -68,7 +68,7 @@ do
         ArgAssert( func, 1, "function" )
 
         local new = {}
-        return setfenv( func, LinkTables( new, env or _G ) ), new
+        return new, setfenv( func, LinkTables( new, env or _G ) )
     end
 
 end
