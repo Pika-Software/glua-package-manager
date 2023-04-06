@@ -3,12 +3,32 @@ local packages = gpm.packages
 local sources = gpm.sources
 local promise = gpm.promise
 local gmad = gpm.gmad
+local string = string
 local file = file
 
-module( "gpm.sources.gmad", package.seeall )
+-- Variables
+local scripted_ents_Register = scripted_ents.Register
+local ErrorNoHaltWithStack = ErrorNoHaltWithStack
+local effects_Register = effects.Register
+local weapons_Register = weapons.Register
+local CLIENT, SERVER = CLIENT, SERVER
+local game_MountGMA = game.MountGMA
+local setfenv = setfenv
+local ipairs = ipairs
+local xpcall = xpcall
 
-function CanImport( filePath )
-    return file.Exists( filePath, "GAME" ) and string.EndsWith( filePath, ".gma.dat" ) or string.EndsWith( filePath, ".gma" )
+local gamemodeResult
+local function waitGamemode()
+    if gamemodeResult then return gamemodeResult end
+    if GAMEMODE then return promise.Resolve() end
+    gamemodeResult = promise.New()
+
+    hook.Add( "PostGamemodeLoaded", "gpm.sources.gmad", function()
+        hook.Remove( "PostGamemodeLoaded", "gpm.sources.gmad" )
+        gamemodeResult:Resolve()
+    end )
+
+    return gamemodeResult
 end
 
 local autorunTypes = {
@@ -27,18 +47,10 @@ for filePath, pathType in pairs( autorunTypes ) do
     autorunBuilder[ #autorunBuilder + 1 ] = { #filePath, filePath, pathType }
 end
 
-local gamemodeResult
-local function waitGamemode()
-    if gamemodeResult then return gamemodeResult end
-    if GAMEMODE then return promise.Resolve() end
-    gamemodeResult = promise.New()
+module( "gpm.sources.gmad" )
 
-    hook.Add( "PostGamemodeLoaded", "gpm.sources.gmad", function()
-        hook.Remove( "PostGamemodeLoaded", "gpm.sources.gmad" )
-        gamemodeResult:Resolve()
-    end )
-
-    return gamemodeResult
+function CanImport( filePath )
+    return file.Exists( filePath, "GAME" ) and string.EndsWith( filePath, ".gma.dat" ) or string.EndsWith( filePath, ".gma" )
 end
 
 Import = promise.Async( function( filePath, parent )
@@ -53,7 +65,7 @@ Import = promise.Async( function( filePath, parent )
         ["requiredContent"] = gma:GetRequiredContent()
     } )
 
-    local ok, files = game.MountGMA( filePath )
+    local ok, files = game_MountGMA( filePath )
     if not ok then return promise.Reject( "gma file mounting failed" ) end
 
     local autorun = {}
@@ -114,7 +126,7 @@ Import = promise.Async( function( filePath, parent )
 
                     xpcall( compiledFile, ErrorNoHaltWithStack )
 
-                    effects.Register( EFFECT, className )
+                    effects_Register( EFFECT, className )
                     EFFECT = nil
                 end
             end
@@ -198,7 +210,7 @@ Import = promise.Async( function( filePath, parent )
 
                 xpcall( compiledFile, ErrorNoHaltWithStack )
 
-                scripted_ents.Register( ENT, className )
+                scripted_ents_Register( ENT, className )
                 ENT = nil
             end
         end
@@ -233,7 +245,7 @@ Import = promise.Async( function( filePath, parent )
 
                 xpcall( compiledFile, ErrorNoHaltWithStack )
 
-                weapons.Register( SWEP, className )
+                weapons_Register( SWEP, className )
                 SWEP = nil
             end
         end
