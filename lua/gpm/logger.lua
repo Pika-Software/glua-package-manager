@@ -22,7 +22,7 @@ function meta:GetColor()
 end
 
 function meta:SetColor( color )
-    ArgAssert( color, 1, "table" )
+    ArgAssert( color, 1, "Color" )
     self.Color = color
 end
 
@@ -32,7 +32,7 @@ function meta:GetTextColor()
 end
 
 function meta:SetTextColor( color )
-    ArgAssert( color, 1, "table" )
+    ArgAssert( color, 1, "Color" )
     self.TextColor = color
 end
 
@@ -65,7 +65,7 @@ do
     local MsgC = MsgC
 
     function meta:Log( levelColor, level, str, ... )
-        ArgAssert( levelColor, 1, "table" )
+        ArgAssert( levelColor, 1, "Color" )
         ArgAssert( level, 2, "string" )
 
         MsgC( dateColor, os_date( "%d/%m/%Y %H:%M:%S ", os_time() ), levelColor, level, dateColor, " --- ", realmColor, "[" .. (SERVER and "SERVER" or "CLIENT") .. "] ", self:GetColor(), self:GetName(), dateColor, " : ", self:GetTextColor(), string.format( str, ... ), "\n"  )
