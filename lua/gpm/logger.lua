@@ -6,6 +6,24 @@ local Color = Color
 local meta = {}
 meta.__index = meta
 
+function meta:__tostring()
+    return "Logger [" .. self:GetName() .. "]"
+end
+
+do
+
+    local getmetatable = getmetatable
+    function IsLogger( any )
+        return getmetatable( any ) == meta
+    end
+
+    TYPE_LOGGER = 257
+
+    list.Set( "GPM - Type Names", TYPE_LOGGER, "Logger" )
+    gpm.SetTypeID( TYPE_LOGGER, IsLogger )
+
+end
+
 -- Logs name
 function meta:GetName()
     return self.Name
