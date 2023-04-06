@@ -79,6 +79,8 @@ if SERVER then
         if ply == nil or ( IsValid( ply ) and ply:IsSuperAdmin() ) then
             BroadcastLua( "gpm.Reload()" )
             gpm.Reload()
+
+            hook.Run( "GPM - Reloaded" )
         end
     end )
 
