@@ -38,7 +38,7 @@ do
         -- return rawget( self, key )
     end
 
-    function LinkTables( a, b )
+    function LinkMetaTables( a, b )
         ArgAssert( a, 1, "table" )
         ArgAssert( b, 2, "table" )
 
@@ -68,13 +68,13 @@ do
         ArgAssert( func, 1, "function" )
 
         local new = {}
-        return new, setfenv( func, LinkTables( new, env or _G ) )
+        return new, setfenv( func, LinkMetaTables( new, env or _G ) )
     end
 
 end
 
 function SetLinkedTable( env, path, tbl )
-    return table.SetValue( env, path, LinkTables( {}, tbl ) )
+    return table.SetValue( env, path, LinkMetaTables( {}, tbl ) )
 end
 
 do
