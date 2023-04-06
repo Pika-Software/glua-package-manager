@@ -58,17 +58,15 @@ do
 
 end
 
-function gpm.Reload()
-    local packages = gpm.Packages
-    if type( packages ) == "table" then
-        for packageName in pairs( packages ) do
-            packages[ packageName ] = nil
-        end
+local packages = gpm.Packages
+if type( packages ) == "table" then
+    for packageName in pairs( packages ) do
+        packages[ packageName ] = nil
     end
-
-    gpm.ImportFolder( "gpm/packages" )
-    gpm.ImportFolder( "packages" )
 end
+
+gpm.ImportFolder( "gpm/packages" )
+gpm.ImportFolder( "packages" )
 
 if SERVER then
 
@@ -77,8 +75,8 @@ if SERVER then
 
     concommand.Add( "gpm_reload", function( ply )
         if ply == nil or ( IsValid( ply ) and ply:IsSuperAdmin() ) then
-            BroadcastLua( "gpm.Reload()" )
-            gpm.Reload()
+            BroadcastLua( "include( \"gpm/init.lua\" )" )
+            include( "gpm/init.lua" )
 
             hook.Run( "GPM - Reloaded" )
         end

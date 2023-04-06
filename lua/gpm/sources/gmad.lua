@@ -19,8 +19,8 @@ local xpcall = xpcall
 
 local gamemodeResult
 local function waitGamemode()
-    if gamemodeResult then return gamemodeResult end
     if GAMEMODE then return promise.Resolve() end
+    if gamemodeResult then return gamemodeResult end
     gamemodeResult = promise.New()
 
     hook.Add( "PostGamemodeLoaded", "gpm.sources.gmad", function()

@@ -66,8 +66,5 @@ end
 -- Importer module
 includeShared "importer"
 
--- Reloading all packages
-Reload()
-
 -- Finish log
 Logger:Info( "Time taken to start-up: %.4f sec.", SysTime() - stopwatch )

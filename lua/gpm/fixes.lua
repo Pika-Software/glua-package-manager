@@ -8,6 +8,9 @@ if not gluaFixes then
     gluaFixes = {}; gpm.GLuaFixes = gluaFixes
 end
 
+-- https://wiki.facepunch.com/gmod/string.StartsWith
+string.StartsWith = string.StartsWith or string.StartWith
+
 -- https://wiki.facepunch.com/gmod/file.Exists
 -- https://wiki.facepunch.com/gmod/file.IsDir
 do
