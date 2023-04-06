@@ -14,12 +14,30 @@ local pairs = pairs
 -- https://wiki.facepunch.com/gmod/Global.TypeID
 do
 
-    local TYPE_COLOR = TYPE_COLOR
-    local IsColor = IsColor
     local TypeID = TypeID
 
+    local types = gpm.VTypes
+    if TypeID( types ) ~= TYPE_TABLE then
+        types = { { TYPE_COLOR, IsColor } }; gpm.VTypes = types
+    end
+
+    function gpm.SetTypeID( id, func )
+        ArgAssert( id, 1, "number" )
+        ArgAssert( func, 2, "function" )
+
+        for index, tbl in ipairs( types ) do
+            if tbl[ 1 ] ~= id then continue end
+            table.remove( types, index )
+        end
+
+        types[ #types + 1 ] = { id, func }
+    end
+
     function gpm.TypeID( any )
-        if IsColor( any ) then return TYPE_COLOR end
+        for _, tbl in ipairs( types ) do
+            if tbl[ 2 ]( any ) then return tbl[ 1 ] end
+        end
+
         return TypeID( any )
     end
 
@@ -32,53 +50,53 @@ do
     local list = list
 
     -- https://wiki.facepunch.com/gmod/Enums/TYPE
-    list.Set( "GPM - Variable Types", TYPE_PARTICLESYSTEM, "CNewParticleEffect" )
-    list.Set( "GPM - Variable Types", TYPE_PROJECTEDTEXTURE, "ProjectedTexture" )
-    list.Set( "GPM - Variable Types", TYPE_PIXELVISHANDLE, "pixelvis_handle_t" )
-    list.Set( "GPM - Variable Types", TYPE_RECIPIENTFILTER, "CRecipientFilter" )
-    list.Set( "GPM - Variable Types", TYPE_SOUNDHANDLE, "IGModAudioChannel" )
-    list.Set( "GPM - Variable Types", TYPE_LIGHTUSERDATA, "light userdata" )
-    list.Set( "GPM - Variable Types", TYPE_PARTICLEEMITTER, "CLuaEmitter" )
-    list.Set( "GPM - Variable Types", TYPE_DAMAGEINFO, "CTakeDamageInfo" )
-    list.Set( "GPM - Variable Types", TYPE_LOCOMOTION, "CLuaLocomotion" )
-    list.Set( "GPM - Variable Types", TYPE_SURFACEINFO, "SurfaceInfo" )
-    list.Set( "GPM - Variable Types", TYPE_PHYSCOLLIDE, "PhysCollide" )
-    list.Set( "GPM - Variable Types", TYPE_EFFECTDATA, "CEffectData" )
-    list.Set( "GPM - Variable Types", TYPE_PARTICLE, "CLuaParticle" )
-    list.Set( "GPM - Variable Types", TYPE_NAVLADDER, "CNavLadder" )
-    list.Set( "GPM - Variable Types", TYPE_VIDEO, "IVideoWriter" )
-    list.Set( "GPM - Variable Types", TYPE_MATERIAL, "IMaterial" )
-    list.Set( "GPM - Variable Types", TYPE_MOVEDATA, "CMoveData" )
-    list.Set( "GPM - Variable Types", TYPE_PATH, "PathFollower" )
-    list.Set( "GPM - Variable Types", TYPE_SOUND, "CSoundPatch" )
-    list.Set( "GPM - Variable Types", TYPE_USERDATA, "userdata" )
-    list.Set( "GPM - Variable Types", TYPE_FUNCTION, "function" )
-    list.Set( "GPM - Variable Types", TYPE_TEXTURE, "ITexture" )
-    list.Set( "GPM - Variable Types", TYPE_USERCMD, "CUserCmd" )
-    list.Set( "GPM - Variable Types", TYPE_RESTORE, "IRestore" )
-    list.Set( "GPM - Variable Types", TYPE_NAVAREA, "CNavArea" )
-    list.Set( "GPM - Variable Types", TYPE_PHYSOBJ, "PhysObj" )
-    list.Set( "GPM - Variable Types", TYPE_DLIGHT, "dlight_t" )
-    list.Set( "GPM - Variable Types", TYPE_USERMSG, "bf_read" )
-    list.Set( "GPM - Variable Types", TYPE_MATRIX, "VMatrix" )
-    list.Set( "GPM - Variable Types", TYPE_CONVAR, "ConVar" )
-    list.Set( "GPM - Variable Types", TYPE_VECTOR, "Vector" )
-    list.Set( "GPM - Variable Types", TYPE_ENTITY, "Entity" )
-    list.Set( "GPM - Variable Types", TYPE_THREAD, "thread" )
-    list.Set( "GPM - Variable Types", TYPE_STRING, "string" )
-    list.Set( "GPM - Variable Types", TYPE_NUMBER, "number" )
-    list.Set( "GPM - Variable Types", TYPE_NONE, "unknown" )
-    list.Set( "GPM - Variable Types", TYPE_BOOL, "boolean" )
-    list.Set( "GPM - Variable Types", TYPE_IMESH, "IMesh" )
-    list.Set( "GPM - Variable Types", TYPE_PANEL, "Panel" )
-    list.Set( "GPM - Variable Types", TYPE_ANGLE, "Angle" )
-    list.Set( "GPM - Variable Types", TYPE_COLOR, "Color" )
-    list.Set( "GPM - Variable Types", TYPE_TABLE, "table" )
-    list.Set( "GPM - Variable Types", TYPE_SAVE, "ISave" )
-    list.Set( "GPM - Variable Types", TYPE_FILE, "File" )
-    list.Set( "GPM - Variable Types", TYPE_NIL, "nil" )
+    list.Set( "GPM - Type Names", TYPE_PARTICLESYSTEM, "CNewParticleEffect" )
+    list.Set( "GPM - Type Names", TYPE_PROJECTEDTEXTURE, "ProjectedTexture" )
+    list.Set( "GPM - Type Names", TYPE_PIXELVISHANDLE, "pixelvis_handle_t" )
+    list.Set( "GPM - Type Names", TYPE_RECIPIENTFILTER, "CRecipientFilter" )
+    list.Set( "GPM - Type Names", TYPE_SOUNDHANDLE, "IGModAudioChannel" )
+    list.Set( "GPM - Type Names", TYPE_LIGHTUSERDATA, "light userdata" )
+    list.Set( "GPM - Type Names", TYPE_PARTICLEEMITTER, "CLuaEmitter" )
+    list.Set( "GPM - Type Names", TYPE_DAMAGEINFO, "CTakeDamageInfo" )
+    list.Set( "GPM - Type Names", TYPE_LOCOMOTION, "CLuaLocomotion" )
+    list.Set( "GPM - Type Names", TYPE_SURFACEINFO, "SurfaceInfo" )
+    list.Set( "GPM - Type Names", TYPE_PHYSCOLLIDE, "PhysCollide" )
+    list.Set( "GPM - Type Names", TYPE_EFFECTDATA, "CEffectData" )
+    list.Set( "GPM - Type Names", TYPE_PARTICLE, "CLuaParticle" )
+    list.Set( "GPM - Type Names", TYPE_NAVLADDER, "CNavLadder" )
+    list.Set( "GPM - Type Names", TYPE_VIDEO, "IVideoWriter" )
+    list.Set( "GPM - Type Names", TYPE_MATERIAL, "IMaterial" )
+    list.Set( "GPM - Type Names", TYPE_MOVEDATA, "CMoveData" )
+    list.Set( "GPM - Type Names", TYPE_PATH, "PathFollower" )
+    list.Set( "GPM - Type Names", TYPE_SOUND, "CSoundPatch" )
+    list.Set( "GPM - Type Names", TYPE_USERDATA, "userdata" )
+    list.Set( "GPM - Type Names", TYPE_FUNCTION, "function" )
+    list.Set( "GPM - Type Names", TYPE_TEXTURE, "ITexture" )
+    list.Set( "GPM - Type Names", TYPE_USERCMD, "CUserCmd" )
+    list.Set( "GPM - Type Names", TYPE_RESTORE, "IRestore" )
+    list.Set( "GPM - Type Names", TYPE_NAVAREA, "CNavArea" )
+    list.Set( "GPM - Type Names", TYPE_PHYSOBJ, "PhysObj" )
+    list.Set( "GPM - Type Names", TYPE_DLIGHT, "dlight_t" )
+    list.Set( "GPM - Type Names", TYPE_USERMSG, "bf_read" )
+    list.Set( "GPM - Type Names", TYPE_MATRIX, "VMatrix" )
+    list.Set( "GPM - Type Names", TYPE_CONVAR, "ConVar" )
+    list.Set( "GPM - Type Names", TYPE_VECTOR, "Vector" )
+    list.Set( "GPM - Type Names", TYPE_ENTITY, "Entity" )
+    list.Set( "GPM - Type Names", TYPE_THREAD, "thread" )
+    list.Set( "GPM - Type Names", TYPE_STRING, "string" )
+    list.Set( "GPM - Type Names", TYPE_NUMBER, "number" )
+    list.Set( "GPM - Type Names", TYPE_NONE, "unknown" )
+    list.Set( "GPM - Type Names", TYPE_BOOL, "boolean" )
+    list.Set( "GPM - Type Names", TYPE_IMESH, "IMesh" )
+    list.Set( "GPM - Type Names", TYPE_PANEL, "Panel" )
+    list.Set( "GPM - Type Names", TYPE_ANGLE, "Angle" )
+    list.Set( "GPM - Type Names", TYPE_COLOR, "Color" )
+    list.Set( "GPM - Type Names", TYPE_TABLE, "table" )
+    list.Set( "GPM - Type Names", TYPE_SAVE, "ISave" )
+    list.Set( "GPM - Type Names", TYPE_FILE, "File" )
+    list.Set( "GPM - Type Names", TYPE_NIL, "nil" )
 
-    local types = list.Get( "GPM - Variable Types" )
+    local types = list.GetForEdit( "GPM - Type Names" )
 
     function gpm.type( any )
         local str = types[ gpm.TypeID( any ) ]
