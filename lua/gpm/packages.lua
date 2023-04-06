@@ -16,6 +16,8 @@ if type( packages ) ~= "table" then
     packages = {}; gpm.Packages = packages
 end
 
+TYPE_PACKAGE = 256
+
 module( "gpm.packages", package.seeall )
 
 -- Get all registered packages
@@ -127,6 +129,9 @@ do
         return getmetatable( any ) == PACKAGE
     end
 
+    list.Set( "GPM - Type Names", TYPE_PACKAGE, "Package" )
+    gpm.SetTypeID( TYPE_PACKAGE, IsPackage )
+
 end
 
 function Run( gPackage, func )
@@ -182,10 +187,15 @@ function Initialize( metadata, func, files, parent )
 
     -- Binding package object to gpm.Package
     environment.SetLinkedTable( packageEnv, "gpm", gpm )
-    table.SetValue( packageEnv, "gpm.Package", gPackage, true )
+
+    -- Globals
     table.SetValue( packageEnv, "gpm.Logger", gPackage.logger, true )
-    environment.SetValue( packageEnv, "import", function( filePath, async, env )
-        return gpm.Import( filePath, async, env or gpm.Package )
+    table.SetValue( packageEnv, "gpm.Package", gPackage, true )
+    table.SetValue( packageEnv, "TypeID", gpm.TypeID )
+    table.SetValue( packageEnv, "type", gpm.type )
+
+    environment.SetValue( packageEnv, "import", function( filePath, async, parent )
+        return gpm.Import( filePath, async, parent or gpm.Package )
     end )
 
     do
