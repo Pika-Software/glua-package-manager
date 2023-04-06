@@ -186,29 +186,46 @@ Import = promise.Async( function( filePath, parent )
 
         local entities = autorun.entities
         if ( entities ~= nil ) then
+            local sents = {}
             for _, filePath in ipairs( entities ) do
-                local compiledFile = luaFiles[ filePath ]
-                if not compiledFile then continue end
+                local className, fileName = string.match( filePath, "^entities/([%w_]+)/?([%w_%.]*)/?" )
+                if not className then continue end
 
-                local className, fileName = string.match( filePath, "^entities/([%w_]+)/?([%w_]*)" )
-
-                local folder = nil
-                if ( fileName ~= nil ) then
-                    if CLIENT and fileName ~= "cl_init.lua" then continue end
-                    if SERVER and fileName ~= "init.lua" then continue end
-                    folder = "entities/" .. className
+                local sent = sents[ className ]
+                if not sent then
+                    sent = { ["Files"] = {} }
+                    sents[ className ] = sent
                 end
 
+                sent.Files[ #sent.Files + 1 ] = { filePath, fileName }
+            end
+
+            for className, sent in pairs( sents ) do
                 ENT = {
                     ["ClassName"] = className,
                     ["Folder"] = folder
                 }
 
-                if environment ~= nil then
-                    setfenv( compiledFile, environment )
+                local files = sent.Files
+                if ( #files > 1 ) then
+                    ENT.Folder = "entities/" .. className
                 end
 
-                xpcall( compiledFile, ErrorNoHaltWithStack )
+                for _, data in ipairs( files ) do
+                    if ( data[ 2 ] ~= nil and data[ 2 ] ~= "" ) then
+                        if CLIENT and data[ 2 ] ~= "cl_init.lua" then continue end
+                        if SERVER and data[ 2 ] ~= "init.lua" then continue end
+                    end
+
+                    local compiledFile = luaFiles[ data[ 1 ] ]
+                    if not compiledFile then continue end
+
+                    if environment ~= nil then
+                        setfenv( compiledFile, environment )
+                    end
+
+                    xpcall( compiledFile, ErrorNoHaltWithStack )
+                end
 
                 scripted_ents_Register( ENT, className )
                 ENT = nil
@@ -217,33 +234,49 @@ Import = promise.Async( function( filePath, parent )
 
         local sweps = autorun.sweps
         if ( sweps ~= nil ) then
+            local weps = {}
             for _, filePath in ipairs( sweps ) do
-                local compiledFile = luaFiles[ filePath ]
-                if not compiledFile then continue end
+                local className, fileName = string.match( filePath, "^weapons/([%w_]+)/?([%w_%.]*)" )
+                if not className then continue end
 
-                local className, fileName = string.match( filePath, "^weapons/([%w_]+)/?([%w_]*)" )
-
-                local folder = nil
-                if ( fileName ~= nil and fileName ~= "" ) then
-                    if CLIENT and fileName ~= "cl_init" then continue end
-                    if SERVER and fileName ~= "init" then continue end
-                    folder = "weapons/" .. className
+                local swep = weps[ className ]
+                if not swep then
+                    swep = { ["Files"] = {} }
+                    swep[ className ] = swep
                 end
 
+                swep.Files[ #swep.Files + 1 ] = { filePath, fileName }
+            end
+
+            for className, swep in pairs( weps ) do
                 SWEP = {
                     ["ClassName"] = className,
-                    ["Base"] = "weapon_base",
-                    ["Folder"] = folder
+                    ["Base"] = "weapon_base"
                 }
 
                 SWEP.Primary = {}
                 SWEP.Secondary = {}
 
-                if environment ~= nil then
-                    setfenv( compiledFile, environment )
+                local files = sent.Files
+                if ( #files > 1 ) then
+                    ENT.Folder = "weapons/" .. className
                 end
 
-                xpcall( compiledFile, ErrorNoHaltWithStack )
+                for _, data in ipairs( files ) do
+                    if ( data[ 2 ] ~= nil and data[ 2 ] ~= "" ) then
+                        if CLIENT and data[ 2 ] ~= "cl_init.lua" then continue end
+                        if SERVER and data[ 2 ] ~= "init.lua" then continue end
+                    end
+
+                    local compiledFile = luaFiles[ data[ 1 ] ]
+                    if not compiledFile then continue end
+
+                    if environment ~= nil then
+                        setfenv( compiledFile, environment )
+                    end
+
+                    xpcall( compiledFile, ErrorNoHaltWithStack )
+                end
 
                 weapons_Register( SWEP, className )
                 SWEP = nil
