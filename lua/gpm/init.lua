@@ -11,16 +11,12 @@ local Color = Color
 
 module( "gpm" )
 
-_VERSION = 000001
+_VERSION = 010000
 
 -- Include function
 function includeShared( filePath )
     filePath = "gpm/" .. filePath  .. ".lua"
-
-    if SERVER then
-        AddCSLuaFile( filePath )
-    end
-
+    if SERVER then AddCSLuaFile( filePath ) end
     return include( filePath )
 end
 
