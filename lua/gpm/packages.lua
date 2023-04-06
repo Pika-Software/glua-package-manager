@@ -159,6 +159,10 @@ function FindFilePath( fileName, files )
 end
 
 function Initialize( metadata, func, files, parent )
+    ArgAssert( metadata, 1, "table" )
+    ArgAssert( func, 2, "function" )
+    ArgAssert( files, 3, "table" )
+
     local versions = packages[ metadata.name ]
     if ( versions ~= nil ) then
         local gPackage = versions[ metadata.version ]
@@ -191,6 +195,7 @@ function Initialize( metadata, func, files, parent )
     -- Globals
     table.SetValue( packageEnv, "gpm.Logger", gPackage.logger, true )
     table.SetValue( packageEnv, "gpm.Package", gPackage, true )
+    table.SetValue( packageEnv, "_VERSION", metadata.version )
     table.SetValue( packageEnv, "TypeID", gpm.TypeID )
     table.SetValue( packageEnv, "type", gpm.type )
 
