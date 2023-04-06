@@ -107,6 +107,7 @@ Import = promise.Async( function( url, parent )
 
         local ok, result = pcall( CompileString, code, cachePath )
         if not ok then return promise.Reject( result ) end
+        if not result then return promise.Reject( "file compilation failed" ) end
 
         file.Write( cachePath, code )
 
