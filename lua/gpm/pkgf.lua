@@ -21,7 +21,7 @@ function PKG:__tostring()
 end
 
 -- File Metadata
-function GMA:GetMetadata()
+function PKG:GetMetadata()
     return self.Metadata
 end
 
