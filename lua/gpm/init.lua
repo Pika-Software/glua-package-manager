@@ -26,6 +26,9 @@ local stopwatch = SysTime()
 -- Utils
 includeShared "utils"
 
+-- Creating folder in data
+utils.CreateFolder( "gpm" )
+
 -- GLua fixes
 includeShared "fixes"
 
@@ -43,12 +46,12 @@ Logger:Info( "Promise the library version %s is initialized.", utils.Version( pr
 includeShared "environment"
 includeShared "packages"
 
--- Filesystem, HTTP & GMAD
+-- HTTP
 includeShared "http"
-includeShared "gmad"
 
--- Creating folder in data
-utils.CreateFolder( "gpm" )
+-- GMAD & PKGF
+includeShared "gmad"
+includeShared "pkgf"
 
 -- Sources
 sources = sources or {}
