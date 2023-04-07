@@ -161,7 +161,7 @@ function PKG:ClearFiles()
     end
 end
 
-function GMA:ReadFile( number )
+function PKG:ReadFile( number )
     local metadata = self.Metadata
     if not metadata then return end
 
@@ -186,7 +186,7 @@ function GMA:ReadFile( number )
     return content
 end
 
-function GMA:ReadAllFiles()
+function PKG:ReadAllFiles()
     local fileClass = self.File
     if not fileClass then return end
 
@@ -307,18 +307,29 @@ end
 function Read( fileClass )
     if not fileClass then return end
 
-    local instance = setmetatable( {}, PKG )
-    instance.Metadata = Parse( fileClass )
-    instance.File = fileClass
+    local metadata = Parse( fileClass )
+    if not metadata then return end
 
-    -- Close file in next tick
-    util.NextTick( instance.Close, instance )
+    local instance = setmetatable( {}, PKG )
+    instance.Metadata = metadata
+    instance.File = fileClass
 
     return instance
 end
 
 function Open( filePath, gamePath )
-    return Read( file.Open( filePath, "rb", gamePath ) )
+    local fileClass = file.Open( filePath, "rb", gamePath )
+    if not fileClass then return end
+
+    local instance = Read( fileClass )
+    if not instance then
+        fileClass:Close()
+        return
+    end
+
+    util.NextTick( fileClass.Close, fileClass )
+
+    return instance
 end
 
 function Write( filePath )
