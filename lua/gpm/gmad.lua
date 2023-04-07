@@ -192,7 +192,7 @@ function GMA:ReadFile( number )
     local metadata = self.Metadata
     if not metadata then return end
 
-    local files = metadata.Files
+    local files = metadata.files
     if not files then return end
 
     local entry = files[ number ]
@@ -223,7 +223,7 @@ function GMA:ReadAllFiles()
     local filesPos = metadata.filesPos
     if not filesPos then return end
 
-    local files = metadata.Files
+    local files = metadata.files
     if not files then return end
 
     for _, entry in ipairs( files ) do
