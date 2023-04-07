@@ -3,6 +3,9 @@ local utils = gpm.utils
 local paths = gpm.paths
 local file = file
 
+-- Variables
+local Either = Either
+
 module( "gpm.pkgf", package.seeall )
 
 PKG = PKG or {}
@@ -257,8 +260,8 @@ function PKG:Close()
         fileClass:WriteULong( self:GetVersion() )
 
         -- Client & server bools
-        fileClass:WriteByte( self:GetClient() )
-        fileClass:WriteByte( self:GetServer() )
+        fileClass:WriteByte( Either( self:GetClient(), 1, 0 ) )
+        fileClass:WriteByte( Either( self:GetServer(), 1, 0 ) )
 
         -- Package author
         fileClass:WriteString( self:GetAuthor() )
