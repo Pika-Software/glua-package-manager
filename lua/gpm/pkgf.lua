@@ -97,13 +97,7 @@ end
 
 -- Files
 function PKG:GetFiles()
-    local metadata = self.Metadata
-    if not metadata then return end
-
-    local files = metadata.files
-    if not files then return end
-
-    return files
+    return self.Files
 end
 
 function PKG:GetFile( number )
@@ -162,17 +156,14 @@ function PKG:ClearFiles()
 end
 
 function PKG:ReadFile( number )
-    local metadata = self.Metadata
-    if not metadata then return end
-
-    local files = metadata.files
-    if not files then return end
-
-    local entry = files[ number ]
+    local entry = self.Files[ number ]
     if not entry then return end
 
     local content = entry.content
     if content then return content end
+
+    local metadata = self.Metadata
+    if not metadata then return end
 
     local filesPos = metadata.filesPos
     if not filesPos then return end
@@ -190,14 +181,14 @@ function PKG:ReadAllFiles()
     local fileClass = self.File
     if not fileClass then return end
 
+    local files = self.Files
+    if not files then return end
+
     local metadata = self.Metadata
     if not metadata then return end
 
     local filesPos = metadata.filesPos
     if not filesPos then return end
-
-    local files = metadata.files
-    if not files then return end
 
     for _, entry in ipairs( files ) do
         if entry.content then continue end
@@ -316,6 +307,9 @@ function Read( fileClass )
     instance.Metadata = metadata
     instance.File = fileClass
 
+    instance.Files = metadata.files
+    metadata.files = nil
+
     return instance
 end
 
@@ -342,6 +336,7 @@ function Write( filePath )
     instance.File = fileClass
     instance.WriteMode = true
     instance.Metadata = {}
+    instance.Files = {}
 
     return instance
 end
