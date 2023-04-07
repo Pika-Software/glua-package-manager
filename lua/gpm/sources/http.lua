@@ -144,6 +144,11 @@ Import = promise.Async( function( url, parentPackage )
             pkg:SetAuthor( author )
         end
 
+        -- Files
+        for _, data in ipairs( content ) do
+            pkg:AddFile( data[ 2 ], data[ 1 ] )
+        end
+
         pkg:Close()
     end
 
