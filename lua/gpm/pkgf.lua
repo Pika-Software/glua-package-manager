@@ -93,6 +93,38 @@ function PKG:SetMainFile( filePath )
     metadata.main = paths.Fix( filePath )
 end
 
+-- Client
+function PKG:GetClient()
+    local metadata = self.Metadata
+    if not metadata then return end
+    return metadata.client
+end
+
+function PKG:SetClient( bool )
+    assert( self.WriteMode, "To change a pkg file, write mode is required." )
+
+    local metadata = self.Metadata
+    if not metadata then return end
+
+    metadata.client = bool == true
+end
+
+-- Server
+function PKG:GetServer()
+    local metadata = self.Metadata
+    if not metadata then return end
+    return metadata.server
+end
+
+function PKG:SetServer( bool )
+    assert( self.WriteMode, "To change a pkg file, write mode is required." )
+
+    local metadata = self.Metadata
+    if not metadata then return end
+
+    metadata.server = bool == true
+end
+
 -- File timestamp
 function PKG:GetTimestamp()
     local metadata = self.Metadata
