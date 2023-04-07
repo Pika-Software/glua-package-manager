@@ -54,7 +54,7 @@ Import = promise.Async( function( url, parentPackage )
                 local metadata = packages.GetMetaData( pkg:GetMetadata() )
 
                 local func = packageFiles[ metadata.main ]
-                if not main then return promise.Reject( "main file is missing (" .. metadata.name .. "@" .. metadata.version .. ")" ) end
+                if not main then return promise.Reject( "main file is missing (" .. metadata.name .. "@" .. utils.Version( metadata.version ) .. ")" ) end
 
                 return packages.Initialize( metadata, func, packageFiles, parentPackage )
             end

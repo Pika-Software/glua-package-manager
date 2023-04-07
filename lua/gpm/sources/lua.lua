@@ -2,6 +2,7 @@
 local packages = gpm.packages
 local promise = gpm.promise
 local paths = gpm.paths
+local utils = gpm.utils
 local string = string
 local file = file
 
@@ -83,7 +84,7 @@ Import = promise.Async( function( filePath, parentPackage )
                 return packages.Initialize( metadata, packageFile, Files, parentPackage )
             end
 
-            return promise.Reject( "package file is missing (" .. metadata.name .. "@" .. metadata.version .. ")" )
+            return promise.Reject( "package file is missing (" .. metadata.name .. "@" .. utils.Version( metadata.version ) .. ")" )
         end
 
         if SERVER and metadata.client then
@@ -108,7 +109,7 @@ Import = promise.Async( function( filePath, parentPackage )
     end
 
     if not func then
-        return promise.Reject( "main file is missing (" .. metadata.name .. "@" .. metadata.version .. ")" )
+        return promise.Reject( "main file is missing (" .. metadata.name .. "@" .. utils.Version( metadata.version ) .. ")" )
     end
 
     metadata.source = metadata.source or "local"

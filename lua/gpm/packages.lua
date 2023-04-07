@@ -37,9 +37,9 @@ function GetMetaData( source )
 
         local version = source.version
         if isnumber( version ) then
-            source.version = utils.Version( version )
+            source.version = version
         else
-            source.version = 000001
+            source.version = 1
         end
 
         if ( source.client ~= false ) then
