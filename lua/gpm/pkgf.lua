@@ -20,6 +20,11 @@ function PKG:__tostring()
     return "Package File " .. self:GetName() .. "@" .. utils.Version( self:GetVersion() ) .. " [" .. status  .. "]"
 end
 
+-- File Metadata
+function GMA:GetMetadata()
+    return self.Metadata
+end
+
 -- Package name
 function PKG:GetName()
     local metadata = self.Metadata
