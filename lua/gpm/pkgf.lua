@@ -28,7 +28,7 @@ function PKG:GetName()
 end
 
 function PKG:SetName( name )
-    assert( self.WriteMode, "To change a gmad file, write mode is required." )
+    assert( self.WriteMode, "To change a pkg file, write mode is required." )
     ArgAssert( name, 1, "string" )
 
     local metadata = self.Metadata
@@ -45,7 +45,7 @@ function PKG:GetVersion()
 end
 
 function PKG:SetVersion( version )
-    assert( self.WriteMode, "To change a gmad file, write mode is required." )
+    assert( self.WriteMode, "To change a pkg file, write mode is required." )
     ArgAssert( version, 1, "number" )
 
     local metadata = self.Metadata
@@ -62,7 +62,7 @@ function PKG:GetAuthor()
 end
 
 function PKG:SetAuthor( author )
-    assert( self.WriteMode, "To change a gmad file, write mode is required." )
+    assert( self.WriteMode, "To change a pkg file, write mode is required." )
     ArgAssert( author, 1, "string" )
 
     local metadata = self.Metadata
@@ -79,7 +79,7 @@ function PKG:GetMainFile()
 end
 
 function PKG:SetMainFile( filePath )
-    assert( self.WriteMode, "To change a gmad file, write mode is required." )
+    assert( self.WriteMode, "To change a pkg file, write mode is required." )
     ArgAssert( filePath, 1, "string" )
 
     local metadata = self.Metadata
@@ -100,7 +100,7 @@ function PKG:GetFiles()
     local metadata = self.Metadata
     if not metadata then return end
 
-    local files = metadata.Files
+    local files = metadata.files
     if not files then return end
 
     return files
@@ -116,7 +116,7 @@ function PKG:GetFile( number )
 end
 
 function PKG:AddFile( filePath, content )
-    assert( self.WriteMode, "To change a gmad file, write mode is required." )
+    assert( self.WriteMode, "To change a pkg file, write mode is required." )
     ArgAssert( filePath, 1, "string" )
     ArgAssert( content, 2, "string" )
 
@@ -131,7 +131,7 @@ function PKG:AddFile( filePath, content )
 end
 
 function PKG:AddFolder( filePath, gamePath )
-    assert( self.WriteMode, "To change a gmad file, write mode is required." )
+    assert( self.WriteMode, "To change a pkg file, write mode is required." )
     ArgAssert( filePath, 1, "string" )
     ArgAssert( gamePath, 2, "string" )
 
@@ -165,7 +165,7 @@ function PKG:ReadFile( number )
     local metadata = self.Metadata
     if not metadata then return end
 
-    local files = metadata.Files
+    local files = metadata.files
     if not files then return end
 
     local entry = files[ number ]
@@ -196,7 +196,7 @@ function PKG:ReadAllFiles()
     local filesPos = metadata.filesPos
     if not filesPos then return end
 
-    local files = metadata.Files
+    local files = metadata.files
     if not files then return end
 
     for _, entry in ipairs( files ) do
