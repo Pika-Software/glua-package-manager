@@ -20,12 +20,7 @@ GMA.Identity = "GMAD"
 GMA.Version = 3
 
 function GMA:__tostring()
-    local status = "stopped"
-    if self.File ~= nil then
-        status = self.WriteMode and "writing" or "reading"
-    end
-
-    return "GMA File \'" .. ( self:GetTitle() or "No Name" ) .. "\' [" .. status  .. "]"
+    return "GMA File \'" .. ( self:GetTitle() or "No Name" ) .. "\'"
 end
 
 -- File Metadata
