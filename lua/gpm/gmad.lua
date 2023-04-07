@@ -123,13 +123,7 @@ end
 
 -- Files
 function GMA:GetFiles()
-    local metadata = self.Metadata
-    if not metadata then return end
-
-    local files = metadata.files
-    if not files then return end
-
-    return files
+    return self.Files
 end
 
 function GMA:GetFile( number )
@@ -189,10 +183,7 @@ function GMA:ClearFiles()
 end
 
 function GMA:ReadFile( number )
-    local metadata = self.Metadata
-    if not metadata then return end
-
-    local files = metadata.files
+    local files = self.Files
     if not files then return end
 
     local entry = files[ number ]
@@ -200,6 +191,9 @@ function GMA:ReadFile( number )
 
     local content = entry.content
     if content then return content end
+
+    local metadata = self.Metadata
+    if not metadata then return end
 
     local filesPos = metadata.filesPos
     if not filesPos then return end
@@ -223,7 +217,7 @@ function GMA:ReadAllFiles()
     local filesPos = metadata.filesPos
     if not filesPos then return end
 
-    local files = metadata.files
+    local files = self.Files
     if not files then return end
 
     for _, entry in ipairs( files ) do
@@ -380,6 +374,9 @@ function Read( fileClass )
     instance.Metadata = metadata
     instance.File = fileClass
 
+    instance.Files = metadata.files
+    metadata.files = nil
+
     return instance
 end
 
@@ -405,6 +402,8 @@ function Write( filePath )
     local instance = setmetatable( {}, GMA )
     instance.File = fileClass
     instance.WriteMode = true
+    instance.Files = {}
+
     instance.Metadata = {
         ["title"] = "Garry\'s Mod Addon",
         ["description"] = "description",
