@@ -4,7 +4,15 @@ local paths = gpm.paths
 local file = file
 
 -- Variables
+local util_NextTick = util.NextTick
+local setmetatable = setmetatable
+local ArgAssert = ArgAssert
+local os_time = os.time
+local tobool = tobool
 local Either = Either
+local assert = assert
+local ipairs = ipairs
+local pairs = pairs
 
 module( "gpm.pkgf", package.seeall )
 
@@ -153,7 +161,7 @@ function PKG:AddFile( filePath, content )
     if not files then return end
 
     files[ #files + 1 ] = {
-        ["size"] = string.len( content ),
+        ["size"] = #content,
         ["content"] = content,
         ["path"] = filePath
     }
@@ -245,7 +253,7 @@ function PKG:Close()
         fileClass:WriteByte( self.Version )
 
         -- Timestamp
-        fileClass:WriteULong( os.time() )
+        fileClass:WriteULong( os_time() )
 
         -- Package name & main file path
         fileClass:WriteString( self:GetName() )
@@ -358,7 +366,7 @@ function Open( filePath, gamePath )
         return
     end
 
-    util.NextTick( fileClass.Close, fileClass )
+    util_NextTick( fileClass.Close, fileClass )
 
     return instance
 end
