@@ -89,7 +89,7 @@ do
     end
 
     function PACKAGE:GetIdentifier( name )
-        local identifier = string.format( "%s@%s", self:GetName(), self:GetVersion() )
+        local identifier = string.format( "%s@%s", self:GetName(), utils.Version( self:GetVersion() ) )
         if name then
             if isstring( name ) then
                 return identifier .. "::" .. name
