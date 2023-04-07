@@ -108,6 +108,12 @@ Import = promise.Async( function( filePath, parentPackage )
         func = Files[ mainFile ]
     end
 
+    -- Legacy packages support
+    if not func then
+        mainFile = paths.Join( packagePath, "main.lua" )
+        func = Files[ mainFile ]
+    end
+
     if not func then
         return promise.Reject( "main file is missing (" .. metadata.name .. "@" .. utils.Version( metadata.version ) .. ")" )
     end
