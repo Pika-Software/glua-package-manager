@@ -45,6 +45,7 @@ Import = promise.Async( function( wsid, parentPackage )
                 local output = gmad.Write( outputPath )
                 if output then
                     output.Metadata = gma.Metadata
+                    output.Files = gma.Files
                     output:Close()
                 end
             end
