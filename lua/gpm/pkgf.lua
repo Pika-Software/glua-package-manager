@@ -15,12 +15,7 @@ PKG.Identity = "GPKG"
 PKG.Version = 1
 
 function PKG:__tostring()
-    local status = "stopped"
-    if self.File ~= nil then
-        status = self.WriteMode and "writing" or "reading"
-    end
-
-    return "Package File " .. self:GetName() .. "@" .. utils.Version( self:GetVersion() ) .. " [" .. status  .. "]"
+    return "Package File " .. self:GetName() .. "@" .. utils.Version( self:GetVersion() )
 end
 
 -- File Metadata
