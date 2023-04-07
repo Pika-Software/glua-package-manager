@@ -13,116 +13,135 @@ local ipairs = ipairs
 
 module( "gpm.gmad" )
 
--- GMAD Metatable
-GMAD = GMAD or {}
-GMAD.__index = GMAD
+GMA = GMA or {}
+GMA.__index = GMA
 
-GMAD.Identity = "GMAD"
-GMAD.Version = 3
+GMA.Identity = "GMAD"
+GMA.Version = 3
 
-function GMAD:Metadata()
+function GMA:__tostring()
+    local status = "stopped"
+    if self.File ~= nil then
+        status = self.WriteMode and "writing" or "reading"
+    end
+
+    return "GMA File \'" .. ( self:GetTitle() or "No Name" ) .. "\' [" .. status  .. "]"
+end
+
+-- File Metadata
+function GMA:GetMetadata()
     return self.Metadata
 end
 
-function GMAD:GetTitle()
+-- Title
+function GMA:GetTitle()
     local metadata = self.Metadata
     if not metadata then return end
-    return metadata.Title
+    return metadata.title
 end
 
-function GMAD:SetTitle( str )
+function GMA:SetTitle( title )
     assert( self.WriteMode, "To change a gmad file, write mode is required." )
-    ArgAssert( str, 1, "string" )
+    ArgAssert( title, 1, "string" )
 
     local metadata = self.Metadata
     if not metadata then return end
-    metadata.Title = str
+
+    metadata.title = title
 end
 
-function GMAD:GetDescription()
+-- Description
+function GMA:GetDescription()
     local metadata = self.Metadata
     if not metadata then return end
-    return metadata.Description
+    return metadata.description
 end
 
-function GMAD:SetDescription( str )
+function GMA:SetDescription( description )
     assert( self.WriteMode, "To change a gmad file, write mode is required." )
-    ArgAssert( str, 1, "string" )
+    ArgAssert( description, 1, "string" )
 
     local metadata = self.Metadata
     if not metadata then return end
-    metadata.Description = str
+
+    metadata.description = description
 end
 
-function GMAD:GetAuthor()
+-- Author
+function GMA:GetAuthor()
     local metadata = self.Metadata
     if not metadata then return end
-    return metadata.Author
+    return metadata.author
 end
 
-function GMAD:SetAuthor( str )
+function GMA:SetAuthor( author )
     assert( self.WriteMode, "To change a gmad file, write mode is required." )
-    ArgAssert( str, 1, "string" )
+    ArgAssert( author, 1, "string" )
 
     local metadata = self.Metadata
     if not metadata then return end
-    metadata.Author = str
+
+    metadata.author = author
 end
 
-function GMAD:GetRequiredContent()
+-- Required content
+function GMA:GetRequiredContent()
     local metadata = self.Metadata
     if not metadata then return end
-    return metadata.RequiredContent
+    return metadata.requiredContent
 end
 
-function GMAD:AddRequiredContent( str )
+function GMA:AddRequiredContent( contentName )
     assert( self.WriteMode, "To change a gmad file, write mode is required." )
-    ArgAssert( str, 1, "string" )
+    ArgAssert( contentName, 1, "string" )
 
     local metadata = self.Metadata
     if not metadata then return end
-    local requiredContent = metadata.RequiredContent
-    requiredContent[ #requiredContent + 1 ] = str
+
+    local requiredContent = metadata.requiredContent
+    requiredContent[ #requiredContent + 1 ] = contentName
 end
 
-function GMAD:ClearRequiredContent()
+function GMA:ClearRequiredContent()
     assert( self.WriteMode, "To change a gmad file, write mode is required." )
 
     local metadata = self.Metadata
     if not metadata then return end
 
-    local requiredContent = metadata.RequiredContent
+    local requiredContent = metadata.requiredContent
     for number in pairs( requiredContent ) do
-        requiredContent[ num ] = nil
+        requiredContent[ number ] = nil
     end
 end
 
-function GMAD:GetTimestamp()
+-- File timestamp
+function GMA:GetTimestamp()
     local metadata = self.Metadata
     if not metadata then return end
-    return metadata.Timestamp
+    return metadata.fileTimestamp
 end
 
-function GMAD:GetFiles()
+-- Files
+function GMA:GetFiles()
     local metadata = self.Metadata
     if not metadata then return end
 
-    local files = metadata.Files
+    local files = metadata.files
     if not files then return end
 
     return files
 end
 
-function GMAD:GetFile( fileID )
-    ArgAssert( fileID, 1, "number" )
+function GMA:GetFile( number )
+    ArgAssert( number, 1, "number" )
 
     local files = self:GetFiles()
     if not files then return end
 
-    return files[ fileID ]
+    return files[ number ]
 end
 
-function GMAD:AddFile( filePath, content )
+function GMA:AddFile( filePath, content )
     assert( self.WriteMode, "To change a gmad file, write mode is required." )
     ArgAssert( filePath, 1, "string" )
     ArgAssert( content, 2, "string" )
@@ -131,14 +150,14 @@ function GMAD:AddFile( filePath, content )
     if not files then return end
 
     files[ #files + 1 ] = {
-        ["Size"] = string.len( content ),
-        ["CRC"] = util.CRC( content ),
-        ["Content"] = content,
-        ["Path"] = filePath
+        ["size"] = string.len( content ),
+        ["crc"] = util.CRC( content ),
+        ["content"] = content,
+        ["path"] = filePath
     }
 end
 
-function GMAD:AddFolder( filePath, gamePath )
+function GMA:AddFolder( filePath, gamePath )
     assert( self.WriteMode, "To change a gmad file, write mode is required." )
     ArgAssert( filePath, 1, "string" )
     ArgAssert( gamePath, 2, "string" )
@@ -160,7 +179,7 @@ function GMAD:AddFolder( filePath, gamePath )
     end
 end
 
-function GMAD:ClearFiles()
+function GMA:ClearFiles()
     local files = self:GetFiles()
     if not files then return end
 
@@ -169,47 +188,82 @@ function GMAD:ClearFiles()
     end
 end
 
-function GMAD:ReadFile( fileID )
-    local entry = self:GetFile( fileID )
+function GMA:ReadFile( number )
+    local metadata = self.Metadata
+    if not metadata then return end
+
+    local files = metadata.Files
+    if not files then return end
+
+    local entry = files[ number ]
     if not entry then return end
 
-    local content = entry.Content
+    local content = entry.content
     if content then return content end
+
+    local filesPos = metadata.filesPos
+    if not filesPos then return end
 
     local fileClass = self.File
     if not fileClass then return end
 
-    fileClass:Seek( self.Metadata.DataPos + entry.Offset )
-    content = fileClass:Read( entry.Size )
-    entry.Content = content
+    fileClass:Seek( filesPos + entry.Offset )
+    content = fileClass:Read( entry.size )
+    entry.content = content
     return content
 end
 
-function GMAD:ReadAllFiles()
-    local files = self:GetFiles()
+function GMA:ReadAllFiles()
+    local fileClass = self.File
+    if not fileClass then return end
+
+    local metadata = self.Metadata
+    if not metadata then return end
+
+    local filesPos = metadata.filesPos
+    if not filesPos then return end
+
+    local files = metadata.Files
     if not files then return end
 
-    local dataPos = self.Metadata.DataPos
-    local fileClass = self.File
-
     for _, entry in ipairs( files ) do
-        if entry.Content then continue end
+        if entry.content then continue end
         if not fileClass then continue end
 
-        fileClass:Seek( dataPos + entry.Offset )
-        entry.Content = fileClass:Read( entry.Size )
+        fileClass:Seek( filesPos + entry.Offset )
+        entry.content = fileClass:Read( entry.Size )
     end
 
     return files
 end
 
-function GMAD:Close()
+function GMA:CheckCRC()
+    local files = self:GetFiles()
+    if not files then return true end
+
+    for _, entry in ipairs( files ) do
+        local crc = entry.crc
+        if not crc then continue end
+
+        local content = entry.content
+        if not content then continue end
+
+        if util.CRC( content ) ~= crc then
+            return false
+        end
+    end
+
+    return true
+end
+
+-- Saving & closing
+function GMA:Close()
     local fileClass = self.File
     if not fileClass then return end
 
     if self.WriteMode then
         fileClass:Write( self.Identity )
-        fileClass:WriteByte( GMAD.Version )
+        fileClass:WriteByte( self.Version )
 
         fileClass:WriteULong( 0 )
         fileClass:WriteULong( 0 )
@@ -234,16 +288,16 @@ function GMAD:Close()
 
         for num, entry in ipairs( self:GetFiles() ) do
             fileClass:WriteULong( num )
-            fileClass:WriteString( entry.Path )
-            fileClass:WriteULong( entry.Size )
+            fileClass:WriteString( entry.path )
+            fileClass:WriteULong( entry.size )
             fileClass:WriteULong( 0 )
-            fileClass:WriteULong( tonumber( entry.CRC ) )
+            fileClass:WriteULong( tonumber( entry.crc ) )
         end
 
         fileClass:WriteULong( 0 )
 
-        for num, entry in ipairs( self:GetFiles() ) do
-            fileClass:Write( entry.Content )
+        for _, entry in ipairs( self:GetFiles() ) do
+            fileClass:Write( entry.content )
         end
 
         fileClass:Flush()
@@ -252,18 +306,22 @@ function GMAD:Close()
     fileClass:Close()
 end
 
+-- Metadata parsing
 function Parse( fileClass )
-    local gmad = {}
-    if fileClass:Read( 4 ) ~= GMAD.Identity then return gmad end
+    if fileClass:Read( 4 ) ~= GMA.Identity then return end
 
-    gmad.Version = fileClass:ReadByte()
-    if ( gmad.Version > GMAD.Version ) then return gmad end
+    local version = fileClass:ReadByte()
+    if ( version > GMA.Version ) then return end
+
+    local gmad = {}
+
+    gmad.fileVersion = version
 
     fileClass:Skip( 8 )
-    gmad.Timestamp = fileClass:ReadULong()
+    gmad.fileTimestamp = fileClass:ReadULong()
     fileClass:Skip( 4 )
 
-    if gmad.Version > 1 then
+    if version > 1 then
         local required = {}
 
         while not fileClass:EndOfFile() do
@@ -272,39 +330,41 @@ function Parse( fileClass )
             required[ #required + 1 ] = content
         end
 
-        gmad.RequiredContent = required
+        gmad.requiredContent = required
     end
 
-    gmad.Title = fileClass:ReadString()
-    gmad.Description = fileClass:ReadString()
-    gmad.Author = fileClass:ReadString()
+    -- Addon info
+    gmad.title = fileClass:ReadString()
+    gmad.description = fileClass:ReadString()
+    gmad.author = fileClass:ReadString()
 
-    gmad.AddonVersion = fileClass:ReadLong()
+    -- Addon version (unused)
+    gmad.version = fileClass:ReadLong()
 
+    -- Files
     local fileNum = 1
     local offset = 0
-    gmad.Files = {}
+    gmad.files = {}
 
     while fileClass:ReadULong() ~= 0 do
         local entry = {}
-        entry.Path = fileClass:ReadString()
-        entry.Size = fileClass:ReadULong()
+        entry.path = fileClass:ReadString()
+        entry.size = fileClass:ReadULong()
         fileClass:Skip( 4 )
 
-        entry.CRC = fileClass:ReadULong()
-        entry.Number = fileNum
-        entry.Offset = offset
+        entry.crc = fileClass:ReadULong()
+        entry.offset = offset
 
-        gmad.Files[ fileNum ] = entry
-        offset = offset + entry.Size
+        gmad.files[ fileNum ] = entry
+        offset = offset + entry.size
         fileNum = fileNum + 1
     end
 
-    gmad.DataPos = fileClass:Tell()
+    gmad.filesPos = fileClass:Tell()
 
-    local description = gmad.Description
+    local description = gmad.description
     if ( description ~= nil ) then
-        gmad.Description = util.JSONToTable( description ) or description
+        gmad.description = util.JSONToTable( description ) or description
     end
 
     return gmad
@@ -313,7 +373,7 @@ end
 function Read( fileClass )
     if not fileClass then return end
 
-    local instance = setmetatable( {}, GMAD )
+    local instance = setmetatable( {}, GMA )
     instance.Metadata = Parse( fileClass )
     instance.File = fileClass
 
@@ -327,19 +387,19 @@ function Open( filePath, gamePath )
     return Read( file.Open( filePath, "rb", gamePath ) )
 end
 
-function Create( filePath )
+function Write( filePath )
     local fileClass = file.Open( filePath, "wb", "DATA" )
     if not fileClass then return end
 
-    local instance = setmetatable( {}, GMAD )
+    local instance = setmetatable( {}, GMA )
     instance.File = fileClass
     instance.WriteMode = true
     instance.Metadata = {
-        ["Title"] = "Garry\'s Mod Addon",
-        ["Description"] = "description",
-        ["Author"] = "Pika Software",
-        ["RequiredContent"] = {},
-        ["Files"] = {}
+        ["title"] = "Garry\'s Mod Addon",
+        ["description"] = "description",
+        ["author"] = "Pika Software",
+        ["requiredContent"] = {},
+        ["files"] = {}
     }
 
     return instance
