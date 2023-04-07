@@ -14,7 +14,7 @@ local assert = assert
 local ipairs = ipairs
 local pairs = pairs
 
-module( "gpm.pkgf", package.seeall )
+module( "gpm.pkgf" )
 
 PKG = PKG or {}
 PKG.__index = PKG
