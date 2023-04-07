@@ -302,6 +302,8 @@ function Parse( fileClass )
     fileClass:WriteULong( 0 )
 
     pkg.filesPos = fileClass:Tell()
+
+    return pkg
 end
 
 function Read( fileClass )
