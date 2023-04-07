@@ -42,7 +42,7 @@ Import = promise.Async( function( wsid, parentPackage )
             if not fileExists or file.Time( outputPath, "DATA" ) > PackageLifeTime then
                 if fileExists then file.Delete( outputPath ) end
 
-                local output = gmad.Create( outputPath )
+                local output = gmad.Write( outputPath )
                 if output then
                     output.Metadata = gma.Metadata
                     output:Close()
