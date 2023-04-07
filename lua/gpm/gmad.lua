@@ -373,18 +373,29 @@ end
 function Read( fileClass )
     if not fileClass then return end
 
-    local instance = setmetatable( {}, GMA )
-    instance.Metadata = Parse( fileClass )
-    instance.File = fileClass
+    local metadata = Parse( fileClass )
+    if not metadata then return end
 
-    -- Close file in next tick
-    util.NextTick( instance.Close, instance )
+    local instance = setmetatable( {}, GMA )
+    instance.Metadata = metadata
+    instance.File = fileClass
 
     return instance
 end
 
 function Open( filePath, gamePath )
-    return Read( file.Open( filePath, "rb", gamePath ) )
+    local fileClass = file.Open( filePath, "rb", gamePath )
+    if not fileClass then return end
+
+    local instance = Read( fileClass )
+    if not instance then
+        fileClass:Close()
+        return
+    end
+
+    util.NextTick( fileClass.Close, fileClass )
+
+    return instance
 end
 
 function Write( filePath )
