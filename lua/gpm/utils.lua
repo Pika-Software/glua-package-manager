@@ -171,6 +171,10 @@ do
         self:WriteByte( 0 )
     end
 
+    function meta:SeekToStart()
+        self:Seek( -self:Tell() )
+    end
+
 end
 
 -- util.NextTick( func, ... )
