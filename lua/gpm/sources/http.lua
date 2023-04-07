@@ -3,6 +3,7 @@ local packages = gpm.packages
 local sources = gpm.sources
 local promise = gpm.promise
 local utils = gpm.utils
+local pkgf = gpm.pkgf
 local http = gpm.http
 local string = string
 local file = file
@@ -37,52 +38,28 @@ Import = promise.Async( function( url, parentPackage )
     if file.Exists( cachePath, "DATA" ) and file.Time( cachePath, "DATA" ) <= PackageLifeTime then
         local fileClass = file.Open( cachePath, "rb", "DATA" )
         if fileClass ~= nil then
-            if fileClass:Read( 4 ) == "GPMP" then
-                local json = fileClass:ReadString()
-                if json then
-                    local metadata = util.JSONToTable( json )
-                    if metadata ~= nil then
+            local pkg = pkgf.Read( fileClass )
+            if pkg ~= nil then
+                local files = pkg:ReadAllFiles()
+                if not files then return promise.Reject( "package is empty" ) end
 
-                        local entries, offset = {}, 0
-                        while fileClass:ReadULong() ~= 0 do
-                            local entry = {}
-                            entry.Path = fileClass:ReadString()
-                            entry.Size = fileClass:ReadULong()
-                            entry.Offset = offset
-
-                            entries[ #entries + 1 ] = entry
-                            offset = offset + entry.Size
-                        end
-
-                        local dataPos = fileClass:Tell()
-
-                        for _, entry in ipairs( entries ) do
-                            fileClass:Seek( dataPos + entry.Offset )
-                            entry.Content = fileClass:Read( entry.Size )
-                        end
-
-                        fileClass:Close()
-
-                        local files = {}
-                        for _, entry in ipairs( entries ) do
-                            local ok, result = pcall( CompileString, entry.Content, entry.Path )
-                            if not ok then return promise.Reject( result ) end
-                            files[ entry.Path ] = result
-                        end
-
-                        local func = files[ metadata.main ]
-                        if not func then return promise.Reject( "main file is missing" ) end
-
-                        return packages.Initialize( metadata, func, files, parentPackage )
-                    end
+                local packageFiles = {}
+                for _, entry in ipairs( files ) do
+                    local filePath = entry.path
+                    local ok, result = pcall( CompileString, entry.Content, filePath )
+                    if not ok then return promise.Reject( result ) end
+                    packageFiles[ filePath ] = result
                 end
 
-                fileClass:Close()
+                local metadata = packages.GetMetaData( pkg:GetMetadata() )
 
-                return promise.Reject( "package file is damaged" )
+                local func = packageFiles[ metadata.main ]
+                if not main then return promise.Reject( "main file is missing (" .. metadata.name .. "@" .. metadata.version .. ")" ) end
+
+                return packages.Initialize( metadata, func, packageFiles, parentPackage )
             end
 
-            fileClass:Seek( -4 )
+            fileClass:SeekToStart()
             local code = fileClass:Read( fileClass:Size() )
             fileClass:Close()
 
@@ -90,6 +67,8 @@ Import = promise.Async( function( url, parentPackage )
 
             local ok, result = pcall( CompileString, code, cachePath )
             if not ok then return promise.Reject( result ) end
+            if not result then return promise.Reject( "file compilation failed" ) end
+
             return packages.Initialize( packages.GetMetaData( {
                 ["name"] = packageName
             } ), result, {}, parentPackage )
@@ -148,25 +127,24 @@ Import = promise.Async( function( url, parentPackage )
     local func = files[ mainFile ]
     if not func then return promise.Reject( "main file '" .. mainFile .. "' is missing" ) end
 
-    local fileClass = file.Open( cachePath, "wb", "DATA" )
-    if fileClass ~= nil then
-        fileClass:WriteString( "GPMP" )
-        fileClass:WriteString( util.TableToJSON( metadata ) )
+    local pkg = pkgf.Write( cachePath )
+    if pkg ~= nil then
+        -- Info
+        pkg:SetName( metadata.name )
+        pkg:SetMainFile( metadata.main )
+        pkg:SetVersion( metadata.version )
 
-        for num, data in ipairs( content ) do
-            fileClass:WriteULong( num )
-            fileClass:WriteString( data[ 1 ] )
-            fileClass:WriteULong( #data[ 2 ] )
+        -- Client & Server
+        pkg:SetClient( metadata.client )
+        pkg:SetServer( metadata.server )
+
+        -- Package Author
+        local author = metadata.author
+        if type( author ) == "string" then
+            pkg:SetAuthor( author )
         end
 
-        fileClass:WriteULong( 0 )
-
-        for num, data in ipairs( content ) do
-            fileClass:Write( data[ 2 ] )
-        end
-
-        fileClass:Flush()
-        fileClass:Close()
+        pkg:Close()
     end
 
     return packages.Initialize( metadata, func, files, parentPackage )
