@@ -8,8 +8,7 @@ Package manager supporting isolation, synchronous import and package dependency 
 - Synchronous import of packages from different sources
 
 ## TODO
-- [ ] Встраивать скрипты из zip файла в файловую систему с помощью gma генерации, для поддержки AddCSLuaFile
-- [ ] Использование сжатия в пакетных файлах zip
+- [ ] Добавить удаление кеша ( скачаный контент и скачаные пакеты ) через определённый период и создать конварку на отключение/включение этого
 
 ## How to create your own package?
 1. Create `package.lua` and `init.lua` files in directory `lua/packages/<your-package-name>/`.
