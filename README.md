@@ -13,18 +13,28 @@
 - [ ] Использование сжатия в пакетных файлах zip
 
 ## How to create your own package?
-1. Create `package.lua` and `main.lua` files in directory `lua/packages/<your-package-name>/`.
-2. Enter information about your package in `package.lua` (See [package.lua](package.lua.md)), or just write `return {}`.
-3. Write your code in `main.lua`, this is shared file, so you can write serverside and clientside code.
+1. Create `package.lua` and `init.lua` files in directory `lua/packages/<your-package-name>/`.
+2. Enter information about your package in `package.lua`, below is an example.
+3. Write your code in `init.lua`, if you want the script to be only on the client or server, write in your `package.lua` additional lines `server` or `client`, an example below.
 
 Also, you can run an existing addon via gpm, just add the code below to `package.lua`, and you don’t even need to add `init.lua`.
+### package.lua example
 ```lua
--- package.lua
-return {
-    -- gpm will run the specified file instead of init.lua
-    main = "path/to/my/code/main.lua",
-}
+-- The name of the package is just text that will be displayed in the format name@version, for example My Awesome Package@0.0.1
+name = "My Awesome Package"
+
+-- Version format { 00 } { 00 } { 00 } = 0.0.0
+version = 000001
+
+-- The `main` in this case is the entry point to the package (where the code execution will start from)
+main = "path/to/my/code/main.lua"
+
+-- Allows to run only on the server side. (default is true, true)
+server = true
+client = false
+
 ```
+This file can also contain any other additional information such as package author, license or description.
 
 ## License
 [MIT](LICENSE) © Pika Software
