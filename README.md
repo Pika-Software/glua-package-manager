@@ -6,7 +6,6 @@
 - Package dependencies support
 
 ## TODO
-- [x] Package enviroment isolation
 - [ ] Встраивать скрипты из zip файла в файловую систему с помощью gma генерации, для поддержки AddCSLuaFile
 - [ ] Использование сжатия в пакетных файлах zip
 
