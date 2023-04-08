@@ -6,8 +6,8 @@ local string = string
 
 -- Variables
 local ErrorNoHaltWithStack = ErrorNoHaltWithStack
-local debug_setfenv = debug.setfenv
 local AddCSLuaFile = AddCSLuaFile
+local setfenv = setfenv
 local type = type
 
 -- Packages table
@@ -46,13 +46,12 @@ function GetMetaData( source )
         end
 
         -- Realms
-        if ( source.client ~= false ) then
-            source.client = true
-        end
+        source.client = source.client ~= false
+        source.server = source.server ~= false
 
-        if ( source.server ~= false ) then
-            source.server = true
-        end
+        -- Package isolation & logger
+        source.isolation = source.isolation ~= false
+        source.logger = source.logger ~= false
 
         return source
     elseif type( source ) == "function" then
@@ -143,7 +142,11 @@ do
 end
 
 function Run( gPackage, func )
-    debug_setfenv( func, gPackage:GetEnvironment() )
+    local env = gPackage.environment
+    if env ~= nil then
+        setfenv( func, env )
+    end
+
     return func()
 end
 
@@ -166,6 +169,8 @@ function FindFilePath( fileName, files )
     return files[ fileName ] and fileName
 end
 
+local packages = gpm.packages
+
 function Initialize( metadata, func, files, parentPackage )
     ArgAssert( metadata, 1, "table" )
     ArgAssert( func, 2, "function" )
@@ -175,7 +180,7 @@ function Initialize( metadata, func, files, parentPackage )
     if versions ~= nil then
         local gPackage = versions[ metadata.version ]
         if IsPackage( gPackage ) then
-            if IsPackage( parentPackage ) then
+            if not metadata.isolation and IsPackage( parentPackage ) then
                 environment.LinkMetaTables( parentPackage.environment, gPackage.environment )
             end
 
@@ -186,41 +191,42 @@ function Initialize( metadata, func, files, parentPackage )
     -- Measuring package startup time
     local stopwatch = SysTime()
 
-    -- Creating environment for package
-    local packageEnv = environment.Create( func )
-
-    if IsPackage( parentPackage ) then
-        environment.LinkMetaTables( parentPackage.environment, packageEnv )
-    end
-
     -- Creating package object
     local gPackage = setmetatable( {}, PACKAGE )
-    gPackage.environment = packageEnv
     gPackage.metadata = metadata
     gPackage.files = files
 
-    gPackage.logger = gpm.logger.Create( gPackage:GetIdentifier(), metadata.color )
+    if metadata.logger then
+        gPackage.logger = gpm.logger.Create( gPackage:GetIdentifier(), metadata.color )
+    end
 
-    -- Binding package object to gpm.Package
-    environment.SetLinkedTable( packageEnv, "gpm", gpm )
+    if metadata.isolation then
 
-    -- Globals
-    table.SetValue( packageEnv, "gpm.Logger", gPackage.logger, true )
-    table.SetValue( packageEnv, "gpm.Package", gPackage, true )
-    table.SetValue( packageEnv, "_VERSION", metadata.version )
-    table.SetValue( packageEnv, "promise", gpm.promise )
-    table.SetValue( packageEnv, "TypeID", gpm.TypeID )
-    table.SetValue( packageEnv, "type", gpm.type )
+        -- Creating environment for package
+        local packageEnv = environment.Create( func )
+        gPackage.environment = packageEnv
 
-    environment.SetValue( packageEnv, "import", function( filePath, async, parentPackage )
-        return gpm.Import( filePath, async, parentPackage or gpm.Package )
-    end )
+        -- Adding to the parent package
+        if IsPackage( parentPackage ) then
+            environment.LinkMetaTables( parentPackage.environment, packageEnv )
+        end
 
-    do
+        -- Binding package object to gpm.Package
+        environment.SetLinkedTable( packageEnv, "gpm", gpm )
 
-        local packages = gpm.packages
+        -- Globals
+        table.SetValue( packageEnv, "gpm.Logger", gPackage.logger, true )
+        table.SetValue( packageEnv, "gpm.Package", gPackage, true )
+        table.SetValue( packageEnv, "_VERSION", metadata.version )
+        table.SetValue( packageEnv, "promise", gpm.promise )
+        table.SetValue( packageEnv, "TypeID", gpm.TypeID )
+        table.SetValue( packageEnv, "type", gpm.type )
 
-        -- Include
+        environment.SetValue( packageEnv, "import", function( filePath, async, parentPackage )
+            return gpm.Import( filePath, async, parentPackage or gpm.Package )
+        end )
+
+        -- include
         environment.SetValue( packageEnv, "include", function( fileName )
             local path = packages.FindFilePath( fileName, files )
 
