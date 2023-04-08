@@ -32,9 +32,12 @@ end
 
 function GetMetaData( source )
     if type( source ) == "table" then
+        -- Package name, main file & author
         source.name = isstring( source.name ) and source.name or nil
         source.main = isstring( source.main ) and source.main or nil
+        source.author = isstring( source.author ) and source.author or nil
 
+        -- Version
         local version = source.version
         if isnumber( version ) then
             source.version = version
@@ -42,6 +45,7 @@ function GetMetaData( source )
             source.version = 1
         end
 
+        -- Realms
         if ( source.client ~= false ) then
             source.client = true
         end
