@@ -85,3 +85,35 @@ do
     end
 
 end
+
+local GetConVar = GetConVar
+
+-- https://wiki.facepunch.com/gmod/cvars.String
+function cvars.String( name, default )
+    local convar = GetConVar( name )
+    if ( convar ~= nil ) then
+        return convar:GetString()
+    end
+
+    return default
+end
+
+-- https://wiki.facepunch.com/gmod/cvars.Number
+function cvars.Number( name, default )
+    local convar = GetConVar( name )
+    if ( convar ~= nil ) then
+        return convar:GetFloat()
+    end
+
+    return default
+end
+
+-- https://wiki.facepunch.com/gmod/cvars.Bool
+function cvars.Bool( name, default )
+    local convar = GetConVar( name )
+    if ( convar ~= nil ) then
+        return convar:GetBool()
+    end
+
+    return default
+end
