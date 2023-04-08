@@ -1,6 +1,8 @@
-# ![GLua Package Manager](https://i.imgur.com/w454Ms1.png?1)
-
 [![Lint](https://github.com/Pika-Software/glua_package_manager/actions/workflows/glualint-check.yml/badge.svg)](https://github.com/Pika-Software/glua_package_manager/actions/workflows/glualint-check.yml)
+
+# GLua Package Manager
+Package manager supporting isolation, synchronous import and package dependency building.
+
 ## Features
 - Package information structure like [package.json](https://docs.npmjs.com/cli/v6/configuring-npm/package-json)
 - Synchronous import of packages from different sources
