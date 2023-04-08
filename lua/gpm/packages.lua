@@ -228,7 +228,7 @@ do
             environment.SetLinkedTable( packageEnv, "gpm", gpm )
 
             -- Globals
-            table.SetValue( packageEnv, "gpm.Logger", gPackage.logger, true )
+            table.SetValue( packageEnv, "gpm.Logger", gPackage.logger )
             table.SetValue( packageEnv, "gpm.Package", gPackage, true )
             table.SetValue( packageEnv, "_VERSION", metadata.version )
             table.SetValue( packageEnv, "promise", gpm.promise )
