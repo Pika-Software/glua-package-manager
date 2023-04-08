@@ -17,6 +17,8 @@ local pairs = pairs
 local pcall = pcall
 local type = type
 
+local cacheLifetime = GetConVar( "gpm_cache_lifetime" )
+
 module( "gpm.sources.http" )
 
 function CanImport( filePath )
@@ -25,8 +27,6 @@ end
 
 local realmFolder = "gpm/packages" .. "/" .. ( SERVER and "server" or "client" )
 utils.CreateFolder( realmFolder )
-
-local cacheLifetime = GetConVar( "gpm_cache_lifetime" )
 
 Import = promise.Async( function( url, parentPackage )
     local wsid = string.match( url, "steamcommunity%.com/sharedfiles/filedetails/%?id=(%d+)" )

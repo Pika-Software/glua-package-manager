@@ -18,13 +18,13 @@ local type = type
 local realmFolder = "gpm/packages" .. "/" .. ( SERVER and "server" or "client" )
 utils.CreateFolder( realmFolder )
 
+local cacheLifetime = GetConVar( "gpm_cache_lifetime" )
+
 module( "gpm.sources.workshop" )
 
 function CanImport( filePath )
     return type( tonumber( filePath ) ) == "number"
 end
-
-local cacheLifetime = GetConVar( "gpm_cache_lifetime" )
 
 Import = promise.Async( function( wsid, parentPackage )
     local p = promise.New()

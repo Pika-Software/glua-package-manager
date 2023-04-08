@@ -9,6 +9,9 @@ local SERVER = SERVER
 local ipairs = ipairs
 local Color = Color
 
+-- Package cache lifetime convar
+CreateConVar( "gpm_cache_lifetime", "24", FCVAR_ARCHIVE, " - the cache lifetime, in hours, sets after how many hours the downloaded gpm packages will not be relevant.", 0, 60480 )
+
 module( "gpm" )
 
 _VERSION = 010000
@@ -47,9 +50,6 @@ includeShared "environment"
 includeShared "packages"
 includeShared "http"
 includeShared "gmad"
-
--- Package cache lifetime convar
-CreateConVar( "gpm_cache_lifetime", "24", FCVAR_ARCHIVE, " - the cache lifetime, in hours, sets after how many hours the downloaded gpm packages will not be relevant.", 0, 60480 )
 
 -- Sources
 sources = sources or {}
