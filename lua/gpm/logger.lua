@@ -86,7 +86,7 @@ do
         ArgAssert( levelColor, 1, "Color" )
         ArgAssert( level, 2, "string" )
 
-        MsgC( dateColor, os_date( "%d/%m/%Y %H:%M:%S ", os_time() ), levelColor, level, dateColor, " --- ", realmColor, "[" .. (SERVER and "SERVER" or "CLIENT") .. "] ", self:GetColor(), self:GetName(), dateColor, " : ", self:GetTextColor(), string.format( str, ... ), "\n"  )
+        MsgC( dateColor, os_date( "%d/%m/%Y %H:%M:%S ", os_time() ), levelColor, level, dateColor, " --- ", realmColor, "[" .. (SERVER and "SERVER" or "CLIENT") .. "] ", self.Color, self.Name, dateColor, " : ", self.TextColor, string.format( str, ... ), "\n"  )
     end
 
 end
