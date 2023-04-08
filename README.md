@@ -1,6 +1,6 @@
 # ![GLua Package Manager](https://i.imgur.com/w454Ms1.png?1)
 
-[![Lint](https://github.com/Pika-Software/gpm/actions/workflows/lint.yml/badge.svg)](https://github.com/Pika-Software/gpm/actions/workflows/lint.yml)
+[![Lint](https://github.com/Pika-Software/glua_package_manager/actions/workflows/glualint-check.yml/badge.svg)](https://github.com/Pika-Software/glua_package_manager/actions/workflows/glualint-check.yml)
 ## Features
 - Package information structure like [package.json](https://docs.npmjs.com/cli/v6/configuring-npm/package-json)
 - [SemVer 2.0](https://semver.org/) support with [npm version matching](https://docs.npmjs.com/cli/v6/configuring-npm/package-json#dependencies)
