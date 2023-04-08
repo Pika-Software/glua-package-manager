@@ -1,18 +1,12 @@
-local promise = gpm.promise
-
 if not reqwest and not CHTTP then
-    if util.IsBinaryModuleInstalled( "reqwest" ) then
-        require( "reqwest" )
-    end
-
-    if not reqwest and util.IsBinaryModuleInstalled( "chttp" ) then
-        require( "chttp" )
-    end
+    if util.IsBinaryModuleInstalled( "reqwest" ) then require( "reqwest" ) end
+    if not reqwest and util.IsBinaryModuleInstalled( "chttp" ) then require( "chttp" ) end
 end
 
 local client = reqwest or CHTTP or HTTP
+local promise = gpm.promise
 
-module( "gpm.http", package.seeall )
+module( "gpm.http" )
 
 DEFAULT_TIMEOUT = 60
 
