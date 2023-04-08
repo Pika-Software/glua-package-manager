@@ -385,7 +385,10 @@ function Open( filePath, gamePath )
         return
     end
 
-    util.NextTick( fileClass.Close, fileClass )
+    util.NextTick( function()
+        if not fileClass then return end
+        fileClass:Close()
+    end )
 
     return instance
 end
