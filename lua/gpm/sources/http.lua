@@ -26,7 +26,7 @@ end
 local realmFolder = "gpm/packages" .. "/" .. ( SERVER and "server" or "client" )
 utils.CreateFolder( realmFolder )
 
-PackageLifeTime = 60 * 60 * 24
+local cacheLifetime = GetConVar( "gpm_cache_lifetime" )
 
 Import = promise.Async( function( url, parentPackage )
     local wsid = string.match( url, "steamcommunity%.com/sharedfiles/filedetails/%?id=(%d+)" )
@@ -34,8 +34,8 @@ Import = promise.Async( function( url, parentPackage )
 
     local packageName = util.CRC( url )
 
-    local cachePath = realmFolder .. "/http_" .. packageName .. ".dat"
-    if file.Exists( cachePath, "DATA" ) and file.Time( cachePath, "DATA" ) > PackageLifeTime then
+    local cachePath = realmFolder .. "/http_" .. packageName .. ".gma.dat"
+    if file.Exists( cachePath, "DATA" ) and file.Time( cachePath, "DATA" ) > ( 60 * 60 * cacheLifetime:GetInt() ) then
         local fileClass = file.Open( cachePath, "rb", "DATA" )
         if fileClass ~= nil then
             local gma = gmad.Read( fileClass )
