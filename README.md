@@ -3,8 +3,7 @@
 [![Lint](https://github.com/Pika-Software/glua_package_manager/actions/workflows/glualint-check.yml/badge.svg)](https://github.com/Pika-Software/glua_package_manager/actions/workflows/glualint-check.yml)
 ## Features
 - Package information structure like [package.json](https://docs.npmjs.com/cli/v6/configuring-npm/package-json)
-- Package dependencies support
-- Magical `import` function
+- Synchronous import of packages from different sources
 
 ## TODO
 - [ ] Встраивать скрипты из zip файла в файловую систему с помощью gma генерации, для поддержки AddCSLuaFile
