@@ -18,7 +18,7 @@ gpm.AsyncImport = promise.Async( function( filePath, parentPackage )
 
     for _, source in ipairs( sources ) do
         if type( source.CanImport ) ~= "function" then continue end
-        if not source.CanImport( filePath, parentPackage ) then continue end
+        if not source.CanImport( filePath ) then continue end
         return source.Import( filePath, parentPackage )
     end
 end )
