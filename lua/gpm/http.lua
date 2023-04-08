@@ -1,9 +1,4 @@
--- Libraries
 local promise = gpm.promise
-local file = file
-
--- Variables
-local os_time = os.time
 
 if not reqwest and not CHTTP then
     if util.IsBinaryModuleInstalled( "reqwest" ) then
@@ -19,7 +14,7 @@ local client = reqwest or CHTTP or HTTP
 
 module( "gpm.http", package.seeall )
 
-local DEFAULT_TIMEOUT = 60
+DEFAULT_TIMEOUT = 60
 
 function HTTP( parameters )
     local p = promise.New()
@@ -61,23 +56,3 @@ function Post( url, parameters, headers, timeout )
         ["timeout"] = timeout or DEFAULT_TIMEOUT
     } )
 end
-
-Download = promise.Async( function( url, filePath, headers, lifeTime )
-    if ( lifeTime ~= nil ) and file.Exists( filePath, "DATA" ) and ( os_time() - file.Time( filePath, "DATA" ) ) < lifeTime then
-        return {
-            ["content"] = file.Read( filePath, "DATA" ),
-            ["filePath"] = filePath
-        }
-    end
-
-    local ok, result = Fetch( url, headers, 120 ):SafeAwait()
-    if not ok then return promise.Reject( result ) end
-    if result.code ~= 200 then return promise.Reject( "invalid response http code - " .. result.code ) end
-
-    file.Write( filePath, result.body )
-
-    return {
-        ["filePath"] = filePath,
-        ["content"] = result.body
-    }
-end )
