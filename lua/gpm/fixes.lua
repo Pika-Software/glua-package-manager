@@ -65,20 +65,12 @@ end
 -- https://wiki.facepunch.com/gmod/util.IsBinaryModuleInstalled
 do
 
-    local CLIENT = CLIENT
-    local error = error
-    local type = type
-
     local suffix = ( { "osx64", "osx", "linux64", "linux", "win64", "win32" } )[ ( system.IsWindows() and 4 or 0 ) + ( system.IsLinux() and 2 or 0 ) + ( jit.arch == "x86" and 1 or 0 ) + 1 ]
     local fmt = "lua/bin/gm" .. ( CLIENT and "cl" or "sv" ) .. "_%s_%s.dll"
     local fmt = "lua/bin/gm" .. ( ( CLIENT and not MENU_DLL ) and "cl" or "sv" ) .. "_%s_%s.dll"
 
     function util.IsBinaryModuleInstalled( name )
-        if type( name ) ~= "string" then
-            error( "bad argument #1 to 'IsBinaryModuleInstalled' (string expected, got " .. type( name ) .. ")" )
-        elseif #name == 0 then
-            error( "bad argument #1 to 'IsBinaryModuleInstalled' (string cannot be empty)" )
-        end
+        ArgAssert( name, 1, "string" )
 
         if file.Exists( string.format( fmt, name, suffix ), "GAME" ) then
             return true
