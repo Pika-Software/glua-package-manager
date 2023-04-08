@@ -24,7 +24,7 @@ function CanImport( filePath )
     return type( tonumber( filePath ) ) == "number"
 end
 
-PackageLifeTime = 60 * 60 * 24
+local cacheLifetime = GetConVar( "gpm_cache_lifetime" )
 
 Import = promise.Async( function( wsid, parentPackage )
     local p = promise.New()
@@ -36,10 +36,10 @@ Import = promise.Async( function( wsid, parentPackage )
             local gma = gmad.Read( fileClass )
             if not gma then return p:Reject( "gma reading error" ) end
 
-            local outputPath = realmFolder .. "/" .. wsid .. ".gma.dat"
+            local outputPath = realmFolder .. "/workshop_" .. wsid .. ".gma.dat"
             local fileExists = file.Exists( outputPath, "DATA" )
 
-            if not fileExists or file.Time( outputPath, "DATA" ) > PackageLifeTime then
+            if not fileExists or file.Time( outputPath, "DATA" ) > ( 60 * 60 * cacheLifetime:GetInt() ) then
                 if fileExists then file.Delete( outputPath ) end
 
                 local output = gmad.Write( outputPath )
