@@ -1,9 +1,8 @@
-if not reqwest and not CHTTP then
-    if util.IsBinaryModuleInstalled( "reqwest" ) then require( "reqwest" ) end
-    if not reqwest and util.IsBinaryModuleInstalled( "chttp" ) then require( "chttp" ) end
-end
+-- if not reqwest and util.IsBinaryModuleInstalled( "reqwest" ) then require( "reqwest" ) end
+-- if not reqwest and not CHTTP and util.IsBinaryModuleInstalled( "chttp" ) then require( "chttp" ) end
+-- local client = reqwest or CHTTP or HTTP
 
-local client = reqwest or CHTTP or HTTP
+local client = HTTP
 local promise = gpm.promise
 
 module( "gpm.http" )
