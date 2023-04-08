@@ -3,7 +3,7 @@ local packages = gpm.packages
 local sources = gpm.sources
 local promise = gpm.promise
 local utils = gpm.utils
-local pkgf = gpm.pkgf
+local gmad = gpm.gmad
 local http = gpm.http
 local string = string
 local file = file
@@ -34,29 +34,14 @@ Import = promise.Async( function( url, parentPackage )
 
     local packageName = util.CRC( url )
 
-    local cachePath = realmFolder .. "/" .. packageName .. ".dat"
-    if file.Exists( cachePath, "DATA" ) and file.Time( cachePath, "DATA" ) <= PackageLifeTime then
+    local cachePath = realmFolder .. "/http_" .. packageName .. ".dat"
+    if file.Exists( cachePath, "DATA" ) and file.Time( cachePath, "DATA" ) > PackageLifeTime then
         local fileClass = file.Open( cachePath, "rb", "DATA" )
         if fileClass ~= nil then
-            local pkg = pkgf.Read( fileClass )
-            if pkg ~= nil then
-                local files = pkg:ReadAllFiles()
-                if not files then return promise.Reject( "package is empty" ) end
-
-                local packageFiles = {}
-                for _, entry in ipairs( files ) do
-                    local filePath = entry.path
-                    local ok, result = pcall( CompileString, entry.Content, filePath )
-                    if not ok then return promise.Reject( result ) end
-                    packageFiles[ filePath ] = result
-                end
-
-                local metadata = packages.GetMetaData( pkg:GetMetadata() )
-
-                local func = packageFiles[ metadata.main ]
-                if not main then return promise.Reject( "main file is missing (" .. metadata.name .. "@" .. utils.Version( metadata.version ) .. ")" ) end
-
-                return packages.Initialize( metadata, func, packageFiles, parentPackage )
+            local gma = gmad.Read( fileClass )
+            if gma ~= nil then
+                fileClass:Close()
+                return sources.gmad.Import( "data/" .. cachePath, parentPackage )
             end
 
             fileClass:SeekToStart()
@@ -73,6 +58,8 @@ Import = promise.Async( function( url, parentPackage )
                 ["name"] = packageName
             } ), result, {}, parentPackage )
         end
+
+        return promise.Reject( "file reading failed" )
     end
 
     local ok, result = http.Fetch( url, nil, 120 ):SafeAwait()
@@ -82,75 +69,49 @@ Import = promise.Async( function( url, parentPackage )
 
     local metadata = util.JSONToTable( result.body )
     if not metadata then
-        local code = result.body
-
-        local ok, result = pcall( CompileString, code, cachePath )
+        local ok, result = pcall( CompileString, result.body, url )
         if not ok then return promise.Reject( result ) end
         if not result then return promise.Reject( "file compilation failed" ) end
 
-        file.Write( cachePath, code )
+        file.Write( cachePath, result.body )
 
         return packages.Initialize( packages.GetMetaData( {
             ["name"] = packageName
         } ), result, {}, parentPackage )
     end
 
-    metadata = packages.GetMetaData( utils.LowerTableKeys( metadata ) )
+    metadata = utils.LowerTableKeys( metadata )
 
-    if not metadata.files then return promise.Reject( "package is empty" ) end
-    metadata.source = metadata.source or "http"
-
-    local mainFile = metadata.main
-    if type( mainFile ) ~= "string" then
-        mainFile = "init.lua"
-    end
-
-    metadata.main = mainFile
-
-    local content = {}
-    for filePath, fileURL in pairs( metadata.files ) do
-        local ok, result = http.Fetch( fileURL, nil, 120 ):SafeAwait()
-        if not ok then return promise.Reject( "file " .. filePath .. " downloading failed, with error: " .. result ) end
-        if result.code ~= 200 then return promise.Reject( "file " .. filePath .. " downloading failed, with code: " .. result.code ) end
-        content[ #content + 1 ] = { result.body, filePath }
-    end
-
+    local urls = metadata.files
+    if type( urls ) ~= "table" then return promise.Reject( "no urls to files" ) end
     metadata.files = nil
 
     local files = {}
-    for _, data in ipairs( content ) do
-        local ok, result = pcall( CompileString, data[ 1 ], data[ 2 ] )
-        if not ok then return promise.Reject( result ) end
-        files[ data[ 2 ] ] = result
+    for filePath, fileURL in pairs( urls ) do
+        local ok, result = http.Fetch( fileURL, nil, 120 ):SafeAwait()
+        if not ok then return promise.Reject( "file " .. filePath .. " downloading failed, with error: " .. result ) end
+        if result.code ~= 200 then return promise.Reject( "file " .. filePath .. " downloading failed, with code: " .. result.code ) end
+        files[ #files + 1 ] = { filePath, result.body }
     end
 
-    local func = files[ mainFile ]
-    if not func then return promise.Reject( "main file '" .. mainFile .. "' is missing" ) end
+    if #files == 0 then return promise.Reject( "no files" ) end
 
-    local pkg = pkgf.Write( cachePath )
-    if pkg ~= nil then
-        -- Info
-        pkg:SetName( metadata.name )
-        pkg:SetMainFile( metadata.main )
-        pkg:SetVersion( metadata.version )
+    local gma = gmad.Write( cachePath )
+    if not gma then return promise.Reject( "cache construction error" ) end
 
-        -- Client & Server
-        pkg:SetClient( metadata.client )
-        pkg:SetServer( metadata.server )
+    gma:SetTitle( metadata.name or packageName )
+    gma:SetDescription( util.TableToJSON( metadata ) )
 
-        -- Package Author
-        local author = metadata.author
-        if type( author ) == "string" then
-            pkg:SetAuthor( author )
-        end
-
-        -- Files
-        for _, data in ipairs( content ) do
-            pkg:AddFile( data[ 2 ], data[ 1 ] )
-        end
-
-        pkg:Close()
+    local author = metadata.author
+    if author ~= nil then
+        gma:SetAuthor( author )
     end
 
-    return packages.Initialize( metadata, func, files, parentPackage )
+    for _, tbl in ipairs( files ) do
+        gma:AddFile( tbl[ 1 ], tbl[ 2 ] )
+    end
+
+    gma:Close()
+
+    return sources.gmad.Import( "data/" .. cachePath, parentPackage )
 end )
