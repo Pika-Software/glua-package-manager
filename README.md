@@ -4,6 +4,7 @@
 ## Features
 - Package information structure like [package.json](https://docs.npmjs.com/cli/v6/configuring-npm/package-json)
 - Package dependencies support
+- Magical `import` function
 
 ## TODO
 - [ ] Встраивать скрипты из zip файла в файловую систему с помощью gma генерации, для поддержки AddCSLuaFile
@@ -32,6 +33,16 @@ client = false
 
 ```
 This file can also contain any other additional information such as package author, license or description.
+
+### `import` function usage example
+Here is an example of the use of import in the init.lua file of the package.
+```lua
+-- pkg1 init.lua
+import "pkg2"
+
+print( package2.feature() )
+```
+Look for more examples in our code ;)
 
 ## License
 [MIT](LICENSE) © Pika Software
