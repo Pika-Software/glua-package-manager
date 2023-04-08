@@ -38,7 +38,7 @@ This file can also contain any other additional information such as package auth
 Here is an example of the use of import in the init.lua file of the package.
 ```lua
 -- pkg1 init.lua
-import "pkg2"
+import "packages/pkg2"
 
 print( package2.feature() )
 ```
