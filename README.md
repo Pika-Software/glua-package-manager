@@ -7,9 +7,6 @@ Package manager supporting isolation, synchronous import and package dependency 
 - Package information structure like [package.json](https://docs.npmjs.com/cli/v6/configuring-npm/package-json)
 - Synchronous import of packages from different sources
 
-## TODO
-- [ ] Добавить удаление кеша ( скачаный контент и скачаные пакеты ) через определённый период и создать конварку на отключение/включение этого
-
 ## How to create your own package?
 1. Create `package.lua` and `init.lua` files in directory `lua/packages/<your-package-name>/`.
 2. Enter information about your package in `package.lua`, below is an example.
