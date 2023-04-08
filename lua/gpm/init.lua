@@ -42,16 +42,11 @@ Logger = logger.Create( "GPM@" .. utils.Version( _VERSION ), Color( 180, 180, 25
 includeShared "promise"
 Logger:Info( "Promise the library version %s is initialized.", utils.Version( promise._VERSION_NUM ) )
 
--- Environment & Packages
+-- Other Libs
 includeShared "environment"
 includeShared "packages"
-
--- HTTP
 includeShared "http"
-
--- GMAD & PKGF
 includeShared "gmad"
-includeShared "pkgf"
 
 -- Sources
 sources = sources or {}
