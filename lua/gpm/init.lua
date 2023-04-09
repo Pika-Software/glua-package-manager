@@ -1,7 +1,3 @@
--- Libraries
-local file = file
-
--- Variables
 local AddCSLuaFile = SERVER and AddCSLuaFile
 local include = include
 local SysTime = SysTime
