@@ -6,7 +6,7 @@ if CLIENT or MENU_DLL or game.IsDedicated() then
     if not reqwest and not CHTTP and util.IsBinaryModuleInstalled( "chttp" ) then require( "chttp" ) end
 end
 
-local defaultTimeout = CreateConVar( "gpm_http_timeout", "60", FCVAR_ARCHIVE, " - default http timeout for gpm http library.", 5, 300 )
+local defaultTimeout = CreateConVar( "gpm_http_timeout", "30", FCVAR_ARCHIVE, " - default http timeout for gpm http library.", 5, 300 )
 local client = reqwest or CHTTP or HTTP
 
 module( "gpm.http" )
