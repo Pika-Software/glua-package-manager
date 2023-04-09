@@ -32,28 +32,21 @@ Import = promise.Async( function( url, parentPackage )
     local wsid = string.match( url, "steamcommunity%.com/sharedfiles/filedetails/%?id=(%d+)" )
     if wsid ~= nil then return sources.workshop.Import( wsid, parentPackage ) end
 
-    local packageName = util.CRC( url )
+    local packageName = util.SHA1( url )
 
-    local cachePath = realmFolder .. "/http_" .. packageName .. ".gma.dat"
+    local cachePath = realmFolder .. "/http_" .. packageName .. ".dat"
     if fs.Exists( cachePath, "DATA" ) and fs.Time( cachePath, "DATA" ) > ( 60 * 60 * cacheLifetime:GetInt() ) then
-        local fileClass = fs.Open( cachePath, "rb", "DATA" )
-        if fileClass ~= nil then
-            local gma = gmad.Read( fileClass )
-            if gma ~= nil then
-                fileClass:Close()
-                return sources.gmad.Import( "data/" .. cachePath, parentPackage )
-            end
-
-            fileClass:SeekToStart()
-            local code = fileClass:Read( fileClass:Size() )
+        local gma = gmad.Open( cachePath, "DATA" )
+        if gma ~= nil then
             fileClass:Close()
+            return sources.gmad.Import( "data/" .. cachePath, parentPackage )
+        end
 
-            if not code then return promise.Reject( "no data" ) end
-
+        local code = fs.Read( cachePath, "DATA" )
+        if code then
             local ok, result = pcall( CompileString, code, cachePath )
             if not ok then return promise.Reject( result ) end
             if not result then return promise.Reject( "file compilation failed" ) end
-
             return packages.Initialize( packages.GetMetaData( {
                 ["name"] = packageName
             } ), result, {}, parentPackage )
@@ -67,14 +60,13 @@ Import = promise.Async( function( url, parentPackage )
 
     if result.code ~= 200 then return promise.Reject( "invalid response http code - " .. result.code ) end
 
-    local metadata = util.JSONToTable( result.body )
+    local code = result.body
+    local metadata = util.JSONToTable( code )
     if not metadata then
-        local ok, result = pcall( CompileString, result.body, url )
+        fs.AsyncWrite( cachePath, code )
+        local ok, result = pcall( CompileString, code, url )
         if not ok then return promise.Reject( result ) end
         if not result then return promise.Reject( "file compilation failed" ) end
-
-        fs.AsyncWrite( cachePath, result.body )
-
         return packages.Initialize( packages.GetMetaData( {
             ["name"] = packageName
         } ), result, {}, parentPackage )
