@@ -234,6 +234,7 @@ do
             table.SetValue( packageEnv, "promise", gpm.promise )
             table.SetValue( packageEnv, "TypeID", gpm.TypeID )
             table.SetValue( packageEnv, "type", gpm.type )
+            table.SetValue( packageEnv, "http", gpm.http )
 
             environment.SetValue( packageEnv, "import", function( filePath, async, parentPackage )
                 return gpm.Import( filePath, async, parentPackage or gpm.Package )

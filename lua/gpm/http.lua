@@ -1,13 +1,14 @@
--- if not reqwest and util.IsBinaryModuleInstalled( "reqwest" ) then require( "reqwest" ) end
--- if not reqwest and not CHTTP and util.IsBinaryModuleInstalled( "chttp" ) then require( "chttp" ) end
--- local client = reqwest or CHTTP or HTTP
-
-local client = HTTP
 local promise = gpm.promise
 
-module( "gpm.http" )
+if SERVER or game.IsDedicated() then
+    if not reqwest and util.IsBinaryModuleInstalled( "reqwest" ) then require( "reqwest" ) end
+    if not reqwest and not CHTTP and util.IsBinaryModuleInstalled( "chttp" ) then require( "chttp" ) end
+end
 
-DEFAULT_TIMEOUT = 60
+local defaultTimeout = CreateConVar( "gpm_http_timeout", "60", FCVAR_ARCHIVE, " - default http timeout for gpm http library.", 5, 300 )
+local client = reqwest or CHTTP or HTTP
+
+module( "gpm.http" )
 
 function HTTP( parameters )
     local p = promise.New()
@@ -36,7 +37,7 @@ function Fetch( url, headers, timeout )
     return HTTP( {
         ["url"] = url,
         ["headers"] = headers,
-        ["timeout"] = timeout or DEFAULT_TIMEOUT
+        ["timeout"] = type( timeout ) == "number" and timeout or defaultTimeout:GetInt()
     } )
 end
 
@@ -46,6 +47,6 @@ function Post( url, parameters, headers, timeout )
         ["method"] = "POST",
         ["headers"] = headers,
         ["parameters"] = parameters,
-        ["timeout"] = timeout or DEFAULT_TIMEOUT
+        ["timeout"] = type( timeout ) == "number" and timeout or defaultTimeout:GetInt()
     } )
 end
