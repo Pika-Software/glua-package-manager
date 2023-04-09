@@ -4,7 +4,7 @@ local promise = gpm.promise
 local paths = gpm.paths
 local utils = gpm.utils
 local string = string
-local file = file
+local fs = gpm.fs
 
 -- Variables
 local CLIENT, SERVER, MENU_DLL = CLIENT, SERVER, MENU_DLL
@@ -30,13 +30,13 @@ elseif CLIENT then
 end
 
 function CanImport( filePath )
-    return file.Exists( filePath, LuaRealm ) and string.EndsWith( filePath, ".lua" ) or file.IsDir( filePath, LuaRealm )
+    return fs.Exists( filePath, LuaRealm ) and string.EndsWith( filePath, ".lua" ) or fs.IsDir( filePath, LuaRealm )
 end
 
 Files = setmetatable( {}, {
     ["__index"] = function( self, filePath )
-        if type( filePath ) == "string" and file.Exists( filePath, LuaRealm ) and string.EndsWith( filePath, ".lua" ) then
-            local code, func = file.Read( filePath, LuaRealm ), nil
+        if type( filePath ) == "string" and fs.Exists( filePath, LuaRealm ) and string.EndsWith( filePath, ".lua" ) then
+            local code, func = fs.Read( filePath, LuaRealm ), nil
             if code then
                 func = CompileString( code, filePath, ErrorNoHaltWithStack )
             end

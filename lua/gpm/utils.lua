@@ -2,7 +2,6 @@
 local string = string
 local debug = debug
 local table = table
-local file = file
 local gpm = gpm
 
 -- Variables
@@ -253,23 +252,6 @@ function table.SetValue( source, path, value, ifEmpty )
 end
 
 module( "gpm.utils" )
-
-function CreateFolder( folderPath )
-    local currentPath = nil
-    for _, folderName in ipairs( string.Split( folderPath, "/" ) ) do
-        if currentPath == nil then
-            currentPath = folderName
-        else
-            currentPath = currentPath .. "/" .. folderName
-        end
-
-        if not file.IsDir( currentPath, "DATA" ) then
-            file.Delete( currentPath )
-            file.CreateDir( currentPath )
-        end
-    end
-
-end
 
 function LowerTableKeys( tbl )
     for key, value in pairs( tbl ) do

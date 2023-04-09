@@ -6,7 +6,7 @@ local utils = gpm.utils
 local gmad = gpm.gmad
 local http = gpm.http
 local string = string
-local file = file
+local fs = gpm.fs
 local util = util
 
 -- Variables
@@ -26,7 +26,7 @@ function CanImport( filePath )
 end
 
 local realmFolder = "gpm/packages" .. "/" .. ( SERVER and "server" or "client" )
-utils.CreateFolder( realmFolder )
+fs.CreateDir( realmFolder )
 
 Import = promise.Async( function( url, parentPackage )
     local wsid = string.match( url, "steamcommunity%.com/sharedfiles/filedetails/%?id=(%d+)" )
@@ -35,8 +35,8 @@ Import = promise.Async( function( url, parentPackage )
     local packageName = util.CRC( url )
 
     local cachePath = realmFolder .. "/http_" .. packageName .. ".gma.dat"
-    if file.Exists( cachePath, "DATA" ) and file.Time( cachePath, "DATA" ) > ( 60 * 60 * cacheLifetime:GetInt() ) then
-        local fileClass = file.Open( cachePath, "rb", "DATA" )
+    if fs.Exists( cachePath, "DATA" ) and fs.Time( cachePath, "DATA" ) > ( 60 * 60 * cacheLifetime:GetInt() ) then
+        local fileClass = fs.Open( cachePath, "rb", "DATA" )
         if fileClass ~= nil then
             local gma = gmad.Read( fileClass )
             if gma ~= nil then
@@ -73,7 +73,7 @@ Import = promise.Async( function( url, parentPackage )
         if not ok then return promise.Reject( result ) end
         if not result then return promise.Reject( "file compilation failed" ) end
 
-        file.Write( cachePath, result.body )
+        fs.AsyncWrite( cachePath, result.body )
 
         return packages.Initialize( packages.GetMetaData( {
             ["name"] = packageName

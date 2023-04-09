@@ -235,6 +235,7 @@ do
             table.SetValue( packageEnv, "TypeID", gpm.TypeID )
             table.SetValue( packageEnv, "type", gpm.type )
             table.SetValue( packageEnv, "http", gpm.http )
+            table.SetValue( packageEnv, "file", gpm.fs )
 
             environment.SetValue( packageEnv, "import", function( filePath, async, parentPackage )
                 return gpm.Import( filePath, async, parentPackage or gpm.Package )

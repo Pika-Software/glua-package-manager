@@ -29,9 +29,6 @@ local stopwatch = SysTime()
 -- Utils
 includeShared "utils"
 
--- Creating folder in data
-utils.CreateFolder( "gpm" )
-
 -- GLua fixes
 includeShared "fixes"
 
@@ -41,20 +38,28 @@ includeShared "logger"
 -- Global GPM Logger Creating
 Logger = logger.Create( "GPM@" .. utils.Version( _VERSION ), Color( 180, 180, 255 ) )
 
+-- Basic Libs
+includeShared "environment"
+includeShared "gmad"
+
 -- Promises
 includeShared "promise"
 Logger:Info( "Promise the library version %s is initialized.", utils.Version( promise._VERSION_NUM ) )
 
--- Other Libs
-includeShared "environment"
-includeShared "packages"
+-- File System & HTTP
+includeShared "fs"
 includeShared "http"
-includeShared "gmad"
+
+-- Creating folder in data
+fs.CreateDir( "gpm" )
+
+-- Packages
+includeShared "packages"
 
 -- Sources
 sources = sources or {}
 
-for _, filePath in ipairs( file.Find( "gpm/sources/*", "LUA" ) ) do
+for _, filePath in ipairs( fs.Find( "gpm/sources/*", "LUA" ) ) do
     filePath = "gpm/sources/" .. filePath
 
     if SERVER then
