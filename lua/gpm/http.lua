@@ -10,12 +10,16 @@ if CLIENT or MENU_DLL or game.IsDedicated() then
 end
 
 local defaultTimeout = CreateConVar( "gpm_http_timeout", "30", FCVAR_ARCHIVE, " - default http timeout for gpm http library.", 5, 300 )
+local userAgent = string.format( "%s/%s %s", "GLua Package Manager", gpm.utils.Version( gpm._VERSION ), "Garry's Mod" )
 local client = reqwest or CHTTP or HTTP
 
 module( "gpm.http" )
 
 function HTTP( parameters )
     local p = promise.New()
+
+    parameters.headers = parameters.headers or {}
+    parameters.headers["User-Agent"] = userAgent
 
     parameters.success = function( code, body, headers )
         p:Resolve( {
