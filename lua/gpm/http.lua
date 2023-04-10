@@ -2,11 +2,17 @@ local promise = gpm.promise
 local type = type
 
 -- https://github.com/WilliamVenner/gmsv_reqwest
--- https://github.com/timschumi/gmod-chttp
+if SERVER and not reqwest and not CHTTP and game.IsDedicated() then
+    if util.IsBinaryModuleInstalled( "reqwest" ) then
+        require( "reqwest" )
+    elseif util.IsBinaryModuleInstalled( "chttp" ) then
+        require( "chttp" )
+    end
+end
 
-if CLIENT or MENU_DLL or game.IsDedicated() then
-    if not reqwest and util.IsBinaryModuleInstalled( "reqwest" ) then require( "reqwest" ) end
-    if not reqwest and not CHTTP and util.IsBinaryModuleInstalled( "chttp" ) then require( "chttp" ) end
+-- https://github.com/timschumi/gmod-chttp
+if CLIENT and not CHTTP and util.IsBinaryModuleInstalled( "chttp" ) then
+    require( "chttp" )
 end
 
 local defaultTimeout = CreateConVar( "gpm_http_timeout", "30", FCVAR_ARCHIVE, " - default http timeout for gpm http library.", 5, 300 )
