@@ -25,7 +25,7 @@ function CanImport( filePath )
     return string.IsURL( filePath )
 end
 
-local realmFolder = "gpm/packages" .. "/" .. ( SERVER and "server" or "client" )
+local realmFolder = "gpm/" .. ( SERVER and "server" or "client" ) .. "/packages/"
 fs.CreateDir( realmFolder )
 
 Import = promise.Async( function( url, parentPackage )
