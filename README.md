@@ -24,6 +24,9 @@ Also, you can run an existing addon via gpm, just add the code below to `package
 -- The name of the package is just text that will be displayed in the format name@version, for example My Awesome Package@0.0.1
 name = "My Awesome Package"
 
+-- Author is an optional field, it is just a field with text that can be read.
+author = "Awesome Guy"
+
 -- Version format { 00 } { 00 } { 00 } = 0.0.0
 version = 000001
 
@@ -34,6 +37,11 @@ main = "path/to/my/code/main.lua"
 server = true
 client = false
 
+-- Allows you to disable packet isolation, I don't know why you need it, but it's there. ( def. true )
+isolation = true
+
+-- Disables the creation of the package logger, if you do not need it you can disable it. ( def. true )
+logger = true
 ```
 This file can also contain any other additional information such as package author, license or description.
 
