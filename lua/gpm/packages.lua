@@ -193,7 +193,7 @@ do
         if versions ~= nil then
             local gPackage = versions[ metadata.version ]
             if IsPackage( gPackage ) then
-                if not metadata.isolation and IsPackage( parentPackage ) then
+                if metadata.isolation and IsPackage( parentPackage ) then
                     environment.LinkMetaTables( parentPackage.environment, gPackage.environment )
                 end
 
