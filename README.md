@@ -7,6 +7,12 @@ Package manager supporting isolation, synchronous import and package dependency 
 - Package information structure like [package.json](https://docs.npmjs.com/cli/v6/configuring-npm/package-json)
 - Synchronous import of packages from different sources
 
+## How to improve?
+For better speed and reliability, the following binary modules can be installed in the game:
+- [async_write](https://github.com/WilliamVenner/gm_async_write)
+- [gmsv_reqwest](https://github.com/WilliamVenner/gmsv_reqwest)
+- [chttp](https://github.com/timschumi/gmod-chttp)
+
 ## How to create your own package?
 1. Create `package.lua` and `init.lua` files in directory `lua/packages/<your-package-name>/`.
 2. Enter information about your package in `package.lua`, below is an example.
