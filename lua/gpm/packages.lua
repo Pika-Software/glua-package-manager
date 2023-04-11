@@ -99,7 +99,10 @@ do
     function PACKAGE:GetIdentifier( name )
         local identifier = string.format( "%s@%s", self:GetName(), utils.Version( self:GetVersion() ) )
         if name then
-            if type( name ) == "string" then return identifier .. "::" .. name end
+            if type( name ) == "string" then
+                return identifier .. "::" .. name
+            end
+
             return name
         end
 
