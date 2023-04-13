@@ -13,6 +13,7 @@ local CompileString = CompileString
 local AddCSLuaFile = AddCSLuaFile
 local setmetatable = setmetatable
 local CompileFile = CompileFile
+local ipairs = ipairs
 local rawset = rawset
 local pcall = pcall
 local type = type
@@ -121,7 +122,23 @@ Import = promise.Async( function( filePath, parentPackage )
     metadata.source = metadata.source or "local"
 
     if SERVER then
-        if metadata.client then AddCSLuaFile( mainFile ) end
+        if metadata.client then
+            AddCSLuaFile( mainFile )
+
+            local send = metadata.send
+            if send ~= nil then
+                for _, filePath in ipairs( send ) do
+                    if not fs.Exists( filePath, LuaRealm ) then
+                        filePath = paths.Join( packagePath, filePath )
+                    end
+
+                    if fs.Exists( filePath, LuaRealm ) then
+                        AddCSLuaFile( filePath )
+                    end
+                end
+            end
+        end
+
         if not metadata.server then return end
     end
 

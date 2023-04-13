@@ -58,6 +58,9 @@ function GetMetaData( source )
         source.isolation = source.isolation ~= false
         source.logger = source.logger ~= false
 
+        -- Files to send to the client ( package and main will already be added and there is no need to specify them here )
+        source.send = type( source.send ) == "table" and source.send or nil
+
         return source
     elseif type( source ) == "function" then
         local env = {}

@@ -177,7 +177,8 @@ Import = promise.Async( function( filePath, parentPackage )
                 if packages[ packagePath ] then continue end
                 packages[ packagePath ] = true
 
-                sources.lua.Import( packagePath, gpm.Package or parentPackage )
+                local ok, result = sources.lua.Import( packagePath, gpm.Package or parentPackage ):SafeAwait()
+                if not ok then ErrorNoHaltWithStack( result ) end
             end
         end
 
