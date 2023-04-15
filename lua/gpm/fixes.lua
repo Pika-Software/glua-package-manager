@@ -62,6 +62,47 @@ do
 
 end
 
+-- https://wiki.facepunch.com/gmod/File_Search_Paths
+local luaRealm = gpm.LuaRealm
+if not luaRealm then
+    luaRealm = "LUA"
+
+    if not MENU_DLL then
+        if SERVER then
+            luaRealm = "lsv"
+        elseif CLIENT then
+            luaRealm = "lcl"
+        end
+    end
+
+    gpm.LuaRealm = luaRealm
+end
+
+-- https://wiki.facepunch.com/gmod/Global.CompileFile
+do
+
+    local _CompileFile = table.SetValue( gluaFixes, "CompileFile", CompileFile, true )
+    local CompileString = CompileString
+
+    function CompileFile( filePath )
+        local f = file.Open( filePath, "r", luaRealm )
+        if not f then
+            return _CompileFile( filePath )
+        end
+
+        local code = f:Read( f:Size() )
+        f:Close()
+
+        local func = CompileString( code, filePath, true )
+        if not func then
+            return _CompileFile( filePath )
+        end
+
+        return func
+    end
+
+end
+
 -- https://wiki.facepunch.com/gmod/util.IsBinaryModuleInstalled
 do
 

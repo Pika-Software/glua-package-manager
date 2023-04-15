@@ -4,7 +4,9 @@ local string = string
 local file = file
 
 -- Variables
+local CompileString = CompileString
 local ipairs = ipairs
+local pcall = pcall
 
 -- https://github.com/WilliamVenner/gm_async_write
 if not file.AsyncWrite and util.IsBinaryModuleInstalled( "async_write" ) then require( "async_write" ) end
@@ -78,6 +80,17 @@ function AsyncRead( filePath, gamePath )
 
     return p
 end
+
+Compile = promise.Async( function( filePath, gamePath, handleError )
+    local ok, result = AsyncRead( filePath, gamePath ):SafeAwait()
+    if not ok then return promise.Reject( result ) end
+
+    local ok, result = pcall( CompileString, result.content, result.filePath, handleError )
+    if not ok then return promise.Reject( result ) end
+    if not result then return promise.Reject( "file compilation failed" ) end
+
+    return result
+end )
 
 if not file.AsyncWrite or not file.AsyncAppend then
 

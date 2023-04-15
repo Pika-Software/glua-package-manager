@@ -7,11 +7,11 @@ local string = string
 local fs = gpm.fs
 
 -- Variables
-local CLIENT, SERVER, MENU_DLL = CLIENT, SERVER, MENU_DLL
-local CompileString = CompileString
+local CLIENT, SERVER = CLIENT, SERVER
 local AddCSLuaFile = AddCSLuaFile
 local setmetatable = setmetatable
 local CompileFile = CompileFile
+local luaRealm = gpm.LuaRealm
 local ipairs = ipairs
 local rawset = rawset
 local pcall = pcall
@@ -19,38 +19,17 @@ local type = type
 
 module( "gpm.sources.lua" )
 
-LuaRealm = "LUA"
-
-if not MENU_DLL then
-    if SERVER then
-        LuaRealm = "lsv"
-    elseif CLIENT then
-        LuaRealm = "lcl"
-    end
-end
-
 function CanImport( filePath )
-    return fs.Exists( filePath, LuaRealm ) and string.EndsWith( filePath, ".lua" ) or fs.IsDir( filePath, LuaRealm )
+    return fs.Exists( filePath, luaRealm ) and string.EndsWith( filePath, ".lua" ) or fs.IsDir( filePath, luaRealm )
 end
 
 Files = setmetatable( {}, {
     ["__index"] = function( self, filePath )
-        if type( filePath ) == "string" and fs.Exists( filePath, LuaRealm ) and string.EndsWith( filePath, ".lua" ) then
-            local code, func = fs.Read( filePath, LuaRealm ), nil
-            if code then
-                func = CompileString( code, filePath )
-            end
-
-            if not func then
-                local ok, result = pcall( CompileFile, filePath )
-                if ok then
-                    func = result
-                end
-            end
-
-            if func ~= nil then
-                rawset( self, filePath, func )
-                return func
+        if type( filePath ) == "string" and string.EndsWith( filePath, ".lua" ) and fs.Exists( filePath, luaRealm ) then
+            local ok, result = pcall( CompileFile, filePath )
+            if ok then
+                rawset( self, filePath, result )
+                return result
             end
         end
 
@@ -127,11 +106,11 @@ Import = promise.Async( function( filePath, parentPackage )
             local send = metadata.send
             if send ~= nil then
                 for _, filePath in ipairs( send ) do
-                    if not fs.Exists( filePath, LuaRealm ) then
+                    if not fs.Exists( filePath, luaRealm ) then
                         filePath = paths.Join( packagePath, filePath )
                     end
 
-                    if fs.Exists( filePath, LuaRealm ) then
+                    if fs.Exists( filePath, luaRealm ) then
                         AddCSLuaFile( filePath )
                     end
                 end

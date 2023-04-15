@@ -11,6 +11,7 @@ local util = util
 
 -- Variables
 local CompileString = CompileString
+local logger = gpm.Logger
 local SERVER = SERVER
 local ipairs = ipairs
 local pairs = pairs
@@ -42,17 +43,12 @@ Import = promise.Async( function( url, parentPackage )
             return sources.gmad.Import( "data/" .. cachePath, parentPackage )
         end
 
-        local code = fs.Read( cachePath, "DATA" )
-        if code then
-            local ok, result = pcall( CompileString, code, cachePath )
-            if not ok then return promise.Reject( result ) end
-            if not result then return promise.Reject( "file compilation failed" ) end
-            return packages.Initialize( packages.GetMetaData( {
-                ["name"] = packageName
-            } ), result, {}, parentPackage )
-        end
+        local ok, result = fs.Compile( cachePath, "DATA" ):SafeAwait()
+        if not ok then return promise.Reject( result ) end
 
-        return promise.Reject( "file reading failed" )
+        return packages.Initialize( packages.GetMetaData( {
+            ["name"] = packageName
+        } ), result, {}, parentPackage )
     end
 
     local ok, result = http.Fetch( url, nil, 120 ):SafeAwait()
@@ -63,10 +59,13 @@ Import = promise.Async( function( url, parentPackage )
     local code = result.body
     local metadata = util.JSONToTable( code )
     if not metadata then
-        fs.AsyncWrite( cachePath, code )
+        local ok, err = fs.AsyncWrite( cachePath, code ):SafeAwait()
+        if not ok then logger:Error( err ) end
+
         local ok, result = pcall( CompileString, code, url )
         if not ok then return promise.Reject( result ) end
         if not result then return promise.Reject( "file compilation failed" ) end
+
         return packages.Initialize( packages.GetMetaData( {
             ["name"] = packageName
         } ), result, {}, parentPackage )
