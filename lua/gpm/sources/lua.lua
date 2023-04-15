@@ -8,7 +8,6 @@ local fs = gpm.fs
 
 -- Variables
 local CLIENT, SERVER, MENU_DLL = CLIENT, SERVER, MENU_DLL
-local ErrorNoHaltWithStack = ErrorNoHaltWithStack
 local CompileString = CompileString
 local AddCSLuaFile = AddCSLuaFile
 local setmetatable = setmetatable
@@ -22,12 +21,12 @@ module( "gpm.sources.lua" )
 
 LuaRealm = "LUA"
 
-if SERVER then
-    LuaRealm = "lsv"
-elseif MENU_DLL then
-    LuaRealm = "LUA"
-elseif CLIENT then
-    LuaRealm = "lcl"
+if not MENU_DLL then
+    if SERVER then
+        LuaRealm = "lsv"
+    elseif CLIENT then
+        LuaRealm = "lcl"
+    end
 end
 
 function CanImport( filePath )
@@ -39,7 +38,7 @@ Files = setmetatable( {}, {
         if type( filePath ) == "string" and fs.Exists( filePath, LuaRealm ) and string.EndsWith( filePath, ".lua" ) then
             local code, func = fs.Read( filePath, LuaRealm ), nil
             if code then
-                func = CompileString( code, filePath, ErrorNoHaltWithStack )
+                func = CompileString( code, filePath )
             end
 
             if not func then
