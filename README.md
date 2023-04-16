@@ -55,5 +55,10 @@ print( package2.feature() )
 ```
 Look for more examples in our code ;)
 
+## Todo
+- [ ] zip source
+- [ ] github source
+- [ ] http zip source support
+
 ## License
 [MIT](LICENSE) © Pika Software
