@@ -46,7 +46,7 @@ Import = promise.Async( function( url, parentPackage )
         local ok, result = fs.Compile( cachePath, "DATA" ):SafeAwait()
         if not ok then return promise.Reject( result ) end
 
-        return packages.Initialize( packages.GetMetaData( {
+        return packages.Initialize( packages.GetMetadata( {
             ["name"] = packageName
         } ), result, {}, parentPackage )
     end
@@ -66,7 +66,7 @@ Import = promise.Async( function( url, parentPackage )
         if not ok then return promise.Reject( result ) end
         if not result then return promise.Reject( "file compilation failed" ) end
 
-        return packages.Initialize( packages.GetMetaData( {
+        return packages.Initialize( packages.GetMetadata( {
             ["name"] = packageName
         } ), result, {}, parentPackage )
     end

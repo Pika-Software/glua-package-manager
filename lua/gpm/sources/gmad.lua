@@ -57,7 +57,7 @@ Import = promise.Async( function( filePath, parentPackage )
     local gma = gmad.Open( filePath, "GAME" )
     if not gma then return promise.Reject( "gma file cannot be read" ) end
 
-    local metadata = packages.GetMetaData( {
+    local metadata = packages.GetMetadata( {
         ["name"] = gma:GetTitle(),
         ["description"] = gma:GetDescription(),
         ["author"] = gma:GetAuthor(),

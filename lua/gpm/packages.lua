@@ -35,7 +35,7 @@ function Get( packageName )
     return pkgs[ packageName ]
 end
 
-function GetMetaData( source )
+function GetMetadata( source )
     if type( source ) == "table" then
         -- Package name, main file & author
         source.name = type( source.name ) == "string" and source.name or nil
@@ -74,10 +74,10 @@ function GetMetaData( source )
         result = utils.LowerTableKeys( result )
 
         if type( result.package ) ~= "table" then
-            return GetMetaData( result )
+            return GetMetadata( result )
         end
 
-        return GetMetaData( result.package )
+        return GetMetadata( result.package )
     end
 end
 
@@ -87,7 +87,7 @@ do
     PACKAGE = PACKAGE or {}
     PACKAGE.__index = PACKAGE
 
-    function PACKAGE:GetMetaData()
+    function PACKAGE:GetMetadata()
         return self.metadata
     end
 
@@ -132,7 +132,6 @@ do
 
     function PACKAGE:GetFileList()
         local fileList = {}
-
         for filePath in pairs( self.files ) do
             fileList[ #fileList + 1 ] = filePath
         end
