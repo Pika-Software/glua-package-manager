@@ -54,6 +54,9 @@ function GetMetadata( source )
         source.client = source.client ~= false
         source.server = source.server ~= false
 
+        -- Should automatically run the package
+        source.autorun = source.autorun == true
+
         -- Package isolation & logger
         source.isolation = source.isolation ~= false
         source.logger = source.logger ~= false

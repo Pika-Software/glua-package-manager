@@ -12,6 +12,7 @@ local AddCSLuaFile = AddCSLuaFile
 local setmetatable = setmetatable
 local CompileFile = CompileFile
 local luaRealm = gpm.LuaRealm
+local logger = gpm.Logger
 local ipairs = ipairs
 local rawset = rawset
 local pcall = pcall
@@ -38,7 +39,7 @@ Files = setmetatable( {}, {
     end
 } )
 
-Import = promise.Async( function( filePath, parentPackage )
+Import = promise.Async( function( filePath, parentPackage, isAutorun )
     local packagePath = paths.Fix( filePath )
 
     local packageFilePath = packagePath
@@ -52,25 +53,33 @@ Import = promise.Async( function( filePath, parentPackage )
 
     local packageFile, metadata = Files[ packageFilePath ], nil
     if packageFile then
-        metadata = packages.GetMetaData( packageFile )
-        if not metadata then
-            metadata = packages.GetMetaData( {
-                ["name"] = packageFilePath,
-                ["main"] = packageFilePath
-            } )
+        metadata = packages.GetMetadata( packageFile )
 
-            if packagePathIsLuaFile then
-                return packages.Initialize( metadata, packageFile, Files, parentPackage )
+        if not metadata then
+            if not packagePathIsLuaFile then
+                return promise.Reject( "package file is empty or does not exist (" .. packageFilePath .. ")" )
             end
 
-            return promise.Reject( "package file is missing (" .. metadata.name .. "@" .. utils.Version( metadata.version ) .. ")" )
-        end
-
-        if SERVER and metadata.client then
-            AddCSLuaFile( packageFilePath )
+            metadata = packages.GetMetadata( {
+                ["name"] = string.GetFileFromFilename( packageFilePath ),
+                ["main"] = packageFilePath,
+                ["autorun"] = true
+            } )
         end
     else
-        metadata = packages.GetMetaData( {} )
+        metadata = packages.GetMetadata( {
+            ["name"] = string.GetFileFromFilename( packageFilePath ),
+            ["autorun"] = true
+        } )
+    end
+
+    if isAutorun and not metadata.autorun then
+        logger:Debug( "package autorun restricted (%s)", metadata.name .. "@" .. utils.Version( metadata.version ) )
+        return
+    end
+
+    if SERVER and metadata.client then
+        AddCSLuaFile( packageFilePath )
     end
 
     if CLIENT and not metadata.client then return end

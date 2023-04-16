@@ -13,13 +13,13 @@ for _, source in pairs( gpm.sources ) do
     sources[ #sources + 1 ] = source
 end
 
-gpm.AsyncImport = promise.Async( function( filePath, parentPackage )
+gpm.AsyncImport = promise.Async( function( filePath, parentPackage, isAutorun )
     ArgAssert( filePath, 1, "string" )
 
     for _, source in ipairs( sources ) do
         if type( source.CanImport ) ~= "function" then continue end
         if not source.CanImport( filePath ) then continue end
-        return source.Import( filePath, parentPackage )
+        return source.Import( filePath, parentPackage, isAutorun )
     end
 end )
 
@@ -27,10 +27,10 @@ do
 
     local assert = assert
 
-    function gpm.Import( filePath, async, parentPackage )
+    function gpm.Import( filePath, async, parentPackage, isAutorun )
         assert( async or promise.RunningInAsync(), "import supposed to be running in coroutine/async function (do you running it from package)" )
 
-        local p = gpm.AsyncImport( filePath, parentPackage )
+        local p = gpm.AsyncImport( filePath, parentPackage, isAutorun )
         if not async then return p:Await() end
         return p
     end
@@ -43,16 +43,16 @@ do
 
     local file_Find = file.Find
 
-    gpm.ImportFolder = promise.Async( function( luaPath )
-        luaPath = paths.Fix( luaPath )
+    gpm.ImportFolder = promise.Async( function( filePath, parentPackage, isAutorun )
+        filePath = paths.Fix( filePath )
 
-        local files, folders = file_Find( luaPath .. "/*", "LUA" )
+        local files, folders = file_Find( filePath .. "/*", "LUA" )
         for _, folderName in ipairs( folders ) do
-            gpm.AsyncImport( luaPath .. "/" .. folderName )
+            gpm.AsyncImport( filePath .. "/" .. folderName, parentPackage, isAutorun )
         end
 
         for _, fileName in ipairs( files ) do
-            gpm.AsyncImport( luaPath .. "/" .. fileName )
+            gpm.AsyncImport( filePath .. "/" .. fileName, parentPackage, isAutorun )
         end
     end )
 
@@ -65,8 +65,8 @@ if type( pkgs ) == "table" then
     end
 end
 
-gpm.ImportFolder( "gpm/packages" )
-gpm.ImportFolder( "packages" )
+gpm.ImportFolder( "gpm/packages", nil, true )
+gpm.ImportFolder( "packages", nil, true )
 
 if SERVER then
 
