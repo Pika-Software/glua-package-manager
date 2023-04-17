@@ -40,6 +40,9 @@ client = false
 -- Allows you to disable packet isolation, I don't know why you need it, but it's there. ( def. true )
 isolation = true
 
+-- Should automatically run the package ( works only with packages from lua folders )
+autorun = false
+
 -- Disables the creation of the package logger, if you do not need it you can disable it. ( def. true )
 logger = true
 ```
