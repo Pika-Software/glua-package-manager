@@ -73,11 +73,6 @@ Import = promise.Async( function( filePath, parentPackage, isAutorun )
         } )
     end
 
-    if isAutorun and not metadata.autorun then
-        logger:Debug( "package autorun restricted (%s)", metadata.name .. "@" .. utils.Version( metadata.version ) )
-        return
-    end
-
     if SERVER and metadata.client then
         AddCSLuaFile( packageFilePath )
     end
@@ -127,6 +122,11 @@ Import = promise.Async( function( filePath, parentPackage, isAutorun )
         end
 
         if not metadata.server then return end
+    end
+
+    if isAutorun and not metadata.autorun then
+        logger:Debug( "package autorun restricted (%s)", metadata.name .. "@" .. utils.Version( metadata.version ) )
+        return
     end
 
     return packages.Initialize( metadata, func, Files, parentPackage )

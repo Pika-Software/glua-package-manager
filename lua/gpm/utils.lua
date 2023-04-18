@@ -193,8 +193,8 @@ do
 
 end
 
-function table.Lookup( tbl, path, default )
-    for _, key in ipairs( string.Split( path, "." ) ) do
+function table.Lookup( tbl, str, default )
+    for _, key in ipairs( string.Split( str, "." ) ) do
         tbl = tbl[ key ]
         if not tbl then return default end
     end
@@ -202,8 +202,8 @@ function table.Lookup( tbl, path, default )
     return tbl
 end
 
-function table.SetValue( tbl, path, value, ifEmpty )
-    local keys = string.Split( path, "." )
+function table.SetValue( tbl, str, value, ifEmpty )
+    local keys = string.Split( str, "." )
     local count = #keys
 
     for num, key in ipairs( keys ) do
@@ -214,16 +214,17 @@ function table.SetValue( tbl, path, value, ifEmpty )
             end
 
             tbl[ key ] = value
-            break
+            return value
+        end
+
+        local nextValue = tbl[ key ]
+        if nextValue == nil then
+            tbl[ key ] = {}
+        elseif gpm.type( nextValue ) ~= "table" then
+            return
         end
 
         tbl = tbl[ key ]
-
-        if tbl == nil then
-            tbl[ key ] = {}
-        elseif gpm.type( tbl ) ~= "table" then
-            break
-        end
     end
 end
 

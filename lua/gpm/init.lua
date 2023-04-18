@@ -10,7 +10,7 @@ CreateConVar( "gpm_cache_lifetime", "24", FCVAR_ARCHIVE, " - the cache lifetime,
 
 module( "gpm" )
 
-_VERSION = 010400
+_VERSION = 010401
 
 -- Include function
 function includeShared( filePath )
