@@ -170,13 +170,8 @@ do
         self:WriteByte( 0 )
     end
 
-    function meta:SeekToStart()
-        self:Seek( -self:Tell() )
-    end
-
 end
 
--- util.NextTick( func, ... )
 do
 
     local timer_Simple = timer.Simple
@@ -198,57 +193,38 @@ do
 
 end
 
---
-function table.GetValue( source, path )
-    ArgAssert( source, 1, "table" )
-
-    local levels = string.Split( path, "." )
-    local count = #levels
-    local tbl = source
-
-    for num, key in ipairs( levels ) do
-        if ( num == count ) then
-            return tbl[ key ]
-        end
-
-        local nextTable = tbl[ key ]
-        if gpm.type( nextTable ) ~= "table" then
-            return
-        end
-
+function table.Lookup( tbl, path, default )
+    for _, key in ipairs( string.Split( path, "." ) ) do
         tbl = tbl[ key ]
+        if not tbl then return default end
     end
+
+    return tbl
 end
 
-function table.SetValue( source, path, value, ifEmpty )
-    ArgAssert( source, 1, "table" )
+function table.SetValue( tbl, path, value, ifEmpty )
+    local keys = string.Split( path, "." )
+    local count = #keys
 
-    local levels = string.Split( path, "." )
-    local count = #levels
-    local tbl = source
-
-    for num, key in ipairs( levels ) do
-        if ( num == count ) then
+    for num, key in ipairs( keys ) do
+        if num == count then
             local oldValue = tbl[ key ]
-            if ( oldValue ~= nil and ifEmpty ) then
+            if oldValue ~= nil and ifEmpty then
                 return oldValue
             end
 
             tbl[ key ] = value
-            return value
-        end
-
-        local nextTable = tbl[ key ]
-        if ( nextTable == nil ) then
-            tbl[ key ] = {}
-        elseif gpm.type( nextTable ) ~= "table" then
-            return
+            break
         end
 
         tbl = tbl[ key ]
-    end
 
-    return
+        if tbl == nil then
+            tbl[ key ] = {}
+        elseif gpm.type( tbl ) ~= "table" then
+            break
+        end
+    end
 end
 
 module( "gpm.utils" )
