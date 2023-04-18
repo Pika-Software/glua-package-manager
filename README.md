@@ -59,6 +59,7 @@ print( package2.feature() )
 Look for more examples in our code ;)
 
 ## Todo
+- [ ] add in zip source compression support
 - [ ] zip source
 - [ ] github source
 - [ ] http zip source support
