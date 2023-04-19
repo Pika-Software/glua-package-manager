@@ -33,7 +33,7 @@ Import = promise.Async( function( url, parentPackage )
     local wsid = string.match( url, "steamcommunity%.com/sharedfiles/filedetails/%?id=(%d+)" )
     if wsid ~= nil then return sources.workshop.Import( wsid, parentPackage ) end
 
-    local packageName = util.SHA1( url )
+    local packageName = util.MD5( url )
 
     local cachePath = realmFolder .. "/http_" .. packageName .. ".dat"
     if fs.Exists( cachePath, "DATA" ) and fs.Time( cachePath, "DATA" ) > ( 60 * 60 * cacheLifetime:GetInt() ) then
