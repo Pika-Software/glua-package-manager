@@ -101,8 +101,6 @@ Import = promise.Async( function( filePath, parentPackage, isAutorun )
         return promise.Reject( "main file is missing (" .. metadata.name .. "@" .. utils.Version( metadata.version ) .. ")" )
     end
 
-    metadata.source = metadata.source or "local"
-
     if SERVER then
         if metadata.client then
             AddCSLuaFile( mainFile )
