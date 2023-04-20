@@ -68,18 +68,41 @@ end
 gpm.ImportFolder( "gpm/packages", nil, true )
 gpm.ImportFolder( "packages", nil, true )
 
+do
+
+    local cachePath = "gpm/" .. ( SERVER and "server" or "client" ) .. "/packages/"
+    local fs = gpm.fs
+
+    function gpm.ClearCache()
+        local files, _ = fs.Find( cachePath .. "*", "DATA" )
+        for _, fileName in ipairs( files ) do
+            fs.Delete( cachePath .. fileName )
+        end
+
+        gpm.Logger:Info( "Deleted %d cache files.", #files )
+    end
+
+end
+
 if SERVER then
 
     local BroadcastLua = BroadcastLua
-    local IsValid = IsValid
 
     concommand.Add( "gpm_reload", function( ply )
-        if ply == nil or ( IsValid( ply ) and ply:IsSuperAdmin() ) then
+        if not ply or ply:IsSuperAdmin() then
             BroadcastLua( "include( \"gpm/init.lua\" )" )
             include( "gpm/init.lua" )
 
             hook.Run( "GPM - Reloaded" )
         end
+    end )
+
+    concommand.Add( "gpm_clear_cache", function( ply )
+        if not ply or ply:IsListenServerHost() then
+            gpm.ClearCache()
+        end
+
+        ply:SendLua( "gpm.ClearCache()" )
     end )
 
 end
