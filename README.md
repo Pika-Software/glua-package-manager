@@ -31,7 +31,7 @@ author = "Awesome Guy"
 version = 000001
 
 -- The `main` in this case is the entry point to the package (where the code execution will start from)
-main = "path/to/my/code/main.lua"
+main = "init.lua"
 
 -- Allows to run only on the server side. (default is true, true)
 server = true
