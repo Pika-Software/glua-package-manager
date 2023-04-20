@@ -267,7 +267,7 @@ do
                     local path = packages.FindFilePath( fileName, files )
                     if path then return AddCSLuaFile( path ) end
 
-                    ErrorNoHaltWithStack( "Couldn't AddCSLuaFile file '" .. tostring( fileName ) .. "' - File not found" )
+                    -- ErrorNoHaltWithStack( "Couldn't AddCSLuaFile file '" .. tostring( fileName ) .. "' - File not found" )
                 end )
             end
 
