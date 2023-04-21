@@ -61,19 +61,19 @@ Import = promise.Async( function( filePath, parentPackage, isAutorun )
             end
 
             metadata = packages.GetMetadata( {
-                ["name"] = string.GetFileFromFilename( packageFilePath ),
+                ["name"] = string.match( filePath, "/(.+)%.lua" ),
                 ["main"] = packageFilePath,
                 ["autorun"] = true
             } )
         end
     else
         metadata = packages.GetMetadata( {
-            ["name"] = string.GetFileFromFilename( packageFilePath ),
+            ["name"] = string.match( filePath, "/(.+)%.lua" ),
             ["autorun"] = true
         } )
     end
 
-    if SERVER and metadata.client then
+    if SERVER and metadata.client and fs.Exists( packageFilePath, luaRealm ) then
         AddCSLuaFile( packageFilePath )
     end
 
