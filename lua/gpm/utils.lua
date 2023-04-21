@@ -241,7 +241,8 @@ function LowerTableKeys( tbl )
 end
 
 function Version( number )
-    if not number then return "invalid version" end
+    if not number then return "unknown" end
+    if gpm.type( number ) == "string" then return number end
     local version = string.format( "%06d", number )
     return string.format( "%d.%d.%d", tonumber( string.sub( version, 0, 2 ) ), tonumber( string.sub( version, 3, 4 ) ), tonumber( string.sub( version, 5 ) ) )
 end

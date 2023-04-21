@@ -43,12 +43,7 @@ function GetMetadata( source )
         source.author = type( source.author ) == "string" and source.author or nil
 
         -- Version
-        local version = source.version
-        if isnumber( version ) then
-            source.version = version
-        else
-            source.version = 1
-        end
+        source.version = utils.Version( source.version )
 
         -- Realms
         source.client = source.client ~= false
@@ -103,12 +98,12 @@ do
     end
 
     function PACKAGE:GetIdentifier( name )
-        local identifier = string.format( "%s@%s", self:GetName(), utils.Version( self:GetVersion() ) )
-        if name then
-            if type( name ) == "string" then
-                return identifier .. "::" .. name
-            end
+        local metadata = self.metadata
+        if not metadata then return "unknown@unknown" end
 
+        local identifier = string.format( "%s@%s", metadata.name, metadata.version )
+        if name then
+            if type( name ) == "string" then return identifier .. "::" .. name end
             return name
         end
 

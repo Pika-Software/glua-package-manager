@@ -2,7 +2,6 @@
 local packages = gpm.packages
 local promise = gpm.promise
 local paths = gpm.paths
-local utils = gpm.utils
 local string = string
 local fs = gpm.fs
 
@@ -98,7 +97,7 @@ Import = promise.Async( function( filePath, parentPackage, isAutorun )
     end
 
     if not func then
-        return promise.Reject( "main file is missing (" .. metadata.name .. "@" .. utils.Version( metadata.version ) .. ")" )
+        return promise.Reject( "main file is missing (" .. metadata.name .. "@" .. metadata.version .. ")" )
     end
 
     if SERVER then
@@ -123,7 +122,7 @@ Import = promise.Async( function( filePath, parentPackage, isAutorun )
     end
 
     if isAutorun and not metadata.autorun then
-        logger:Debug( "package autorun restricted (%s)", metadata.name .. "@" .. utils.Version( metadata.version ) )
+        logger:Debug( "package autorun restricted (%s)", metadata.name .. "@" .. metadata.version )
         return
     end
 
