@@ -23,6 +23,10 @@ gpm.AsyncImport = promise.Async( function( filePath, parentPackage, isAutorun )
     end
 end )
 
+function gpm.LuaPackageExists( filePath )
+    return gpm.sources.lua.CanImport( filePath )
+end
+
 do
 
     local assert = assert
