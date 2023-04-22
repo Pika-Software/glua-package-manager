@@ -25,7 +25,7 @@ end
 
 Files = setmetatable( {}, {
     ["__index"] = function( self, filePath )
-        if type( filePath ) == "string" and string.EndsWith( filePath, ".lua" ) and fs.Exists( filePath, luaRealm ) then
+        if type( filePath ) == "string" and fs.Exists( filePath, luaRealm ) and not fs.IsDir( filePath, luaRealm ) then
             local ok, result = pcall( CompileFile, filePath )
             if ok then
                 rawset( self, filePath, result )
@@ -39,41 +39,37 @@ Files = setmetatable( {}, {
 } )
 
 Import = promise.Async( function( filePath, parentPackage, isAutorun )
-    local packagePath = paths.Fix( filePath )
+    filePath = paths.Fix( filePath )
 
-    local packageFilePath = packagePath
-
-    local packagePathIsLuaFile = string.EndsWith( packagePath, ".lua" )
-    if packagePathIsLuaFile then
-        packagePath = string.GetPathFromFilename( packageFilePath )
-    else
-        packageFilePath = paths.Join( packagePath, "package.lua" )
+    local packagePath = filePath
+    if not fs.IsDir( packagePath, luaRealm ) then
+        packagePath = string.GetPathFromFilename( packagePath )
     end
 
+    local packageFilePath = paths.Join( packagePath, "package.lua" )
     local packageFile, metadata = Files[ packageFilePath ], nil
     if packageFile then
         metadata = packages.GetMetadata( packageFile )
-
         if not metadata then
-            if not packagePathIsLuaFile then
-                return promise.Reject( "package file is empty or does not exist (" .. packageFilePath .. ")" )
-            end
+            return promise.Reject( "package file is empty (" .. packageFilePath .. ")" )
+        end
 
-            metadata = packages.GetMetadata( {
-                ["name"] = string.match( filePath, "/(.+)%.lua" ),
-                ["main"] = packageFilePath,
-                ["autorun"] = true
-            } )
+        if SERVER and metadata.client then
+            AddCSLuaFile( packageFilePath )
         end
     else
-        metadata = packages.GetMetadata( {
-            ["name"] = string.match( filePath, "/(.+)%.lua" ),
-            ["autorun"] = true
-        } )
-    end
 
-    if SERVER and metadata.client and fs.Exists( packageFilePath, luaRealm ) then
-        AddCSLuaFile( packageFilePath )
+        local data = {
+            ["name"] = "lua/" .. filePath,
+            ["autorun"] = true
+        }
+
+        if fs.Exists( filePath, luaRealm ) and not fs.IsDir( filePath, luaRealm ) then
+            data.main = filePath
+        end
+
+        metadata = packages.GetMetadata( data )
+
     end
 
     if CLIENT and not metadata.client then return end
@@ -125,6 +121,8 @@ Import = promise.Async( function( filePath, parentPackage, isAutorun )
         logger:Debug( "package autorun restricted (%s)", metadata.name .. "@" .. metadata.version )
         return
     end
+
+    metadata.folder = packagePath
 
     return packages.Initialize( metadata, func, Files, parentPackage )
 end )
