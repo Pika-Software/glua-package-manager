@@ -60,7 +60,7 @@ Import = promise.Async( function( filePath, parentPackage, isAutorun )
     else
 
         local data = {
-            ["name"] = "lua/" .. filePath,
+            ["name"] = "lua/" .. packagePath,
             ["autorun"] = true
         }
 
