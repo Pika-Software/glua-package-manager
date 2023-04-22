@@ -27,6 +27,10 @@ function gpm.LuaPackageExists( filePath )
     return gpm.sources.lua.CanImport( filePath )
 end
 
+function gpm.GetLuaFiles()
+    return gpm.sources.lua.Files
+end
+
 do
 
     local assert = assert
