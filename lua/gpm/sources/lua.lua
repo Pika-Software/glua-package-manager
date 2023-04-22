@@ -11,6 +11,7 @@ local AddCSLuaFile = AddCSLuaFile
 local setmetatable = setmetatable
 local CompileFile = CompileFile
 local luaRealm = gpm.LuaRealm
+local util_MD5 = util.MD5
 local logger = gpm.Logger
 local ipairs = ipairs
 local rawset = rawset
@@ -60,7 +61,7 @@ Import = promise.Async( function( filePath, parentPackage, isAutorun )
     else
 
         local data = {
-            ["name"] = "lua/" .. packagePath,
+            ["name"] = util_MD5( filePath ),
             ["autorun"] = true
         }
 
