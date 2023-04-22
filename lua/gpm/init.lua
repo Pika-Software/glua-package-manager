@@ -5,15 +5,13 @@ local SERVER = SERVER
 local ipairs = ipairs
 local Color = Color
 
--- Package cache lifetime convar
 CreateConVar( "gpm_cache_lifetime", "24", FCVAR_ARCHIVE, " - the cache lifetime, in hours, sets after how many hours the downloaded gpm packages will not be relevant.", 0, 60480 )
 
 module( "gpm" )
 
-_VERSION = 010402
+_VERSION = 010500
 
--- Include function
-function includeShared( filePath )
+function IncludeComponent( filePath )
     filePath = "gpm/" .. filePath  .. ".lua"
     if SERVER then AddCSLuaFile( filePath ) end
     return include( filePath )
@@ -23,34 +21,34 @@ end
 local stopwatch = SysTime()
 
 -- Utils
-includeShared "utils"
+IncludeComponent "utils"
 
 -- GLua fixes
-includeShared "fixes"
+IncludeComponent "fixes"
 
 -- Colors & Logger modules
-includeShared "logger"
+IncludeComponent "logger"
 
 -- Global GPM Logger Creating
 Logger = logger.Create( "GPM@" .. utils.Version( _VERSION ), Color( 180, 180, 255 ) )
 
 -- Basic Libs
-includeShared "environment"
-includeShared "gmad"
+IncludeComponent "environment"
+IncludeComponent "gmad"
 
 -- Promises
-includeShared "promise"
+IncludeComponent "promise"
 Logger:Info( "Promise the library version %s is initialized.", utils.Version( promise._VERSION_NUM ) )
 
 -- File System & HTTP
-includeShared "fs"
-includeShared "http"
+IncludeComponent "fs"
+IncludeComponent "http"
 
 -- Creating folder in data
 fs.CreateDir( "gpm" )
 
 -- Packages
-includeShared "packages"
+IncludeComponent "packages"
 
 -- Sources
 sources = sources or {}
@@ -66,7 +64,7 @@ for _, filePath in ipairs( fs.Find( "gpm/sources/*", "LUA" ) ) do
 end
 
 -- Importer module
-includeShared "importer"
+IncludeComponent "importer"
 
 -- Finish log
 Logger:Info( "Time taken to start-up: %.4f sec.", SysTime() - stopwatch )
