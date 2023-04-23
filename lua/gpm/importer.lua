@@ -1,36 +1,51 @@
 -- Libraries
 local promise = gpm.promise
+local logger = gpm.Logger
 local paths = gpm.paths
+local fs = gpm.fs
 local gpm = gpm
 
 -- Variables
+local ErrorNoHaltWithStack = ErrorNoHaltWithStack
+local SysTime = SysTime
 local ipairs = ipairs
 local pairs = pairs
 local type = type
+local MsgN = MsgN
 
-local sources = {}
-for _, source in pairs( gpm.sources ) do
-    sources[ #sources + 1 ] = source
-end
+do
 
-gpm.AsyncImport = promise.Async( function( filePath, parentPackage, isAutorun )
-    ArgAssert( filePath, 1, "string" )
+    local sources = gpm.sources
 
-    for _, source in ipairs( sources ) do
-        if type( source.CanImport ) ~= "function" then continue end
-        if not source.CanImport( filePath ) then continue end
-        return source.Import( filePath, parentPackage, isAutorun )
+    function gpm.LuaPackageExists( filePath )
+        return sources.lua.CanImport( filePath )
     end
 
-    ErrorNoHaltWithStack( "The requested package doesn't exist." )
-end )
+    function gpm.GetLuaFiles()
+        return sources.lua.Files
+    end
 
-function gpm.LuaPackageExists( filePath )
-    return gpm.sources.lua.CanImport( filePath )
 end
 
-function gpm.GetLuaFiles()
-    return gpm.sources.lua.Files
+do
+
+    local sources = {}
+    for _, source in pairs( gpm.sources ) do
+        sources[ #sources + 1 ] = source
+    end
+
+    gpm.AsyncImport = promise.Async( function( filePath, parentPackage, isAutorun )
+        ArgAssert( filePath, 1, "string" )
+
+        for _, source in ipairs( sources ) do
+            if type( source.CanImport ) ~= "function" then continue end
+            if not source.CanImport( filePath ) then continue end
+            return source.Import( filePath, parentPackage, isAutorun )
+        end
+
+        ErrorNoHaltWithStack( "The requested package doesn't exist." )
+    end )
+
 end
 
 do
@@ -45,43 +60,40 @@ do
         return p
     end
 
-end
-
-_G.import = gpm.Import
-
-do
-
-    local file_Find = file.Find
-
-    gpm.ImportFolder = promise.Async( function( filePath, parentPackage, isAutorun )
-        filePath = paths.Fix( filePath )
-
-        local files, folders = file_Find( filePath .. "/*", "LUA" )
-        for _, folderName in ipairs( folders ) do
-            gpm.AsyncImport( filePath .. "/" .. folderName, parentPackage, isAutorun )
-        end
-
-        for _, fileName in ipairs( files ) do
-            gpm.AsyncImport( filePath .. "/" .. fileName, parentPackage, isAutorun )
-        end
-    end )
+    _G.import = gpm.Import
 
 end
 
-local pkgs = gpm.Packages
-if type( pkgs ) == "table" then
-    for packageName in pairs( pkgs ) do
-        pkgs[ packageName ] = nil
+gpm.ImportFolder = promise.Async( function( folderPath, parentPackage, isAutorun )
+    if not fs.IsDir( folderPath, gpm.LuaRealm ) then
+        logger:Warn( "Import impossible, folder '%s' is empty, skipping...", folderPath )
+        return
     end
-end
 
-gpm.ImportFolder( "gpm/packages", nil, true )
-gpm.ImportFolder( "packages", nil, true )
+    MsgN()
+
+    logger:Info( "Starting to import packages from '%s'", folderPath )
+    folderPath = paths.Fix( folderPath )
+    local stopwatch = SysTime()
+
+    local files, folders = fs.Find( folderPath .. "/*", gpm.LuaRealm )
+    for _, folderName in ipairs( folders ) do
+        local ok, err = gpm.AsyncImport( folderPath .. "/" .. folderName, parentPackage, isAutorun ):SafeAwait()
+        if not ok then ErrorNoHaltWithStack( err ) end
+    end
+
+    for _, fileName in ipairs( files ) do
+        local ok, err = gpm.AsyncImport( folderPath .. "/" .. fileName, parentPackage, isAutorun ):SafeAwait()
+        if not ok then ErrorNoHaltWithStack( err ) end
+    end
+
+    logger:Info( "Import from '%s' is completed, it took %f seconds.", folderPath, SysTime() - stopwatch )
+end )
+
 
 do
 
     local cachePath = "gpm/" .. ( SERVER and "server" or "client" ) .. "/packages/"
-    local fs = gpm.fs
 
     function gpm.ClearCache()
         local files, _ = fs.Find( cachePath .. "*", "DATA" )
@@ -96,6 +108,14 @@ end
 
 if SERVER then
 
+    concommand.Add( "gpm_clear_cache", function( ply )
+        if not ply or ply:IsListenServerHost() then
+            gpm.ClearCache()
+        end
+
+        ply:SendLua( "gpm.ClearCache()" )
+    end )
+
     local BroadcastLua = BroadcastLua
 
     concommand.Add( "gpm_reload", function( ply )
@@ -107,12 +127,14 @@ if SERVER then
         end
     end )
 
-    concommand.Add( "gpm_clear_cache", function( ply )
-        if not ply or ply:IsListenServerHost() then
-            gpm.ClearCache()
-        end
-
-        ply:SendLua( "gpm.ClearCache()" )
-    end )
-
 end
+
+local pkgs = gpm.Packages
+if type( pkgs ) == "table" then
+    for packageName in pairs( pkgs ) do
+        pkgs[ packageName ] = nil
+    end
+end
+
+gpm.ImportFolder( "gpm/packages", nil, true )
+gpm.ImportFolder( "packages", nil, true )
