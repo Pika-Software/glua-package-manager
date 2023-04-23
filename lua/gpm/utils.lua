@@ -45,57 +45,55 @@ end
 -- https://wiki.facepunch.com/gmod/Global.type
 do
 
+    local types = list.GetForEdit( "GPM - Type Names" )
     local TYPE_NONE = TYPE_NONE
-    local list = list
 
     -- https://wiki.facepunch.com/gmod/Enums/TYPE
-    list.Set( "GPM - Type Names", TYPE_PARTICLESYSTEM, "CNewParticleEffect" )
-    list.Set( "GPM - Type Names", TYPE_PROJECTEDTEXTURE, "ProjectedTexture" )
-    list.Set( "GPM - Type Names", TYPE_PIXELVISHANDLE, "pixelvis_handle_t" )
-    list.Set( "GPM - Type Names", TYPE_RECIPIENTFILTER, "CRecipientFilter" )
-    list.Set( "GPM - Type Names", TYPE_SOUNDHANDLE, "IGModAudioChannel" )
-    list.Set( "GPM - Type Names", TYPE_LIGHTUSERDATA, "light userdata" )
-    list.Set( "GPM - Type Names", TYPE_PARTICLEEMITTER, "CLuaEmitter" )
-    list.Set( "GPM - Type Names", TYPE_DAMAGEINFO, "CTakeDamageInfo" )
-    list.Set( "GPM - Type Names", TYPE_LOCOMOTION, "CLuaLocomotion" )
-    list.Set( "GPM - Type Names", TYPE_SURFACEINFO, "SurfaceInfo" )
-    list.Set( "GPM - Type Names", TYPE_PHYSCOLLIDE, "PhysCollide" )
-    list.Set( "GPM - Type Names", TYPE_EFFECTDATA, "CEffectData" )
-    list.Set( "GPM - Type Names", TYPE_PARTICLE, "CLuaParticle" )
-    list.Set( "GPM - Type Names", TYPE_NAVLADDER, "CNavLadder" )
-    list.Set( "GPM - Type Names", TYPE_VIDEO, "IVideoWriter" )
-    list.Set( "GPM - Type Names", TYPE_MATERIAL, "IMaterial" )
-    list.Set( "GPM - Type Names", TYPE_MOVEDATA, "CMoveData" )
-    list.Set( "GPM - Type Names", TYPE_PATH, "PathFollower" )
-    list.Set( "GPM - Type Names", TYPE_SOUND, "CSoundPatch" )
-    list.Set( "GPM - Type Names", TYPE_USERDATA, "userdata" )
-    list.Set( "GPM - Type Names", TYPE_FUNCTION, "function" )
-    list.Set( "GPM - Type Names", TYPE_TEXTURE, "ITexture" )
-    list.Set( "GPM - Type Names", TYPE_USERCMD, "CUserCmd" )
-    list.Set( "GPM - Type Names", TYPE_RESTORE, "IRestore" )
-    list.Set( "GPM - Type Names", TYPE_NAVAREA, "CNavArea" )
-    list.Set( "GPM - Type Names", TYPE_PHYSOBJ, "PhysObj" )
-    list.Set( "GPM - Type Names", TYPE_DLIGHT, "dlight_t" )
-    list.Set( "GPM - Type Names", TYPE_USERMSG, "bf_read" )
-    list.Set( "GPM - Type Names", TYPE_MATRIX, "VMatrix" )
-    list.Set( "GPM - Type Names", TYPE_CONVAR, "ConVar" )
-    list.Set( "GPM - Type Names", TYPE_VECTOR, "Vector" )
-    list.Set( "GPM - Type Names", TYPE_ENTITY, "Entity" )
-    list.Set( "GPM - Type Names", TYPE_THREAD, "thread" )
-    list.Set( "GPM - Type Names", TYPE_STRING, "string" )
-    list.Set( "GPM - Type Names", TYPE_NUMBER, "number" )
-    list.Set( "GPM - Type Names", TYPE_NONE, "unknown" )
-    list.Set( "GPM - Type Names", TYPE_BOOL, "boolean" )
-    list.Set( "GPM - Type Names", TYPE_IMESH, "IMesh" )
-    list.Set( "GPM - Type Names", TYPE_PANEL, "Panel" )
-    list.Set( "GPM - Type Names", TYPE_ANGLE, "Angle" )
-    list.Set( "GPM - Type Names", TYPE_COLOR, "Color" )
-    list.Set( "GPM - Type Names", TYPE_TABLE, "table" )
-    list.Set( "GPM - Type Names", TYPE_SAVE, "ISave" )
-    list.Set( "GPM - Type Names", TYPE_FILE, "File" )
-    list.Set( "GPM - Type Names", TYPE_NIL, "nil" )
-
-    local types = list.GetForEdit( "GPM - Type Names" )
+    types[TYPE_PARTICLESYSTEM] = "CNewParticleEffect"
+    types[TYPE_PROJECTEDTEXTURE] = "ProjectedTexture"
+    types[TYPE_PIXELVISHANDLE] = "pixelvis_handle_t"
+    types[TYPE_RECIPIENTFILTER] = "CRecipientFilter"
+    types[TYPE_SOUNDHANDLE] = "IGModAudioChannel"
+    types[TYPE_LIGHTUSERDATA] = "light userdata"
+    types[TYPE_PARTICLEEMITTER] = "CLuaEmitter"
+    types[TYPE_DAMAGEINFO] = "CTakeDamageInfo"
+    types[TYPE_LOCOMOTION] = "CLuaLocomotion"
+    types[TYPE_SURFACEINFO] = "SurfaceInfo"
+    types[TYPE_PHYSCOLLIDE] = "PhysCollide"
+    types[TYPE_EFFECTDATA] = "CEffectData"
+    types[TYPE_PARTICLE] = "CLuaParticle"
+    types[TYPE_NAVLADDER] = "CNavLadder"
+    types[TYPE_VIDEO] = "IVideoWriter"
+    types[TYPE_MATERIAL] = "IMaterial"
+    types[TYPE_MOVEDATA] = "CMoveData"
+    types[TYPE_PATH] = "PathFollower"
+    types[TYPE_SOUND] = "CSoundPatch"
+    types[TYPE_USERDATA] = "userdata"
+    types[TYPE_FUNCTION] = "function"
+    types[TYPE_TEXTURE] = "ITexture"
+    types[TYPE_USERCMD] = "CUserCmd"
+    types[TYPE_RESTORE] = "IRestore"
+    types[TYPE_NAVAREA] = "CNavArea"
+    types[TYPE_PHYSOBJ] = "PhysObj"
+    types[TYPE_DLIGHT] = "dlight_t"
+    types[TYPE_USERMSG] = "bf_read"
+    types[TYPE_MATRIX] = "VMatrix"
+    types[TYPE_CONVAR] = "ConVar"
+    types[TYPE_VECTOR] = "Vector"
+    types[TYPE_ENTITY] = "Entity"
+    types[TYPE_THREAD] = "thread"
+    types[TYPE_STRING] = "string"
+    types[TYPE_NUMBER] = "number"
+    types[TYPE_NONE] = "unknown"
+    types[TYPE_BOOL] = "boolean"
+    types[TYPE_IMESH] = "IMesh"
+    types[TYPE_PANEL] = "Panel"
+    types[TYPE_ANGLE] = "Angle"
+    types[TYPE_COLOR] = "Color"
+    types[TYPE_TABLE] = "table"
+    types[TYPE_SAVE] = "ISave"
+    types[TYPE_FILE] = "File"
+    types[TYPE_NIL] = "nil"
 
     function gpm.type( any )
         local str = types[ gpm.TypeID( any ) ]
