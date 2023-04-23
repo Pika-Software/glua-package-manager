@@ -9,7 +9,7 @@ CreateConVar( "gpm_cache_lifetime", "24", FCVAR_ARCHIVE, " - the cache lifetime,
 
 module( "gpm" )
 
-_VERSION = 010503
+_VERSION = 010600
 
 function IncludeComponent( filePath )
     filePath = "gpm/" .. filePath  .. ".lua"
@@ -63,8 +63,8 @@ for _, filePath in ipairs( fs.Find( "gpm/sources/*", "LUA" ) ) do
     include( filePath )
 end
 
--- Importer module
-IncludeComponent "importer"
-
 -- Finish log
 Logger:Info( "Time taken to start-up: %.4f sec.", SysTime() - stopwatch )
+
+-- Importer
+IncludeComponent "importer"
