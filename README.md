@@ -40,7 +40,7 @@ version = 1
     This is the parameter responsible for isolation, by default it is `true`, if it is set to `false` then the package will run in `_G` and all global values created in it will go to `_G`, as well as you will no longer have access to gpm environment features. I recommend to use this only if you really need it.
 
 - ### Package logger (`logger`) (def. `false`)
-    If set to `true` then a personal logger object will be created in the package environment, to easily send logs to the console. If necessary, you can create a logger object yourself, just call `gpm.logger.Create( name )` (`name` is `string`).
+    If set to `true` then a personal logger object will be created in the package environment, to easily send logs to the console. If necessary, you can create a logger object yourself, just call `gpm.logger.Create( name, color )` (`name` is `string`, `color` is `Color`).
 
     #### Example usage
     ```lua
