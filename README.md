@@ -20,29 +20,29 @@ main = "init.lua"
 version = 1
 ```
 
-# Available package file parameters:
-## Package name (`name`) (def. `nil`)
+## Available package file parameters:
+### Package name (`name`) (def. `nil`)
 The name of the package is just text that will be displayed in the format `name@version`, for example `My Awesome Package@0.0.1`.
 
-## Package version (`version`) (def. `nil`)
+### Package version (`version`) (def. `nil`)
 By default, the version is a number whose format is { 00 } { 00 } { 00 } { 00 } = 0.0.0, you can also use your own version format, just put your version here as a string.
 
-## Package entry point (`main`) (def. `init.lua`)
+### Package entry point (`main`) (def. `init.lua`)
 The `main` in this case is the entry point to the package (where the code execution will start from), you can use either the full `lua/` path, for example 'lua/packages/example-package/init.lua' or a local path relative to your package folder.
 
-## Client & Server (`client`, `server`) (def. `true`, `true`)
+### Client & Server (`client`, `server`) (def. `true`, `true`)
 You can change the permissions to run a package, for example if you set `client` to `false` the client will not be able to run it, moreover it will not even know that such a package exists and therefore will not see its files.
 
-## Package autorun (`autorun`) (def. `false`)
+### Package autorun (`autorun`) (def. `false`)
 The default setting is `false`, if this parameter is set to `true` and the package is in a valid `lua/` directory, the package will automatically start and will not wait to be run externally.
 
-## Package isolation (`isolation`) (def. `true`)
+### Package isolation (`isolation`) (def. `true`)
 This is the parameter responsible for isolation, by default it is `true`, if it is set to `false` then the package will run in `_G` and all global values created in it will go to `_G`, as well as you will no longer have access to gpm environment features. I recommend to use this only if you really need it.
 
-## Package logger (`logger`) (def. `false`)
+### Package logger (`logger`) (def. `false`)
 If set to `true` then a personal logger object will be created in the package environment, to easily send logs to the console. If necessary, you can create a logger object yourself, just call `gpm.logger.Create( name )` (`name` is `string`).
 
-### Example usage
+#### Example usage
 ```lua
 local logger = gpm.Logger
 
@@ -58,13 +58,13 @@ logger:SetDebugFilter( function( str, ... )
     return true
 end )
 ```
-### Result
+#### Result
 ![Console](https://i.imgur.com/FwScVHf.png)
 
-## Others
+### Others
 This file can also contain any other additional information such as package author, license or description.
 
-# Simple `import` function usage example
+## Simple `import` function usage example
 Here is an example of the use of import in the `init.lua` file of the package.
 ```lua
 -- pkg1 init.lua
@@ -74,7 +74,7 @@ print( package2.feature() )
 ```
 Look for more examples in our code ;)
 
-# How to improve?
+## How to improve?
 For better speed and reliability, the following binary modules can be installed in the game:
 - [async_write](https://github.com/WilliamVenner/gm_async_write)
 - [gmsv_reqwest](https://github.com/WilliamVenner/gmsv_reqwest)
