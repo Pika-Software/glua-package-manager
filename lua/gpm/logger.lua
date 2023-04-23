@@ -93,7 +93,7 @@ end
 
 local convar = GetConVar( "developer" )
 local function debugFilter()
-    return convar:GetInt() > 1
+    return convar:GetInt() > 0
 end
 
 module( "gpm.logger" )

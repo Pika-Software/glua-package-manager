@@ -49,12 +49,10 @@ function GetMetadata( source )
         source.client = source.client ~= false
         source.server = source.server ~= false
 
-        -- Should automatically run the package
-        source.autorun = source.autorun == true
-
-        -- Package isolation & logger
+        -- Isolation, autorun, logger
         source.isolation = source.isolation ~= false
-        source.logger = source.logger ~= false
+        source.autorun = source.autorun == true
+        source.logger = source.logger == true
 
         -- Files to send to the client ( package and main will already be added and there is no need to specify them here )
         source.send = type( source.send ) == "table" and source.send or nil
