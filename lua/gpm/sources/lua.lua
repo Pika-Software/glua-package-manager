@@ -104,11 +104,10 @@ Import = promise.Async( function( filePath, parentPackage, isAutorun )
             local send = metadata.send
             if send ~= nil then
                 for _, filePath in ipairs( send ) do
-                    if not fs.Exists( filePath, luaRealm ) then
-                        filePath = paths.Join( packagePath, filePath )
-                    end
-
-                    if fs.Exists( filePath, luaRealm ) then
+                    local insideFilePath = paths.Join( packagePath, filePath )
+                    if fs.Exists( insideFilePath, luaRealm ) then
+                        AddCSLuaFile( insideFilePath )
+                    elseif fs.Exists( filePath, luaRealm ) then
                         AddCSLuaFile( filePath )
                     end
                 end
