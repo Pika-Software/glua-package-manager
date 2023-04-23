@@ -21,6 +21,8 @@ gpm.AsyncImport = promise.Async( function( filePath, parentPackage, isAutorun )
         if not source.CanImport( filePath ) then continue end
         return source.Import( filePath, parentPackage, isAutorun )
     end
+
+    ErrorNoHaltWithStack( "The requested package doesn't exist." )
 end )
 
 function gpm.LuaPackageExists( filePath )
