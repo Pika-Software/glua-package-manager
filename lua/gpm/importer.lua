@@ -87,7 +87,6 @@ gpm.ImportFolder = promise.Async( function( folderPath, parentPackage, isAutorun
     logger:Info( "Import from '%s' is completed, it took %f seconds.", folderPath, SysTime() - stopwatch )
 end )
 
-
 do
 
     local cachePath = "gpm/" .. ( SERVER and "server" or "client" ) .. "/packages/"
