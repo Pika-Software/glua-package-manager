@@ -11,7 +11,6 @@ local SysTime = SysTime
 local ipairs = ipairs
 local pairs = pairs
 local type = type
-local MsgN = MsgN
 
 do
 
@@ -69,8 +68,6 @@ gpm.ImportFolder = promise.Async( function( folderPath, parentPackage, isAutorun
         logger:Warn( "Import impossible, folder '%s' is empty, skipping...", folderPath )
         return
     end
-
-    MsgN()
 
     logger:Info( "Starting to import packages from '%s'", folderPath )
     folderPath = paths.Fix( folderPath )
