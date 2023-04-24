@@ -64,19 +64,20 @@ function meta:SetDebugFilter( func )
     self.DebugFilter = func
 end
 
+local sideColor = nil
+
+if SERVER then
+    sideColor = Color( 5, 170, 250 )
+elseif MENU_DLL then
+    sideColor = Color( 75, 175, 80 )
+else
+    sideColor = Color( 225, 170, 10 )
+end
+
+local dateColor = Color( 150, 150, 150 )
+
 -- Console log
 do
-
-    local dateColor = Color( 150, 150, 150 )
-    local realmColor = nil
-
-    if SERVER then
-        realmColor = Color( 5, 170, 250 )
-    elseif MENU_DLL then
-        realmColor = Color( 75, 175, 80 )
-    else
-        realmColor = Color( 225, 170, 10 )
-    end
 
     local os_time = os.time
     local os_date = os.date
@@ -86,7 +87,7 @@ do
         ArgAssert( levelColor, 1, "Color" )
         ArgAssert( level, 2, "string" )
 
-        MsgC( dateColor, os_date( "%d/%m/%Y %H:%M:%S ", os_time() ), levelColor, level, dateColor, " --- ", realmColor, "[" .. (SERVER and "SERVER" or "CLIENT") .. "] ", self.Color, self.Name, dateColor, " : ", self.TextColor, string.format( str, ... ), "\n"  )
+        MsgC( dateColor, os_date( "%d/%m/%Y %H:%M:%S ", os_time() ), levelColor, level, dateColor, " --- ", sideColor, "[" .. (SERVER and "SERVER" or "CLIENT") .. "] ", self.Color, self.Name, dateColor, " : ", self.TextColor, string.format( str, ... ), "\n"  )
     end
 
 end
@@ -98,7 +99,12 @@ end
 
 module( "gpm.logger" )
 
+-- Metatable
 LOGGER = meta
+
+-- Colors
+SIDE_COLOR = sideColor
+DATE_COLOR = dateColor
 
 INFO_COLOR = Color( 70, 135, 255 )
 WARN_COLOR = Color( 255, 130, 90 )
