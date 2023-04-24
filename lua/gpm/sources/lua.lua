@@ -7,6 +7,7 @@ local fs = gpm.fs
 
 -- Variables
 local activeGamemode = engine.ActiveGamemode()
+local isSinglePlayer = game.SinglePlayer()
 local CLIENT, SERVER = CLIENT, SERVER
 local AddCSLuaFile = AddCSLuaFile
 local setmetatable = setmetatable
@@ -61,6 +62,11 @@ Import = promise.Async( function( filePath, parentPackage, isAutorun )
 
         if not metadata.name then metadata.name = util_MD5( filePath ) end
         identifier = metadata.name .. "@" .. metadata.version
+
+        if not metadata.singleplayer and isSinglePlayer then
+            logger:Error( "Package `%s` cannot be executed in a single-player game.", identifier )
+            return
+        end
 
         local gamemodeType = type( metadata.gamemode )
         if gamemodeType == "string" and metadata.gamemode ~= activeGamemode then

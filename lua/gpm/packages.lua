@@ -51,6 +51,9 @@ function GetMetadata( source )
             source.gamemode = nil
         end
 
+        -- Single-player
+        source.singleplayer = source.singleplayer ~= false
+
         -- Realms
         source.client = source.client ~= false
         source.server = source.server ~= false
