@@ -145,9 +145,11 @@ if SERVER then
         if not ply or ply:IsSuperAdmin() then
             BroadcastLua( "include( \"gpm/init.lua\" )" )
             include( "gpm/init.lua" )
-
             hook.Run( "GPM - Reloaded" )
+            return
         end
+
+        ply:ChatPrint( "[GPM] You do not have enough permissions to execute this command." )
     end )
 
 end
