@@ -102,6 +102,25 @@ do
 
 end
 
+do
+
+    local sideColor = gpm.logger.SIDE_COLOR
+    local MsgC = MsgC
+
+    function gpm.PrintPackageList()
+        MsgC( sideColor, SERVER and "Server" or "Client", logger.TextColor, " packages:\n" )
+        for name, packages in pairs( gpm.Packages ) do
+            local versions = {}
+            for version in pairs( packages ) do
+                versions[ #versions + 1 ] = version
+            end
+
+            MsgC( sideColor, "* ", logger.TextColor, string.format( "%s@%s\n", name, table.concat( versions, ", " ) ) )
+        end
+    end
+
+end
+
 if SERVER then
 
     concommand.Add( "gpm_clear_cache", function( ply )
@@ -110,6 +129,14 @@ if SERVER then
         end
 
         ply:SendLua( "gpm.ClearCache()" )
+    end )
+
+    concommand.Add( "gpm_list", function( ply )
+        if not ply or ply:IsListenServerHost() then
+            gpm.PrintPackageList()
+        end
+
+        ply:SendLua( "gpm.PrintPackageList()" )
     end )
 
     local BroadcastLua = BroadcastLua

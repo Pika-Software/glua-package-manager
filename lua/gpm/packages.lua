@@ -293,37 +293,3 @@ do
     end
 
 end
-
-if SERVER then
-
-    concommand.Add( "gpm_list", function( ply )
-        if ply ~= nil and not ply:IsListenServerHost() then return end
-
-        logger:Info( "Package list:" )
-        for name, versions in pairs( pkgs ) do
-            local vTbl = {}
-            for version in pairs( versions ) do
-                vTbl[ #vTbl + 1 ] = utils.Version( version )
-            end
-
-            logger:Info( "%s@%s", name, table.concat( vTbl, ", " ) )
-        end
-    end )
-
-end
-
-if CLIENT then
-
-    concommand.Add( "gpm_list", function()
-        logger:Info( "Package list:" )
-        for name, versions in pairs( pkgs ) do
-            local vTbl = {}
-            for version in pairs( versions ) do
-                vTbl[ #vTbl + 1 ] = utils.Version( version )
-            end
-
-            logger:Info( "%s@%s", name, table.concat( vTbl, ", " ) )
-        end
-    end )
-
-end
