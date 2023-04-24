@@ -39,7 +39,6 @@ Import = promise.Async( function( url, parentPackage )
     if fs.Exists( cachePath, "DATA" ) and fs.Time( cachePath, "DATA" ) > ( 60 * 60 * cacheLifetime:GetInt() ) then
         local gma = gmad.Open( cachePath, "DATA" )
         if gma ~= nil then
-            fileClass:Close()
             return sources.gmad.Import( "data/" .. cachePath, parentPackage )
         end
 
