@@ -2,6 +2,7 @@
 local packages = gpm.packages
 local sources = gpm.sources
 local promise = gpm.promise
+local logger = gpm.Logger
 local utils = gpm.utils
 local gmad = gpm.gmad
 local http = gpm.http
@@ -10,8 +11,8 @@ local fs = gpm.fs
 local util = util
 
 -- Variables
-local ErrorNoHaltWithStack = ErrorNoHaltWithStack
 local CompileString = CompileString
+local util_MD5 = util.MD5
 local SERVER = SERVER
 local ipairs = ipairs
 local pairs = pairs
@@ -43,7 +44,10 @@ Import = promise.Async( function( url, parentPackage )
         end
 
         local ok, result = fs.Compile( cachePath, "DATA" ):SafeAwait()
-        if not ok then return promise.Reject( result ) end
+        if not ok then
+            logger:Error( "Package `%s` cache compile error: %s. (%s)", url, result, cachePath )
+            return
+        end
 
         return packages.Initialize( packages.GetMetadata( {
             ["name"] = packageName
@@ -53,17 +57,22 @@ Import = promise.Async( function( url, parentPackage )
     local ok, result = http.Fetch( url, nil, 120 ):SafeAwait()
     if not ok then return promise.Reject( result ) end
 
-    if result.code ~= 200 then return promise.Reject( "invalid response http code - " .. result.code ) end
+    if result.code ~= 200 then
+        logger:Error( "Package downloading failed, invalid response http code: %s. (%s)", result.code, url )
+        return
+    end
 
     local code = result.body
     local metadata = util.JSONToTable( code )
     if not metadata then
         local ok, err = fs.AsyncWrite( cachePath, code ):SafeAwait()
-        if not ok then ErrorNoHaltWithStack( err ) end
+        if not ok then
+            logger:Error( "Failed cache write: %s (%s), file system message: %s", cachePath, url, err )
+        end
 
         local ok, result = pcall( CompileString, code, url )
         if not ok then return promise.Reject( result ) end
-        if not result then return promise.Reject( "file compilation failed" ) end
+        if not result then return promise.Reject( "File `" .. url .. "` compilation failed." ) end
 
         return packages.Initialize( packages.GetMetadata( {
             ["name"] = packageName
@@ -73,7 +82,11 @@ Import = promise.Async( function( url, parentPackage )
     metadata = utils.LowerTableKeys( metadata )
 
     local urls = metadata.files
-    if type( urls ) ~= "table" then return promise.Reject( "no urls to files" ) end
+    if type( urls ) ~= "table" then
+        logger:Error( "No links to files, download canceled. (%s)", url )
+        return
+    end
+
     metadata.files = nil
 
     local files = {}
@@ -84,10 +97,50 @@ Import = promise.Async( function( url, parentPackage )
         files[ #files + 1 ] = { filePath, result.body }
     end
 
-    if #files == 0 then return promise.Reject( "no files" ) end
+    if #files == 0 then
+        logger:Error( "No files to download. (%s)", url )
+        return
+    end
+
+    if metadata.mount == false then
+        metadata = packages.GetMetadata( packageFile )
+
+        local cFiles = {}
+        for _, data in ipairs( files ) do
+            local ok, result = pcall( CompileString, data[ 2 ], data[ 1 ] )
+            if not ok then return promise.Reject( result ) end
+            if not result then return promise.Reject( "File `" .. data[ 1 ] .. "` compilation failed." ) end
+            cFiles[ data[ 1 ] ] = result
+        end
+
+        if not metadata.name then
+            metadata.name = util_MD5( url )
+        end
+
+        local mainFile = metadata.main
+        if not mainFile then
+            mainFile = "init.lua"
+        end
+
+        local func = cFiles[ mainFile ]
+        if not func then
+            mainFile = "main.lua"
+            func = Files[ mainFile ]
+        end
+
+        if not func then
+            logger:Error( "Package `%s` main file is missing!", metadata.name .. "@" .. metadata.version )
+            return
+        end
+
+        return packages.Initialize( metadata, func, cFiles, parentPackage )
+    end
 
     local gma = gmad.Write( cachePath )
-    if not gma then return promise.Reject( "cache construction error" ) end
+    if not gma then
+        logger:Error( "Cache construction error, mounting failed. (%s)", url )
+        return
+    end
 
     gma:SetTitle( metadata.name or packageName )
     gma:SetDescription( util.TableToJSON( metadata ) )

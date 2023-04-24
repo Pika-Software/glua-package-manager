@@ -87,7 +87,7 @@ Compile = promise.Async( function( filePath, gamePath, handleError )
 
     local ok, result = pcall( CompileString, result.content, result.filePath, handleError )
     if not ok then return promise.Reject( result ) end
-    if not result then return promise.Reject( "file compilation failed" ) end
+    if not result then return promise.Reject( "File `" .. filePath .. "` (" .. gamePath .. ") compilation failed." ) end
 
     return result
 end )
