@@ -45,6 +45,12 @@ function GetMetadata( source )
         -- Version
         source.version = utils.Version( source.version )
 
+        -- Gamemode
+        local gamemodeType = type( source.gamemode )
+        if gamemodeType ~= "string" and gamemodeType ~= "table" then
+            source.gamemode = nil
+        end
+
         -- Realms
         source.client = source.client ~= false
         source.server = source.server ~= false
@@ -269,7 +275,7 @@ do
         -- Run
         local ok, result = SafeRun( gPackage, func, ErrorNoHaltWithStack )
         if not ok then
-            logger:Warn( "Package `%s` failed to load, see above for the reason, it took %.4f seconds.", gPackage, SysTime() - stopwatch )
+            logger:Error( "Package `%s` start-up failed, see above for the reason, it took %.4f seconds.", gPackage, SysTime() - stopwatch )
             return
         end
 

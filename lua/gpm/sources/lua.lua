@@ -6,6 +6,7 @@ local string = string
 local fs = gpm.fs
 
 -- Variables
+local activeGamemode = engine.ActiveGamemode()
 local CLIENT, SERVER = CLIENT, SERVER
 local AddCSLuaFile = AddCSLuaFile
 local setmetatable = setmetatable
@@ -48,11 +49,37 @@ Import = promise.Async( function( filePath, parentPackage, isAutorun )
     end
 
     local packageFilePath = paths.Join( packagePath, "package.lua" )
+    local identifier = packageFilePath
+
     local packageFile, metadata = Files[ packageFilePath ], nil
     if packageFile then
         metadata = packages.GetMetadata( packageFile )
         if not metadata then
-            return promise.Reject( "package file is empty (" .. packageFilePath .. ")" )
+            logger:Error( "Package `%s` package.lua file is empty!", identifier )
+            return
+        end
+
+        if not metadata.name then metadata.name = util_MD5( filePath ) end
+        identifier = metadata.name .. "@" .. metadata.version
+
+        local gamemodeType = type( metadata.gamemode )
+        if gamemodeType == "string" and metadata.gamemode ~= activeGamemode then
+            logger:Error( "Package `%s` is not compatible with this gamemode.", identifier )
+            return
+        end
+
+        if gamemodeType == "table" then
+            local allowed = false
+            for _, gamemodeName in ipairs( metadata.gamemode ) do
+                if gamemodeName ~= activeGamemode then continue end
+                allowed = true
+                break
+            end
+
+            if not allowed then
+                logger:Error( "Package `%s` is not compatible with this gamemode.", identifier )
+                return
+            end
         end
 
         if SERVER and metadata.client then
@@ -70,11 +97,11 @@ Import = promise.Async( function( filePath, parentPackage, isAutorun )
         end
 
         metadata = packages.GetMetadata( data )
+        identifier = metadata.name .. "@" .. metadata.version
 
     end
 
     if CLIENT and not metadata.client then return end
-    if not metadata.name then metadata.name = string.GetFileFromFilename( packagePath ) end
 
     local mainFile = metadata.main
     if not mainFile then
@@ -94,7 +121,8 @@ Import = promise.Async( function( filePath, parentPackage, isAutorun )
     end
 
     if not func then
-        return promise.Reject( "main file is missing (" .. metadata.name .. "@" .. metadata.version .. ")" )
+        logger:Error( "Package `%s` main file is missing!", identifier )
+        return
     end
 
     if SERVER then
@@ -118,7 +146,7 @@ Import = promise.Async( function( filePath, parentPackage, isAutorun )
     end
 
     if isAutorun and not metadata.autorun then
-        logger:Debug( "package autorun restricted (%s)", metadata.name .. "@" .. metadata.version )
+        logger:Debug( "Package `%s` autorun restricted.", identifier )
         return
     end
 
