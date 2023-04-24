@@ -10,8 +10,8 @@ local fs = gpm.fs
 local util = util
 
 -- Variables
+local ErrorNoHaltWithStack = ErrorNoHaltWithStack
 local CompileString = CompileString
-local logger = gpm.Logger
 local SERVER = SERVER
 local ipairs = ipairs
 local pairs = pairs
@@ -60,7 +60,7 @@ Import = promise.Async( function( url, parentPackage )
     local metadata = util.JSONToTable( code )
     if not metadata then
         local ok, err = fs.AsyncWrite( cachePath, code ):SafeAwait()
-        if not ok then logger:Error( err ) end
+        if not ok then ErrorNoHaltWithStack( err ) end
 
         local ok, result = pcall( CompileString, code, url )
         if not ok then return promise.Reject( result ) end
