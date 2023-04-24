@@ -49,7 +49,11 @@ Import = promise.Async( function( wsid, parentPackage )
                 end
             end
 
-            if not fs.Exists( outputPath, "DATA" ) then return p:Reject( "gma writing error" ) end
+            if not fs.Exists( outputPath, "DATA" ) then
+                p:Reject( "gma writing error" )
+                return
+            end
+
             p:Resolve( "data/" .. outputPath )
             return
         end
