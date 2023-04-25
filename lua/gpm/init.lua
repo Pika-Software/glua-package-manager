@@ -9,7 +9,7 @@ CreateConVar( "gpm_cache_lifetime", "24", FCVAR_ARCHIVE, " - the cache lifetime,
 
 module( "gpm" )
 
-_VERSION = 010800
+_VERSION = 010801
 
 function IncludeComponent( filePath )
     filePath = "gpm/" .. filePath  .. ".lua"

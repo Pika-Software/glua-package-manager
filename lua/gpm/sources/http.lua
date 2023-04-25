@@ -58,7 +58,7 @@ Import = promise.Async( function( url, parentPackage )
     if not ok then return promise.Reject( result ) end
 
     if result.code ~= 200 then
-        logger:Error( "Package downloading failed, invalid response http code: %s. (%s)", result.code, url )
+        logger:Error( "Package `%s` downloading failed, invalid response http code (%s).", url, result.code )
         return
     end
 

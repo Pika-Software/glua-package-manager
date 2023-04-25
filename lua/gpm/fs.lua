@@ -5,8 +5,10 @@ local file = file
 
 -- Variables
 local CompileString = CompileString
+local math_max = math.max
 local ipairs = ipairs
 local pcall = pcall
+local type = type
 
 -- https://github.com/WilliamVenner/gm_async_write
 if not file.AsyncWrite and util.IsBinaryModuleInstalled( "async_write" ) then require( "async_write" ) end
@@ -22,11 +24,11 @@ Find = file.Find
 Size = file.Size
 Time = file.Time
 
-function Read( filePath, gamePath )
+function Read( filePath, gamePath, lenght )
     local fileClass = file.Open( filePath, "rb", gamePath )
     if not fileClass then return end
 
-    local content = fileClass:Read( fileClass:Size() )
+    local content = fileClass:Read( type( lenght ) == "number" and math_max( 0, lenght ) or fileClass:Size() )
     fileClass:Close()
 
     return content
