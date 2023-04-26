@@ -23,7 +23,7 @@ do
 
         function gpm.TypeID( any )
             for _, data in ipairs( typeIDs ) do
-                if data[ 1 ]( any ) then return data[ 2 ] end
+                if data[ 1 ]( any ) == true then return data[ 2 ] end
             end
 
             return TypeID( any )
