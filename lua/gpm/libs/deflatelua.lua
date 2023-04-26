@@ -127,7 +127,6 @@ local error = error
 local ipairs = ipairs
 local pairs = pairs
 local print = print
-local require = require
 local tostring = tostring
 local type = type
 local setmetatable = setmetatable
@@ -136,22 +135,6 @@ local math = math
 local table_sort = table.sort
 local math_max = math.max
 local string_char = string.char
-
---[[
- Requires the first module listed that exists, else raises like `require`.
- If a non-string is encountered, it is returned.
- Second return value is module name loaded (or '').
- --]]
-local function requireany(...)
-  local errs = {}
-  for i = 1, select('#', ...) do local name = select(i, ...)
-    if type(name) ~= 'string' then return name, '' end
-    local ok, mod = pcall(require, name)
-    if ok then return mod, name end
-    errs[#errs+1] = mod
-  end
-  error(table.concat(errs, '\n'), 2)
-end
 
 -- local crc32 = require "digest.crc32lua" . crc32_byte
 
@@ -323,7 +306,7 @@ local function bitstream_from_bytestream(bys)
     buf_nbit = buf_nbit - nbits
     return bits
   end
-  
+
   is_bitstream[o] = true
 
   return o
@@ -334,7 +317,7 @@ local function get_bitstream(o)
   local bs
   if is_bitstream[o] then
     return o
-  elseif io.type(o) == 'file' then
+  elseif type(o) == 'file' then
     bs = bitstream_from_bytestream(bytestream_from_file(o))
   elseif type(o) == 'string' then
     bs = bitstream_from_bytestream(bytestream_from_string(o))
@@ -349,10 +332,16 @@ end
 
 local function get_obytestream(o)
   local bs
-  if io.type(o) == 'file' then
-    bs = function(sbyte) o:write(string_char(sbyte)) end
+  if type(o) == 'file' then
+    bs = function(sbyte) o:Write(string_char(sbyte)) end
   elseif type(o) == 'function' then
     bs = o
+  elseif type(o) == 'table' then
+    o.n = 0
+    bs = function(sbyte)
+        o.n = o.n + 1
+        o[o.n] = string_char(sbyte)
+    end
   else
     runtime_error('unrecognized type: ' .. tostring(o))
   end
@@ -410,7 +399,7 @@ local function HuffmanTable(init, is_full)
 
   -- function t:lookup(bits) return look[bits] end
 
-  local msb = unction(bits, nbits)
+  local msb = function(bits, nbits)
     local res = 0
     for i=1,nbits do
       res = lshift(res, 1) + band(bits, 1)
@@ -418,7 +407,7 @@ local function HuffmanTable(init, is_full)
     end
     return res
   end
-  
+
   local tfirstcode = memoize(
     function(bits) return pow2[minbits] + msb(bits, minbits) end)
 
@@ -469,12 +458,12 @@ local function parse_gzip_header(bs)
   local os = bs:read(8) -- Operating System
 
   if DEBUG then
-    debug("CM=", cm)
-    debug("FLG=", flg)
-    debug("MTIME=", mtime)
+    debug('CM=', cm)
+    debug('FLG=', flg)
+    debug('MTIME=', mtime)
     -- debug("MTIME_str=",os.date("%Y-%m-%d %H:%M:%S",mtime)) -- non-portable
-    debug("XFL=", xfl)
-    debug("OS=", os)
+    debug('XFL=', xfl)
+    debug('OS=', os)
   end
 
   if not os then runtime_error 'invalid header' end
@@ -508,9 +497,9 @@ local function parse_gzip_header(bs)
     if not crc16 then runtime_error 'invalid header' end
     -- IMPROVE: check CRC.  where is an example .gz file that
     -- has this set?
-    if DEBUG then
-      debug("CRC16=", crc16)
-    end
+    -- if DEBUG then
+    --   debug("CRC16=", crc16)
+    -- end
   end
 end
 
@@ -522,24 +511,24 @@ local function parse_zlib_header(bs)
   local flevel = bs:read(2) -- FLaGs: FLEVEL (compression level)
   local cmf = cinfo * 16  + cm -- CMF (Compresion Method and flags)
   local flg = fcheck + fdict * 32 + flevel * 64 -- FLaGs
-  
+
   if cm ~= 8 then -- not "deflate"
-    runtime_error("unrecognized zlib compression method: " + cm)
+    runtime_error('unrecognized zlib compression method: ' + cm)
   end
   if cinfo > 7 then
-    runtime_error("invalid zlib window size: cinfo=" + cinfo)
+    runtime_error('invalid zlib window size: cinfo=' + cinfo)
   end
   local window_size = 2^(cinfo + 8)
-  
+
   if (cmf*256 + flg) %  31 ~= 0 then
-    runtime_error("invalid zlib header (bad fcheck sum)")
+    runtime_error('invalid zlib header (bad fcheck sum)')
   end
-  
+
   if fdict == 1 then
-    runtime_error("FIX:TODO - FDICT not currently implemented")
-    local dictid_ = bs:read(32)
+    runtime_error('FIX:TODO - FDICT not currently implemented')
+    -- local dictid_ = bs:read(32)
   end
-  
+
   return window_size
 end
 
@@ -682,7 +671,7 @@ local function parse_block(bs, outstate)
   local BTYPE_NO_COMPRESSION = 0
   local BTYPE_FIXED_HUFFMAN = 1
   local BTYPE_DYNAMIC_HUFFMAN = 2
-  local BTYPE_RESERVED_ = 3
+--   local BTYPE_RESERVED_ = 3
 
   if DEBUG then
     debug('bfinal=', bfinal)
@@ -692,7 +681,7 @@ local function parse_block(bs, outstate)
   if btype == BTYPE_NO_COMPRESSION then
     bs:read(bs:nbits_left_in_byte())
     local len = bs:read(16)
-    local nlen_ = noeof(bs:read(16))
+    noeof(bs:read(16))
 
     for i=1,len do
       local by = noeof(bs:read(8))
@@ -757,10 +746,8 @@ function M.gunzip(t)
     debug('crc32=', expected_crc32)
     debug('isize=', isize)
   end
-  if not disable_crc and data_crc32 then
-    if data_crc32 ~= expected_crc32 then
-      runtime_error('invalid compressed data--crc error')
-    end    
+  if not disable_crc and data_crc32 and data_crc32 ~= expected_crc32 then
+    runtime_error('invalid compressed data--crc error')
   end
   if bs:read() then
     warn 'trailing garbage ignored'
@@ -782,11 +769,11 @@ function M.inflate_zlib(t)
   local outbs = get_obytestream(t.output)
   local disable_crc = t.disable_crc
   if disable_crc == nil then disable_crc = false end
-  
-  local window_size_ = parse_zlib_header(bs)
-  
+
+parse_zlib_header(bs)
+
   local data_adler32 = 1
-  
+
   inflate{input=bs, output=
     disable_crc and outbs or
       function(byte)
@@ -796,7 +783,7 @@ function M.inflate_zlib(t)
   }
 
   bs:read(bs:nbits_left_in_byte())
-  
+
   local b3 = bs:read(8)
   local b2 = bs:read(8)
   local b1 = bs:read(8)
@@ -805,10 +792,8 @@ function M.inflate_zlib(t)
   if DEBUG then
     debug('alder32=', expected_adler32)
   end
-  if not disable_crc then
-    if data_adler32 ~= expected_adler32 then
-      runtime_error('invalid compressed data--crc error')
-    end    
+  if not disable_crc and data_adler32 ~= expected_adler32 then
+    runtime_error('invalid compressed data--crc error')
   end
   if bs:read() then
     warn 'trailing garbage ignored'
