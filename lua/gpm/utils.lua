@@ -92,6 +92,28 @@ do
         return types[ TYPE_NONE ] or "unknown"
     end
 
+    -- gpm.AddType( typeName, func )
+    function gpm.AddType( typeName, func )
+        ArgAssert( typeName, 1, "string" )
+        ArgAssert( func, 2, "function" )
+
+        local last = nil
+        for index, name in pairs( types ) do
+            if not last or index > last then
+                last = index
+            end
+
+            if typeName == name then
+                return index
+            end
+        end
+
+        local index = ( last or 0 ) + 1
+        types[ index ] = typeName
+        typeIDs[ #typeIDs + 1 ] = { func, index }
+        return index
+    end
+
 end
 
 -- Checks if argument have valid type
