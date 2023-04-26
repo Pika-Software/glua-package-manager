@@ -76,12 +76,18 @@ gpm.ImportFolder = promise.Async( function( folderPath, parentPackage, isAutorun
     local files, folders = fs.Find( folderPath .. "/*", gpm.LuaRealm )
     for _, folderName in ipairs( folders ) do
         local ok, err = gpm.AsyncImport( folderPath .. "/" .. folderName, parentPackage, isAutorun ):SafeAwait()
-        if not ok then ErrorNoHaltWithStack( err ) end
+        if not ok then
+            logger:Error( "Package `%s` start-up failed, see above to see the error.", folderName )
+            ErrorNoHaltWithStack( err )
+        end
     end
 
     for _, fileName in ipairs( files ) do
         local ok, err = gpm.AsyncImport( folderPath .. "/" .. fileName, parentPackage, isAutorun ):SafeAwait()
-        if not ok then ErrorNoHaltWithStack( err ) end
+        if not ok then
+            logger:Error( "Package `%s` start-up failed, see above to see the error.", folderName )
+            ErrorNoHaltWithStack( err )
+        end
     end
 
     logger:Info( "Import from '%s' is completed, it took %f seconds.", folderPath, SysTime() - stopwatch )
