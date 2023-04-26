@@ -14,14 +14,13 @@ local setfenv = setfenv
 local xpcall = xpcall
 local pairs = pairs
 local type = type
+local _G = _G
 
 -- Packages table
 local pkgs = gpm.Packages
 if type( pkgs ) ~= "table" then
     pkgs = {}; gpm.Packages = pkgs
 end
-
-TYPE_PACKAGE = 256
 
 module( "gpm.packages", package.seeall )
 
@@ -148,12 +147,11 @@ do
 
         local getmetatable = getmetatable
 
-        function IsPackage( any )
+        function _G.IsPackage( any )
             return getmetatable( any ) == PACKAGE
         end
 
-        list.Set( "GPM - Type Names", TYPE_PACKAGE, "Package" )
-        gpm.SetTypeID( TYPE_PACKAGE, IsPackage )
+        _G.TYPE_PACKAGE = gpm.AddType( "Package", IsPackage )
 
     end
 

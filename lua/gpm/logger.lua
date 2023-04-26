@@ -13,14 +13,12 @@ end
 do
 
     local getmetatable = getmetatable
+
     function IsLogger( any )
         return getmetatable( any ) == meta
     end
 
-    TYPE_LOGGER = 257
-
-    list.Set( "GPM - Type Names", TYPE_LOGGER, "Logger" )
-    gpm.SetTypeID( TYPE_LOGGER, IsLogger )
+    TYPE_LOGGER = gpm.AddType( "Logger", IsLogger )
 
 end
 
