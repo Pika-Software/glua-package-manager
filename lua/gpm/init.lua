@@ -20,6 +20,10 @@ end
 -- Measuring startup time
 local stopwatch = SysTime()
 
+-- Third-party libraries
+libs = {}
+libs.deflatelua = IncludeComponent "libs/deflatelua"
+
 -- Utils
 IncludeComponent "utils"
 

@@ -1,6 +1,7 @@
 local promise = gpm.promise
 local string = string
 local fs = gpm.fs
+local deflatelua = gpm.libs.deflatelua
 
 local debug_fempty = debug.fempty
 local util_CRC = util.CRC
@@ -32,13 +33,25 @@ function IterateZipFiles( fileHandle )
         fileHandle:Skip( extraLen )
 
         local data
-        if compressionMethod ~= 0 then
-            fileHandle:Skip( compressedSize )
-        else
+        if compressionMethod == 0 then
+            -- No compression
             data = fileHandle:Read( compressedSize )
-            if data and tostring( crc ) ~= util_CRC( data ) then
-                data = nil
+        elseif compressionMethod == 8 then
+            -- Deflate compression
+            local compressedData = fileHandle:Read( compressedSize )
+
+            local out = {}
+            local ok = xpcall(deflatelua.inflate, ErrorNoHaltWithStack, {
+                input = compressedData,
+                output = out,
+            })
+            if ok then
+                data = table.concat(out)
             end
+        end
+
+        if data and tostring( crc ) ~= util_CRC( data ) then
+            data = nil
         end
 
         return fileName, data
