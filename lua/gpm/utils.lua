@@ -10,91 +10,79 @@ local module = module
 local ipairs = ipairs
 local pairs = pairs
 
--- https://wiki.facepunch.com/gmod/Global.TypeID
 do
 
-    local TypeID = TypeID
+    local typeIDs = {
+        { IsColor, TYPE_COLOR }
+    }
 
-    local types = gpm.VTypes
-    if TypeID( types ) ~= TYPE_TABLE then
-        types = { { TYPE_COLOR, IsColor } }; gpm.VTypes = types
-    end
+    -- https://wiki.facepunch.com/gmod/Global.TypeID
+    do
 
-    function gpm.SetTypeID( id, func )
-        ArgAssert( id, 1, "number" )
-        ArgAssert( func, 2, "function" )
+        local TypeID = TypeID
 
-        for index, tbl in ipairs( types ) do
-            if tbl[ 1 ] ~= id then continue end
-            table.remove( types, index )
+        function gpm.TypeID( any )
+            for _, data in ipairs( typeIDs ) do
+                if data[ 1 ]( any ) then return data[ 2 ] end
+            end
+
+            return TypeID( any )
         end
 
-        types[ #types + 1 ] = { id, func }
     end
 
-    function gpm.TypeID( any )
-        for _, tbl in ipairs( types ) do
-            if tbl[ 2 ]( any ) then return tbl[ 1 ] end
-        end
-
-        return TypeID( any )
-    end
-
-end
-
--- https://wiki.facepunch.com/gmod/Global.type
-do
-
-    local types = list.GetForEdit( "GPM - Type Names" )
     local TYPE_NONE = TYPE_NONE
 
     -- https://wiki.facepunch.com/gmod/Enums/TYPE
-    types[TYPE_PARTICLESYSTEM] = "CNewParticleEffect"
-    types[TYPE_PROJECTEDTEXTURE] = "ProjectedTexture"
-    types[TYPE_PIXELVISHANDLE] = "pixelvis_handle_t"
-    types[TYPE_RECIPIENTFILTER] = "CRecipientFilter"
-    types[TYPE_SOUNDHANDLE] = "IGModAudioChannel"
-    types[TYPE_LIGHTUSERDATA] = "light userdata"
-    types[TYPE_PARTICLEEMITTER] = "CLuaEmitter"
-    types[TYPE_DAMAGEINFO] = "CTakeDamageInfo"
-    types[TYPE_LOCOMOTION] = "CLuaLocomotion"
-    types[TYPE_SURFACEINFO] = "SurfaceInfo"
-    types[TYPE_PHYSCOLLIDE] = "PhysCollide"
-    types[TYPE_EFFECTDATA] = "CEffectData"
-    types[TYPE_PARTICLE] = "CLuaParticle"
-    types[TYPE_NAVLADDER] = "CNavLadder"
-    types[TYPE_VIDEO] = "IVideoWriter"
-    types[TYPE_MATERIAL] = "IMaterial"
-    types[TYPE_MOVEDATA] = "CMoveData"
-    types[TYPE_PATH] = "PathFollower"
-    types[TYPE_SOUND] = "CSoundPatch"
-    types[TYPE_USERDATA] = "userdata"
-    types[TYPE_FUNCTION] = "function"
-    types[TYPE_TEXTURE] = "ITexture"
-    types[TYPE_USERCMD] = "CUserCmd"
-    types[TYPE_RESTORE] = "IRestore"
-    types[TYPE_NAVAREA] = "CNavArea"
-    types[TYPE_PHYSOBJ] = "PhysObj"
-    types[TYPE_DLIGHT] = "dlight_t"
-    types[TYPE_USERMSG] = "bf_read"
-    types[TYPE_MATRIX] = "VMatrix"
-    types[TYPE_CONVAR] = "ConVar"
-    types[TYPE_VECTOR] = "Vector"
-    types[TYPE_ENTITY] = "Entity"
-    types[TYPE_THREAD] = "thread"
-    types[TYPE_STRING] = "string"
-    types[TYPE_NUMBER] = "number"
-    types[TYPE_NONE] = "unknown"
-    types[TYPE_BOOL] = "boolean"
-    types[TYPE_IMESH] = "IMesh"
-    types[TYPE_PANEL] = "Panel"
-    types[TYPE_ANGLE] = "Angle"
-    types[TYPE_COLOR] = "Color"
-    types[TYPE_TABLE] = "table"
-    types[TYPE_SAVE] = "ISave"
-    types[TYPE_FILE] = "File"
-    types[TYPE_NIL] = "nil"
+    local types = {
+        [TYPE_PARTICLESYSTEM] = "CNewParticleEffect",
+        [TYPE_PROJECTEDTEXTURE] = "ProjectedTexture",
+        [TYPE_PIXELVISHANDLE] = "pixelvis_handle_t",
+        [TYPE_RECIPIENTFILTER] = "CRecipientFilter",
+        [TYPE_SOUNDHANDLE] = "IGModAudioChannel",
+        [TYPE_LIGHTUSERDATA] = "light userdata",
+        [TYPE_PARTICLEEMITTER] = "CLuaEmitter",
+        [TYPE_DAMAGEINFO] = "CTakeDamageInfo",
+        [TYPE_LOCOMOTION] = "CLuaLocomotion",
+        [TYPE_SURFACEINFO] = "SurfaceInfo",
+        [TYPE_PHYSCOLLIDE] = "PhysCollide",
+        [TYPE_EFFECTDATA] = "CEffectData",
+        [TYPE_PARTICLE] = "CLuaParticle",
+        [TYPE_NAVLADDER] = "CNavLadder",
+        [TYPE_VIDEO] = "IVideoWriter",
+        [TYPE_MATERIAL] = "IMaterial",
+        [TYPE_MOVEDATA] = "CMoveData",
+        [TYPE_PATH] = "PathFollower",
+        [TYPE_SOUND] = "CSoundPatch",
+        [TYPE_USERDATA] = "userdata",
+        [TYPE_FUNCTION] = "function",
+        [TYPE_TEXTURE] = "ITexture",
+        [TYPE_USERCMD] = "CUserCmd",
+        [TYPE_RESTORE] = "IRestore",
+        [TYPE_NAVAREA] = "CNavArea",
+        [TYPE_PHYSOBJ] = "PhysObj",
+        [TYPE_DLIGHT] = "dlight_t",
+        [TYPE_USERMSG] = "bf_read",
+        [TYPE_MATRIX] = "VMatrix",
+        [TYPE_CONVAR] = "ConVar",
+        [TYPE_VECTOR] = "Vector",
+        [TYPE_ENTITY] = "Entity",
+        [TYPE_THREAD] = "thread",
+        [TYPE_STRING] = "string",
+        [TYPE_NUMBER] = "number",
+        [TYPE_NONE] = "unknown",
+        [TYPE_BOOL] = "boolean",
+        [TYPE_IMESH] = "IMesh",
+        [TYPE_PANEL] = "Panel",
+        [TYPE_ANGLE] = "Angle",
+        [TYPE_COLOR] = "Color",
+        [TYPE_TABLE] = "table",
+        [TYPE_SAVE] = "ISave",
+        [TYPE_FILE] = "File",
+        [TYPE_NIL] = "nil"
+    }
 
+    -- https://wiki.facepunch.com/gmod/Global.type
     function gpm.type( any )
         local str = types[ gpm.TypeID( any ) ]
         if ( str ~= nil ) then
