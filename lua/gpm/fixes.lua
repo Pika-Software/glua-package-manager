@@ -158,3 +158,24 @@ function cvars.Bool( name, default )
 
     return default
 end
+
+-- https://wiki.facepunch.com/gmod/Global.IsColor
+do
+
+    local meta = FindMetaTable( "Color" )
+    local getmetatable = getmetatable
+    local type = type
+
+    function IsColor( any )
+        if getmetatable( any ) == meta then
+            return true
+        end
+
+        if type( any ) == "table" then
+            return type( any.r ) == "number" and type( any.g ) == "number" and type( any.b ) == "number"
+        end
+
+        return false
+    end
+
+end
