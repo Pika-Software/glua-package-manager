@@ -1,4 +1,4 @@
--- https://github.com/davidm/lua-compress-deflatelua/blob/master/lmod/compress/deflatelua.lua 
+-- https://github.com/davidm/lua-compress-deflatelua/blob/master/lmod/compress/deflatelua.lua
 --[[
 
 LUA MODULE
@@ -6,7 +6,7 @@ LUA MODULE
   compress.deflatelua - deflate (and gunzip/zlib) implemented in Lua.
 
 SYNOPSIS
-  
+
   local DEFLATE = require 'compress.deflatelua'
   -- uncompress gzip file
   local fh = assert(io.open'foo.txt.gz', 'rb')
@@ -14,12 +14,12 @@ SYNOPSIS
   DEFLATE.gunzip {input=fh, output=ofh}
   fh:close(); ofh:close()
   -- can also uncompress from string including zlib and raw DEFLATE formats.
-  
+
 DESCRIPTION
-  
+
   This is a pure Lua implementation of decompressing the DEFLATE format,
   including the related zlib and gzip formats.
-  
+
   Note: This library only supports decompression.
   Compression is not currently implemented.
 
@@ -35,9 +35,9 @@ API
     Decompresses input stream `fh` in the DEFLATE format
     while writing to output stream `ofh`.
     DEFLATE is detailed in http://tools.ietf.org/html/rfc1951 .
-  
+
   DEFLATE.gunzip {input=fh, output=ofh, disable_crc=disable_crc}
-  
+
     Decompresses input stream `fh` with the gzip format
     while writing to output stream `ofh`.
     `disable_crc` (defaults to `false`) will disable CRC-32 checking
@@ -45,15 +45,15 @@ API
     gzip is detailed in http://tools.ietf.org/html/rfc1952 .
 
   DEFLATE.inflate_zlib {input=fh, output=ofh, disable_crc=disable_crc}
-  
+
     Decompresses input stream `fh` with the zlib format
     while writing to output stream `ofh`.
     `disable_crc` (defaults to `false`) will disable CRC-32 checking
     to increase speed.
-    zlib is detailed in http://tools.ietf.org/html/rfc1950 .  
+    zlib is detailed in http://tools.ietf.org/html/rfc1950 .
 
   DEFLATE.adler32(byte, crc) --> rcrc
-  
+
     Returns adler32 checksum of byte `byte` (number 0..255) appended
     to string with adler32 checksum `crc`.  This is internally used by
     `inflate_zlib`.
@@ -64,9 +64,9 @@ COMMAND LINE UTILITY
   A `gunziplua` command line utility (in folder `bin`) is also provided.
   This mimicks the *nix `gunzip` utility but is a pure Lua implementation
   that invokes this library.  For help do
-  
+
     gunziplua -h
-    
+
 DEPENDENCIES
 
   Requires 'digest.crc32lua' (used for optional CRC-32 checksum checks).
@@ -76,13 +76,13 @@ DEPENDENCIES
   is not that critical for this library but is required by digest.crc32lua.
 
   'pythonic.optparse' is only required by the optional `gunziplua`
-  command-line utilty for command line parsing.  
+  command-line utilty for command line parsing.
     https://github.com/davidm/lua-pythonic-optparse
 
 INSTALLATION
 
   Copy the `compress` directory into your LUA_PATH.
-    
+
 REFERENCES
 
   [1] DEFLATE Compressed Data Format Specification version 1.3
@@ -120,7 +120,7 @@ LICENSE
   (end license)
 --]]
 
-local M = {_TYPE='module', _NAME='compress.deflatelua', _VERSION='0.3.20111128'}
+local M = {_TYPE = 'module', _NAME = 'compress.deflatelua', _VERSION = '0.3.20111128'}
 
 local assert = assert
 local error = error
@@ -157,7 +157,7 @@ end
 
 local function runtime_error(s, level)
   level = level or 1
-  error({s}, level+1)
+  error({s}, level + 1)
 end
 
 
@@ -211,7 +211,7 @@ local pow2 = memoize(function(n) return 2^n end)
 
 
 -- weak metatable marking objects as bitstream type
-local is_bitstream = setmetatable({}, {__mode='k'})
+local is_bitstream = setmetatable({}, {__mode = 'k'})
 
 
 -- DEBUG
@@ -354,17 +354,17 @@ local function HuffmanTable(init, is_full)
   if is_full then
     for val,nbits in pairs(init) do
       if nbits ~= 0 then
-        t[#t+1] = {val=val, nbits=nbits}
+        t[#t + 1] = {val = val, nbits = nbits}
         --debug('*',val,nbits)
       end
     end
   else
-    for i=1,#init-2,2 do
-      local firstval, nbits, nextval = init[i], init[i+1], init[i+2]
+    for i = 1, #init - 2, 2 do
+      local firstval, nbits, nextval = init[i], init[i + 1], init[i + 2]
       --debug(val, nextval, nbits)
       if nbits ~= 0 then
-        for val=firstval,nextval-1 do
-          t[#t+1] = {val=val, nbits=nbits}
+        for val = firstval, nextval - 1 do
+          t[#t + 1] = { val = val, nbits = nbits}
         end
       end
     end
@@ -401,7 +401,7 @@ local function HuffmanTable(init, is_full)
 
   local msb = function(bits, nbits)
     local res = 0
-    for i=1,nbits do
+    for i = 1, nbits do
       res = lshift(res, 1) + band(bits, 1)
       bits = rshift(bits, 1)
     end
@@ -471,9 +471,10 @@ local function parse_gzip_header(bs)
   if hasbit(flg, FLG_FEXTRA) then
     local xlen = bs:read(16)
     local extra = 0
-    for i=1,xlen do
+    for i = 1, xlen do
       extra = bs:read(8)
     end
+
     if not extra then runtime_error 'invalid header' end
   end
 
@@ -518,9 +519,9 @@ local function parse_zlib_header(bs)
   if cinfo > 7 then
     runtime_error('invalid zlib window size: cinfo=' + cinfo)
   end
-  local window_size = 2^(cinfo + 8)
+  local window_size = 2 ^ (cinfo + 8)
 
-  if (cmf*256 + flg) %  31 ~= 0 then
+  if (cmf * 256 + flg) %  31 ~= 0 then
     runtime_error('invalid zlib header (bad fcheck sum)')
   end
 
@@ -539,13 +540,14 @@ local function parse_huffmantables(bs)
 
     local ncodelen_codes = hclen + 4
     local codelen_init = {}
-    local codelen_vals = {
-      16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15}
-    for i=1,ncodelen_codes do
+    local codelen_vals = {16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15}
+
+    for i = 1, ncodelen_codes do
       local nbits = bs:read(3)
       local val = codelen_vals[i]
       codelen_init[val] = nbits
     end
+
     local codelentable = HuffmanTable(codelen_init, true)
 
     local function decode(ncodes)
@@ -572,22 +574,19 @@ local function parse_huffmantables(bs)
         else
           error 'ASSERT'
         end
-        for i=1,nrepeat do
+        for i = 1, nrepeat do
           init[val] = nbits
           val = val + 1
         end
       end
-      local huffmantable = HuffmanTable(init, true)
-      return huffmantable
+
+      return HuffmanTable( init, true )
     end
 
     local nlit_codes = hlit + 257
     local ndist_codes = hdist + 1
 
-    local littable = decode(nlit_codes)
-    local disttable = decode(ndist_codes)
-
-    return littable, disttable
+    return decode(nlit_codes), decode(ndist_codes)
 end
 
 
@@ -604,22 +603,24 @@ local function parse_compressed_item(bs, outstate, littable, disttable)
     return true
   else
     if not tdecode_len_base then
-      local t = {[257]=3}
+      local t = {[257] = 3}
       local skip = 1
-      for i=258,285,4 do
-        for j=i,i+3 do t[j] = t[j-1] + skip end
+      for i = 258, 285, 4 do
+        for j = i, i + 3 do t[j] = t[j - 1] + skip end
         if i ~= 258 then skip = skip * 2 end
       end
+
       t[285] = 258
       tdecode_len_base = t
       --for i=257,285 do debug('T1',i,t[i]) end
     end
     if not tdecode_len_nextrabits then
       local t = {}
-      for i=257,285 do
+      for i = 257, 285 do
         local j = math_max(i - 261, 0)
         t[i] = rshift(j, 2)
       end
+
       t[285] = 0
       tdecode_len_nextrabits = t
       --for i=257,285 do debug('T2',i,t[i]) end
@@ -630,10 +631,10 @@ local function parse_compressed_item(bs, outstate, littable, disttable)
     local len = len_base + extrabits
 
     if not tdecode_dist_base then
-      local t = {[0]=1}
+      local t = {[0] = 1}
       local skip = 1
-      for i=1,29,2 do
-        for j=i,i+1 do t[j] = t[j-1] + skip end
+      for i = 1, 29, 2 do
+        for j = i, i + 1 do t[j] = t[j-1] + skip end
         if i ~= 1 then skip = skip * 2 end
       end
       tdecode_dist_base = t
@@ -641,7 +642,7 @@ local function parse_compressed_item(bs, outstate, littable, disttable)
     end
     if not tdecode_dist_nextrabits then
       local t = {}
-      for i=0,29 do
+      for i = 0, 29 do
         local j = math_max(i - 2, 0)
         t[i] = rshift(j, 1)
       end
@@ -655,7 +656,7 @@ local function parse_compressed_item(bs, outstate, littable, disttable)
     local dist = dist_base + dist_extrabits
 
     --debug('BACK', len, dist)
-    for i=1,len do
+    for i = 1, len do
       local pos = (outstate.window_pos - 1 - dist) % 32768 + 1  -- 32K
       output(outstate, assert(outstate.window[pos], 'invalid distance'))
     end
@@ -683,7 +684,7 @@ local function parse_block(bs, outstate)
     local len = bs:read(16)
     noeof(bs:read(16))
 
-    for i=1,len do
+    for i = 1, len do
       local by = noeof(bs:read(8))
       output(outstate, by)
     end
@@ -730,7 +731,7 @@ function M.gunzip(t)
 
   local data_crc32 = 0
 
-  inflate{input=bs, output=
+  inflate{ input = bs, output =
     disable_crc and outbs or
       function(byte)
         data_crc32 = crc32(byte, data_crc32)
@@ -760,7 +761,7 @@ function M.adler32(byte, crc)
   local s2 = (crc - s1) / 65536
   s1 = (s1 + byte) % 65521
   s2 = (s2 + s1) % 65521
-  return s2*65536 + s1
+  return s2 * 65536 + s1
 end -- 65521 is the largest prime smaller than 2^16
 
 
@@ -774,7 +775,7 @@ parse_zlib_header(bs)
 
   local data_adler32 = 1
 
-  inflate{input=bs, output=
+  inflate{ input = bs, output =
     disable_crc and outbs or
       function(byte)
         data_adler32 = M.adler32(byte, data_adler32)
@@ -788,7 +789,7 @@ parse_zlib_header(bs)
   local b2 = bs:read(8)
   local b1 = bs:read(8)
   local b0 = bs:read(8)
-  local expected_adler32 = ((b3*256 + b2)*256 + b1)*256 + b0
+  local expected_adler32 = ( ( b3 * 256 + b2 ) * 256 + b1 ) * 256 + b0
   if DEBUG then
     debug('alder32=', expected_adler32)
   end
