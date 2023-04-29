@@ -2,12 +2,19 @@
 local table = table
 
 -- Variables
+local getmetatable = getmetatable
+local setmetatable = setmetatable
 local debug_fcopy = debug.fcopy
 local ArgAssert = ArgAssert
 local setfenv = setfenv
+local rawget = rawget
+local rawset = rawset
+local ipairs = ipairs
+local pairs = pairs
 local type = type
+local _G = _G
 
-module( "gpm.environment", package.seeall )
+module( "gpm.environment" )
 
 function SetValue( env, path, func, makeCopy )
     ArgAssert( func, 1, "function" )
@@ -15,12 +22,6 @@ function SetValue( env, path, func, makeCopy )
 end
 
 do
-
-    local getmetatable = getmetatable
-    local setmetatable = setmetatable
-    local rawget = rawget
-    local rawset = rawset
-    local ipairs = ipairs
 
     local meta = {}
 
@@ -60,53 +61,41 @@ do
 
 end
 
-do
+function Create( func, env )
+    ArgAssert( func, 1, "function" )
 
-    local _G = _G
-
-    function Create( func, env )
-        ArgAssert( func, 1, "function" )
-
-        local new = {}
-        return new, setfenv( func, LinkMetaTables( new, env or _G ) )
-    end
-
+    local new = {}
+    return new, setfenv( func, LinkMetaTables( new, env or _G ) )
 end
 
 function SetLinkedTable( env, path, tbl )
     return table.SetValue( env, path, LinkMetaTables( {}, tbl ) )
 end
 
-do
+function SetTable( env, path, tbl, makeCopy )
+    ArgAssert( env, 1, "table" )
+    ArgAssert( tbl, 3, "table" )
 
-    local pairs = pairs
-
-    function SetTable( env, path, tbl, makeCopy )
-        ArgAssert( env, 1, "table" )
-        ArgAssert( tbl, 3, "table" )
-
-        local object = {}
-        for key, value in pairs( tbl ) do
-            if type( key ) == "table" then
-                key = SetTable( env, nil, tbl, makeCopy )
-            elseif makeCopy and type( key ) == "function" then
-                key = debug_fcopy( setfenv( key, env ) )
-            end
-
-            if type( value ) == "table" then
-                value = SetTable( env, nil, tbl, makeCopy )
-            elseif makeCopy and type( value ) == "function" then
-                value = debug_fcopy( setfenv( value, env ) )
-            end
-
-            object[ key ] = value
+    local object = {}
+    for key, value in pairs( tbl ) do
+        if type( key ) == "table" then
+            key = SetTable( env, nil, tbl, makeCopy )
+        elseif makeCopy and type( key ) == "function" then
+            key = debug_fcopy( setfenv( key, env ) )
         end
 
-        if path ~= nil then
-            return table.SetValue( env, path, object )
-        else
-            return object
+        if type( value ) == "table" then
+            value = SetTable( env, nil, tbl, makeCopy )
+        elseif makeCopy and type( value ) == "function" then
+            value = debug_fcopy( setfenv( value, env ) )
         end
+
+        object[ key ] = value
     end
 
+    if path ~= nil then
+        return table.SetValue( env, path, object )
+    else
+        return object
+    end
 end
