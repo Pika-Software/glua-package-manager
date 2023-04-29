@@ -82,11 +82,5 @@ For better speed and reliability, the following binary modules can be installed 
 
 In the near future we will release our own, better implemented binary modules to improve performance.
 
-## Current Todo
-- [ ] add in zip source compression support
-- [ ] zip source
-- [ ] github source
-- [ ] http zip source support
-
 ## License
 [MIT](LICENSE) © Pika Software
