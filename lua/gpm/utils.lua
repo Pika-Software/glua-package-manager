@@ -190,7 +190,7 @@ do
 
         local args = {...}
         timer_Simple( 0, function()
-            if ( #args ~= 0 ) then
+            if #args ~= 0 then
                 func( unpack( args ) )
                 return
             end

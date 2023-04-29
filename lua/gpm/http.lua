@@ -1,6 +1,4 @@
-local util_NextTick = util.NextTick
 local promise = gpm.promise
-local ipairs = ipairs
 local type = type
 
 -- https://github.com/WilliamVenner/gmsv_reqwest
@@ -23,8 +21,6 @@ local client = reqwest or CHTTP or HTTP
 
 module( "gpm.http" )
 
-local queue = {}
-
 function HTTP( parameters )
     local p = promise.New()
 
@@ -43,10 +39,6 @@ function HTTP( parameters )
         p:Reject( err )
     end
 
-    if queue ~= nil then
-        queue[ #queue + 1 ] = parameters
-        return p
-    end
 
     local ok = client( parameters )
     if not ok then
@@ -55,16 +47,6 @@ function HTTP( parameters )
 
     return p
 end
-
-util_NextTick( function()
-    for _, parameters in ipairs( queue ) do
-        HTTP( parameters )
-    end
-
-    util_NextTick = nil
-    queue = nil
-    ipairs = nil
-end )
 
 function Fetch( url, headers, timeout )
     return HTTP( {
