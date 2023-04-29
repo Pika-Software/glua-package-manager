@@ -1,6 +1,10 @@
 -- Libraries
 local string = string
+local table = table
 local file = file
+
+-- Variables
+local SERVER = SERVER
 
 -- Global table
 local gluaFixes = gpm.GLuaFixes
@@ -15,9 +19,6 @@ string.StartsWith = string.StartsWith or string.StartWith
 -- https://wiki.facepunch.com/gmod/file.IsDir
 do
 
-    local SERVER = SERVER
-    local ipairs = ipairs
-
     local file_Exists = table.SetValue( gluaFixes, "file.Exists", file.Exists, true )
     local file_IsDir = table.SetValue( gluaFixes, "file.IsDir", file.IsDir, true )
 
@@ -26,16 +27,10 @@ do
         if file_IsDir( filePath, gamePath ) then return true end
 
         local _, folders = file.Find( filePath .. "*", gamePath )
-        if ( folders == nil or #folders == 0 ) then return false end
+        if folders == nil or #folders == 0 then return false end
 
         local splits = string.Split( filePath, "/" )
-        local folderName = splits[ #splits ]
-
-        for _, value in ipairs( folders ) do
-            if ( value == folderName ) then return true end
-        end
-
-        return false
+        return table.HasIValue( folders, splits[ #splits ] )
     end
 
     function file.Exists( filePath, gamePath )
@@ -44,20 +39,12 @@ do
 
         local files, folders = file.Find( filePath .. "*", gamePath )
         if not files or not folders then return false end
-        if ( #files == 0 and #folders == 0 ) then return false end
+        if #files == 0 and #folders == 0 then return false end
 
         local splits = string.Split( filePath, "/" )
         local fileName = splits[ #splits ]
 
-        for _, value in ipairs( files ) do
-            if ( value == fileName ) then return true end
-        end
-
-        for _, value in ipairs( folders ) do
-            if ( value == fileName ) then return true end
-        end
-
-        return false
+        return table.HasIValue( files, fileName ) or table.HasIValue( folders, fileName )
     end
 
 end
