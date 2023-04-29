@@ -2,7 +2,6 @@
 local packages = gpm.packages
 local sources = gpm.sources
 local promise = gpm.promise
-local logger = gpm.Logger
 local utils = gpm.utils
 local gmad = gpm.gmad
 local http = gpm.http
@@ -27,64 +26,103 @@ function CanImport( filePath )
     return string.IsURL( filePath )
 end
 
-local realmFolder = "gpm/" .. ( SERVER and "server" or "client" ) .. "/packages/"
-fs.CreateDir( realmFolder )
+local cacheFolder = "gpm/" .. ( SERVER and "server" or "client" ) .. "/packages/"
+fs.CreateDir( cacheFolder )
+
+local allowedExtensions = {
+    ["lua"] = true,
+    ["zip"] = true,
+    ["gma"] = true,
+    ["json"] = true
+}
 
 Import = promise.Async( function( url, parentPackage )
+    if sources.github.CanImport( url ) then
+        return sources.github.Import( url, parentPackage )
+    end
+
     local wsid = string.match( url, "steamcommunity%.com/sharedfiles/filedetails/%?id=(%d+)" )
-    if wsid ~= nil then return sources.workshop.Import( wsid, parentPackage ) end
+    if wsid ~= nil then
+        if not sources.workshop then
+            return promise.Reject( "Importing content from the workshop is not possible due to the missing steamworks library, you can download the binary module here: https://github.com/WilliamVenner/gmsv_workshop" )
+        end
+
+        return sources.workshop.Import( wsid, parentPackage )
+    end
+
+    local extension = string.GetExtensionFromFilename( url )
+    if not extension then extension = "json" end
+
+    if not allowedExtensions[ extension ] then
+        return promise.Reject( "Unsupported file extension. (" .. url .. ")" )
+    end
 
     local packageName = util.MD5( url )
 
-    local cachePath = realmFolder .. "/http_" .. packageName .. ".dat"
+    -- Cache
+    local cachePath = cacheFolder .. "http_" .. packageName .. "."  .. ( extension == "json" and "gma" or extension ) .. ".dat"
     if fs.Exists( cachePath, "DATA" ) and fs.Time( cachePath, "DATA" ) > ( 60 * 60 * cacheLifetime:GetInt() ) then
-        local gma = gmad.Open( cachePath, "DATA" )
-        if gma ~= nil then
+        if extension == "zip" then
+            return sources.zip.Import( "data/" .. cachePath, parentPackage )
+        elseif extension == "gma" or extension == "json" then
             return sources.gmad.Import( "data/" .. cachePath, parentPackage )
-        end
+        elseif extension == "lua" then
+            local ok, result = fs.Compile( cachePath, "DATA" ):SafeAwait()
+            if not ok then
+                return promise.Reject( string.format( "Package `%s` cache compile error: %s. (%s)", url, result, cachePath ) )
+            end
 
-        local ok, result = fs.Compile( cachePath, "DATA" ):SafeAwait()
-        if not ok then
-            logger:Error( "Package `%s` cache compile error: %s. (%s)", url, result, cachePath )
-            return
+            return packages.Initialize( packages.GetMetadata( {
+                ["name"] = packageName
+            } ), result, {}, parentPackage )
         end
-
-        return packages.Initialize( packages.GetMetadata( {
-            ["name"] = packageName
-        } ), result, {}, parentPackage )
     end
 
+    -- Downloading
     local ok, result = http.Fetch( url, nil, 120 ):SafeAwait()
     if not ok then return promise.Reject( result ) end
 
     if result.code ~= 200 then
-        logger:Error( "Package `%s` downloading failed, invalid response http code (%s).", url, result.code )
-        return
+        return promise.Reject( string.format( "Package `%s` downloading failed, invalid response http code (%s).", url, result.code ) )
     end
 
-    local code = result.body
-    local metadata = util.JSONToTable( code )
-    if not metadata then
-        local ok, err = fs.AsyncWrite( cachePath, code ):SafeAwait()
-        if not ok then
-            logger:Error( "Failed cache write: %s (%s), file system message: %s", cachePath, url, err )
+    -- Processing
+    local body = result.body
+    if extension ~= "json" then
+        local ok, result = fs.AsyncWrite( cachePath, body ):SafeAwait()
+        if not ok then return promise.Reject( result ) end
+
+        if extension == "zip" then
+            return sources.zip.Import( "data/" .. cachePath, parentPackage )
+        elseif extension == "gma" then
+            return sources.gmad.Import( "data/" .. cachePath, parentPackage )
         end
 
-        local ok, result = pcall( CompileString, code, url )
+        return promise.Reject( "Unknown file format. (" .. url .. ")" )
+    end
+
+    local metadata = util.JSONToTable( body )
+    if not metadata then
+        local ok, err = fs.AsyncWrite( cachePath, body ):SafeAwait()
+        if not ok then
+            return promise.Reject( string.format( "Failed cache write: %s (%s), file system message: %s", cachePath, url, err ) )
+        end
+
+        local ok, result = pcall( CompileString, body, url )
         if not ok then return promise.Reject( result ) end
         if not result then return promise.Reject( "File `" .. url .. "` compilation failed." ) end
 
         return packages.Initialize( packages.GetMetadata( {
-            ["name"] = packageName
-        } ), result, {}, parentPackage )
+            ["name"] = packageName,
+            ["autorun"] = true
+        } ), result, sources.lua.Files, parentPackage )
     end
 
     metadata = utils.LowerTableKeys( metadata )
 
     local urls = metadata.files
     if type( urls ) ~= "table" then
-        logger:Error( "No links to files, download canceled. (%s)", url )
-        return
+        return promise.Reject( string.format( "No links to files, download canceled. (%s)", url ) )
     end
 
     metadata.files = nil
@@ -98,19 +136,18 @@ Import = promise.Async( function( url, parentPackage )
     end
 
     if #files == 0 then
-        logger:Error( "No files to download. (%s)", url )
-        return
+        return promise.Reject( string.format( "No files to download. (%s)", url ) )
     end
 
     if metadata.mount == false then
         metadata = packages.GetMetadata( packageFile )
 
-        local cFiles = {}
+        local compiledFiles = {}
         for _, data in ipairs( files ) do
             local ok, result = pcall( CompileString, data[ 2 ], data[ 1 ] )
             if not ok then return promise.Reject( result ) end
-            if not result then return promise.Reject( "File `" .. data[ 1 ] .. "` compilation failed." ) end
-            cFiles[ data[ 1 ] ] = result
+            if not result then return promise.Reject( "Package `" .. url .. "`, file `" .. data[ 1 ] .. "` compilation failed." ) end
+            compiledFiles[ data[ 1 ] ] = result
         end
 
         if not metadata.name then
@@ -122,27 +159,31 @@ Import = promise.Async( function( url, parentPackage )
             mainFile = "init.lua"
         end
 
-        local func = cFiles[ mainFile ]
+        local func = compiledFiles[ mainFile ]
         if not func then
             mainFile = "main.lua"
             func = Files[ mainFile ]
         end
 
         if not func then
-            logger:Error( "Package `%s` main file is missing!", metadata.name .. "@" .. metadata.version )
-            return
+            return promise.Reject( string.format( "Package `%s` main file is missing!", metadata.name .. "@" .. metadata.version ) )
         end
 
-        return packages.Initialize( metadata, func, cFiles, parentPackage )
+        return packages.Initialize( metadata, func, compiledFiles, parentPackage )
     end
 
     local gma = gmad.Write( cachePath )
     if not gma then
-        logger:Error( "Cache construction error, mounting failed. (%s)", url )
-        return
+        return promise.Reject( string.format( "Package cache construction error, mounting failed. (%s)", url ) )
     end
 
-    gma:SetTitle( metadata.name or packageName )
+    local name = metadata.name
+    if name ~= nil then
+        gma:SetTitle( name )
+    else
+        gma:SetTitle( packageName )
+    end
+
     gma:SetDescription( util.TableToJSON( metadata ) )
 
     local author = metadata.author
@@ -150,8 +191,8 @@ Import = promise.Async( function( url, parentPackage )
         gma:SetAuthor( author )
     end
 
-    for _, tbl in ipairs( files ) do
-        gma:AddFile( tbl[ 1 ], tbl[ 2 ] )
+    for _, data in ipairs( files ) do
+        gma:AddFile( data[ 1 ], data[ 2 ] )
     end
 
     gma:Close()
