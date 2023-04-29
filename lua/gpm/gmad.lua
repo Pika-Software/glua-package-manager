@@ -1,5 +1,6 @@
 -- Libraries
 local string = string
+local table = table
 local file = file
 local util = util
 
@@ -7,11 +8,135 @@ local util = util
 local setmetatable = setmetatable
 local ArgAssert = ArgAssert
 local tonumber = tonumber
+local logger = gpm.Logger
 local os_time = os.time
 local assert = assert
 local ipairs = ipairs
 
 module( "gpm.gmad" )
+
+-- TypeExists( any )
+do
+
+    local types = {
+        "gamemode",
+        "map",
+        "weapon",
+        "vehicle",
+        "npc",
+        "entity",
+        "tool",
+        "effects",
+        "model",
+        "servercontent"
+    }
+
+    function TypeExists( any )
+        return table.HasIValue( types, any )
+    end
+
+end
+
+-- TagExists( any )
+do
+
+    local tags = {
+        "fun",
+        "roleplay",
+        "scenic",
+        "movie",
+        "realism",
+        "cartoon",
+        "water",
+        "comic",
+        "build"
+    }
+
+    function TagExists( any )
+        return table.HasIValue( tags, any )
+    end
+
+end
+
+-- IsAllowedFilePath( filePath )
+do
+
+    local wildcard = {
+        "lua/*.lua",
+        "scenes/*.vcd",
+        "particles/*.pcf",
+        "resource/fonts/*.ttf",
+        "scripts/vehicles/*.txt",
+        "resource/localization/*/*.properties",
+        "maps/*.bsp",
+        "maps/*.nav",
+        "maps/*.ain",
+        "maps/thumb/*.png",
+        "sound/*.wav",
+        "sound/*.mp3",
+        "sound/*.ogg",
+        "materials/*.vmt",
+        "materials/*.vtf",
+        "materials/*.png",
+        "materials/*.jpg",
+        "materials/*.jpeg",
+        "models/*.mdl",
+        "models/*.vtx",
+        "models/*.phy",
+        "models/*.ani",
+        "models/*.vvd",
+        "gamemodes/*/*.txt",
+        "gamemodes/*/*.fgd",
+        "gamemodes/*/logo.png",
+        "gamemodes/*/icon24.png",
+        "gamemodes/*/gamemode/*.lua",
+        "gamemodes/*/entities/effects/*.lua",
+        "gamemodes/*/entities/weapons/*.lua",
+        "gamemodes/*/entities/entities/*.lua",
+        "gamemodes/*/backgrounds/*.png",
+        "gamemodes/*/backgrounds/*.jpg",
+        "gamemodes/*/backgrounds/*.jpeg",
+        "gamemodes/*/content/models/*.mdl",
+        "gamemodes/*/content/models/*.vtx",
+        "gamemodes/*/content/models/*.phy",
+        "gamemodes/*/content/models/*.ani",
+        "gamemodes/*/content/models/*.vvd",
+        "gamemodes/*/content/materials/*.vmt",
+        "gamemodes/*/content/materials/*.vtf",
+        "gamemodes/*/content/materials/*.png",
+        "gamemodes/*/content/materials/*.jpg",
+        "gamemodes/*/content/materials/*.jpeg",
+        "gamemodes/*/content/scenes/*.vcd",
+        "gamemodes/*/content/particles/*.pcf",
+        "gamemodes/*/content/resource/fonts/*.ttf",
+        "gamemodes/*/content/scripts/vehicles/*.txt",
+        "gamemodes/*/content/resource/localization/*/*.properties",
+        "gamemodes/*/content/maps/*.bsp",
+        "gamemodes/*/content/maps/*.nav",
+        "gamemodes/*/content/maps/*.ain",
+        "gamemodes/*/content/maps/thumb/*.png",
+        "gamemodes/*/content/sound/*.wav",
+        "gamemodes/*/content/sound/*.mp3",
+        "gamemodes/*/content/sound/*.ogg"
+    }
+
+    -- Formatting to lua patterns
+    for index, str in ipairs( wildcard ) do
+        wildcard[ index ] = string.Replace( string.Replace( str, ".", "%." ), "*", ".+" )
+    end
+
+    function IsAllowedFilePath( filePath )
+        local isValid = false
+        for _, pattern in ipairs( wildcard ) do
+            if not string.find( filePath, pattern ) then continue end
+            isValid = true
+            break
+        end
+
+        return isValid
+    end
+
+end
 
 GMA = GMA or {}
 GMA.__index = GMA
@@ -32,7 +157,7 @@ end
 function GMA:GetTitle()
     local metadata = self.Metadata
     if not metadata then return end
-    return metadata.title
+    return metadata.Title
 end
 
 function GMA:SetTitle( title )
@@ -42,14 +167,14 @@ function GMA:SetTitle( title )
     local metadata = self.Metadata
     if not metadata then return end
 
-    metadata.title = title
+    metadata.Title = title
 end
 
 -- Description
 function GMA:GetDescription()
     local metadata = self.Metadata
     if not metadata then return end
-    return metadata.description
+    return metadata.Description
 end
 
 function GMA:SetDescription( description )
@@ -59,14 +184,14 @@ function GMA:SetDescription( description )
     local metadata = self.Metadata
     if not metadata then return end
 
-    metadata.description = description
+    metadata.Description = description
 end
 
 -- Author
 function GMA:GetAuthor()
     local metadata = self.Metadata
     if not metadata then return end
-    return metadata.author
+    return metadata.Author
 end
 
 function GMA:SetAuthor( author )
@@ -76,14 +201,14 @@ function GMA:SetAuthor( author )
     local metadata = self.Metadata
     if not metadata then return end
 
-    metadata.author = author
+    metadata.Author = author
 end
 
 -- Required content
 function GMA:GetRequiredContent()
     local metadata = self.Metadata
     if not metadata then return end
-    return metadata.requiredContent
+    return metadata.RequiredContent
 end
 
 function GMA:AddRequiredContent( contentName )
@@ -93,7 +218,7 @@ function GMA:AddRequiredContent( contentName )
     local metadata = self.Metadata
     if not metadata then return end
 
-    local requiredContent = metadata.requiredContent
+    local requiredContent = metadata.RequiredContent
     requiredContent[ #requiredContent + 1 ] = contentName
 end
 
@@ -103,17 +228,14 @@ function GMA:ClearRequiredContent()
     local metadata = self.Metadata
     if not metadata then return end
 
-    local requiredContent = metadata.requiredContent
-    for number in pairs( requiredContent ) do
-        requiredContent[ number ] = nil
-    end
+    table.Empty( metadata.RequiredContent )
 end
 
 -- File timestamp
 function GMA:GetTimestamp()
     local metadata = self.Metadata
     if not metadata then return end
-    return metadata.fileTimestamp
+    return metadata.FileTimestamp
 end
 
 -- Files
@@ -132,17 +254,30 @@ end
 
 function GMA:AddFile( filePath, content )
     assert( self.WriteMode, "To change a gmad file, write mode is required." )
+
     ArgAssert( filePath, 1, "string" )
+    if not IsAllowedFilePath( filePath ) then
+        logger:Warn( "File `%s` was not written to gma because its path is not valid.", filePath )
+        return
+    end
+
     ArgAssert( content, 2, "string" )
 
     local files = self:GetFiles()
     if not files then return end
 
+    for number, entry in ipairs( files ) do
+        if entry.Path == filePath then
+            table.remove( files, number )
+            break
+        end
+    end
+
     files[ #files + 1 ] = {
-        ["size"] = string.len( content ),
-        ["crc"] = util.CRC( content ),
-        ["content"] = content,
-        ["path"] = filePath
+        ["Size"] = string.len( content ),
+        ["CRC"] = util.CRC( content ),
+        ["Content"] = content,
+        ["Path"] = filePath
     }
 end
 
@@ -171,10 +306,7 @@ end
 function GMA:ClearFiles()
     local files = self:GetFiles()
     if not files then return end
-
-    for number in pairs( files ) do
-        files[ number ] = nil
-    end
+    table.Empty( files )
 end
 
 function GMA:ReadFile( number )
@@ -184,21 +316,21 @@ function GMA:ReadFile( number )
     local entry = files[ number ]
     if not entry then return end
 
-    local content = entry.content
+    local content = entry.Content
     if content then return content end
 
     local metadata = self.Metadata
     if not metadata then return end
 
-    local filesPos = metadata.filesPos
+    local filesPos = metadata.FilesPos
     if not filesPos then return end
 
     local fileClass = self.File
     if not fileClass then return end
 
     fileClass:Seek( filesPos + entry.Offset )
-    content = fileClass:Read( entry.size )
-    entry.content = content
+    content = fileClass:Read( entry.Size )
+    entry.Content = content
     return content
 end
 
@@ -209,18 +341,18 @@ function GMA:ReadAllFiles()
     local metadata = self.Metadata
     if not metadata then return end
 
-    local filesPos = metadata.filesPos
+    local filesPos = metadata.FilesPos
     if not filesPos then return end
 
     local files = self.Files
     if not files then return end
 
     for _, entry in ipairs( files ) do
-        if entry.content then continue end
+        if entry.Content then continue end
         if not fileClass then continue end
 
         fileClass:Seek( filesPos + entry.Offset )
-        entry.content = fileClass:Read( entry.Size )
+        entry.Content = fileClass:Read( entry.Size )
     end
 
     return files
@@ -231,10 +363,10 @@ function GMA:CheckCRC()
     if not files then return true end
 
     for _, entry in ipairs( files ) do
-        local crc = entry.crc
+        local crc = entry.CRC
         if not crc then continue end
 
-        local content = entry.content
+        local content = entry.Content
         if not content then continue end
 
         if util.CRC( content ) ~= crc then
@@ -277,16 +409,16 @@ function GMA:Close()
 
         for num, entry in ipairs( self:GetFiles() ) do
             fileClass:WriteULong( num )
-            fileClass:WriteString( entry.path )
-            fileClass:WriteULong( entry.size )
+            fileClass:WriteString( entry.Path )
+            fileClass:WriteULong( entry.Size )
             fileClass:WriteULong( 0 )
-            fileClass:WriteULong( tonumber( entry.crc ) )
+            fileClass:WriteULong( tonumber( entry.CRC ) )
         end
 
         fileClass:WriteULong( 0 )
 
         for _, entry in ipairs( self:GetFiles() ) do
-            fileClass:Write( entry.content )
+            fileClass:Write( entry.Content )
         end
 
         fileClass:Flush()
@@ -304,10 +436,10 @@ function Parse( fileClass )
 
     local gmad = {}
 
-    gmad.fileVersion = version
+    gmad.FileVersion = version
 
     fileClass:Skip( 8 )
-    gmad.fileTimestamp = fileClass:ReadULong()
+    gmad.FileTimestamp = fileClass:ReadULong()
     fileClass:Skip( 4 )
 
     if version > 1 then
@@ -319,41 +451,41 @@ function Parse( fileClass )
             required[ #required + 1 ] = content
         end
 
-        gmad.requiredContent = required
+        gmad.RequiredContent = required
     end
 
     -- Addon info
-    gmad.title = fileClass:ReadString()
-    gmad.description = fileClass:ReadString()
-    gmad.author = fileClass:ReadString()
+    gmad.Title = fileClass:ReadString()
+    gmad.Description = fileClass:ReadString()
+    gmad.Author = fileClass:ReadString()
 
     -- Addon version (unused)
-    gmad.version = fileClass:ReadLong()
+    gmad.Version = fileClass:ReadLong()
 
     -- Files
     local fileNum = 1
     local offset = 0
-    gmad.files = {}
+    gmad.Files = {}
 
     while fileClass:ReadULong() ~= 0 do
         local entry = {}
-        entry.path = fileClass:ReadString()
-        entry.size = fileClass:ReadULong()
+        entry.Path = fileClass:ReadString()
+        entry.Size = fileClass:ReadULong()
         fileClass:Skip( 4 )
 
-        entry.crc = fileClass:ReadULong()
-        entry.offset = offset
+        entry.CRC = fileClass:ReadULong()
+        entry.Offset = offset
 
-        gmad.files[ fileNum ] = entry
-        offset = offset + entry.size
+        gmad.Files[ fileNum ] = entry
+        offset = offset + entry.Size
         fileNum = fileNum + 1
     end
 
-    gmad.filesPos = fileClass:Tell()
+    gmad.FilesPos = fileClass:Tell()
 
-    local description = gmad.description
+    local description = gmad.Description
     if ( description ~= nil ) then
-        gmad.description = util.JSONToTable( description ) or description
+        gmad.Description = util.JSONToTable( description ) or description
     end
 
     return gmad
@@ -369,8 +501,8 @@ function Read( fileClass )
     instance.Metadata = metadata
     instance.File = fileClass
 
-    instance.Files = metadata.files
-    metadata.files = nil
+    instance.Files = metadata.Files
+    metadata.Files = nil
 
     return instance
 end
@@ -403,11 +535,11 @@ function Write( filePath )
     instance.Files = {}
 
     instance.Metadata = {
-        ["title"] = "Garry\'s Mod Addon",
-        ["description"] = "description",
-        ["author"] = "Pika Software",
-        ["requiredContent"] = {},
-        ["files"] = {}
+        ["Title"] = "Garry\'s Mod Addon",
+        ["Description"] = "Builded by GLua Package Manager",
+        ["Author"] = "GLua Package Manager",
+        ["RequiredContent"] = {},
+        ["Files"] = {}
     }
 
     return instance
