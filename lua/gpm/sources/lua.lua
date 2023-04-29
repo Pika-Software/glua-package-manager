@@ -49,43 +49,30 @@ Import = promise.Async( function( filePath, parentPackage, isAutorun )
         packagePath = string.GetPathFromFilename( packagePath )
     end
 
-    local packageFilePath = paths.Join( packagePath, "package.lua" )
+    local packageFilePath = packagePath .. "/package.lua"
     local identifier = packageFilePath
 
     local packageFile, metadata = Files[ packageFilePath ], nil
     if packageFile then
         metadata = packages.GetMetadata( packageFile )
         if not metadata then
-            logger:Error( "Package `%s` package.lua file is empty!", identifier )
-            return
+            return promise.Reject( string.format( "Package `%s` package.lua file is empty! (%s)", identifier, packagePath ) )
         end
 
         if not metadata.name then metadata.name = util_MD5( filePath ) end
         identifier = metadata.name .. "@" .. metadata.version
 
         if not metadata.singleplayer and isSinglePlayer then
-            logger:Error( "Package `%s` cannot be executed in a single-player game.", identifier )
-            return
+            return promise.Reject( string.format( "Package `%s` cannot be executed in a single-player game. (%s)", identifier, packagePath ) )
         end
 
         local gamemodeType = type( metadata.gamemode )
         if gamemodeType == "string" and metadata.gamemode ~= activeGamemode then
-            logger:Error( "Package `%s` is not compatible with this gamemode.", identifier )
-            return
+            return promise.Reject( string.format( "Package `%s` is not compatible with this gamemode. (%s)", identifier, packagePath ) )
         end
 
-        if gamemodeType == "table" then
-            local allowed = false
-            for _, gamemodeName in ipairs( metadata.gamemode ) do
-                if gamemodeName ~= activeGamemode then continue end
-                allowed = true
-                break
-            end
-
-            if not allowed then
-                logger:Error( "Package `%s` is not compatible with this gamemode.", identifier )
-                return
-            end
+        if gamemodeType == "table" and not table.HasIValue( metadata.gamemode, activeGamemode ) then
+            return promise.Reject( string.format( "Package `%s` is not compatible with this gamemode. (%s)", identifier, packagePath ) )
         end
 
         if SERVER and metadata.client then
@@ -111,24 +98,23 @@ Import = promise.Async( function( filePath, parentPackage, isAutorun )
 
     local mainFile = metadata.main
     if not mainFile then
-        mainFile = paths.Join( packagePath, "init.lua" )
+        mainFile = packagePath .. "/init.lua"
     end
 
     local func = Files[ mainFile ]
     if not func then
-        mainFile = paths.Join( packagePath, mainFile )
+        mainFile = packagePath .. "/" .. mainFile
         func = Files[ mainFile ]
     end
 
     -- Legacy packages support
     if not func then
-        mainFile = paths.Join( packagePath, "main.lua" )
+        mainFile = packagePath .. "/main.lua"
         func = Files[ mainFile ]
     end
 
     if not func then
-        logger:Error( "Package `%s` main file is missing!", identifier )
-        return
+        return promise.Reject( string.format( "Package `%s` main file is missing! (%s)", identifier, packagePath ) )
     end
 
     if SERVER then
@@ -138,7 +124,7 @@ Import = promise.Async( function( filePath, parentPackage, isAutorun )
             local send = metadata.send
             if send ~= nil then
                 for _, filePath in ipairs( send ) do
-                    local insideFilePath = paths.Join( packagePath, filePath )
+                    local insideFilePath = packagePath .. "/" .. filePath
                     if fs.Exists( insideFilePath, luaRealm ) then
                         AddCSLuaFile( insideFilePath )
                     elseif fs.Exists( filePath, luaRealm ) then
@@ -152,7 +138,7 @@ Import = promise.Async( function( filePath, parentPackage, isAutorun )
     end
 
     if isAutorun and not metadata.autorun then
-        logger:Debug( "Package `%s` autorun restricted.", identifier )
+        logger:Debug( "Package `%s` autorun restricted. (%s)", identifier, packagePath )
         return
     end
 
