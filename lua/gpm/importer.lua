@@ -39,7 +39,14 @@ do
         for _, source in ipairs( sources ) do
             if type( source.CanImport ) ~= "function" then continue end
             if not source.CanImport( filePath ) then continue end
-            return source.Import( filePath, parentPackage, isAutorun )
+
+            local ok, result = source.Import( filePath, parentPackage, isAutorun ):SafeAwait()
+            if not ok then
+                logger:Error( result )
+                return
+            end
+
+            return result
         end
 
         ErrorNoHaltWithStack( "The requested package doesn't exist." )
@@ -95,21 +102,6 @@ end )
 
 do
 
-    local cachePath = "gpm/" .. ( SERVER and "server" or "client" ) .. "/packages/"
-
-    function gpm.ClearCache()
-        local files, _ = fs.Find( cachePath .. "*", "DATA" )
-        for _, fileName in ipairs( files ) do
-            fs.Delete( cachePath .. fileName )
-        end
-
-        gpm.Logger:Info( "Deleted %d cache files.", #files )
-    end
-
-end
-
-do
-
     local sideColor = gpm.logger.SIDE_COLOR
     local MsgC = MsgC
 
@@ -121,8 +113,49 @@ do
                 versions[ #versions + 1 ] = version
             end
 
-            MsgC( sideColor, "* ", logger.TextColor, string.format( "%s@%s\n", name, table.concat( versions, ", " ) ) )
+            MsgC( sideColor, "\t* ", logger.TextColor, string.format( "%s@%s\n", name, table.concat( versions, ", " ) ) )
         end
+    end
+
+end
+
+do
+
+    local cachePath = "gpm/" .. ( SERVER and "server" or "client" ) .. "/packages/"
+    local workshopPath = "gpm/" .. ( SERVER and "server" or "client" ) .. "/workshop/"
+
+    function gpm.ClearCache()
+        local count, size = 0, 0
+
+        for _, fileName in ipairs( fs.Find( cachePath .. "*", "DATA" ) ) do
+            local filePath = cachePath .. fileName
+            local fileSize = fs.Size( filePath, "DATA" )
+            fs.Delete( filePath )
+
+            if fs.Exists( filePath, "DATA" ) then
+                logger:Warn( "Unable to remove file `%s` probably used by the game, restart game and try again.", filePath )
+                continue
+            end
+
+            size = size + fileSize
+            count = count + 1
+        end
+
+        for _, fileName in ipairs( fs.Find( workshopPath .. "*", "DATA" ) ) do
+            local filePath = workshopPath .. fileName
+            local fileSize = fs.Size( filePath, "DATA" )
+            fs.Delete( filePath )
+
+            if fs.Exists( filePath, "DATA" ) then
+                logger:Warn( "Unable to remove file `%s` probably used by the game, restart game and try again.", filePath )
+                continue
+            end
+
+            size = size + fileSize
+            count = count + 1
+        end
+
+        logger:Info( "Deleted %d cache files, freeing up %dMB of space.", count, size / 1024 / 1024 )
     end
 
 end
