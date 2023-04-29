@@ -1,13 +1,26 @@
-local promise = gpm.promise
-local string = string
-local fs = gpm.fs
+-- Libraries
 local deflatelua = gpm.libs.deflatelua
+local promise = gpm.promise
+local sources = gpm.sources
+local gmad = gpm.gmad
+local string = string
+local table = table
+local util = util
+local fs = gpm.fs
 
+-- Variables
+local cacheLifetime = GetConVar( "gpm_cache_lifetime" )
+local ErrorNoHaltWithStack = ErrorNoHaltWithStack
 local debug_fempty = debug.fempty
-local util_CRC = util.CRC
+local tostring = tostring
+local ipairs = ipairs
+local xpcall = xpcall
 local type = gpm.type
 
-module( "gpm.sources.zip", package.seeall )
+local cacheFolder = "gpm/" .. ( SERVER and "server" or "client" ) .. "/packages/"
+fs.CreateDir( cacheFolder )
+
+module( "gpm.sources.zip" )
 
 function CanImport( filePath )
     return fs.Exists( filePath, "GAME" ) and string.EndsWith( filePath, ".zip.dat" ) or string.EndsWith( filePath, ".zip" )
@@ -41,16 +54,17 @@ function IterateZipFiles( fileHandle )
             local compressedData = fileHandle:Read( compressedSize )
 
             local out = {}
-            local ok = xpcall(deflatelua.inflate, ErrorNoHaltWithStack, {
-                input = compressedData,
-                output = out,
-            })
+            local ok = xpcall( deflatelua.inflate, ErrorNoHaltWithStack, {
+                ["input"] = compressedData,
+                ["output"] = out
+            } )
+
             if ok then
-                data = table.concat(out)
+                data = table.concat( out )
             end
         end
 
-        if data and tostring( crc ) ~= util_CRC( data ) then
+        if data and tostring( crc ) ~= util.CRC( data ) then
             data = nil
         end
 
@@ -58,31 +72,77 @@ function IterateZipFiles( fileHandle )
     end
 end
 
+local contentFolders = {
+    ["particles"] = true,
+    ["materials"] = true,
+    ["gamemodes"] = true,
+    ["resource"] = true,
+    ["scripts"] = true,
+    ["scenes"] = true,
+    ["models"] = true,
+    ["sound"] = true,
+    ["maps"] = true,
+    ["lua"] = true
+}
+
+function PerformPath( filePath )
+    local result = {}
+
+    local founded = false
+    for _, folder in ipairs( string.Split( filePath, "/" ) ) do
+        if not founded and contentFolders[ folder ] then
+            founded = true
+        end
+
+        if founded then
+            result[ #result + 1 ] = folder
+        end
+    end
+
+    if #result > 0 then
+        return table.concat( result, "/" )
+    end
+end
+
 Import = promise.Async( function( filePath, parentPackage )
+    local packageName = util.MD5( filePath )
+
+    local cachePath = cacheFolder .. "zip_" .. packageName .. ".gma.dat"
+    if fs.Exists( cachePath, "DATA" ) and fs.Time( cachePath, "DATA" ) > ( 60 * 60 * cacheLifetime:GetInt() ) then
+        return sources.gmad.Import( "data/" .. cachePath, parentPackage )
+    end
+
     local fileClass = fs.Open( filePath, "rb", "GAME" )
     if not fileClass then return promise.Reject( "file not found" ) end
 
     local files = {}
     for filePath, content in IterateZipFiles( fileClass ) do
-        files[ filePath ] = content
-        print( filePath, content )
+        if not content then continue end
+
+        filePath = PerformPath( filePath )
+        if not filePath then continue end
+
+        files[ #files + 1 ] = { filePath, content }
     end
 
     fileClass:Close()
 
-    for k, v in pairs( files ) do
-        print( k, v, #v )
+    if #files == 0 then
+        return promise.Reject( string.format( "No files to mount. (%s)", url ) )
     end
 
-    -- if not packageInfo then return ErrorNoHaltWithStack( "package.lua not found" ) end
-    -- if not packageInfo.main or not files[ packageInfo.main ] then
-    --     return ErrorNoHaltWithStack( "no main file provided" )
-    -- end
+    local gma = gmad.Write( cachePath )
+    if not gma then
+        return promise.Reject( string.format( "Cache construction error, mounting failed. (%s)", url ) )
+    end
 
-    -- packageInfo.ImportedFrom = "ZIP"
-    -- packageInfo.ImportedExtra = nil
+    gma:SetTitle( packageName )
 
-    -- local main = files[ packageInfo.main ]
-    -- return gpm.packages.Initialize( packageInfo, main, files )
+    for _, data in ipairs( files ) do
+        gma:AddFile( data[ 1 ], data[ 2 ] )
+    end
 
+    gma:Close()
+
+    return sources.gmad.Import( "data/" .. cachePath, parentPackage )
 end )
