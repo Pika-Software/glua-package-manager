@@ -133,7 +133,7 @@ end
 
 -- Returns true if string is url
 function string.IsURL( str )
-    return string.match( str, "^https?://.*" ) ~= nil
+    return string.match( str, "^https?://.+$" ) ~= nil
 end
 
 -- Make JIT happy
@@ -199,6 +199,14 @@ do
         end )
     end
 
+end
+
+function table.HasIValue( tbl, any )
+    for _, value in ipairs( tbl ) do
+        if any == value then return true end
+    end
+
+    return false
 end
 
 function table.Lookup( tbl, str, default )
