@@ -8,10 +8,16 @@ local table = table
 -- Variables
 local ErrorNoHaltWithStack = ErrorNoHaltWithStack
 local AddCSLuaFile = AddCSLuaFile
+local getmetatable = getmetatable
+local setmetatable = setmetatable
 local ArgAssert = ArgAssert
+local tostring = tostring
 local logger = gpm.Logger
+local SysTime = SysTime
+local IsColor = IsColor
 local setfenv = setfenv
 local xpcall = xpcall
+local Color = Color
 local pairs = pairs
 local type = type
 local _G = _G
@@ -57,9 +63,12 @@ function GetMetadata( source )
         source.client = source.client ~= false
         source.server = source.server ~= false
 
-        -- Isolation, autorun, logger
+        -- Isolation & autorun
         source.isolation = source.isolation ~= false
         source.autorun = source.autorun == true
+
+        -- Color & logger
+        source.color = IsColor( source.color ) and source.color or nil
         source.logger = source.logger == true
 
         -- Files to send to the client ( package and main will already be added and there is no need to specify them here )
@@ -67,7 +76,10 @@ function GetMetadata( source )
 
         return source
     elseif type( source ) == "function" then
-        local env = {}
+        local env = {
+            ["Color"] = Color
+        }
+
         setfenv( source, env )
 
         local ok, result = xpcall( source, ErrorNoHaltWithStack )
@@ -96,24 +108,17 @@ do
     end
 
     function PACKAGE:GetName()
-        return self.metadata.name
+        return table.Lookup( self, "metadata.name", "unknown" )
     end
 
     function PACKAGE:GetVersion()
-        return self.metadata.version
+        return table.Lookup( self, "metadata.version", "unknown" )
     end
 
     function PACKAGE:GetIdentifier( name )
-        local metadata = self.metadata
-        if not metadata then return "unknown@unknown" end
-
-        local identifier = string.format( "%s@%s", metadata.name, metadata.version )
-        if name then
-            if type( name ) == "string" then return identifier .. "::" .. name end
-            return name
-        end
-
-        return identifier
+        local identifier = string.format( "%s@%s", self:GetName(), self:GetVersion() )
+        if type( name ) ~= "string" then return identifier end
+        return identifier .. "::" .. name
     end
 
     PACKAGE.__tostring = PACKAGE.GetIdentifier
@@ -143,21 +148,17 @@ do
         return fileList
     end
 
-    do
+    local function isPackage( any ) return getmetatable( any ) == PACKAGE end
+    _G.IsPackage = isPackage
+    IsPackage = isPackage
 
-        local getmetatable = getmetatable
-
-        function _G.IsPackage( any )
-            return getmetatable( any ) == PACKAGE
-        end
-
-        _G.TYPE_PACKAGE = gpm.AddType( "Package", IsPackage )
-
-    end
+    local typePackage = gpm.AddType( "Package", isPackage )
+    _G.TYPE_PACKAGE = typePackage
+    TYPE_PACKAGE = typePackage
 
 end
 
-function Run( gPackage, func )
+local function run( gPackage, func )
     local env = gPackage.environment
     if env ~= nil then
         setfenv( func, env )
@@ -166,131 +167,141 @@ function Run( gPackage, func )
     return func()
 end
 
-function SafeRun( gPackage, func, errorHandler )
+Run = run
+
+local function safeRun( gPackage, func, errorHandler )
     return xpcall( Run, errorHandler, gPackage, func )
 end
 
-function FindFilePath( fileName, files )
+SafeRun = safeRun
+
+local function findFilePath( fileName, files )
     if type( fileName ) ~= "string" or type( files ) ~= "table" then return end
 
     local currentFile = utils.GetCurrentFile()
     if currentFile ~= nil then
         local folder = string.GetPathFromFilename( paths.Localize( currentFile ) )
         if type( folder ) == "string" then
-            local path = paths.Join( folder, fileName )
-            if files[ path ] then return path end
+            local filePath = folder .. fileName
+            if files[ filePath ] then
+                return filePath
+            end
         end
     end
 
-    return files[ fileName ] and fileName
+    if files[ fileName ] then
+        return fileName
+    end
 end
 
-do
+FindFilePath = findFilePath
 
-    local setmetatable = setmetatable
-    local packages = gpm.packages
-    local tostring = tostring
-    local SysTime = SysTime
+function Initialize( metadata, func, files, parentPackage )
+    ArgAssert( metadata, 1, "table" )
+    ArgAssert( func, 2, "function" )
+    ArgAssert( files, 3, "table" )
 
-    function Initialize( metadata, func, files, parentPackage )
-        ArgAssert( metadata, 1, "table" )
-        ArgAssert( func, 2, "function" )
-        ArgAssert( files, 3, "table" )
-
-        local versions = pkgs[ metadata.name ]
-        if versions ~= nil then
-            local gPackage = versions[ metadata.version ]
-            if IsPackage( gPackage ) then
-                if metadata.isolation and IsPackage( parentPackage ) then
-                    environment.LinkMetaTables( parentPackage.environment, gPackage.environment )
-                end
-
-                return gPackage.result
-            end
-        end
-
-        -- Measuring package startup time
-        local stopwatch = SysTime()
-
-        -- Creating package object
-        local gPackage = setmetatable( {}, PACKAGE )
-        gPackage.metadata = metadata
-        gPackage.files = files
-
-        if metadata.logger then
-            gPackage.logger = gpm.logger.Create( gPackage:GetIdentifier(), metadata.color )
-        end
-
-        if metadata.isolation then
-
-            -- Creating environment for package
-            local packageEnv = environment.Create( func )
-            gPackage.environment = packageEnv
-
-            -- Adding to the parent package
-            if IsPackage( parentPackage ) then
-                environment.LinkMetaTables( parentPackage.environment, packageEnv )
+    local versions = pkgs[ metadata.name ]
+    if versions ~= nil then
+        local gPackage = versions[ metadata.version ]
+        if IsPackage( gPackage ) then
+            if metadata.isolation and IsPackage( parentPackage ) then
+                environment.LinkMetaTables( parentPackage.environment, gPackage.environment )
             end
 
-            -- Binding package object to gpm.Package
-            environment.SetLinkedTable( packageEnv, "gpm", gpm )
-
-            -- Globals
-            table.SetValue( packageEnv, "gpm.Logger", gPackage.logger )
-            table.SetValue( packageEnv, "gpm.Package", gPackage, true )
-            table.SetValue( packageEnv, "_VERSION", metadata.version )
-            table.SetValue( packageEnv, "promise", gpm.promise )
-            table.SetValue( packageEnv, "TypeID", gpm.TypeID )
-            table.SetValue( packageEnv, "type", gpm.type )
-            table.SetValue( packageEnv, "http", gpm.http )
-            table.SetValue( packageEnv, "file", gpm.fs )
-
-            environment.SetValue( packageEnv, "import", function( filePath, async, parentPackage )
-                return gpm.Import( filePath, async, parentPackage or gpm.Package )
-            end )
-
-            -- include
-            environment.SetValue( packageEnv, "include", function( fileName )
-                local path = packages.FindFilePath( fileName, files )
-
-                if path and files[ path ] then
-                    return packages.Run( gpm.Package, files[ path ] )
-                end
-
-                ErrorNoHaltWithStack( "Couldn't include file '" .. tostring( fileName ) .. "' - File not found" )
-            end )
-
-            -- AddCSLuaFile
-            if SERVER then
-                environment.SetValue( packageEnv, "AddCSLuaFile", function( fileName )
-                    if fileName == nil then fileName = paths.Localize( utils.GetCurrentFile() ) end
-                    local path = packages.FindFilePath( fileName, files )
-                    if path then return AddCSLuaFile( path ) end
-
-                    -- ErrorNoHaltWithStack( "Couldn't AddCSLuaFile file '" .. tostring( fileName ) .. "' - File not found" )
-                end )
-            end
-
+            return gPackage.result
         end
-
-        -- Run
-        local ok, result = SafeRun( gPackage, func, ErrorNoHaltWithStack )
-        if not ok then
-            logger:Error( "Package `%s` start-up failed, see above for the reason, it took %.4f seconds.", gPackage, SysTime() - stopwatch )
-            return
-        end
-
-        -- Saving result to gPackage
-        gPackage.result = result
-
-        -- Saving in global table & final log
-        logger:Info( "Package `%s` was successfully loaded, it took %.4f seconds.", gPackage, SysTime() - stopwatch )
-
-        local packageName = gPackage:GetName()
-        pkgs[ packageName ] = pkgs[ packageName ] or {}
-        pkgs[ packageName ][ gPackage:GetVersion() ] = gPackage
-
-        return result
     end
 
+    -- Measuring package startup time
+    local stopwatch = SysTime()
+
+    -- Creating package object
+    local gPackage = setmetatable( {}, PACKAGE )
+    gPackage.metadata = metadata
+    gPackage.files = files
+
+    if metadata.logger then
+        gPackage.logger = gpm.logger.Create( gPackage:GetIdentifier(), metadata.color )
+    end
+
+    if metadata.isolation then
+
+        -- Creating environment for package
+        local packageEnv = environment.Create( func )
+        gPackage.environment = packageEnv
+
+        -- Adding to the parent package
+        if IsPackage( parentPackage ) then
+            environment.LinkMetaTables( parentPackage.environment, packageEnv )
+        end
+
+        -- Binding package object to gpm.Package
+        environment.SetLinkedTable( packageEnv, "gpm", gpm )
+
+        -- GPM globals
+        table.SetValue( packageEnv, "gpm.Logger", gPackage.logger )
+        table.SetValue( packageEnv, "gpm.Package", gPackage )
+
+        -- Globals
+        packageEnv._VERSION = metadata.version
+        packageEnv.promise = gpm.promise
+        packageEnv.TypeID = gpm.TypeID
+        packageEnv.type = gpm.type
+        packageEnv.http = gpm.http
+        packageEnv.file = gpm.fs
+
+        environment.SetValue( packageEnv, "import", function( filePath, async, parentPackage )
+            return gpm.Import( filePath, async, parentPackage or gpm.Package )
+        end )
+
+        -- include
+        environment.SetValue( packageEnv, "include", function( fileName )
+            local filePath = findFilePath( fileName, files )
+            if filePath then
+                local func = files[ filePath ]
+                if func then
+                    return run( gPackage, func )
+                end
+            end
+
+            ErrorNoHaltWithStack( "Couldn't include file '" .. tostring( fileName ) .. "' - File not found" )
+        end )
+
+        -- AddCSLuaFile
+        if SERVER then
+            environment.SetValue( packageEnv, "AddCSLuaFile", function( fileName )
+                if not fileName then
+                    fileName = paths.Localize( utils.GetCurrentFile() )
+                end
+
+                local filePath = findFilePath( fileName, files )
+                if filePath then
+                    return AddCSLuaFile( filePath )
+                end
+
+                ErrorNoHaltWithStack( "Couldn't AddCSLuaFile file '" .. tostring( fileName ) .. "' - File not found" )
+            end )
+        end
+
+    end
+
+    -- Run
+    local ok, result = safeRun( gPackage, func, ErrorNoHaltWithStack )
+    if not ok then
+        logger:Error( "Package `%s` start-up failed, see above for the reason, it took %.4f seconds.", gPackage, SysTime() - stopwatch )
+        return
+    end
+
+    -- Saving result to gPackage
+    gPackage.result = result
+
+    -- Saving in global table & final log
+    logger:Info( "Package `%s` was successfully loaded, it took %.4f seconds.", gPackage, SysTime() - stopwatch )
+
+    local packageName = gPackage:GetName()
+    pkgs[ packageName ] = pkgs[ packageName ] or {}
+    pkgs[ packageName ][ gPackage:GetVersion() ] = gPackage
+
+    return result
 end
