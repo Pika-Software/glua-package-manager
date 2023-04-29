@@ -20,10 +20,6 @@ end
 -- Measuring startup time
 local stopwatch = SysTime()
 
--- Third-party libraries
-libs = {}
-libs.deflatelua = IncludeComponent "libs/deflatelua"
-
 -- Utils
 IncludeComponent "utils"
 
@@ -36,13 +32,18 @@ IncludeComponent "logger"
 -- Global GPM Logger Creating
 Logger = logger.Create( "GPM@" .. utils.Version( _VERSION ), Color( 180, 180, 255 ) )
 
--- Basic Libs
+-- Third-party libraries
+libs = {}
+libs.deflatelua = IncludeComponent "libs/deflatelua"
+Logger:Info( "%s %s is initialized.", libs.deflatelua._NAME, libs.deflatelua._VERSION )
+
+-- Our libraries
 IncludeComponent "environment"
 IncludeComponent "gmad"
 
 -- Promises
 IncludeComponent "promise"
-Logger:Info( "Promise the library version %s is initialized.", utils.Version( promise._VERSION_NUM ) )
+Logger:Info( "gm_promise %s is initialized.", utils.Version( promise._VERSION_NUM ) )
 
 -- File System & HTTP
 IncludeComponent "fs"
