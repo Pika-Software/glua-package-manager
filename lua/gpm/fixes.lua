@@ -16,6 +16,11 @@ end
 -- https://wiki.facepunch.com/gmod/string.StartsWith
 string.StartsWith = string.StartsWith or string.StartWith
 
+-- https://wiki.facepunch.com/gmod/string.Split
+function string.Split( str, separator )
+    return string.Explode( separator, str, false )
+end
+
 -- https://wiki.facepunch.com/gmod/file.Exists
 -- https://wiki.facepunch.com/gmod/file.IsDir
 do

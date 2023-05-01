@@ -280,7 +280,7 @@ function Initialize( metadata, func, files, parentPackage )
                     return AddCSLuaFile( filePath )
                 end
 
-                ErrorNoHaltWithStack( "Couldn't AddCSLuaFile file '" .. tostring( fileName ) .. "' - File not found" )
+                -- ErrorNoHaltWithStack( "Couldn't AddCSLuaFile file '" .. tostring( fileName ) .. "' - File not found" )
             end )
         end
 
