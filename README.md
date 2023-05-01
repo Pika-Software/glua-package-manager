@@ -76,9 +76,10 @@ Look for more examples in our code ;)
 
 ## How to improve?
 For better speed and reliability, the following binary modules can be installed in the game:
+- [gm_asyncio](https://github.com/Pika-Software/gm_asyncio) ⭐
+- [gm_chttp](https://github.com/timschumi/gmod-chttp)
 - [async_write](https://github.com/WilliamVenner/gm_async_write)
 - [gmsv_reqwest](https://github.com/WilliamVenner/gmsv_reqwest)
-- [chttp](https://github.com/timschumi/gmod-chttp)
 
 In the near future we will release our own, better implemented binary modules to improve performance.
 

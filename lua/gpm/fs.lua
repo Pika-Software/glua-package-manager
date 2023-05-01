@@ -1,17 +1,26 @@
+if not asyncio then
+    -- https://github.com/Pika-Software/gm_asyncio
+    if util.IsBinaryModuleInstalled( "asyncio" ) then
+        require( "asyncio" )
+    -- https://github.com/WilliamVenner/gm_async_write
+    elseif not file.AsyncWrite and util.IsBinaryModuleInstalled( "async_write" ) then
+        require( "async_write" )
+    end
+end
+
 -- Libraries
 local promise = gpm.promise
+local asyncio = asyncio
 local string = string
 local file = file
 
 -- Variables
 local CompileString = CompileString
 local math_max = math.max
+local SERVER = SERVER
 local ipairs = ipairs
 local pcall = pcall
 local type = type
-
--- https://github.com/WilliamVenner/gm_async_write
-if not file.AsyncWrite and util.IsBinaryModuleInstalled( "async_write" ) then require( "async_write" ) end
 
 module( "gpm.fs" )
 
@@ -28,10 +37,10 @@ function Read( filePath, gamePath, lenght )
     local fileClass = file.Open( filePath, "rb", gamePath )
     if not fileClass then return end
 
-    local content = fileClass:Read( type( lenght ) == "number" and math_max( 0, lenght ) or fileClass:Size() )
+    local fileContent = fileClass:Read( type( lenght ) == "number" and math_max( 0, lenght ) or fileClass:Size() )
     fileClass:Close()
 
-    return content
+    return fileContent
 end
 
 function Write( filePath, contents )
@@ -64,57 +73,64 @@ function CreateDir( folderPath )
     end
 end
 
-function AsyncRead( filePath, gamePath )
-    local p = promise.New()
-
-    local status = file.AsyncRead( filePath, gamePath, function( filePath, gamePath, status, content )
-        if status ~= 0 then return p:Reject( "Error code: " .. status ) end
-        p:Resolve( {
-            ["filePath"] = filePath,
-            ["gamePath"] = gamePath,
-            ["content"] = content
-        } )
-    end )
-
-    if status ~= 0 then
-        p:Reject( "Error code: " .. status )
-    end
-
-    return p
-end
-
 Compile = promise.Async( function( filePath, gamePath, handleError )
     local ok, result = AsyncRead( filePath, gamePath ):SafeAwait()
     if not ok then return promise.Reject( result ) end
 
-    local ok, result = pcall( CompileString, result.content, result.filePath, handleError )
+    local ok, result = pcall( CompileString, result.fileContent, result.filePath, handleError )
     if not ok then return promise.Reject( result ) end
     if not result then return promise.Reject( "File `" .. filePath .. "` (" .. gamePath .. ") compilation failed." ) end
 
     return result
 end )
 
-if not file.AsyncWrite or not file.AsyncAppend then
+if asyncio ~= nil then
 
-    function AsyncWrite( filePath, content )
+    function AsyncRead( filePath, gamePath )
         local p = promise.New()
 
-        Write( filePath, content )
-
-        if Exists( filePath, "DATA" ) then
-            p:Resolve( filePath )
-        else
-            p:Reject( "failed" )
+        if asyncio.AsyncRead( filePath, gamePath, function( filePath, gamePath, status, fileContent )
+            if status ~= 0 then return p:Reject( "Error code: " .. status ) end
+            p:Resolve( {
+                ["fileContent"] = fileContent,
+                ["filePath"] = filePath,
+                ["gamePath"] = gamePath
+            } )
+        end ) ~= 0 then
+            p:Reject( "Error code: " .. status )
         end
 
         return p
     end
 
-    function AsyncAppend( filePath, content )
+    function AsyncWrite( filePath, fileContent )
         local p = promise.New()
 
-        Append( filePath, content )
-        p:Resolve( filePath )
+        if asyncio.AsyncWrite( filePath, fileContent, function( filePath, gamePath, status )
+            if status ~= 0 then return p:Reject( "Error code: " .. status ) end
+            p:Resolve( {
+                ["filePath"] = filePath,
+                ["gamePath"] = gamePath
+            } )
+        end ) ~= 0 then
+            p:Reject( "Error code: " .. status )
+        end
+
+        return p
+    end
+
+    function AsyncAppend( filePath, fileContent )
+        local p = promise.New()
+
+        if asyncio.AsyncAppend( filePath, fileContent, function( filePath, gamePath, status )
+            if status ~= 0 then return p:Reject( "Error code: " .. status ) end
+            p:Resolve( {
+                ["filePath"] = filePath,
+                ["gamePath"] = gamePath
+            } )
+        end ) ~= 0 then
+            p:Reject( "Error code: " .. status )
+        end
 
         return p
     end
@@ -122,30 +138,81 @@ if not file.AsyncWrite or not file.AsyncAppend then
     return
 end
 
-function AsyncWrite( filePath, content )
+function AsyncRead( filePath, gamePath )
     local p = promise.New()
 
-    local status = file.AsyncWrite( filePath, content, function( filePath, status )
+    if file.AsyncRead( filePath, gamePath, function( filePath, gamePath, status, fileContent )
         if status ~= 0 then return p:Reject( "Error code: " .. status ) end
-        p:Resolve( filePath )
-    end )
-
-    if status ~= 0 then
+        p:Resolve( {
+            ["filePath"] = filePath,
+            ["gamePath"] = gamePath,
+            ["fileContent"] = fileContent
+        } )
+    end ) ~= 0 then
         p:Reject( "Error code: " .. status )
     end
 
     return p
 end
 
-function AsyncAppend( filePath, content )
+if not file.AsyncWrite or not file.AsyncAppend then
+
+    function AsyncWrite( filePath, fileContent )
+        local p = promise.New()
+
+        Write( filePath, fileContent )
+
+        if Exists( filePath, "DATA" ) then
+            p:Resolve( {
+                ["filePath"] = filePath
+            } )
+        else
+            p:Reject( "failed" )
+        end
+
+        return p
+    end
+
+    function AsyncAppend( filePath, fileContent )
+        local p = promise.New()
+
+        Append( filePath, fileContent )
+        p:Resolve( {
+            ["filePath"] = filePath
+        } )
+
+        return p
+    end
+
+    return
+end
+
+if not SERVER then return end
+
+function AsyncWrite( filePath, fileContent )
     local p = promise.New()
 
-    local status = file.AsyncAppend( filePath, content, function( filePath, status )
+    if file.AsyncWrite( filePath, fileContent, function( filePath, status )
         if status ~= 0 then return p:Reject( "Error code: " .. status ) end
-        p:Resolve( filePath )
-    end )
+        p:Resolve( {
+            ["filePath"] = filePath
+        } )
+    end ) ~= 0 then
+        p:Reject( "Error code: " .. status )
+    end
 
-    if status ~= 0 then
+    return p
+end
+
+function AsyncAppend( filePath, fileContent )
+    local p = promise.New()
+
+    if file.AsyncAppend( filePath, fileContent, function( filePath, status )
+        if status ~= 0 then return p:Reject( "Error code: " .. status ) end
+        p:Resolve( {
+            ["filePath"] = filePath
+        } )
+    end ) ~= 0 then
         p:Reject( "Error code: " .. status )
     end
 
