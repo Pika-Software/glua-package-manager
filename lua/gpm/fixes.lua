@@ -4,6 +4,7 @@ local table = table
 local file = file
 
 -- Variables
+local ArgAssert = ArgAssert
 local SERVER = SERVER
 
 -- Global table
