@@ -5,11 +5,11 @@ local SERVER = SERVER
 local ipairs = ipairs
 local Color = Color
 
-CreateConVar( "gpm_cache_lifetime", "24", FCVAR_ARCHIVE, " - the cache lifetime, in hours, sets after how many hours the downloaded gpm packages will not be relevant.", 0, 60480 )
+CreateConVar( "gpm_cache_lifetime", "24", FCVAR_ARCHIVE, "Packages cache lifetime, in hours, sets after how many hours the downloaded gpm packages will not be relevant.", 0, 60480 )
 
 module( "gpm" )
 
-_VERSION = 011101
+_VERSION = 011102
 
 function IncludeComponent( filePath )
     filePath = "gpm/" .. filePath  .. ".lua"

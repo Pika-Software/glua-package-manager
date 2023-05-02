@@ -15,7 +15,7 @@ if CLIENT and not CHTTP and util.IsBinaryModuleInstalled( "chttp" ) then
     require( "chttp" )
 end
 
-local defaultTimeout = CreateConVar( "gpm_http_timeout", "10", FCVAR_ARCHIVE, " - default http timeout for gpm http library.", 5, 300 )
+local defaultTimeout = CreateConVar( "gpm_http_timeout", "10", FCVAR_ARCHIVE, "Default http timeout for gpm http library.", 5, 300 )
 local userAgent = string.format( "%s/%s %s", "GLua Package Manager", gpm.utils.Version( gpm._VERSION ), "Garry's Mod" )
 local client = reqwest or CHTTP or HTTP
 
