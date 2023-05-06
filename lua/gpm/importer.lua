@@ -107,14 +107,19 @@ do
 
     function gpm.PrintPackageList()
         MsgC( sideColor, SERVER and "Server" or "Client", logger.TextColor, " packages:\n" )
+
+        local total = 0
         for name, packages in pairs( gpm.Packages ) do
             local versions = {}
             for version in pairs( packages ) do
                 versions[ #versions + 1 ] = version
+                total = total + 1
             end
 
             MsgC( sideColor, "\t* ", logger.TextColor, string.format( "%s@%s\n", name, table.concat( versions, ", " ) ) )
         end
+
+        MsgC( sideColor, "\tTotal: ", logger.TextColor, total, "\n" )
     end
 
 end
