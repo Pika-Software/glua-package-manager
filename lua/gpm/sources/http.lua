@@ -11,6 +11,7 @@ local util = util
 
 -- Variables
 local CompileString = CompileString
+local logger = gpm.Logger
 local util_MD5 = util.MD5
 local SERVER = SERVER
 local ipairs = ipairs
@@ -37,7 +38,7 @@ local allowedExtensions = {
 }
 
 Import = promise.Async( function( url, parentPackage )
-    if sources.github.CanImport( url ) then
+    if string.match( url, "^https?://github.com/[^/]+/[^/]+$" ) ~= nil then
         return sources.github.Import( url, parentPackage )
     end
 
@@ -79,6 +80,7 @@ Import = promise.Async( function( url, parentPackage )
     end
 
     -- Downloading
+    logger:Info( "Package `%s` is downloading...", url )
     local ok, result = http.Fetch( url, nil, 120 ):SafeAwait()
     if not ok then return promise.Reject( result ) end
 
