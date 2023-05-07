@@ -64,7 +64,7 @@ function Download( wsid )
             elseif fs.Exists( cachePath, "DATA" ) then
                 logger:Warn( "Cache writing failed, probably file `data/" .. cachePath .. "` was already mounted, need to restart the game." )
             else
-                p:Reject( "gma file writing failed." )
+                p:Reject( "gma file writing failed" )
                 return
             end
 
@@ -72,7 +72,7 @@ function Download( wsid )
             return
         end
 
-        p:Reject( "gma has no data to read." )
+        p:Reject( "gma has no data to read" )
     end )
 
     return p
@@ -80,6 +80,10 @@ end
 
 Import = promise.Async( function( wsid, parentPackage )
     local ok, result = Download( wsid ):SafeAwait()
-    if not ok then return promise.Reject( "Workshop package `" .. wsid .. "` import failed: " .. result ) end
+    if not ok then
+        logger:Error( "`%s` import failed, %s.", wsid, result )
+        return
+    end
+
     return sources.gmad.Import( result, parentPackage )
 end )
