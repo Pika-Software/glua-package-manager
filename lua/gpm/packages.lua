@@ -1,9 +1,11 @@
 -- Libraries
+local gpm = gpm
 local environment = gpm.environment
 local paths = gpm.paths
 local utils = gpm.utils
 local string = string
 local table = table
+local fs = gpm.fs
 
 -- Variables
 local ErrorNoHaltWithStack = ErrorNoHaltWithStack
@@ -13,6 +15,7 @@ local setmetatable = setmetatable
 local ArgAssert = ArgAssert
 local tostring = tostring
 local logger = gpm.Logger
+local require = require
 local SysTime = SysTime
 local IsColor = IsColor
 local setfenv = setfenv
@@ -23,21 +26,21 @@ local type = type
 local _G = _G
 
 -- Packages table
-local pkgs = gpm.Packages
-if type( pkgs ) ~= "table" then
-    pkgs = {}; gpm.Packages = pkgs
+local packages = gpm.Packages
+if type( packages ) ~= "table" then
+    packages = {}; gpm.Packages = packages
 end
 
 module( "gpm.packages", package.seeall )
 
 -- Get all registered packages
 function GetAll()
-    return pkgs
+    return packages
 end
 
 -- Get one registered package
 function Get( packageName )
-    return pkgs[ packageName ]
+    return packages[ packageName ]
 end
 
 function GetMetadata( source )
@@ -135,6 +138,14 @@ do
         return self.result
     end
 
+    function PACKAGE:GetFilePath()
+        return table.Lookup( self, "metadata.filePath" )
+    end
+
+    function PACKAGE:GetFolder()
+        return table.Lookup( self, "metadata.folder" )
+    end
+
     function PACKAGE:GetFiles()
         return self.files
     end
@@ -148,20 +159,23 @@ do
         return fileList
     end
 
-    local function isPackage( any ) return getmetatable( any ) == PACKAGE end
-    _G.IsPackage = isPackage
-    IsPackage = isPackage
+    function PACKAGE:IsIsolated()
+        return table.Lookup( self, "metadata.isolation" )
+    end
 
-    local typePackage = gpm.AddType( "Package", isPackage )
-    _G.TYPE_PACKAGE = typePackage
-    TYPE_PACKAGE = typePackage
+    local function isPackage( any ) return getmetatable( any ) == PACKAGE end
+    gpm.IsPackage = isPackage
+    _G.IsPackage = isPackage
+
+    _G.TYPE_PACKAGE = gpm.AddType( "Package", isPackage )
 
 end
 
-local function run( gPackage, func )
-    local env = gPackage.environment
-    if env ~= nil then
-        setfenv( func, env )
+-- Function run in package
+local function run( func, package )
+    local environment = package:GetEnvironment()
+    if environment then
+        setfenv( func, environment )
     end
 
     return func()
@@ -169,51 +183,19 @@ end
 
 Run = run
 
-local function safeRun( gPackage, func, errorHandler )
-    return xpcall( run, errorHandler, gPackage, func )
+-- Safe function run in package
+local function safeRun( func, package, errorHandler )
+    return xpcall( run, errorHandler, func, package )
 end
 
 SafeRun = safeRun
 
-local function findFilePath( fileName, files )
-    if type( fileName ) ~= "string" or type( files ) ~= "table" then return end
-
-    local currentFile = utils.GetCurrentFile()
-    if currentFile ~= nil then
-        local folder = string.GetPathFromFilename( paths.Localize( currentFile ) )
-        if type( folder ) == "string" then
-            local filePath = folder .. fileName
-            if files[ filePath ] then
-                return filePath
-            end
-        end
-    end
-
-    if files[ fileName ] then
-        return fileName
-    end
-end
-
-FindFilePath = findFilePath
-
 local modules = {}
 
-function Initialize( metadata, func, files, parentPackage )
+function Initialize( metadata, func, files )
     ArgAssert( metadata, 1, "table" )
     ArgAssert( func, 2, "function" )
     ArgAssert( files, 3, "table" )
-
-    local versions = pkgs[ metadata.name ]
-    if versions ~= nil then
-        local gPackage = versions[ metadata.version ]
-        if IsPackage( gPackage ) then
-            if metadata.isolation and IsPackage( parentPackage ) then
-                environment.LinkMetaTables( parentPackage.environment, gPackage.environment )
-            end
-
-            return gPackage.result
-        end
-    end
 
     -- Measuring package startup time
     local stopwatch = SysTime()
@@ -223,48 +205,50 @@ function Initialize( metadata, func, files, parentPackage )
     gPackage.metadata = metadata
     gPackage.files = files
 
-    if metadata.logger then
-        gPackage.logger = gpm.logger.Create( gPackage:GetIdentifier(), metadata.color )
-    end
-
     if metadata.isolation then
 
         -- Creating environment for package
-        local packageEnv = environment.Create( func )
+        local packageEnv = environment.Create( func, _G )
         gPackage.environment = packageEnv
 
-        -- Adding to the parent package
-        if IsPackage( parentPackage ) then
-            environment.LinkMetaTables( parentPackage.environment, packageEnv )
-        end
-
-        -- Binding package object to gpm.Package
-        environment.SetLinkedTable( packageEnv, "gpm", gpm )
-
-        -- GPM globals
-        table.SetValue( packageEnv, "gpm.Logger", gPackage.logger )
-        table.SetValue( packageEnv, "gpm.Package", gPackage )
-
         -- Globals
+        environment.SetLinkedTable( packageEnv, "gpm", gpm )
         packageEnv._VERSION = metadata.version
         packageEnv.promise = gpm.promise
         packageEnv.TypeID = gpm.TypeID
         packageEnv.type = gpm.type
         packageEnv.http = gpm.http
-        packageEnv.file = gpm.fs
+        packageEnv.file = fs
 
-        environment.SetValue( packageEnv, "import", function( filePath, async, parentPackage )
-            return gpm.Import( filePath, async, parentPackage or gpm.Package )
+        -- Binding package object to gpm.Package
+        table.SetValue( packageEnv, "gpm.Package", gPackage )
+
+        -- Logger
+        if metadata.logger then
+            gPackage.logger = gpm.logger.Create( gPackage:GetIdentifier(), metadata.color )
+            table.SetValue( packageEnv, "gpm.Logger", gPackage.logger )
+        end
+
+        environment.SetValue( packageEnv, "import", function( filePath, async )
+            return gpm.Import( filePath, async, gPackage )
         end )
 
         -- include
         environment.SetValue( packageEnv, "include", function( fileName )
-            local filePath = findFilePath( fileName, files )
-            if filePath then
-                local func = files[ filePath ]
-                if func then
-                    return run( gPackage, func )
+            local currentFile = utils.GetCurrentFile()
+            if currentFile then
+                local folder = string.GetPathFromFilename( paths.Localize( currentFile ) )
+                if folder then
+                    local func = files[ folder .. fileName ]
+                    if func then
+                        return run( func, gPackage )
+                    end
                 end
+            end
+
+            local func = files[ fileName ]
+            if func then
+                return run( func, gPackage )
             end
 
             ErrorNoHaltWithStack( "Couldn't include file '" .. tostring( fileName ) .. "' - File not found" )
@@ -273,16 +257,28 @@ function Initialize( metadata, func, files, parentPackage )
         -- AddCSLuaFile
         if SERVER then
             environment.SetValue( packageEnv, "AddCSLuaFile", function( fileName )
-                if not fileName then
-                    fileName = paths.Localize( utils.GetCurrentFile() )
+                local currentFile = utils.GetCurrentFile()
+                if currentFile then
+                    if fileName ~= nil then
+                        ArgAssert( fileName, 1, "string" )
+                    else
+                        fileName = currentFile
+                    end
+
+                    local folder = string.GetPathFromFilename( paths.Localize( currentFile ) )
+                    if folder then
+                        local filePath = folder .. fileName
+                        if fs.Exists( filePath, gpm.LuaRealm ) then
+                            return AddCSLuaFile( filePath )
+                        end
+                    end
                 end
 
-                local filePath = findFilePath( fileName, files )
-                if filePath then
-                    return AddCSLuaFile( filePath )
+                if fs.Exists( fileName, gpm.LuaRealm ) then
+                    return AddCSLuaFile( fileName )
                 end
 
-                -- ErrorNoHaltWithStack( "Couldn't AddCSLuaFile file '" .. tostring( fileName ) .. "' - File not found" )
+                ErrorNoHaltWithStack( "Couldn't AddCSLuaFile file '" .. tostring( fileName ) .. "' - File not found" )
             end )
         end
 
@@ -292,28 +288,30 @@ function Initialize( metadata, func, files, parentPackage )
                 return require( name )
             end
 
-            local loaded = modules[ name ]
-            if loaded ~= nil then
-                if loaded == false then return end
-                return loaded
+            local package2 = modules[ name ]
+            if gpm.IsPackage( package2 ) then
+                gpm.packages.LinkPackages( gPackage, package2 )
+                return package2:GetResult()
             end
 
-            local func = files[ "includes/modules/" .. name .. ".lua" ]
-            if func then
-                local result = run( gPackage, func )
-                modules[ name ] = result ~= nil and result or false
+            local ok, result = gpm.Import( "includes/modules/" .. name .. ".lua", true, gPackage, false ):SafeAwait()
+            if ok then
+                modules[ name ] = result
                 return result
             end
 
-            ErrorNoHaltWithStack( "Module `" .. name .. "`not found!" )
+            ErrorNoHaltWithStack( "Module `" .. name .. "` not found!" )
         end )
 
     end
 
+    -- Package folder
+    local packagePath = metadata.filePath
+
     -- Run
-    local ok, result = safeRun( gPackage, func, ErrorNoHaltWithStack )
+    local ok, result = safeRun( func, gPackage, ErrorNoHaltWithStack )
     if not ok then
-        logger:Error( "Package `%s` start-up failed, see above for the reason, it took %.4f seconds.", gPackage, SysTime() - stopwatch )
+        logger:Error( "Package `%s` start-up failed, see above for the reason, it took %.4f seconds.", packagePath, SysTime() - stopwatch )
         return
     end
 
@@ -321,11 +319,21 @@ function Initialize( metadata, func, files, parentPackage )
     gPackage.result = result
 
     -- Saving in global table & final log
-    logger:Info( "Package `%s` was successfully loaded, it took %.4f seconds.", gPackage, SysTime() - stopwatch )
+    logger:Info( "Package `%s` was successfully loaded, it took %.4f seconds.", packagePath, SysTime() - stopwatch )
 
-    local packageName = gPackage:GetName()
-    pkgs[ packageName ] = pkgs[ packageName ] or {}
-    pkgs[ packageName ][ gPackage:GetVersion() ] = gPackage
+    packages[ packagePath ] = packages[ packagePath ] or {}
+    packages[ packagePath ][ gPackage:GetVersion() ] = gPackage
 
-    return result
+    return gPackage
+end
+
+function LinkPackages( package1, package2 )
+    ArgAssert( package1, 1, "Package" )
+    ArgAssert( package2, 2, "Package" )
+
+    local environment1, environment2 = package1:GetEnvironment(), package2:GetEnvironment()
+    logger:Debug( "Packages `%s` <- `%s` import status: %s", package1, package2, ( environment1 ~= nil and environment2 ~= nil ) and "success" or "failed" )
+    if not environment1 or not environment2 then return end
+
+    environment.LinkMetaTables( environment1, environment2 )
 end
