@@ -284,6 +284,20 @@ function Initialize( metadata, func, files, parentPackage )
             end )
         end
 
+        -- require
+        environment.SetValue( packageEnv, "require", function( name )
+            if util.IsBinaryModuleInstalled( name ) then
+                return require( name )
+            end
+
+            local func = files[ "includes/modules/" .. name .. ".lua" ]
+            if func then
+                return run( gPackage, func )
+            end
+
+            ErrorNoHaltWithStack( "Module `" .. name .. "`not found!" )
+        end )
+
     end
 
     -- Run
