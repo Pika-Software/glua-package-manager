@@ -7,11 +7,11 @@ local gpm = gpm
 
 -- Variables
 local ErrorNoHaltWithStack = ErrorNoHaltWithStack
-local SysTime = SysTime
 local ipairs = ipairs
 local pairs = pairs
 local type = type
 
+-- Source functions
 do
 
     local sources = gpm.sources
@@ -26,6 +26,11 @@ do
 
 end
 
+function gpm.ErrorHandler( packagePath, str )
+    logger:Error( "Package `%s` import failed, see above to see the error.", packagePath )
+    ErrorNoHaltWithStack( str )
+end
+
 do
 
     local sources = {}
@@ -33,24 +38,29 @@ do
         sources[ #sources + 1 ] = source
     end
 
-    gpm.AsyncImport = promise.Async( function( filePath, parentPackage, isAutorun )
-        ArgAssert( filePath, 1, "string" )
+    local processes = {}
 
-        for _, source in ipairs( sources ) do
-            if type( source.CanImport ) ~= "function" then continue end
-            if not source.CanImport( filePath ) then continue end
+    function gpm.AsyncImport( packagePath, parentPackage, isAutorun )
+        ArgAssert( packagePath, 1, "string" )
+        packagePath = paths.Fix( packagePath )
 
-            local ok, result = source.Import( filePath, parentPackage, isAutorun ):SafeAwait()
-            if not ok then
-                logger:Error( result )
-                return
+        local p = processes[ packagePath ]
+        if not promise.IsPromise( p ) then
+            for _, source in ipairs( sources ) do
+                if type( source.CanImport ) ~= "function" then continue end
+                if not source.CanImport( packagePath ) then continue end
+                p = source.Import( packagePath, parentPackage, isAutorun )
+                processes[ packagePath ] = p
+                break
             end
 
-            return result
+            if not promise.IsPromise( p ) then
+                gpm.ErrorHandler( packagePath, "Requested package doesn't exist!" )
+            end
         end
 
-        ErrorNoHaltWithStack( "The requested package doesn't exist." )
-    end )
+        return p
+    end
 
 end
 
@@ -62,7 +72,16 @@ do
         assert( async or promise.RunningInAsync(), "import supposed to be running in coroutine/async function (do you running it from package)" )
 
         local p = gpm.AsyncImport( filePath, parentPackage, isAutorun )
-        if not async then return p:Await() end
+        if not async then
+            local ok, result = p:SafeAwait()
+            if not ok then
+                gpm.ErrorHandler( filePath, result )
+                return
+            end
+
+            return result
+        end
+
         return p
     end
 
@@ -70,35 +89,32 @@ do
 
 end
 
-gpm.ImportFolder = promise.Async( function( folderPath, parentPackage, isAutorun )
+function gpm.ImportFolder( folderPath, parentPackage, isAutorun )
+    folderPath = paths.Fix( folderPath )
+
     if not fs.IsDir( folderPath, gpm.LuaRealm ) then
         logger:Warn( "Import impossible, folder '%s' is empty, skipping...", folderPath )
         return
     end
 
     logger:Info( "Starting to import packages from '%s'", folderPath )
-    folderPath = paths.Fix( folderPath )
-    local stopwatch = SysTime()
 
     local files, folders = fs.Find( folderPath .. "/*", gpm.LuaRealm )
     for _, folderName in ipairs( folders ) do
-        local ok, err = gpm.AsyncImport( folderPath .. "/" .. folderName, parentPackage, isAutorun ):SafeAwait()
-        if not ok then
-            logger:Error( "Package `%s` start-up failed, see above to see the error.", folderName )
-            ErrorNoHaltWithStack( err )
-        end
+        local packagePath = folderPath .. "/" .. folderName
+        gpm.Import( packagePath, true, parentPackage, isAutorun ):Catch( function( str )
+            gpm.ErrorHandler( packagePath, result )
+        end )
     end
 
     for _, fileName in ipairs( files ) do
-        local ok, err = gpm.AsyncImport( folderPath .. "/" .. fileName, parentPackage, isAutorun ):SafeAwait()
-        if not ok then
-            logger:Error( "Package `%s` start-up failed, see above to see the error.", folderName )
-            ErrorNoHaltWithStack( err )
-        end
+        local packagePath = folderPath .. "/" .. fileName
+        gpm.Import( packagePath, true, parentPackage, isAutorun ):Catch( function( str )
+            gpm.ErrorHandler( packagePath, result )
+        end )
     end
 
-    logger:Info( "Import from '%s' is completed, it took %f seconds.", folderPath, SysTime() - stopwatch )
-end )
+end
 
 do
 
