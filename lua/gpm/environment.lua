@@ -12,49 +12,55 @@ local rawset = rawset
 local ipairs = ipairs
 local pairs = pairs
 local type = type
-local _G = _G
 
 module( "gpm.environment" )
 
-function SetValue( env, path, func, makeCopy )
-    ArgAssert( func, 1, "function" )
-    return table.SetValue( env, path, setfenv( makeCopy and debug_fcopy( func ) or func, env ) )
+function SetValue( env, path, value, makeCopy )
+    if type( value ) == "function" then
+        if makeCopy then
+            value = debug_fcopy( value )
+        end
+
+        setfenv( value, env )
+    elseif makeCopy then
+        value = table.Copy( value )
+    end
+
+    return table.SetValue( env, path, value )
 end
 
 do
 
-    local meta = {}
+    local ENVIRONMENT = {}
 
-    function meta:__index( key )
+    function ENVIRONMENT:__index( key )
         local indexes = rawget( self, "__indexes" )
-        if indexes ~= nil then
-            for _, index in ipairs( indexes ) do
-                local value = index[ key ]
-                if value == nil then continue end
+        if not indexes then return end
 
+        for _, index in ipairs( indexes ) do
+            local value = index[ key ]
+            if value ~= nil then
                 return value
             end
         end
-
-        -- return rawget( self, key )
     end
 
     function LinkMetaTables( a, b )
         ArgAssert( a, 1, "table" )
         ArgAssert( b, 2, "table" )
 
-        local aMeta = getmetatable( a )
-        if aMeta ~= meta then
-            setmetatable( a, meta )
-
-            local indexes = rawget( a, "__indexes" )
-            if type( indexes ) ~= "table" then
-                indexes = {}; rawset( a, "__indexes", indexes )
-            end
-
-            table.RemoveByValue( indexes, b )
-            table.insert( indexes, 1, b )
+        local metaTable = getmetatable( a )
+        if metaTable ~= ENVIRONMENT then
+            setmetatable( a, ENVIRONMENT )
         end
+
+        local indexes = rawget( a, "__indexes" )
+        if type( indexes ) ~= "table" then
+            indexes = {}; rawset( a, "__indexes", indexes )
+        end
+
+        table.RemoveByValue( indexes, b )
+        table.insert( indexes, 1, b )
 
         return a
     end
@@ -65,7 +71,11 @@ function Create( func, env )
     ArgAssert( func, 1, "function" )
 
     local new = {}
-    return new, setfenv( func, LinkMetaTables( new, env or _G ) )
+    if type( env ) == "table" then
+        LinkMetaTables( new, env )
+    end
+
+    return new, setfenv( func, new )
 end
 
 function SetLinkedTable( env, path, tbl )
@@ -93,9 +103,7 @@ function SetTable( env, path, tbl, makeCopy )
         object[ key ] = value
     end
 
-    if path ~= nil then
-        return table.SetValue( env, path, object )
-    else
-        return object
-    end
+    if not path then return object end
+
+    return table.SetValue( env, path, object )
 end
