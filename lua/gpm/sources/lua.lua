@@ -53,7 +53,7 @@ Import = promise.Async( function( filePath, parentPackage, isAutorun )
     if packageFile then
         metadata = packages.GetMetadata( packageFile )
         if not metadata then
-            logger:Error( "`%s` import failed, package.lua file is empty!", packagePath )
+            logger:Error( "`%s` import failed, package.lua file is empty.", packagePath )
             return
         end
 
@@ -108,7 +108,7 @@ Import = promise.Async( function( filePath, parentPackage, isAutorun )
     end
 
     if not func then
-        logger:Error( "`%s` import failed, main file is missing!", packagePath )
+        logger:Error( "`%s` import failed, main file is missing.", packagePath )
         return
     end
 
