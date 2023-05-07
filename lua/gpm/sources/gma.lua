@@ -13,6 +13,7 @@ local effects_Register = effects.Register
 local weapons_Register = weapons.Register
 local CLIENT, SERVER = CLIENT, SERVER
 local game_MountGMA = game.MountGMA
+local logger = gpm.Logger
 local setfenv = setfenv
 local ipairs = ipairs
 local pcall = pcall
@@ -81,7 +82,8 @@ RunLua = runLua
 Import = promise.Async( function( filePath, psarentPackage )
     local gma = gmad.Open( filePath, "GAME" )
     if not gma then
-        return promise.Reject( "Package `" .. filePath .. "` gma file cannot be readed." )
+        logger:Error( "`%s` import failed, gma file cannot be readed.", filePath )
+        return
     end
 
     local metadata = packages.GetMetadata( {
@@ -96,7 +98,8 @@ Import = promise.Async( function( filePath, psarentPackage )
 
     local ok, files = game_MountGMA( filePath )
     if not ok then
-        return promise.Reject( "Package `" .. metadata.name .. "@" .. metadata.version .. "` gma file mounting failed." )
+        logger:Error( "`%s` import failed, gma file cannot be mounted.", filePath )
+        return
     end
 
     local autorun = {}
