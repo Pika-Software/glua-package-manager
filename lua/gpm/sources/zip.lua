@@ -12,6 +12,7 @@ local fs = gpm.fs
 local cacheLifetime = GetConVar( "gpm_cache_lifetime" )
 local ErrorNoHaltWithStack = ErrorNoHaltWithStack
 local debug_fempty = debug.fempty
+local logger = gpm.Logger
 local tostring = tostring
 local ipairs = ipairs
 local xpcall = xpcall
@@ -105,15 +106,16 @@ function PerformPath( filePath )
 end
 
 Import = promise.Async( function( filePath, parentPackage )
-    local packageName = util.MD5( filePath )
-
-    local cachePath = cacheFolder .. "zip_" .. packageName .. ".gma.dat"
+    local cachePath = cacheFolder .. "zip_" .. util.MD5( filePath ) .. ".gma.dat"
     if fs.Exists( cachePath, "DATA" ) and fs.Time( cachePath, "DATA" ) > ( 60 * 60 * cacheLifetime:GetInt() ) then
         return sources.gmad.Import( "data/" .. cachePath, parentPackage )
     end
 
     local fileClass = fs.Open( filePath, "rb", "GAME" )
-    if not fileClass then return promise.Reject( "file not found" ) end
+    if not fileClass then
+        logger:Error( "`%s` import failed, file cannot be readed.", filePath )
+        return
+    end
 
     local files = {}
     for filePath, content in IterateZipFiles( fileClass ) do
@@ -128,15 +130,17 @@ Import = promise.Async( function( filePath, parentPackage )
     fileClass:Close()
 
     if #files == 0 then
-        return promise.Reject( string.format( "No files to mount. (%s)", url ) )
+        logger:Error( "`%s` import failed, no files to mount.", filePath )
+        return
     end
 
     local gma = gmad.Write( cachePath )
     if not gma then
-        return promise.Reject( string.format( "Cache construction error, mounting failed. (%s)", url ) )
+        logger:Error( "`%s` import failed, cache construction error, mounting failed.", filePath )
+        return
     end
 
-    gma:SetTitle( packageName )
+    gma:SetTitle( filePath )
 
     for _, data in ipairs( files ) do
         gma:AddFile( data[ 1 ], data[ 2 ] )
