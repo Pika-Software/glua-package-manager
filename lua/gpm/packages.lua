@@ -196,6 +196,8 @@ end
 
 FindFilePath = findFilePath
 
+local modules = {}
+
 function Initialize( metadata, func, files, parentPackage )
     ArgAssert( metadata, 1, "table" )
     ArgAssert( func, 2, "function" )
@@ -290,9 +292,17 @@ function Initialize( metadata, func, files, parentPackage )
                 return require( name )
             end
 
+            local loaded = modules[ name ]
+            if loaded ~= nil then
+                if loaded == false then return end
+                return loaded
+            end
+
             local func = files[ "includes/modules/" .. name .. ".lua" ]
             if func then
-                return run( gPackage, func )
+                local result = run( gPackage, func )
+                modules[ name ] = result ~= nil and result or false
+                return result
             end
 
             ErrorNoHaltWithStack( "Module `" .. name .. "`not found!" )
