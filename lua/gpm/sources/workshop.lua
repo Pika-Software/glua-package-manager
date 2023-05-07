@@ -81,7 +81,7 @@ end
 Import = promise.Async( function( wsid, parentPackage )
     local ok, result = Download( wsid ):SafeAwait()
     if not ok then
-        logger:Error( "`%s` import failed, %s.", wsid, result )
+        logger:Error( "Package `%s` import failed, %s.", wsid, result )
         return
     end
 

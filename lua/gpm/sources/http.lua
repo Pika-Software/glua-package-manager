@@ -44,7 +44,7 @@ Import = promise.Async( function( url, parentPackage )
     local wsid = string.match( url, "steamcommunity%.com/sharedfiles/filedetails/%?id=(%d+)" )
     if wsid ~= nil then
         if not sources.workshop then
-            logger:Error( "`%s` import failed, importing content from the workshop is not possible due to the missing steamworks library, you can download the binary module here: https://github.com/WilliamVenner/gmsv_workshop", wsid )
+            logger:Error( "Package `%s` import failed, importing content from the workshop is not possible due to the missing steamworks library, you can download the binary module here: https://github.com/WilliamVenner/gmsv_workshop", wsid )
             return
         end
 
@@ -55,7 +55,7 @@ Import = promise.Async( function( url, parentPackage )
     if not extension then extension = "json" end
 
     if not allowedExtensions[ extension ] then
-        logger:Error( "`%s` import failed, unsupported file extension. ", url )
+        logger:Error( "Package `%s` import failed, unsupported file extension. ", url )
         return
     end
 
@@ -69,7 +69,7 @@ Import = promise.Async( function( url, parentPackage )
         elseif extension == "lua" then
             local ok, result = fs.Compile( cachePath, "DATA" ):SafeAwait()
             if not ok then
-                logger:Error( "`%s` import failed, cache `%s` compile error: %s. ", url, cachePath, result )
+                logger:Error( "Package `%s` import failed, cache `%s` compile error: %s. ", url, cachePath, result )
                 return
             end
 
@@ -83,12 +83,12 @@ Import = promise.Async( function( url, parentPackage )
     logger:Info( "Package `%s` is downloading...", url )
     local ok, result = http.Fetch( url, nil, 120 ):SafeAwait()
     if not ok then
-        logger:Error( "`%s` import failed, %s.", url, result )
+        logger:Error( "Package `%s` import failed, %s.", url, result )
         return
     end
 
     if result.code ~= 200 then
-        logger:Error( "`%s` import failed, invalid response code: %d.", url, result.code )
+        logger:Error( "Package `%s` import failed, invalid response code: %d.", url, result.code )
         return
     end
 
@@ -97,7 +97,7 @@ Import = promise.Async( function( url, parentPackage )
     if extension ~= "json" then
         local ok, result = fs.AsyncWrite( cachePath, body ):SafeAwait()
         if not ok then
-            logger:Error( "`%s` import failed, %s.", url, result )
+            logger:Error( "Package `%s` import failed, %s.", url, result )
             return
         end
 
@@ -107,7 +107,7 @@ Import = promise.Async( function( url, parentPackage )
             return sources.gmad.Import( "data/" .. cachePath, parentPackage )
         end
 
-        logger:Error( "`%s` import failed, unknown file format.", url )
+        logger:Error( "Package `%s` import failed, unknown file format.", url )
         return
     end
 
@@ -115,17 +115,17 @@ Import = promise.Async( function( url, parentPackage )
     if not metadata then
         local ok, err = fs.AsyncWrite( cachePath, body ):SafeAwait()
         if not ok then
-            logger:Error( "`%s` import cache `%s` write failed, %s", url, cachePath, err )
+            logger:Error( "Package `%s` import cache `%s` write failed, %s", url, cachePath, err )
         end
 
         local ok, result = pcall( CompileString, body, url )
         if not ok then
-            logger:Error( "`%s` import failed, %s.", url, result )
+            logger:Error( "Package `%s` import failed, %s.", url, result )
             return
         end
 
         if not result then
-            logger:Error( "`%s` import failed, lua compilation failed.", url )
+            logger:Error( "Package `%s` import failed, lua compilation failed.", url )
             return
         end
 
@@ -139,7 +139,7 @@ Import = promise.Async( function( url, parentPackage )
 
     local urls = metadata.files
     if type( urls ) ~= "table" then
-        logger:Error( "`%s` import failed, no links to files, download canceled.", url )
+        logger:Error( "Package `%s` import failed, no links to files, download canceled.", url )
         return
     end
 
@@ -147,7 +147,7 @@ Import = promise.Async( function( url, parentPackage )
 
     local files = {}
     for filePath, fileURL in pairs( urls ) do
-        logger:Debug( "`%s`, file `%s` (%s) download has started.", url, filePath, fileURL )
+        logger:Debug( "Package `%s`, file `%s` (%s) download has started.", url, filePath, fileURL )
 
         local ok, result = http.Fetch( fileURL, nil, 120 ):SafeAwait()
         if not ok then return promise.Reject( "file `" .. filePath .. "` download failed, " .. result ) end
@@ -156,7 +156,7 @@ Import = promise.Async( function( url, parentPackage )
     end
 
     if #files == 0 then
-        logger:Error( "`%s` import failed, no files to download.", url )
+        logger:Error( "Package `%s` import failed, no files to download.", url )
         return
     end
 
@@ -187,7 +187,7 @@ Import = promise.Async( function( url, parentPackage )
         end
 
         if not func then
-            logger:Error( "`%s` import failed, main file is missing.", url )
+            logger:Error( "Package `%s` import failed, main file is missing.", url )
             return
         end
 
@@ -196,7 +196,7 @@ Import = promise.Async( function( url, parentPackage )
 
     local gma = gmad.Write( cachePath )
     if not gma then
-        logger:Error( "`%s` import failed, cache construction error, mounting failed.", url )
+        logger:Error( "Package `%s` import failed, cache construction error, mounting failed.", url )
         return
     end
 

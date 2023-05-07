@@ -82,7 +82,7 @@ RunLua = runLua
 Import = promise.Async( function( filePath, psarentPackage )
     local gma = gmad.Open( filePath, "GAME" )
     if not gma then
-        logger:Error( "`%s` import failed, gma file cannot be readed.", filePath )
+        logger:Error( "Package `%s` import failed, gma file cannot be readed.", filePath )
         return
     end
 
@@ -98,7 +98,7 @@ Import = promise.Async( function( filePath, psarentPackage )
 
     local ok, files = game_MountGMA( filePath )
     if not ok then
-        logger:Error( "`%s` import failed, gma file cannot be mounted.", filePath )
+        logger:Error( "Package `%s` import failed, gma file cannot be mounted.", filePath )
         return
     end
 

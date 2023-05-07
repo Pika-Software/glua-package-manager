@@ -45,12 +45,12 @@ Import = promise.Async( function( url, parentPackage )
 
     local user, repository = string.match( url, "github.com/([%w_%-%.]+)/([%w_%-%.]+)" )
     if not user then
-        logger:Error( "`%s` import failed, attempt to download failed - repository not recognized.", url )
+        logger:Error( "Package `%s` import failed, attempt to download failed - repository not recognized.", url )
         return
     end
 
     if not repository then
-        logger:Error( "`%s` import failed, attempt to download failed - user not recognized.", url )
+        logger:Error( "Package `%s` import failed, attempt to download failed - user not recognized.", url )
         return
     end
 
@@ -66,5 +66,5 @@ Import = promise.Async( function( url, parentPackage )
     ok, result = TryTree( user, repository, "master", parentPackage ):SafeAwait()
     if ok then return result end
 
-    logger:Error( "`%s` import failed, %s.", url, result )
+    logger:Error( "Package `%s` import failed, %s.", url, result )
 end )

@@ -53,20 +53,20 @@ Import = promise.Async( function( filePath, parentPackage, isAutorun )
     if packageFile then
         metadata = packages.GetMetadata( packageFile )
         if not metadata then
-            logger:Error( "`%s` import failed, package.lua file is empty.", packagePath )
+            logger:Error( "Package `%s` import failed, package.lua file is empty.", packagePath )
             return
         end
 
         if not metadata.name then metadata.name = filePath end
 
         if not metadata.singleplayer and isSinglePlayer then
-            logger:Error( "`%s` import failed, cannot be executed in a single-player game.", packagePath )
+            logger:Error( "Package `%s` import failed, cannot be executed in a single-player game.", packagePath )
             return
         end
 
         local gamemodeType = type( metadata.gamemode )
         if ( gamemodeType == "string" and metadata.gamemode ~= activeGamemode ) or ( gamemodeType == "table" and not table.HasIValue( metadata.gamemode, activeGamemode ) ) then
-            logger:Error( "`%s` import failed, is not compatible with this gamemode.", packagePath )
+            logger:Error( "Package `%s` import failed, is not compatible with this gamemode.", packagePath )
             return
         end
 
@@ -108,7 +108,7 @@ Import = promise.Async( function( filePath, parentPackage, isAutorun )
     end
 
     if not func then
-        logger:Error( "`%s` import failed, main file is missing.", packagePath )
+        logger:Error( "Package `%s` import failed, main file is missing.", packagePath )
         return
     end
 
@@ -133,7 +133,7 @@ Import = promise.Async( function( filePath, parentPackage, isAutorun )
     end
 
     if isAutorun and not metadata.autorun then
-        logger:Debug( "`%s` autorun restricted.", packagePath )
+        logger:Debug( "Package `%s` autorun restricted.", packagePath )
         return
     end
 
