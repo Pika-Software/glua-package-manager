@@ -1,6 +1,7 @@
 -- Libraries
 local sources = gpm.sources
 local promise = gpm.promise
+local http = gpm.http
 local string = string
 
 module( "gpm.sources.github" )
@@ -9,38 +10,54 @@ function CanImport( filePath )
     return string.match( filePath, "github.com/(.+)" ) ~= nil
 end
 
+Try = promise.Async( function( url, parentPackage )
+    local ok, result = http.Fetch( url ):SafeAwait()
+    if not ok then
+        return promise.Reject( result )
+    end
+
+    if result.code ~= 200 then
+        return promise.Reject( "invalid response http code - " .. result.code )
+    end
+
+    return sources.http.Import( url, parentPackage )
+end )
+
+TryTree = promise.Async( function( user, repository, tree, parentPackage )
+    local ok, result = Try( string.format( "https://raw.githubusercontent.com/%s/%s/%s/package.json", user, repository, tree ), parentPackage ):SafeAwait()
+    if ok then return result end
+
+    ok, result = Try( string.format( "https://github.com/%s/%s/archive/refs/heads/%s.zip", user, repository, tree ), parentPackage ):SafeAwait()
+    if ok then return result end
+
+    return promise.Reject( result )
+end )
+
 Import = promise.Async( function( url, parentPackage )
     if not string.IsURL( url ) then url = "https://" .. url end
 
     local user, repository = string.match( url, "github.com/([%w_%-%.]+)/([%w_%-%.]+)" )
     if not user then
-        return promise.Reject( string.format( "Attempt to download `%s` package failed, repository not recognized.", url ) )
+        logger:Error( "`%s` import failed, attempt to download failed - repository not recognized.", url )
+        return
     end
 
     if not repository then
-        return promise.Reject( string.format( "Attempt to download `%s` package failed, user not recognized.", url ) )
+        logger:Error( "`%s` import failed, attempt to download failed - user not recognized.", url )
+        return
     end
 
     local tree = string.match( url, "/tree/([%w_%-%.%/]+)")
     if tree ~= nil then
-        local ok, result = sources.http.Import( string.format( "https://raw.githubusercontent.com/%s/%s/%s/package.json", user, repository, tree ), parentPackage ):SafeAwait()
-        if ok then return promise.Resolve( result ) end
-
-        ok, result = sources.http.Import( string.format( "https://github.com/%s/%s/archive/refs/heads/%s.zip", user, repository, tree ), parentPackage ):SafeAwait()
-        if ok then return promise.Resolve( result ) end
+        local ok, result = TryTree( user, repository, tree, parentPackage ):SafeAwait()
+        if ok then return result end
     end
 
-    local ok, result = sources.http.Import( string.format( "https://raw.githubusercontent.com/%s/%s/main/package.json", user, repository ), parentPackage ):SafeAwait()
-    if ok then return promise.Resolve( result ) end
+    local ok, result = TryTree( user, repository, "main", parentPackage ):SafeAwait()
+    if ok then return result end
 
-    ok, result = sources.http.Import( string.format( "https://github.com/%s/%s/archive/refs/heads/main.zip", user, repository ), parentPackage ):SafeAwait()
-    if ok then return promise.Resolve( result ) end
+    ok, result = TryTree( user, repository, "master", parentPackage ):SafeAwait()
+    if ok then return result end
 
-    ok, result = sources.http.Import( string.format( "https://raw.githubusercontent.com/%s/%s/master/package.json", user, repository ), parentPackage ):SafeAwait()
-    if ok then return promise.Resolve( result ) end
-
-    ok, result = sources.http.Import( string.format( "https://github.com/%s/%s/archive/refs/heads/master.zip", user, repository ), parentPackage ):SafeAwait()
-    if ok then return promise.Resolve( result ) end
-
-    return promise.Reject( result )
+    logger:Error( "`%s` import failed, %s.", url, result )
 end )
