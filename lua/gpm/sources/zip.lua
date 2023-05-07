@@ -105,10 +105,10 @@ function PerformPath( filePath )
     end
 end
 
-Import = promise.Async( function( filePath, parentPackage )
+Import = promise.Async( function( filePath )
     local cachePath = cacheFolder .. "zip_" .. util.MD5( filePath ) .. ".gma.dat"
     if fs.Exists( cachePath, "DATA" ) and fs.Time( cachePath, "DATA" ) > ( 60 * 60 * cacheLifetime:GetInt() ) then
-        return sources.gmad.Import( "data/" .. cachePath, parentPackage )
+        return sources.gmad.Import( "data/" .. cachePath )
     end
 
     local fileClass = fs.Open( filePath, "rb", "GAME" )
@@ -148,5 +148,5 @@ Import = promise.Async( function( filePath, parentPackage )
 
     gma:Close()
 
-    return sources.gmad.Import( "data/" .. cachePath, parentPackage )
+    return sources.gmad.Import( "data/" .. cachePath )
 end )

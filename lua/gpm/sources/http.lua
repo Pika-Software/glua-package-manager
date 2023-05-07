@@ -36,9 +36,9 @@ local allowedExtensions = {
     ["json"] = true
 }
 
-Import = promise.Async( function( url, parentPackage )
+Import = promise.Async( function( url )
     if string.match( url, "^https?://github.com/[^/]+/[^/]+$" ) ~= nil then
-        return sources.github.Import( url, parentPackage )
+        return sources.github.Import( url )
     end
 
     local wsid = string.match( url, "steamcommunity%.com/sharedfiles/filedetails/%?id=(%d+)" )
@@ -48,7 +48,7 @@ Import = promise.Async( function( url, parentPackage )
             return
         end
 
-        return sources.workshop.Import( wsid, parentPackage )
+        return sources.workshop.Import( wsid )
     end
 
     local extension = string.GetExtensionFromFilename( url )
@@ -63,9 +63,9 @@ Import = promise.Async( function( url, parentPackage )
     local cachePath = cacheFolder .. "http_" .. util.MD5( url ) .. "."  .. ( extension == "json" and "gma" or extension ) .. ".dat"
     if fs.Exists( cachePath, "DATA" ) and fs.Time( cachePath, "DATA" ) > ( 60 * 60 * cacheLifetime:GetInt() ) then
         if extension == "zip" then
-            return sources.zip.Import( "data/" .. cachePath, parentPackage )
+            return sources.zip.Import( "data/" .. cachePath )
         elseif extension == "gma" or extension == "json" then
-            return sources.gmad.Import( "data/" .. cachePath, parentPackage )
+            return sources.gmad.Import( "data/" .. cachePath )
         elseif extension == "lua" then
             local ok, result = fs.Compile( cachePath, "DATA" ):SafeAwait()
             if not ok then
@@ -75,7 +75,7 @@ Import = promise.Async( function( url, parentPackage )
 
             return packages.Initialize( packages.GetMetadata( {
                 ["name"] = url
-            } ), result, {}, parentPackage )
+            } ), result, {} )
         end
     end
 
@@ -102,9 +102,9 @@ Import = promise.Async( function( url, parentPackage )
         end
 
         if extension == "zip" then
-            return sources.zip.Import( "data/" .. cachePath, parentPackage )
+            return sources.zip.Import( "data/" .. cachePath )
         elseif extension == "gma" then
-            return sources.gmad.Import( "data/" .. cachePath, parentPackage )
+            return sources.gmad.Import( "data/" .. cachePath )
         end
 
         logger:Error( "Package `%s` import failed, unknown file format.", url )
@@ -132,10 +132,11 @@ Import = promise.Async( function( url, parentPackage )
         return packages.Initialize( packages.GetMetadata( {
             ["name"] = url,
             ["autorun"] = true
-        } ), result, sources.lua.Files, parentPackage )
+        } ), result, sources.lua.Files )
     end
 
     metadata = utils.LowerTableKeys( metadata )
+    metadata.filePath = url
 
     local urls = metadata.files
     if type( urls ) ~= "table" then
@@ -161,7 +162,7 @@ Import = promise.Async( function( url, parentPackage )
     end
 
     if metadata.mount == false then
-        metadata = packages.GetMetadata( packageFile )
+        metadata = packages.GetMetadata( metadata )
 
         local compiledFiles = {}
         for _, data in ipairs( files ) do
@@ -191,7 +192,7 @@ Import = promise.Async( function( url, parentPackage )
             return
         end
 
-        return packages.Initialize( metadata, func, compiledFiles, parentPackage )
+        return packages.Initialize( metadata, func, compiledFiles )
     end
 
     local gma = gmad.Write( cachePath )
@@ -220,5 +221,5 @@ Import = promise.Async( function( url, parentPackage )
 
     gma:Close()
 
-    return sources.gmad.Import( "data/" .. cachePath, parentPackage )
+    return sources.gmad.Import( "data/" .. cachePath )
 end )

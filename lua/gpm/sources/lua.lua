@@ -40,7 +40,7 @@ Files = setmetatable( {}, {
     end
 } )
 
-Import = promise.Async( function( filePath, parentPackage, isAutorun )
+Import = promise.Async( function( filePath, isAutorun )
     filePath = paths.Fix( filePath )
 
     local packagePath = filePath
@@ -138,6 +138,7 @@ Import = promise.Async( function( filePath, parentPackage, isAutorun )
     end
 
     metadata.folder = packagePath
+    metadata.filePath = filePath
 
-    return packages.Initialize( metadata, func, Files, parentPackage )
+    return packages.Initialize( metadata, func, Files )
 end )

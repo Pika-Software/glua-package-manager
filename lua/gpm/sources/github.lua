@@ -14,7 +14,7 @@ function CanImport( filePath )
     return string.match( filePath, "github.com/(.+)" ) ~= nil
 end
 
-Try = promise.Async( function( url, parentPackage )
+Try = promise.Async( function( url )
     local ok, result = http.Fetch( url ):SafeAwait()
     if not ok then
         return promise.Reject( result )
@@ -24,23 +24,23 @@ Try = promise.Async( function( url, parentPackage )
         return promise.Reject( "invalid response http code - " .. result.code )
     end
 
-    local ok, result = sources.http.Import( url, parentPackage ):SafeAwait()
+    local ok, result = sources.http.Import( url ):SafeAwait()
     if ok then return result end
 
     ErrorNoHaltWithStack( result )
 end )
 
-TryTree = promise.Async( function( user, repository, tree, parentPackage )
-    local ok, result = Try( string.format( "https://raw.githubusercontent.com/%s/%s/%s/package.json", user, repository, tree ), parentPackage ):SafeAwait()
+TryTree = promise.Async( function( user, repository, tree )
+    local ok, result = Try( string.format( "https://raw.githubusercontent.com/%s/%s/%s/package.json", user, repository, tree ) ):SafeAwait()
     if ok then return result end
 
-    ok, result = Try( string.format( "https://github.com/%s/%s/archive/refs/heads/%s.zip", user, repository, tree ), parentPackage ):SafeAwait()
+    ok, result = Try( string.format( "https://github.com/%s/%s/archive/refs/heads/%s.zip", user, repository, tree ) ):SafeAwait()
     if ok then return result end
 
     return promise.Reject( result )
 end )
 
-Import = promise.Async( function( url, parentPackage )
+Import = promise.Async( function( url )
     if not string.IsURL( url ) then url = "https://" .. url end
 
     local user, repository = string.match( url, "github.com/([%w_%-%.]+)/([%w_%-%.]+)" )
@@ -56,14 +56,14 @@ Import = promise.Async( function( url, parentPackage )
 
     local tree = string.match( url, "/tree/([%w_%-%.%/]+)")
     if tree ~= nil then
-        local ok, result = TryTree( user, repository, tree, parentPackage ):SafeAwait()
+        local ok, result = TryTree( user, repository, tree ):SafeAwait()
         if ok then return result end
     end
 
-    local ok, result = TryTree( user, repository, "main", parentPackage ):SafeAwait()
+    local ok, result = TryTree( user, repository, "main" ):SafeAwait()
     if ok then return result end
 
-    ok, result = TryTree( user, repository, "master", parentPackage ):SafeAwait()
+    ok, result = TryTree( user, repository, "master" ):SafeAwait()
     if ok then return result end
 
     logger:Error( "Package `%s` import failed, %s.", url, result )

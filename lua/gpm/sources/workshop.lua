@@ -78,12 +78,12 @@ function Download( wsid )
     return p
 end
 
-Import = promise.Async( function( wsid, parentPackage )
+Import = promise.Async( function( wsid )
     local ok, result = Download( wsid ):SafeAwait()
     if not ok then
         logger:Error( "Package `%s` import failed, %s.", wsid, result )
         return
     end
 
-    return sources.gmad.Import( result, parentPackage )
+    return sources.gmad.Import( result )
 end )

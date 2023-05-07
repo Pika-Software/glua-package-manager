@@ -91,7 +91,8 @@ Import = promise.Async( function( filePath, psarentPackage )
         ["description"] = gma:GetDescription(),
         ["timestamp"] = gma:GetTimestamp(),
         ["author"] = gma:GetAuthor(),
-        ["name"] = gma:GetTitle()
+        ["name"] = gma:GetTitle(),
+        ["filePath"] = filePath
     } )
 
     gma:Close()
@@ -134,7 +135,7 @@ Import = promise.Async( function( filePath, psarentPackage )
                 if imported[ packagePath ] then continue end
                 imported[ packagePath ] = true
 
-                local ok, result = sources.lua.Import( packagePath, gPackage or parentPackage ):SafeAwait()
+                local ok, result = sources.lua.Import( packagePath, gPackage ):SafeAwait()
                 if not ok then return promise.Reject( result ) end
             end
         end
@@ -151,7 +152,7 @@ Import = promise.Async( function( filePath, psarentPackage )
                 if imported[ packagePath ] then continue end
                 imported[ packagePath ] = true
 
-                local ok, result = sources.lua.Import( packagePath, gPackage or parentPackage ):SafeAwait()
+                local ok, result = sources.lua.Import( packagePath, gPackage ):SafeAwait()
                 if not ok then return promise.Reject( result ) end
             end
         end
@@ -322,5 +323,5 @@ Import = promise.Async( function( filePath, psarentPackage )
                 SWEP = nil
             end
         end
-    end, sources.lua.Files, parentPackage )
+    end, sources.lua.Files )
 end )
