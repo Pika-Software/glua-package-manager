@@ -6,9 +6,9 @@ local fs = gpm.fs
 local gpm = gpm
 
 -- Variables
-local ErrorNoHaltWithStack = ErrorNoHaltWithStack
 local ipairs = ipairs
 local pairs = pairs
+local error = error
 local type = type
 
 -- Source functions
@@ -28,7 +28,7 @@ end
 
 function gpm.ErrorHandler( packagePath, str )
     logger:Error( "Package `%s` import failed, see above to see the error.", packagePath )
-    ErrorNoHaltWithStack( str )
+    error( str )
 end
 
 do
@@ -40,7 +40,7 @@ do
 
     local processes = {}
 
-    function gpm.AsyncImport( packagePath, parentPackage, isAutorun )
+    function gpm.AsyncImport( packagePath, package1, isAutorun )
         ArgAssert( packagePath, 1, "string" )
         packagePath = paths.Fix( packagePath )
 
@@ -49,13 +49,27 @@ do
             for _, source in ipairs( sources ) do
                 if type( source.CanImport ) ~= "function" then continue end
                 if not source.CanImport( packagePath ) then continue end
-                p = source.Import( packagePath, parentPackage, isAutorun )
+                p = source.Import( packagePath, isAutorun )
                 processes[ packagePath ] = p
                 break
             end
 
             if not promise.IsPromise( p ) then
                 gpm.ErrorHandler( packagePath, "Requested package doesn't exist!" )
+            end
+        end
+
+        if gpm.IsPackage( package1 ) then
+            if p:IsPending() then
+                p:Then( function( package2 )
+                    if not gpm.IsPackage( package2 ) then return end
+                    gpm.packages.LinkPackages( package1, package2 )
+                end )
+            elseif p:IsFulfilled() then
+                local package2 = p:GetResult()
+                if gpm.IsPackage( package2 ) then
+                    gpm.packages.LinkPackages( package1, package2 )
+                end
             end
         end
 
@@ -68,10 +82,10 @@ do
 
     local assert = assert
 
-    function gpm.Import( filePath, async, parentPackage, isAutorun )
+    function gpm.Import( filePath, async, package, isAutorun )
         assert( async or promise.RunningInAsync(), "import supposed to be running in coroutine/async function (do you running it from package)" )
 
-        local p = gpm.AsyncImport( filePath, parentPackage, isAutorun )
+        local p = gpm.AsyncImport( filePath, package, isAutorun )
         if not async then
             local ok, result = p:SafeAwait()
             if not ok then
@@ -79,7 +93,7 @@ do
                 return
             end
 
-            return result
+            return result:GetResult()
         end
 
         return p
@@ -89,7 +103,7 @@ do
 
 end
 
-function gpm.ImportFolder( folderPath, parentPackage, isAutorun )
+function gpm.ImportFolder( folderPath, package, isAutorun )
     folderPath = paths.Fix( folderPath )
 
     if not fs.IsDir( folderPath, gpm.LuaRealm ) then
@@ -102,18 +116,24 @@ function gpm.ImportFolder( folderPath, parentPackage, isAutorun )
     local files, folders = fs.Find( folderPath .. "/*", gpm.LuaRealm )
     for _, folderName in ipairs( folders ) do
         local packagePath = folderPath .. "/" .. folderName
-        gpm.Import( packagePath, true, parentPackage, isAutorun ):Catch( function( str )
+        gpm.Import( packagePath, true, package, isAutorun ):Catch( function( str )
             gpm.ErrorHandler( packagePath, result )
         end )
     end
 
     for _, fileName in ipairs( files ) do
         local packagePath = folderPath .. "/" .. fileName
-        gpm.Import( packagePath, true, parentPackage, isAutorun ):Catch( function( str )
+        gpm.Import( packagePath, true, package, isAutorun ):Catch( function( str )
             gpm.ErrorHandler( packagePath, result )
         end )
     end
 
+end
+
+-- Packages table
+local packages = gpm.Packages
+for packagePath in pairs( packages ) do
+    packages[ packagePath ] = nil
 end
 
 do
@@ -125,14 +145,14 @@ do
         MsgC( sideColor, SERVER and "Server" or "Client", logger.TextColor, " packages:\n" )
 
         local total = 0
-        for name, packages in pairs( gpm.Packages ) do
-            local versions = {}
-            for version in pairs( packages ) do
-                versions[ #versions + 1 ] = version
+        for name, versions in pairs( packages ) do
+            local result = {}
+            for version in pairs( versions ) do
+                result[ #result + 1 ] = version
                 total = total + 1
             end
 
-            MsgC( sideColor, "\t* ", logger.TextColor, string.format( "%s@%s\n", name, table.concat( versions, ", " ) ) )
+            MsgC( sideColor, "\t* ", logger.TextColor, string.format( "%s@%s\n", name, table.concat( result, ", " ) ) )
         end
 
         MsgC( sideColor, "\tTotal: ", logger.TextColor, total, "\n" )
@@ -212,13 +232,6 @@ if SERVER then
         ply:ChatPrint( "[GPM] You do not have enough permissions to execute this command." )
     end )
 
-end
-
-local pkgs = gpm.Packages
-if type( pkgs ) == "table" then
-    for packageName in pairs( pkgs ) do
-        pkgs[ packageName ] = nil
-    end
 end
 
 gpm.ImportFolder( "gpm/packages", nil, true )
