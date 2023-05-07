@@ -170,7 +170,7 @@ end
 Run = run
 
 local function safeRun( gPackage, func, errorHandler )
-    return xpcall( Run, errorHandler, gPackage, func )
+    return xpcall( run, errorHandler, gPackage, func )
 end
 
 SafeRun = safeRun
