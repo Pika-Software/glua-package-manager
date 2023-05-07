@@ -13,7 +13,6 @@ local AddCSLuaFile = AddCSLuaFile
 local setmetatable = setmetatable
 local CompileFile = CompileFile
 local luaRealm = gpm.LuaRealm
-local util_MD5 = util.MD5
 local logger = gpm.Logger
 local ipairs = ipairs
 local rawset = rawset
@@ -50,29 +49,25 @@ Import = promise.Async( function( filePath, parentPackage, isAutorun )
     end
 
     local packageFilePath = packagePath .. "/package.lua"
-    local identifier = packageFilePath
-
     local packageFile, metadata = Files[ packageFilePath ], nil
     if packageFile then
         metadata = packages.GetMetadata( packageFile )
         if not metadata then
-            return promise.Reject( string.format( "Package `%s` package.lua file is empty! (%s)", identifier, packagePath ) )
+            logger:Error( "`%s` import failed, package.lua file is empty!", packagePath )
+            return
         end
 
-        if not metadata.name then metadata.name = util_MD5( filePath ) end
-        identifier = metadata.name .. "@" .. metadata.version
+        if not metadata.name then metadata.name = filePath end
 
         if not metadata.singleplayer and isSinglePlayer then
-            return promise.Reject( string.format( "Package `%s` cannot be executed in a single-player game. (%s)", identifier, packagePath ) )
+            logger:Error( "`%s` import failed, cannot be executed in a single-player game.", packagePath )
+            return
         end
 
         local gamemodeType = type( metadata.gamemode )
-        if gamemodeType == "string" and metadata.gamemode ~= activeGamemode then
-            return promise.Reject( string.format( "Package `%s` is not compatible with this gamemode. (%s)", identifier, packagePath ) )
-        end
-
-        if gamemodeType == "table" and not table.HasIValue( metadata.gamemode, activeGamemode ) then
-            return promise.Reject( string.format( "Package `%s` is not compatible with this gamemode. (%s)", identifier, packagePath ) )
+        if ( gamemodeType == "string" and metadata.gamemode ~= activeGamemode ) or ( gamemodeType == "table" and not table.HasIValue( metadata.gamemode, activeGamemode ) ) then
+            logger:Error( "`%s` import failed, is not compatible with this gamemode.", packagePath )
+            return
         end
 
         if SERVER and metadata.client then
@@ -81,7 +76,7 @@ Import = promise.Async( function( filePath, parentPackage, isAutorun )
     else
 
         local data = {
-            ["name"] = util_MD5( filePath ),
+            ["name"] = filePath,
             ["autorun"] = true
         }
 
@@ -90,7 +85,6 @@ Import = promise.Async( function( filePath, parentPackage, isAutorun )
         end
 
         metadata = packages.GetMetadata( data )
-        identifier = metadata.name .. "@" .. metadata.version
 
     end
 
@@ -114,7 +108,8 @@ Import = promise.Async( function( filePath, parentPackage, isAutorun )
     end
 
     if not func then
-        return promise.Reject( string.format( "Package `%s` main file is missing! (%s)", identifier, packagePath ) )
+        logger:Error( "`%s` import failed, main file is missing!", packagePath )
+        return
     end
 
     if SERVER then
@@ -138,7 +133,7 @@ Import = promise.Async( function( filePath, parentPackage, isAutorun )
     end
 
     if isAutorun and not metadata.autorun then
-        logger:Debug( "Package `%s` autorun restricted. (%s)", identifier, packagePath )
+        logger:Debug( "`%s` autorun restricted.", packagePath )
         return
     end
 
