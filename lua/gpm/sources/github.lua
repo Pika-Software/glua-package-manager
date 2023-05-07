@@ -1,8 +1,12 @@
 -- Libraries
 local sources = gpm.sources
 local promise = gpm.promise
+local logger = gpm.Logger
 local http = gpm.http
 local string = string
+
+-- Variables
+local ErrorNoHaltWithStack = ErrorNoHaltWithStack
 
 module( "gpm.sources.github" )
 
@@ -20,7 +24,10 @@ Try = promise.Async( function( url, parentPackage )
         return promise.Reject( "invalid response http code - " .. result.code )
     end
 
-    return sources.http.Import( url, parentPackage )
+    local ok, result = sources.http.Import( url, parentPackage ):SafeAwait()
+    if ok then return result end
+
+    ErrorNoHaltWithStack( result )
 end )
 
 TryTree = promise.Async( function( user, repository, tree, parentPackage )
