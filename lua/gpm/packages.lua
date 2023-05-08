@@ -59,14 +59,20 @@ do
             -- Version
             source.version = utils.Version( source.version )
 
-            -- Gamemode
-            local gamemodeType = type( source.gamemode )
-            if gamemodeType ~= "string" and gamemodeType ~= "table" then
-                source.gamemode = nil
+            -- Gamemodes
+            local gamemodesType = type( source.gamemodes )
+            if gamemodesType ~= "string" and gamemodesType ~= "table" then
+                source.gamemodes = nil
             end
 
             -- Single-player
             source.singleplayer = source.singleplayer ~= false
+
+            -- Maps
+            local mapsType = type( source.maps )
+            if mapsType ~= "string" and mapsType ~= "table" then
+                source.maps = nil
+            end
 
             -- Realms
             source.client = source.client ~= false
