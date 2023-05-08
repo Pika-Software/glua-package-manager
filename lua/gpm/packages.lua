@@ -20,7 +20,6 @@ local SysTime = SysTime
 local IsColor = IsColor
 local setfenv = setfenv
 local xpcall = xpcall
-local Color = Color
 local pairs = pairs
 local type = type
 local _G = _G
@@ -43,61 +42,73 @@ function Get( packageName )
     return packages[ packageName ]
 end
 
-function GetMetadata( source )
-    if type( source ) == "table" then
-        -- Package name, main file & author
-        source.name = type( source.name ) == "string" and source.name or nil
-        source.main = type( source.main ) == "string" and source.main or nil
-        source.author = type( source.author ) == "string" and source.author or nil
+-- gpm.packages.GetMetadata( source )
+do
 
-        -- Version
-        source.version = utils.Version( source.version )
+    local environment = {
+        ["__index"] = _G
+    }
 
-        -- Gamemode
-        local gamemodeType = type( source.gamemode )
-        if gamemodeType ~= "string" and gamemodeType ~= "table" then
-            source.gamemode = nil
+    local function getMetadata( source )
+        if type( source ) == "table" then
+            -- Package name, main file & author
+            source.name = type( source.name ) == "string" and source.name or nil
+            source.main = type( source.main ) == "string" and source.main or nil
+            source.author = type( source.author ) == "string" and source.author or nil
+
+            -- Version
+            source.version = utils.Version( source.version )
+
+            -- Gamemode
+            local gamemodeType = type( source.gamemode )
+            if gamemodeType ~= "string" and gamemodeType ~= "table" then
+                source.gamemode = nil
+            end
+
+            -- Single-player
+            source.singleplayer = source.singleplayer ~= false
+
+            -- Realms
+            source.client = source.client ~= false
+            source.server = source.server ~= false
+
+            -- Isolation & autorun
+            source.isolation = source.isolation ~= false
+            source.autorun = source.autorun == true
+
+            -- Color & logger
+            source.color = IsColor( source.color ) and source.color or nil
+            source.logger = source.logger == true
+
+            -- Files to send to the client ( package and main will already be added and there is no need to specify them here )
+            source.send = type( source.send ) == "table" and source.send or nil
+
+            return source
+        elseif type( source ) == "function" then
+            local metadata = {}
+
+            setmetatable( metadata, environment )
+            setfenv( source, metadata )
+
+            local ok, result = xpcall( source, ErrorNoHaltWithStack )
+            setmetatable( metadata, nil )
+
+            if not ok then return end
+            result = result or metadata
+
+            if type( result ) ~= "table" then return end
+            result = utils.LowerTableKeys( result )
+
+            if type( result.package ) ~= "table" then
+                return getMetadata( result )
+            end
+
+            return getMetadata( result.package )
         end
-
-        -- Single-player
-        source.singleplayer = source.singleplayer ~= false
-
-        -- Realms
-        source.client = source.client ~= false
-        source.server = source.server ~= false
-
-        -- Isolation & autorun
-        source.isolation = source.isolation ~= false
-        source.autorun = source.autorun == true
-
-        -- Color & logger
-        source.color = IsColor( source.color ) and source.color or nil
-        source.logger = source.logger == true
-
-        -- Files to send to the client ( package and main will already be added and there is no need to specify them here )
-        source.send = type( source.send ) == "table" and source.send or nil
-
-        return source
-    elseif type( source ) == "function" then
-        local env = {
-            ["Color"] = Color
-        }
-
-        setfenv( source, env )
-
-        local ok, result = xpcall( source, ErrorNoHaltWithStack )
-        if not ok then return end
-        result = result or env
-
-        if type( result ) ~= "table" then return end
-        result = utils.LowerTableKeys( result )
-
-        if type( result.package ) ~= "table" then
-            return GetMetadata( result )
-        end
-
-        return GetMetadata( result.package )
     end
+
+    GetMetadata = getMetadata
+
 end
 
 -- Package Meta
@@ -321,8 +332,12 @@ function Initialize( metadata, func, files )
     -- Saving in global table & final log
     logger:Info( "Package `%s` was successfully loaded, it took %.4f seconds.", packagePath, SysTime() - stopwatch )
 
-    packages[ packagePath ] = packages[ packagePath ] or {}
-    packages[ packagePath ][ gPackage:GetVersion() ] = gPackage
+    local versions = packages[ packagePath ]
+    if type( versions ) ~= "table" then
+        versions = {}; packages[ packagePath ] = versions
+    end
+
+    versions[ gPackage:GetVersion() ] = gPackage
 
     return gPackage
 end
