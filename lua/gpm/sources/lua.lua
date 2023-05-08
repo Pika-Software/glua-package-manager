@@ -11,6 +11,7 @@ local isSinglePlayer = game.SinglePlayer()
 local CLIENT, SERVER = CLIENT, SERVER
 local AddCSLuaFile = AddCSLuaFile
 local setmetatable = setmetatable
+local currentMap = game.GetMap()
 local CompileFile = CompileFile
 local luaRealm = gpm.LuaRealm
 local logger = gpm.Logger
@@ -59,14 +60,25 @@ Import = promise.Async( function( filePath, isAutorun )
 
         if not metadata.name then metadata.name = filePath end
 
+        -- Singleplayer
         if not metadata.singleplayer and isSinglePlayer then
             logger:Error( "Package `%s` import failed, cannot be executed in a single-player game.", packagePath )
             return
         end
 
-        local gamemodeType = type( metadata.gamemode )
-        if ( gamemodeType == "string" and metadata.gamemode ~= activeGamemode ) or ( gamemodeType == "table" and not table.HasIValue( metadata.gamemode, activeGamemode ) ) then
-            logger:Error( "Package `%s` import failed, is not compatible with this gamemode.", packagePath )
+        -- Gamemode
+        local gamemodes = metadata.gamemodes
+        local gamemodesType = type( gamemodes )
+        if ( gamemodesType == "string" and gamemodes ~= activeGamemode ) or ( gamemodesType == "table" and not table.HasIValue( gamemodes, activeGamemode ) ) then
+            logger:Error( "Package `%s` import failed, is not compatible with active gamemode.", packagePath )
+            return
+        end
+
+        -- Map
+        local maps = metadata.maps
+        local mapsType = type( maps )
+        if ( mapsType == "string" and maps ~= currentMap ) or ( mapsType == "table" and not table.HasIValue( maps, currentMap ) ) then
+            logger:Error( "Package `%s` import failed, is not compatible with current map.", packagePath )
             return
         end
 

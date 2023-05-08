@@ -136,6 +136,29 @@ Import = promise.Async( function( url )
     end
 
     metadata = utils.LowerTableKeys( metadata )
+
+    -- Singleplayer
+    if not metadata.singleplayer and isSinglePlayer then
+        logger:Error( "Package `%s` import failed, cannot be executed in a single-player game.", url )
+        return
+    end
+
+    -- Gamemode
+    local gamemodes = metadata.gamemodes
+    local gamemodesType = type( gamemodes )
+    if ( gamemodesType == "string" and gamemodes ~= activeGamemode ) or ( gamemodesType == "table" and not table.HasIValue( gamemodes, activeGamemode ) ) then
+        logger:Error( "Package `%s` import failed, is not compatible with active gamemode.", url )
+        return
+    end
+
+    -- Map
+    local maps = metadata.maps
+    local mapsType = type( maps )
+    if ( mapsType == "string" and maps ~= currentMap ) or ( mapsType == "table" and not table.HasIValue( maps, currentMap ) ) then
+        logger:Error( "Package `%s` import failed, is not compatible with current map.", url )
+        return
+    end
+
     metadata.filePath = url
 
     local urls = metadata.files
