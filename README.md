@@ -30,7 +30,7 @@ version = 1
 - ### Package entry point (`main`) (def. `init.lua`)
     The `main` in this case is the entry point to the package (where the code execution will start from), you can use either the full `lua/` path, for example 'lua/packages/example-package/init.lua' or a local path relative to your package folder.
 
-- ### Client & Server (`client`, `server`) (def. `true`, `true`)
+- ### Client and server (`client`, `server`) (def. `true`, `true`)
     You can change the permissions to run a package, for example if you set `client` to `false` the client will not be able to run it, moreover it will not even know that such a package exists and therefore will not see its files.
 
 - ### Package autorun (`autorun`) (def. `false`)
@@ -38,6 +38,9 @@ version = 1
 
 - ### Package isolation (`isolation`) (def. `true`)
     This is the parameter responsible for isolation, by default it is `true`, if it is set to `false` then the package will run in `_G` and all global values created in it will go to `_G`, as well as you will no longer have access to gpm environment features. I recommend to use this only if you really need it.
+
+- ### Package send list (`send`) (def. `nil`)
+    The list of files to send to the client, can be useful if the package runs exclusively on the client and has more than one file. (must be a table with indexes from 1 to infinity)
 
 - ### Package logger (`logger`) (def. `false`)
     If set to `true` then a personal logger object will be created in the package environment, to easily send logs to the console. If necessary, you can create a logger object yourself, just call `gpm.logger.Create( name, color )` (`name` is `string`, `color` is `Color`).
@@ -60,6 +63,15 @@ version = 1
     ```
     #### Result
     ![Console](https://i.imgur.com/FwScVHf.png)
+
+- ### Package active gamemode (`gamemodes`) (def. `nil`)
+    A string with a one gamemode or a list table with allowed gamemodes, if the current gamemode does not match any of the ones listed here the package will not run.
+
+- ### Package current map (`maps`) (def. `nil`)
+    A string with a map name or a list table with many map names, if the current map does not match any of the ones listed here the package will not run.
+
+- ### Package singleplayer only (`singleplayer`) (def. `false`)
+    The boolean value that allows the package to be executed only in a singleplayer game.
 
 - ### Others
     This file can also contain any other additional information such as package author, license or description.
