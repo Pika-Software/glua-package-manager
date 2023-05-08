@@ -22,11 +22,53 @@ Package manager supporting isolation, synchronous import, package dependency bui
 3. Write your code in `init.lua`, if you want the script to be only on the client or server, write in your `package.lua` additional lines `server` or `client`, an example below.
 
 Also, you can run an existing addon via gpm, just add the code below to `package.lua`, and you don’t even need to add `init.lua`.
-### `package.lua` file example
+
+### Minimal example of `package.lua`
 ```lua
 name = "example-package"
 main = "init.lua"
 version = 1
+```
+
+### Full example of `package.lua`
+```lua
+-- lua/packages/example-package/package.lua
+name = "example-package"
+main = "init.lua"
+version = 1
+
+-- allowed sides to run package, if client is false then the server will not send anything
+client = true
+server = true
+
+-- if there is no autorun, the package will wait for import from another package
+autorun = true
+
+-- don't touch it if you don't know what you're doing
+isolation = true
+
+-- client files
+send = {
+    "my/client/file.lua",
+    "my/client/file2.lua"
+}
+
+-- if false, the logger will not be created by default
+logger = false
+
+-- if nil, all gamemodes are allowed
+gamemodes = {
+    "sandbox",
+    "darkrp"
+}
+
+-- if nil, all maps are allowed
+maps = {
+    "gm_construct"
+}
+
+-- if true, then the package is allowed to run only in a singleplayer game
+singleplayer = false
 ```
 
 ## Available package file parameters
