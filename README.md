@@ -7,6 +7,15 @@ Package manager supporting isolation, synchronous import, package dependency bui
 - Package information structure like [package.json](https://docs.npmjs.com/cli/v6/configuring-npm/package-json)
 - Synchronous import of packages from different sources
 
+### Console commands
+- `gpm_clear_cache` - Clears the cache of externally downloaded packages.
+- `gpm_reload` - Restarts the package manager by refreshing its own code as well as reloading all packages.
+- `gpm_list` - Prints a list of loaded packages in the console.
+
+### Console variables
+- `gpm_cache_lifetime` - Packages cache lifetime, in hours, sets after how many hours the downloaded gpm packages will not be relevant.
+- `gpm_http_timeout` - Default http timeout for gpm http library.
+
 ## How to create your own package?
 1. Create `package.lua` and `init.lua` files in directory `lua/packages/<your-package-name>/`.
 2. Enter information about your package in `package.lua`, below is an example.
@@ -20,7 +29,7 @@ main = "init.lua"
 version = 1
 ```
 
-## Available package file parameters:
+## Available package file parameters
 - ### Package name (`name`) (def. `nil`)
     The name of the package is just text that will be displayed in the format `name@version`, for example `My Awesome Package@0.0.1`.
 
