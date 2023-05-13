@@ -1,6 +1,6 @@
 local setmetatable = setmetatable
 local ArgAssert = gpm.ArgAssert
-local Color = Color
+local colors = gpm.Colors
 
 -- Metatable
 local meta = {}
@@ -62,18 +62,6 @@ function meta:SetDebugFilter( func )
     self.DebugFilter = func
 end
 
-local sideColor = nil
-
-if SERVER then
-    sideColor = Color( 5, 170, 250 )
-elseif MENU_DLL then
-    sideColor = Color( 75, 175, 80 )
-else
-    sideColor = Color( 225, 170, 10 )
-end
-
-local dateColor = Color( 150, 150, 150 )
-
 -- Console log
 do
 
@@ -85,7 +73,7 @@ do
         ArgAssert( levelColor, 1, "Color" )
         ArgAssert( level, 2, "string" )
 
-        MsgC( dateColor, os_date( "%d/%m/%Y %H:%M:%S ", os_time() ), levelColor, level, dateColor, " --- ", sideColor, "[" .. (SERVER and "SERVER" or "CLIENT") .. "] ", self.Color, self.Name, dateColor, " : ", self.TextColor, string.format( str, ... ), "\n"  )
+        MsgC( colors.SecondaryText, os_date( "%d/%m/%Y %H:%M:%S ", os_time() ), levelColor, level, colors.SecondaryText, " --- ", colors.Realm, "[" .. (SERVER and "SERVER" or "CLIENT") .. "] ", self.Color, self.Name, colors.SecondaryText, " : ", self.TextColor, string.format( str, ... ), "\n"  )
     end
 
 end
@@ -100,44 +88,33 @@ module( "gpm.logger" )
 -- Metatable
 LOGGER = meta
 
--- Colors
-SIDE_COLOR = sideColor
-DATE_COLOR = dateColor
-
-INFO_COLOR = Color( 70, 135, 255 )
-WARN_COLOR = Color( 255, 130, 90 )
-ERROR_COLOR = Color( 250, 55, 40 )
-DEBUG_COLOR = Color( 0, 200, 150 )
-TEXT_COLOR = Color( 200, 200, 200 )
-WHITE_COLOR = Color( 255, 255, 255 )
-
 -- Info log
 function meta:Info( str, ... )
-    self:Log( INFO_COLOR, " INFO", str, ... )
+    self:Log( colors.Info, " INFO", str, ... )
 end
 
 -- Warn log
 function meta:Warn( str, ... )
-    self:Log( WARN_COLOR, " WARN", str, ... )
+    self:Log( colors.Warn, " WARN", str, ... )
 end
 
 -- Error log
 function meta:Error( str, ... )
-    self:Log( ERROR_COLOR, "ERROR", str, ... )
+    self:Log( colors.Error, "ERROR", str, ... )
 end
 
 -- Debug log
 function meta:Debug( str, ... )
     if not self:DebugFilter( str, ... ) then return end
-    self:Log( DEBUG_COLOR, "DEBUG", str, ... )
+    self:Log( colors.Debug, "DEBUG", str, ... )
 end
 
 function Create( name, color )
     ArgAssert( name, 1, "string" )
     return setmetatable( {
         ["DebugFilter"] = debugFilter,
-        ["Color"] = color or WHITE_COLOR,
-        ["TextColor"] = TEXT_COLOR,
+        ["Color"] = color or colors.White,
+        ["TextColor"] = colors.PrimaryText,
         ["Name"] = name
     }, meta )
 end

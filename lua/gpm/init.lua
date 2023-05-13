@@ -5,7 +5,29 @@ local SERVER = SERVER
 local ipairs = ipairs
 local Color = Color
 
-CreateConVar( "gpm_cache_lifetime", "24", FCVAR_ARCHIVE, "Packages cache lifetime, in hours, sets after how many hours the downloaded gpm packages will not be relevant.", 0, 60480 )
+
+if not Colors then
+    Colors = {
+        ["SecondaryText"] = Color( 150, 150, 150 ),
+        ["PrimaryText"] = Color( 200, 200, 200 ),
+        ["White"] = Color( 255, 255, 255 ),
+        ["Info"] = Color( 70, 135, 255 ),
+        ["Warn"] = Color( 255, 130, 90 ),
+        ["Error"] = Color( 250, 55, 40 ),
+        ["Debug"] = Color( 0, 200, 150 )
+    }
+
+    if MENU_DLL then
+        Colors.Realm = Color( 75, 175, 80 )
+        LuaRealm = "LUA"
+    elseif CLIENT then
+        Colors.Realm = Color( 225, 170, 10 )
+        LuaRealm = "lcl"
+    elseif SERVER then
+        Colors.Realm = Color( 5, 170, 250 )
+        LuaRealm = "lsv"
+    end
+end
 
 module( "gpm" )
 
