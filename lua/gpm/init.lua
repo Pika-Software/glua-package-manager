@@ -7,6 +7,7 @@ local Color = Color
 
 module( "gpm", package.seeall )
 
+_VERSION = 011600
 
 if not Colors then
     Colors = {
