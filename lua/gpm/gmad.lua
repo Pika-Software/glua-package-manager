@@ -6,7 +6,7 @@ local util = util
 
 -- Variables
 local setmetatable = setmetatable
-local ArgAssert = ArgAssert
+local ArgAssert = gpm.ArgAssert
 local tonumber = tonumber
 local logger = gpm.Logger
 local os_time = os.time

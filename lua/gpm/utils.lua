@@ -94,8 +94,8 @@ do
 
     -- gpm.AddType( typeName, func )
     function gpm.AddType( typeName, func )
-        ArgAssert( typeName, 1, "string" )
-        ArgAssert( func, 2, "function" )
+        gpm.ArgAssert( typeName, 1, "string" )
+        gpm.ArgAssert( func, 2, "function" )
 
         local last = nil
         for index, name in pairs( types ) do
@@ -121,7 +121,7 @@ do
 
     local error = error
 
-    function ArgAssert( value, argNum, expected, errorlevel )
+    function gpm.ArgAssert( value, argNum, expected, errorlevel )
         local valueType = gpm.type( value )
         if valueType == expected then return end
 
@@ -186,7 +186,7 @@ do
     local unpack = unpack
 
     function util.NextTick( func, ... )
-        ArgAssert( func, 1, "function" )
+        gpm.ArgAssert( func, 1, "function" )
 
         local args = {...}
         timer_Simple( 0, function()

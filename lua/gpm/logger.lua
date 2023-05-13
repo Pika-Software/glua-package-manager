@@ -1,5 +1,5 @@
 local setmetatable = setmetatable
-local ArgAssert = ArgAssert
+local ArgAssert = gpm.ArgAssert
 local Color = Color
 
 -- Metatable
