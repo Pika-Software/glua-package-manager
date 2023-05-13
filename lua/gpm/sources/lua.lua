@@ -1,17 +1,14 @@
 -- Libraries
-local packages = gpm.packages
+local package = gpm.package
 local promise = gpm.promise
 local paths = gpm.paths
 local string = string
 local fs = gpm.fs
 
 -- Variables
-local activeGamemode = engine.ActiveGamemode()
-local isSinglePlayer = game.SinglePlayer()
 local CLIENT, SERVER = CLIENT, SERVER
 local AddCSLuaFile = AddCSLuaFile
 local setmetatable = setmetatable
-local currentMap = game.GetMap()
 local CompileFile = CompileFile
 local luaRealm = gpm.LuaRealm
 local logger = gpm.Logger
@@ -28,129 +25,111 @@ end
 
 Files = setmetatable( {}, {
     ["__index"] = function( self, filePath )
-        if type( filePath ) == "string" and fs.Exists( filePath, luaRealm ) and not fs.IsDir( filePath, luaRealm ) then
-            local ok, result = pcall( CompileFile, filePath )
-            if ok then
-                rawset( self, filePath, result )
-                return result
-            end
-        end
+        if type( filePath ) ~= "string" then return false end
+        if not fs.IsFile( filePath, luaRealm ) then return false end
 
-        rawset( self, filePath, false )
-        return false
+        local ok, result = pcall( CompileFile, filePath )
+        if not ok then return false end
+        if not result then return false end
+
+        rawset( self, filePath, result )
+        return result
     end
 } )
 
-Import = promise.Async( function( filePath, isAutorun )
-    filePath = paths.Fix( filePath )
+function GetInfo( filePath )
+    local importPath = paths.Fix( filePath )
+    local info = nil
 
-    local packagePath = filePath
-    if not fs.IsDir( packagePath, luaRealm ) then
-        packagePath = string.GetPathFromFilename( packagePath )
+    local folder = importPath
+    if not fs.IsDir( folder, luaRealm ) then
+        folder = string.GetPathFromFilename( importPath )
     end
 
-    local packageFilePath = packagePath .. "/package.lua"
-    local packageFile, metadata = Files[ packageFilePath ], nil
-    if packageFile then
-        metadata = packages.GetMetadata( packageFile )
-        if not metadata then
-            logger:Error( "Package `%s` import failed, package.lua file is empty.", packagePath )
-            return
+    local packagePath = folder .. "/package.lua"
+    local hasPackageFile = fs.IsFile( packagePath, luaRealm )
+    if hasPackageFile then
+        local func = Files[ packagePath ]
+        if func then
+            info = package.GetMetadata( func )
         end
+    end
 
-        if not metadata.name then metadata.name = filePath end
-
-        -- Singleplayer
-        if not metadata.singleplayer and isSinglePlayer then
-            logger:Error( "Package `%s` import failed, cannot be executed in a single-player game.", packagePath )
-            return
-        end
-
-        -- Gamemode
-        local gamemodes = metadata.gamemodes
-        local gamemodesType = type( gamemodes )
-        if ( gamemodesType == "string" and gamemodes ~= activeGamemode ) or ( gamemodesType == "table" and not table.HasIValue( gamemodes, activeGamemode ) ) then
-            logger:Error( "Package `%s` import failed, is not compatible with active gamemode.", packagePath )
-            return
-        end
-
-        -- Map
-        local maps = metadata.maps
-        local mapsType = type( maps )
-        if ( mapsType == "string" and maps ~= currentMap ) or ( mapsType == "table" and not table.HasIValue( maps, currentMap ) ) then
-            logger:Error( "Package `%s` import failed, is not compatible with current map.", packagePath )
-            return
-        end
-
-        if SERVER and metadata.client then
-            AddCSLuaFile( packageFilePath )
-        end
-    else
-
-        local data = {
-            ["name"] = filePath,
+    if not info then
+        info = {
             ["autorun"] = true
         }
 
-        if fs.Exists( filePath, luaRealm ) and not fs.IsDir( filePath, luaRealm ) then
-            data.main = filePath
+        if fs.IsFile( importPath, luaRealm ) then
+            info.main = importPath
         end
 
-        metadata = packages.GetMetadata( data )
-
+        info = package.GetMetadata( info )
     end
 
-    if CLIENT and not metadata.client then return end
-
-    local mainFile = metadata.main
-    if not mainFile then
-        mainFile = packagePath .. "/init.lua"
+    if hasPackageFile then
+        info.packagePath = packagePath
     end
 
-    local func = Files[ mainFile ]
-    if not func then
-        mainFile = packagePath .. "/" .. mainFile
-        func = Files[ mainFile ]
+    info.importPath = importPath
+    info.folder = folder
+
+    local mainFile = info.main
+    if not mainFile or not fs.IsFile( mainFile, luaRealm ) then
+        mainFile = importPath .. "/init.lua"
     end
 
-    -- Legacy packages support
-    if not func then
-        mainFile = packagePath .. "/main.lua"
-        func = Files[ mainFile ]
+    if not fs.IsFile( mainFile, luaRealm ) then
+        mainFile = importPath .. "/" .. mainFile
     end
 
-    if not func then
+    if not fs.IsFile( mainFile, luaRealm ) then
+        mainFile = importPath .. "/main.lua"
+    end
+
+    info.main = mainFile
+
+    if type( info.name ) ~= "string" then
+        info.name = importPath
+    end
+
+    return info
+end
+
+Import = promise.Async( function( info )
+    if CLIENT and not info.client then return end
+    local mainFile = info.main
+
+    local main = Files[ mainFile ]
+    if not main then
         logger:Error( "Package `%s` import failed, main file is missing.", packagePath )
         return
     end
 
     if SERVER then
-        if metadata.client then
+        if info.client then
             AddCSLuaFile( mainFile )
 
-            local send = metadata.send
-            if send ~= nil then
+            local packagePath = info.packagePath
+            if packagePath then
+                AddCSLuaFile( packagePath )
+            end
+
+            local send = info.send
+            if send then
                 for _, filePath in ipairs( send ) do
-                    local insideFilePath = packagePath .. "/" .. filePath
-                    if fs.Exists( insideFilePath, luaRealm ) then
-                        AddCSLuaFile( insideFilePath )
-                    elseif fs.Exists( filePath, luaRealm ) then
+                    local localFilePath = packagePath .. "/" .. filePath
+                    if fs.IsFile( localFilePath, luaRealm ) then
+                        AddCSLuaFile( localFilePath )
+                    elseif fs.IsFile( filePath, luaRealm ) then
                         AddCSLuaFile( filePath )
                     end
                 end
             end
         end
 
-        if not metadata.server then return end
+        if not info.server then return end
     end
 
-    if isAutorun and not metadata.autorun then
-        logger:Debug( "Package `%s` autorun restricted.", packagePath )
-        return
-    end
-
-    metadata.folder = packagePath
-    metadata.filePath = filePath
-
-    return packages.Initialize( metadata, func, Files )
+    return package.Initialize( info, main, Files )
 end )
