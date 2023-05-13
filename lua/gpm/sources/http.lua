@@ -1,6 +1,6 @@
 -- Libraries
-local packages = gpm.packages
 local sources = gpm.sources
+local package = gpm.package
 local promise = gpm.promise
 local utils = gpm.utils
 local gmad = gpm.gmad
@@ -12,13 +12,13 @@ local util = util
 -- Variables
 local CompileString = CompileString
 local logger = gpm.Logger
-local SERVER = SERVER
 local ipairs = ipairs
 local pairs = pairs
 local pcall = pcall
 local type = type
 
 local cacheLifetime = GetConVar( "gpm_cache_lifetime" )
+local cacheFolder = gpm.CachePath
 
 module( "gpm.sources.http" )
 
@@ -26,8 +26,12 @@ function CanImport( filePath )
     return string.IsURL( filePath )
 end
 
-local cacheFolder = "gpm/" .. ( SERVER and "server" or "client" ) .. "/packages/"
-fs.CreateDir( cacheFolder )
+function GetInfo( url )
+    return {
+        ["importPath"] = url,
+        ["url"] = url
+    }
+end
 
 local allowedExtensions = {
     ["lua"] = true,
@@ -36,36 +40,37 @@ local allowedExtensions = {
     ["json"] = true
 }
 
-Import = promise.Async( function( url )
+Import = promise.Async( function( info )
+    local url = info.url
+
     if string.match( url, "^https?://github.com/[^/]+/[^/]+$" ) ~= nil then
-        return sources.github.Import( url )
+        return sources.github.Import( sources.github.GetInfo( url ) )
     end
 
     local wsid = string.match( url, "steamcommunity%.com/sharedfiles/filedetails/%?id=(%d+)" )
     if wsid ~= nil then
-        if not sources.workshop then
+        local workshop = sources.workshop
+        if not workshop then
             logger:Error( "Package `%s` import failed, importing content from the workshop is not possible due to the missing steamworks library, you can download the binary module here: https://github.com/WilliamVenner/gmsv_workshop", wsid )
             return
         end
 
-        return sources.workshop.Import( wsid )
+        return workshop.Import( workshop.GetInfo( wsid ) )
     end
 
-    local extension = string.GetExtensionFromFilename( url )
-    if not extension then extension = "json" end
-
+    local extension = string.GetExtensionFromFilename( url ) or "json"
     if not allowedExtensions[ extension ] then
         logger:Error( "Package `%s` import failed, unsupported file extension. ", url )
         return
     end
 
-    -- Cache
+    -- Local cache
     local cachePath = cacheFolder .. "http_" .. util.MD5( url ) .. "."  .. ( extension == "json" and "gma" or extension ) .. ".dat"
     if fs.Exists( cachePath, "DATA" ) and fs.Time( cachePath, "DATA" ) > ( 60 * 60 * cacheLifetime:GetInt() ) then
         if extension == "zip" then
-            return sources.zip.Import( "data/" .. cachePath )
+            return sources.zip.Import( sources.zip.GetInfo( "data/" .. cachePath ) )
         elseif extension == "gma" or extension == "json" then
-            return sources.gmad.Import( "data/" .. cachePath )
+            return sources.gmad.Import( sources.gmad.GetInfo( "data/" .. cachePath ) )
         elseif extension == "lua" then
             local ok, result = fs.Compile( cachePath, "DATA" ):SafeAwait()
             if not ok then
@@ -73,7 +78,7 @@ Import = promise.Async( function( url )
                 return
             end
 
-            return packages.Initialize( packages.GetMetadata( {
+            return package.Initialize( package.GetMetadata( {
                 ["name"] = url
             } ), result, {} )
         end
@@ -102,9 +107,9 @@ Import = promise.Async( function( url )
         end
 
         if extension == "zip" then
-            return sources.zip.Import( "data/" .. cachePath )
+            return sources.zip.Import( sources.zip.GetInfo( "data/" .. cachePath ) )
         elseif extension == "gma" then
-            return sources.gmad.Import( "data/" .. cachePath )
+            return sources.gmad.Import( sources.gmad.GetInfo( "data/" .. cachePath ) )
         end
 
         logger:Error( "Package `%s` import failed, unknown file format.", url )
@@ -129,7 +134,7 @@ Import = promise.Async( function( url )
             return
         end
 
-        return packages.Initialize( packages.GetMetadata( {
+        return package.Initialize( package.GetMetadata( {
             ["name"] = url,
             ["autorun"] = true
         } ), result, sources.lua.Files )
@@ -185,7 +190,7 @@ Import = promise.Async( function( url )
     end
 
     if metadata.mount == false then
-        metadata = packages.GetMetadata( metadata )
+        metadata = package.GetMetadata( metadata )
 
         local compiledFiles = {}
         for _, data in ipairs( files ) do
@@ -215,7 +220,7 @@ Import = promise.Async( function( url )
             return
         end
 
-        return packages.Initialize( metadata, func, compiledFiles )
+        return package.Initialize( metadata, func, compiledFiles )
     end
 
     local gma = gmad.Write( cachePath )
@@ -244,5 +249,5 @@ Import = promise.Async( function( url )
 
     gma:Close()
 
-    return sources.gmad.Import( "data/" .. cachePath )
+    return sources.gmad.Import( sources.gmad.GetInfo( "data/" .. cachePath ) )
 end )
