@@ -16,15 +16,20 @@ local logger = gpm.Logger
 local tonumber = tonumber
 local type = type
 
-local cacheFolder = "gpm/" .. ( SERVER and "server" or "client" ) .. "/workshop/"
-fs.CreateDir( cacheFolder )
-
 local cacheLifetime = GetConVar( "gpm_cache_lifetime" )
+local cacheFolder = gpm.WorkshopPath
 
 module( "gpm.sources.workshop" )
 
 function CanImport( filePath )
     return type( tonumber( filePath ) ) == "number"
+end
+
+function GetInfo( wsid )
+    return {
+        ["importPath"] = wsid,
+        ["wsid"] = wsid
+    }
 end
 
 function Download( wsid )
@@ -78,12 +83,12 @@ function Download( wsid )
     return p
 end
 
-Import = promise.Async( function( wsid )
-    local ok, result = Download( wsid ):SafeAwait()
+Import = promise.Async( function( info )
+    local ok, result = Download( info.wsid ):SafeAwait()
     if not ok then
-        logger:Error( "Package `%s` import failed, %s.", wsid, result )
+        logger:Error( "Package `%s` import failed, %s.", info.wsid, result )
         return
     end
 
-    return sources.gmad.Import( result )
+    return sources.gmad.Import( sources.gmad.GetInfo( result ) )
 end )
