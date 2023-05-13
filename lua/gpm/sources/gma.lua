@@ -1,7 +1,8 @@
 -- Libraries
-local packages = gpm.packages
 local sources = gpm.sources
+local package = gpm.package
 local promise = gpm.promise
+local paths = gpm.paths
 local gmad = gpm.gmad
 local string = string
 local fs = gpm.fs
@@ -11,6 +12,7 @@ local scripted_ents_Register = scripted_ents.Register
 local ErrorNoHaltWithStack = ErrorNoHaltWithStack
 local effects_Register = effects.Register
 local weapons_Register = weapons.Register
+local util_JSONToTable = util.JSONToTable
 local CLIENT, SERVER = CLIENT, SERVER
 local game_MountGMA = game.MountGMA
 local logger = gpm.Logger
@@ -33,10 +35,10 @@ local function waitGamemode()
 end
 
 local autorunTypes = {
-    ["lua/gpm/packages/"] = "gpmPackages",
+    ["lua/gpm/package/"] = "gpmPackages",
     ["lua/autorun/server/"] = "server",
     ["lua/autorun/client/"] = "client",
-    ["lua/packages/"] = "packages",
+    ["lua/package/"] = "package",
     ["lua/entities/"] = "entities",
     ["lua/effects/"] = "effects",
     ["lua/autorun/"] = "shared",
@@ -55,6 +57,12 @@ module( "gpm.sources.gmad" )
 
 function CanImport( filePath )
     return fs.Exists( filePath, "GAME" ) and string.EndsWith( filePath, ".gma.dat" ) or string.EndsWith( filePath, ".gma" )
+end
+
+function GetInfo( filePath )
+    return {
+        ["importPath"] = paths.Fix( filePath )
+    }
 end
 
 local runLua = promise.Async( function( filePath, environment )
@@ -79,27 +87,32 @@ end )
 
 RunLua = runLua
 
-Import = promise.Async( function( filePath, psarentPackage )
-    local gma = gmad.Open( filePath, "GAME" )
+Import = promise.Async( function( info )
+    local importPath = info.importPath
+
+    local gma = gmad.Open( importPath, "GAME" )
     if not gma then
-        logger:Error( "Package `%s` import failed, gma file cannot be readed.", filePath )
+        logger:Error( "Package `%s` import failed, gma file cannot be readed.", importPath )
         return
     end
 
-    local metadata = packages.GetMetadata( {
-        ["requiredContent"] = gma:GetRequiredContent(),
-        ["description"] = gma:GetDescription(),
-        ["timestamp"] = gma:GetTimestamp(),
-        ["author"] = gma:GetAuthor(),
-        ["name"] = gma:GetTitle(),
-        ["filePath"] = filePath
-    } )
-
+    info.requiredContent = gma:GetRequiredContent()
+    info.description = gma:GetDescription()
+    info.timestamp = gma:GetTimestamp()
+    info.author = gma:GetAuthor()
+    info.name = gma:GetTitle()
     gma:Close()
 
-    local ok, files = game_MountGMA( filePath )
+    local description = util_JSONToTable( info.description )
+    if description then
+        for key, value in pairs( description ) do
+            info[ key ] = value
+        end
+    end
+
+    local ok, files = game_MountGMA( importPath )
     if not ok then
-        logger:Error( "Package `%s` import failed, gma file cannot be mounted.", filePath )
+        logger:Error( "Package `%s` import failed, gma file cannot be mounted.", importPath )
         return
     end
 
@@ -117,42 +130,44 @@ Import = promise.Async( function( filePath, psarentPackage )
         end
     end
 
-    return packages.Initialize( metadata, function()
-        local gPackage, environment = gpm.Package, nil
-        if gPackage ~= nil then
-            environment = gPackage:GetEnvironment()
+    local source = sources.lua
+
+    return package.Initialize( package.GetMetadata( info ), function()
+        local package2, environment = gpm.Package, nil
+        if package2 ~= nil then
+            environment = package2:GetEnvironment()
         end
 
         -- Packages
-        local packages = autorun.packages
-        if packages ~= nil then
+        local package = autorun.package
+        if package ~= nil then
             local imported = {}
 
-            for _, filePath in ipairs( packages ) do
-                local packagePath = string.match( filePath, "packages/[^/]+" )
+            for _, filePath in ipairs( package ) do
+                local packagePath = string.match( filePath, "package/[^/]+" )
                 if not packagePath then continue end
 
                 if imported[ packagePath ] then continue end
                 imported[ packagePath ] = true
 
-                local ok, result = sources.lua.Import( packagePath, gPackage ):SafeAwait()
+                local ok, result = source.Import( source.GetInfo( packagePath ), package2 ):SafeAwait()
                 if not ok then return promise.Reject( result ) end
             end
         end
 
-        -- Legacy packages
-        packages = autorun.gpmPackages
-        if packages ~= nil then
+        -- Legacy package
+        package = autorun.gpmPackages
+        if package ~= nil then
             local imported = {}
 
-            for _, filePath in ipairs( packages ) do
-                local packagePath = string.match( filePath, "gpm/packages/[^/]+" )
+            for _, filePath in ipairs( package ) do
+                local packagePath = string.match( filePath, "gpm/package/[^/]+" )
                 if not packagePath then continue end
 
                 if imported[ packagePath ] then continue end
                 imported[ packagePath ] = true
 
-                local ok, result = sources.lua.Import( packagePath, gPackage ):SafeAwait()
+                local ok, result = source.Import( source.GetInfo( packagePath ), package2 ):SafeAwait()
                 if not ok then return promise.Reject( result ) end
             end
         end
@@ -323,5 +338,5 @@ Import = promise.Async( function( filePath, psarentPackage )
                 SWEP = nil
             end
         end
-    end, sources.lua.Files )
+    end, source.Files )
 end )
