@@ -1,9 +1,12 @@
-local AddCSLuaFile = SERVER and AddCSLuaFile
-local include = include
-local SysTime = SysTime
+-- Libraries
+local string = string
+
+-- Variables
 local SERVER = SERVER
 local ipairs = ipairs
 local Color = Color
+local pairs = pairs
+local type = type
 
 module( "gpm", package.seeall )
 
@@ -32,55 +35,63 @@ if not Colors then
     end
 end
 
-module( "gpm" )
+do
 
-_VERSION = 011500
+    local AddCSLuaFile = SERVER and AddCSLuaFile
+    local include = include
 
-function IncludeComponent( filePath )
-    filePath = "gpm/" .. filePath  .. ".lua"
-    if SERVER then AddCSLuaFile( filePath ) end
-    return include( filePath )
+    function IncludeComponent( filePath )
+        filePath = "gpm/" .. filePath  .. ".lua"
+        if SERVER then AddCSLuaFile( filePath ) end
+        return include( filePath )
+    end
+
 end
 
--- Measuring startup time
 local stopwatch = SysTime()
 
--- Utils
 IncludeComponent "utils"
-
--- GLua fixes
 IncludeComponent "fixes"
-
--- Colors & Logger modules
 IncludeComponent "logger"
 
--- Global GPM Logger Creating
 Logger = logger.Create( "GPM@" .. utils.Version( _VERSION ), Color( 180, 180, 255 ) )
 
--- Third-party libraries
+do
+
+    local error = error
+
+    function Error( packageName, ... )
+        Logger:Error( "Package `%s` import failed, see above to see the error.", packageName )
+        error( ... )
+    end
+
+end
+
 libs = {}
 libs.deflatelua = IncludeComponent "libs/deflatelua"
 Logger:Info( "%s %s is initialized.", libs.deflatelua._NAME, libs.deflatelua._VERSION )
 
--- Our libraries
-IncludeComponent "environment"
-IncludeComponent "gmad"
-
--- Promises
 IncludeComponent "promise"
 Logger:Info( "gm_promise %s is initialized.", utils.Version( promise._VERSION_NUM ) )
 
--- File System & HTTP
-IncludeComponent "fs"
+IncludeComponent "environment"
+IncludeComponent "gmad"
 IncludeComponent "http"
+IncludeComponent "fs"
+IncludeComponent "zip"
 
--- Creating folder in data
-fs.CreateDir( "gpm" )
+if Packages then
+    table.Empty( Packages )
+else
+    Packages = {}
+end
 
--- Packages
-IncludeComponent "packages"
+IncludeComponent "package"
 
--- Sources
+CacheLifetime = CreateConVar( "gpm_cache_lifetime", "24", FCVAR_ARCHIVE, "Packages cache lifetime, in hours, sets after how many hours the downloaded gpm packages will not be relevant.", 0, 60480 )
+WorkshopPath = fs.CreateDir( "gpm/" .. ( SERVER and "server" or "client" ) .. "/workshop/" )
+CachePath = fs.CreateDir( "gpm/" .. ( SERVER and "server" or "client" ) .. "/packages/" )
+
 sources = sources or {}
 
 for _, filePath in ipairs( fs.Find( "gpm/sources/*", "LUA" ) ) do
@@ -93,8 +104,247 @@ for _, filePath in ipairs( fs.Find( "gpm/sources/*", "LUA" ) ) do
     include( filePath )
 end
 
--- Finish log
-Logger:Info( "Time taken to start-up: %.4f sec.", SysTime() - stopwatch )
+do
 
--- Importer
-IncludeComponent "importer"
+    local sourceList = {}
+    local tasks = {}
+
+    for _, source in pairs( sources ) do
+        sourceList[ #sourceList + 1 ] = source
+    end
+
+    function PackageExists( packagePath )
+        for _, source in ipairs( sourceList ) do
+            if not source.CanImport( packagePath ) then continue end
+            return true
+        end
+
+        return false
+    end
+
+    function AsyncImport( packagePath, package, autorun )
+        ArgAssert( packagePath, 1, "string" )
+        packagePath = paths.Fix( packagePath )
+
+        local task = tasks[ packagePath ]
+        if not promise.IsPromise( task ) then
+            for _, source in ipairs( sourceList ) do
+                if not source.CanImport( packagePath ) then continue end
+
+                local info = source.GetInfo( packagePath )
+                if not info then
+                    Logger:Error( "Package `%s` import failed, no import info.", packagePath )
+                    return
+                end
+
+                if autorun and not info.autorun then
+                    Logger:Debug( "Package `%s` autorun restricted.", packagePath )
+                    return
+                end
+
+                if not info.singleplayer and SinglePlayer then
+                    Logger:Error( "Package `%s` import failed, cannot be executed in a single-player game.", packagePath )
+                    return
+                end
+
+                local gamemodes = info.gamemodes
+                local gamemodesType = type( gamemodes )
+                if ( gamemodesType == "string" and gamemodes ~= Gamemode ) or ( gamemodesType == "table" and not table.HasIValue( gamemodes, Gamemode ) ) then
+                    Logger:Error( "Package `%s` import failed, is not compatible with active gamemode.", packagePath )
+                    return
+                end
+
+                local maps = info.maps
+                local mapsType = type( maps )
+                if ( mapsType == "string" and maps ~= Map ) or ( mapsType == "table" and not table.HasIValue( maps, Map ) ) then
+                    Logger:Error( "Package `%s` import failed, is not compatible with current map.", packagePath )
+                    return
+                end
+
+                task = source.Import( info )
+                tasks[ packagePath ] = task
+                break
+            end
+
+            if not promise.IsPromise( task ) then
+                Error( packagePath, "Requested package doesn't exist!" )
+            end
+        end
+
+        if IsPackage( package ) then
+            if task:IsPending() then
+                task:Then( function( package2 )
+                    if not IsPackage( package2 ) then return end
+                    package:Link( package2 )
+                end )
+            elseif task:IsFulfilled() then
+                local package2 = task:GetResult()
+                if IsPackage( package2 ) then
+                    package:Link( package2 )
+                end
+            end
+        end
+
+        return task
+    end
+
+end
+
+Gamemode = engine.ActiveGamemode()
+SinglePlayer = game.SinglePlayer()
+Map = game.GetMap()
+
+do
+
+    local assert = assert
+
+    function Import( packagePath, async, package )
+        assert( async or promise.RunningInAsync(), "import supposed to be running in coroutine/async function (do you running it from package)" )
+
+        local task = AsyncImport( packagePath, package, false )
+        if not task then return end
+
+        if not async then
+            local ok, result = task:SafeAwait()
+            if not ok then
+                Error( packagePath, result )
+                return
+            end
+
+            if not result then
+                Error( packagePath, "This should never have happened, but the package was missing after the import." )
+                return
+            end
+
+            return result:GetResult()
+        end
+
+        return task
+    end
+
+    _G.import = Import
+
+end
+
+function ImportFolder( folderPath, package, autorun )
+    folderPath = paths.Fix( folderPath )
+
+    if not fs.IsDir( folderPath, LuaRealm ) then
+        Logger:Warn( "Import impossible, folder '%s' is empty, skipping...", folderPath )
+        return
+    end
+
+    Logger:Info( "Starting to import packages from '%s'", folderPath )
+
+    local files, folders = fs.Find( folderPath .. "/*", LuaRealm )
+    for _, folderName in ipairs( folders ) do
+        local packagePath = folderPath .. "/" .. folderName
+
+        local p = AsyncImport( packagePath, package, autorun )
+        if not p then continue end
+
+        p:Catch( function( result )
+            Error( packagePath, result )
+        end )
+    end
+
+    for _, fileName in ipairs( files ) do
+        local packagePath = folderPath .. "/" .. fileName
+
+        local p = AsyncImport( packagePath, package, autorun )
+        if not p then continue end
+
+        p:Catch( function( result )
+            Error( packagePath, result )
+        end )
+    end
+
+end
+
+function ClearCache()
+    local count, size = 0, 0
+
+    for _, fileName in ipairs( fs.Find( CachePath .. "*", "DATA" ) ) do
+        local filePath = CachePath .. fileName
+        local fileSize = fs.Size( filePath, "DATA" )
+        fs.Delete( filePath )
+
+        if not fs.Exists( filePath, "DATA" ) then
+            size = size + fileSize
+            count = count + 1
+            continue
+        end
+
+        Logger:Warn( "Unable to remove file `%s` probably used by the game, restart game and try again.", filePath )
+    end
+
+    for _, fileName in ipairs( fs.Find( WorkshopPath .. "*", "DATA" ) ) do
+        local filePath = WorkshopPath .. fileName
+        local fileSize = fs.Size( filePath, "DATA" )
+        fs.Delete( filePath )
+
+        if not fs.Exists( filePath, "DATA" ) then
+            size = size + fileSize
+            count = count + 1
+            continue
+        end
+
+        Logger:Warn( "Unable to remove file `%s` probably used by the game, restart game and try again.", filePath )
+    end
+
+    Logger:Info( "Deleted %d cache files, freeing up %dMB of space.", count, size / 1024 / 1024 )
+end
+
+do
+
+    local MsgC = MsgC
+
+    function PrintPackageList()
+        MsgC( Colors.Realm, SERVER and "Server" or "Client", Colors.PrimaryText, " packages:\n" )
+
+        local total = 0
+        for name, package in pairs( Packages ) do
+            MsgC( Colors.Realm, "\t* ", Colors.PrimaryText, string.format( "%s@%s\n", name, package:GetVersion() ) )
+            total = total + 1
+        end
+
+        MsgC( Colors.Realm, "\tTotal: ", Colors.PrimaryText, total, "\n" )
+    end
+
+end
+
+if SERVER then
+
+    concommand.Add( "gpm_clear_cache", function( ply )
+        if not ply or ply:IsListenServerHost() then
+            ClearCache()
+        end
+
+        ply:SendLua( "gpm.ClearCache()" )
+    end )
+
+    concommand.Add( "gpm_list", function( ply )
+        if not ply or ply:IsListenServerHost() then
+            PrintPackageList()
+        end
+
+        ply:SendLua( "gpm.PrintPackageList()" )
+    end )
+
+    concommand.Add( "gpm_reload", function( ply )
+        if not ply or ply:IsSuperAdmin() then
+            BroadcastLua( "include( \"gpm/init.lua\" )" )
+            include( "gpm/init.lua" )
+            hook.Run( "GPM - Reloaded" )
+            return
+        end
+
+        ply:ChatPrint( "[GPM] You do not have enough permissions to execute this command." )
+    end )
+
+end
+
+ImportFolder( "gpm/packages", nil, true )
+ImportFolder( "packages", nil, true )
+
+Logger:Info( "Time taken to start-up: %.4f sec.", SysTime() - stopwatch )
