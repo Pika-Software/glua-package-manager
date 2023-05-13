@@ -23,14 +23,7 @@ Package manager supporting isolation, synchronous import, package dependency bui
 
 Also, you can run an existing addon via gpm, just add the code below to `package.lua`, and you don’t even need to add `init.lua`.
 
-### Minimal example of `package.lua`
-```lua
-name = "example-package"
-main = "init.lua"
-version = 1
-```
-
-### Full example of `package.lua`
+### `package.lua` example
 ```lua
 -- lua/packages/example-package/package.lua
 name = "example-package"
