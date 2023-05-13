@@ -12,7 +12,6 @@ local ErrorNoHaltWithStack = ErrorNoHaltWithStack
 local AddCSLuaFile = AddCSLuaFile
 local getmetatable = getmetatable
 local setmetatable = setmetatable
-local ArgAssert = ArgAssert
 local tostring = tostring
 local logger = gpm.Logger
 local require = require
@@ -24,25 +23,19 @@ local pairs = pairs
 local type = type
 local _G = _G
 
--- Packages table
-local packages = gpm.Packages
-if type( packages ) ~= "table" then
-    packages = {}; gpm.Packages = packages
-end
-
-module( "gpm.packages", package.seeall )
+module( "gpm.package", package.seeall )
 
 -- Get all registered packages
 function GetAll()
-    return packages
+    return gpm.Packages
 end
 
 -- Get one registered package
-function Get( packageName )
-    return packages[ packageName ]
+function Get( importPath )
+    return gpm.Packages[ importPath ]
 end
 
--- gpm.packages.GetMetadata( source )
+-- gpm.package.GetMetadata( source )
 do
 
     local environment = {
@@ -180,6 +173,18 @@ do
         return table.Lookup( self, "metadata.isolation" )
     end
 
+    function PACKAGE:Link( package2 )
+        gpm.ArgAssert( package2, 1, "Package" )
+
+        local env = self:GetEnvironment()
+        if not env then return end
+
+        local env2 = package2:GetEnvironment()
+        if not env2 then return end
+
+        environment.LinkMetaTables( env, env2 )
+    end
+
     local function isPackage( any ) return getmetatable( any ) == PACKAGE end
     gpm.IsPackage = isPackage
     _G.IsPackage = isPackage
@@ -207,65 +212,64 @@ end
 
 SafeRun = safeRun
 
-local modules = {}
-
 function Initialize( metadata, func, files )
-    ArgAssert( metadata, 1, "table" )
-    ArgAssert( func, 2, "function" )
-    ArgAssert( files, 3, "table" )
+    gpm.ArgAssert( metadata, 1, "table" )
+    gpm.ArgAssert( func, 2, "function" )
+    gpm.ArgAssert( files, 3, "table" )
 
     -- Measuring package startup time
     local stopwatch = SysTime()
 
     -- Creating package object
-    local gPackage = setmetatable( {}, PACKAGE )
-    gPackage.metadata = metadata
-    gPackage.files = files
+    local package = setmetatable( {}, PACKAGE )
+    package.metadata = metadata
+    package.files = files
 
     if metadata.isolation then
 
         -- Creating environment for package
-        local packageEnv = environment.Create( func, _G )
-        gPackage.environment = packageEnv
+        local env = environment.Create( func, _G )
+        package.environment = env
 
         -- Globals
-        environment.SetLinkedTable( packageEnv, "gpm", gpm )
-        packageEnv._VERSION = metadata.version
-        packageEnv.promise = gpm.promise
-        packageEnv.TypeID = gpm.TypeID
-        packageEnv.type = gpm.type
-        packageEnv.http = gpm.http
-        packageEnv.file = fs
+        environment.SetLinkedTable( env, "gpm", gpm )
+        env._VERSION = metadata.version
+        env.ArgAssert = gpm.ArgAssert
+        env.promise = gpm.promise
+        env.TypeID = gpm.TypeID
+        env.type = gpm.type
+        env.http = gpm.http
+        env.file = fs
 
         -- Binding package object to gpm.Package
-        table.SetValue( packageEnv, "gpm.Package", gPackage )
+        table.SetValue( env, "gpm.Package", package )
 
         -- Logger
         if metadata.logger then
-            gPackage.logger = gpm.logger.Create( gPackage:GetIdentifier(), metadata.color )
-            table.SetValue( packageEnv, "gpm.Logger", gPackage.logger )
+            package.logger = gpm.logger.Create( package:GetIdentifier(), metadata.color )
+            table.SetValue( env, "gpm.Logger", package.logger )
         end
 
-        environment.SetValue( packageEnv, "import", function( filePath, async )
-            return gpm.Import( filePath, async, gPackage )
+        environment.SetValue( env, "import", function( filePath, async )
+            return gpm.Import( filePath, async, package )
         end )
 
         -- include
-        environment.SetValue( packageEnv, "include", function( fileName )
+        environment.SetValue( env, "include", function( fileName )
             local currentFile = utils.GetCurrentFile()
             if currentFile then
                 local folder = string.GetPathFromFilename( paths.Localize( currentFile ) )
                 if folder then
                     local func = files[ folder .. fileName ]
                     if func then
-                        return run( func, gPackage )
+                        return run( func, package )
                     end
                 end
             end
 
             local func = files[ fileName ]
             if func then
-                return run( func, gPackage )
+                return run( func, package )
             end
 
             ErrorNoHaltWithStack( "Couldn't include file '" .. tostring( fileName ) .. "' - File not found" )
@@ -273,11 +277,11 @@ function Initialize( metadata, func, files )
 
         -- AddCSLuaFile
         if SERVER then
-            environment.SetValue( packageEnv, "AddCSLuaFile", function( fileName )
+            environment.SetValue( env, "AddCSLuaFile", function( fileName )
                 local currentFile = utils.GetCurrentFile()
                 if currentFile then
                     if fileName ~= nil then
-                        ArgAssert( fileName, 1, "string" )
+                        gpm.ArgAssert( fileName, 1, "string" )
                     else
                         fileName = currentFile
                     end
@@ -300,61 +304,30 @@ function Initialize( metadata, func, files )
         end
 
         -- require
-        environment.SetValue( packageEnv, "require", function( name )
-            if util.IsBinaryModuleInstalled( name ) then
-                return require( name )
-            end
+        environment.SetValue( env, "require", function( name )
+            if util.IsBinaryModuleInstalled( name ) then return require( name ) end
 
-            local package2 = modules[ name ]
-            if gpm.IsPackage( package2 ) then
-                gpm.packages.LinkPackages( gPackage, package2 )
-                return package2:GetResult()
-            end
-
-            local ok, result = gpm.Import( "includes/modules/" .. name .. ".lua", true, gPackage, false ):SafeAwait()
-            if ok then
-                modules[ name ] = result
-                return result
-            end
+            local ok, result = import( "includes/modules/" .. name .. ".lua", true ):SafeAwait()
+            if ok then return result end
 
             ErrorNoHaltWithStack( "Module `" .. name .. "` not found!" )
         end )
 
     end
 
-    -- Package folder
-    local packagePath = metadata.filePath
-
     -- Run
-    local ok, result = safeRun( func, gPackage, ErrorNoHaltWithStack )
+    local ok, result = safeRun( func, package, ErrorNoHaltWithStack )
     if not ok then
-        logger:Error( "Package `%s` start-up failed, see above for the reason, it took %.4f seconds.", packagePath, SysTime() - stopwatch )
+        logger:Error( "Package `%s` import failed, see above for the reason.", metadata.importPath )
         return
     end
 
-    -- Saving result to gPackage
-    gPackage.result = result
+    -- Saving result to package
+    package.result = result
 
     -- Saving in global table & final log
-    logger:Info( "Package `%s` was successfully loaded, it took %.4f seconds.", packagePath, SysTime() - stopwatch )
+    logger:Info( "Package `%s` was successfully imported, it took %.4f seconds.", metadata.importPath, SysTime() - stopwatch )
+    gpm.Packages[ metadata.importPath ] = package
 
-    local versions = packages[ packagePath ]
-    if type( versions ) ~= "table" then
-        versions = {}; packages[ packagePath ] = versions
-    end
-
-    versions[ gPackage:GetVersion() ] = gPackage
-
-    return gPackage
-end
-
-function LinkPackages( package1, package2 )
-    ArgAssert( package1, 1, "Package" )
-    ArgAssert( package2, 2, "Package" )
-
-    local environment1, environment2 = package1:GetEnvironment(), package2:GetEnvironment()
-    logger:Debug( "Packages `%s` <- `%s` import status: %s", package1, package2, ( environment1 ~= nil and environment2 ~= nil ) and "success" or "failed" )
-    if not environment1 or not environment2 then return end
-
-    environment.LinkMetaTables( environment1, environment2 )
+    return package
 end
