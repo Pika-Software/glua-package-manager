@@ -5,6 +5,8 @@ local SERVER = SERVER
 local ipairs = ipairs
 local Color = Color
 
+module( "gpm", package.seeall )
+
 
 if not Colors then
     Colors = {
