@@ -27,6 +27,7 @@ module( "gpm.fs" )
 Delete = file.Delete
 Exists = file.Exists
 Rename = file.Rename
+IsFile = file.IsFile
 IsDir = file.IsDir
 Open = file.Open
 Find = file.Find
@@ -59,18 +60,18 @@ end
 
 function CreateDir( folderPath )
     local currentPath = nil
-    for _, folderName in ipairs( string.Split( folderPath, "/" ) ) do
-        if currentPath == nil then
-            currentPath = folderName
-        else
-            currentPath = currentPath .. "/" .. folderName
-        end
 
-        if not file.IsDir( currentPath, "DATA" ) then
-            file.Delete( currentPath )
-            file.CreateDir( currentPath )
-        end
+    for _, folderName in ipairs( string.Split( folderPath, "/" ) ) do
+        if not folderName then continue end
+
+        currentPath = currentPath and ( currentPath .. "/" .. folderName ) or folderName
+        if file.IsDir( currentPath, "DATA" ) then continue end
+
+        file.Delete( currentPath )
+        file.CreateDir( currentPath )
     end
+
+    return currentPath
 end
 
 Compile = promise.Async( function( filePath, gamePath, handleError )
