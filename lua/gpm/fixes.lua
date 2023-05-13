@@ -2,9 +2,9 @@
 local string = string
 local table = table
 local file = file
+local gpm = gpm
 
 -- Variables
-local ArgAssert = ArgAssert
 local SERVER = SERVER
 
 -- Global table
@@ -21,13 +21,12 @@ function string.Split( str, separator )
     return string.Explode( separator, str, false )
 end
 
--- https://wiki.facepunch.com/gmod/file.Exists
--- https://wiki.facepunch.com/gmod/file.IsDir
 do
 
     local file_Exists = table.SetValue( gluaFixes, "file.Exists", file.Exists, true )
     local file_IsDir = table.SetValue( gluaFixes, "file.IsDir", file.IsDir, true )
 
+    -- https://wiki.facepunch.com/gmod/file.IsDir
     function file.IsDir( filePath, gamePath )
         if SERVER then return file_IsDir( filePath, gamePath ) end
         if file_IsDir( filePath, gamePath ) then return true end
@@ -39,6 +38,7 @@ do
         return table.HasIValue( folders, splits[ #splits ] )
     end
 
+    -- https://wiki.facepunch.com/gmod/file.Exists
     function file.Exists( filePath, gamePath )
         if SERVER then return file_Exists( filePath, gamePath ) end
         if file_Exists( filePath, gamePath ) then return true end
@@ -53,22 +53,23 @@ do
         return table.HasIValue( files, fileName ) or table.HasIValue( folders, fileName )
     end
 
-end
-
--- https://wiki.facepunch.com/gmod/File_Search_Paths
-local luaRealm = gpm.LuaRealm
-if not luaRealm then
-    luaRealm = "LUA"
-
-    if not MENU_DLL then
+    -- file.IsFile( filePath, gamePath )
+    function file.IsFile( filePath, gamePath )
         if SERVER then
-            luaRealm = "lsv"
-        elseif CLIENT then
-            luaRealm = "lcl"
+            return file_Exists( filePath, gamePath ) and not file_IsDir( filePath, gamePath )
         end
+
+        if file_Exists( filePath, gamePath ) and not file_IsDir( filePath, gamePath ) then
+            return true
+        end
+
+        local files, _ = file.Find( filePath .. "*", gamePath )
+        if not files or #files == 0 then return false end
+        local splits = string.Split( filePath, "/" )
+
+        return table.HasIValue( files, splits[ #splits ] )
     end
 
-    gpm.LuaRealm = luaRealm
 end
 
 -- https://wiki.facepunch.com/gmod/Global.CompileFile
@@ -78,7 +79,7 @@ do
     local CompileString = CompileString
 
     function CompileFile( filePath )
-        local f = file.Open( filePath, "r", luaRealm )
+        local f = file.Open( filePath, "r", gpm.LuaRealm )
         if not f then
             return _CompileFile( filePath )
         end
@@ -104,7 +105,7 @@ do
     local fmt = "lua/bin/gm" .. ( ( CLIENT and not MENU_DLL ) and "cl" or "sv" ) .. "_%s_%s.dll"
 
     function util.IsBinaryModuleInstalled( name )
-        ArgAssert( name, 1, "string" )
+        gpm.ArgAssert( name, 1, "string" )
 
         if file.Exists( string.format( fmt, name, suffix ), "GAME" ) then
             return true
