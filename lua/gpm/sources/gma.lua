@@ -8,12 +8,12 @@ local string = string
 local fs = gpm.fs
 
 -- Variables
-local scripted_ents_Register = scripted_ents.Register
+local CLIENT, SERVER, MENU_DLL = CLIENT, SERVER, MENU_DLL
+local effects_Register = ( CLIENT and not MENU_DLL ) and effects.Register
+local scripted_ents_Register = not MENU_DLL and scripted_ents.Register
+local weapons_Register = not MENU_DLL and weapons.Register
 local ErrorNoHaltWithStack = ErrorNoHaltWithStack
-local effects_Register = effects.Register
-local weapons_Register = weapons.Register
 local util_JSONToTable = util.JSONToTable
-local CLIENT, SERVER = CLIENT, SERVER
 local game_MountGMA = game.MountGMA
 local logger = gpm.Logger
 local setfenv = setfenv
@@ -199,6 +199,8 @@ Import = promise.Async( function( info )
                 runLua( filePath, environment )
             end
         end
+
+        if MENU_DLL then return end
 
         -- Lua effects
         if CLIENT then

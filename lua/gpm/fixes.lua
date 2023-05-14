@@ -81,6 +81,7 @@ do
     function CompileFile( filePath )
         local f = file.Open( filePath, "r", gpm.LuaRealm )
         if not f then
+            if not _CompileFile then return end
             return _CompileFile( filePath )
         end
 
@@ -89,6 +90,7 @@ do
 
         local func = CompileString( code, filePath, true )
         if not func then
+            if not _CompileFile then return end
             return _CompileFile( filePath )
         end
 
@@ -171,5 +173,7 @@ do
 
         return false
     end
+
+    TYPE_COLOR = gpm.AddType( "Color", IsColor )
 
 end

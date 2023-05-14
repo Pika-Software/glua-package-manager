@@ -70,6 +70,7 @@ do
             -- Realms
             source.client = source.client ~= false
             source.server = source.server ~= false
+            source.menu = source.menu == true
 
             -- Isolation & autorun
             source.isolation = source.isolation ~= false

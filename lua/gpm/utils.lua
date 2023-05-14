@@ -12,9 +12,7 @@ local pairs = pairs
 
 do
 
-    local typeIDs = {
-        { IsColor, TYPE_COLOR }
-    }
+    local typeIDs = {}
 
     -- https://wiki.facepunch.com/gmod/Global.TypeID
     do
@@ -75,7 +73,6 @@ do
         [TYPE_IMESH] = "IMesh",
         [TYPE_PANEL] = "Panel",
         [TYPE_ANGLE] = "Angle",
-        [TYPE_COLOR] = "Color",
         [TYPE_TABLE] = "table",
         [TYPE_SAVE] = "ISave",
         [TYPE_FILE] = "File",

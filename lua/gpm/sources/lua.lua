@@ -6,7 +6,7 @@ local string = string
 local fs = gpm.fs
 
 -- Variables
-local CLIENT, SERVER = CLIENT, SERVER
+local CLIENT, SERVER, MENU_DLL = CLIENT, SERVER, MENU_DLL
 local AddCSLuaFile = AddCSLuaFile
 local setmetatable = setmetatable
 local CompileFile = CompileFile
@@ -98,6 +98,7 @@ end
 
 Import = promise.Async( function( info )
     if CLIENT and not info.client then return end
+    if MENU_DLL and not info.menu then return end
     local mainFile = info.main
 
     local main = Files[ mainFile ]
