@@ -9,6 +9,7 @@ local fs = gpm.fs
 
 -- Variables
 local ErrorNoHaltWithStack = ErrorNoHaltWithStack
+local CLIENT, SERVER = CLIENT, SERVER
 local AddCSLuaFile = AddCSLuaFile
 local getmetatable = getmetatable
 local setmetatable = setmetatable
@@ -23,7 +24,7 @@ local pairs = pairs
 local type = type
 local _G = _G
 
-module( "gpm.package", package.seeall )
+module( "gpm.package" )
 
 -- Get all registered packages
 function GetAll()
@@ -44,10 +45,13 @@ do
 
     local function getMetadata( source )
         if type( source ) == "table" then
-            -- Package name, main file & author
+            -- Package name & entry point
             source.name = type( source.name ) == "string" and source.name or nil
-            source.main = type( source.main ) == "string" and source.main or nil
-            source.author = type( source.author ) == "string" and source.author or nil
+            if CLIENT and type( source.cl_main ) == "string" then
+                source.main = source.cl_main
+            else
+                source.main = type( source.main ) == "string" and source.main or nil
+            end
 
             -- Version
             source.version = utils.Version( source.version )
