@@ -1,5 +1,6 @@
+local gpm = gpm
+
 -- Libraries
-local sources = gpm.sources
 local package = gpm.package
 local promise = gpm.promise
 local paths = gpm.paths
@@ -35,7 +36,6 @@ local function waitGamemode()
 end
 
 local autorunTypes = {
-    ["lua/gpm/package/"] = "gpmPackages",
     ["lua/autorun/server/"] = "server",
     ["lua/autorun/client/"] = "client",
     ["lua/package/"] = "package",
@@ -66,10 +66,7 @@ function GetInfo( filePath )
 end
 
 local runLua = promise.Async( function( filePath, environment )
-    local files = sources.lua.Files
-    if not files then return end
-
-    local func = files[ filePath ]
+    local func = gpm.CompileLua( filePath )
     if not func then return end
 
     if environment ~= nil then
@@ -130,46 +127,10 @@ Import = promise.Async( function( info )
         end
     end
 
-    local source = sources.lua
-
     return package.Initialize( package.GetMetadata( info ), function()
-        local package2, environment = gpm.Package, nil
-        if package2 ~= nil then
-            environment = package2:GetEnvironment()
-        end
-
-        -- Packages
-        local package = autorun.package
-        if package ~= nil then
-            local imported = {}
-
-            for _, filePath in ipairs( package ) do
-                local packagePath = string.match( filePath, "package/[^/]+" )
-                if not packagePath then continue end
-
-                if imported[ packagePath ] then continue end
-                imported[ packagePath ] = true
-
-                local ok, result = source.Import( source.GetInfo( packagePath ), package2 ):SafeAwait()
-                if not ok then return promise.Reject( result ) end
-            end
-        end
-
-        -- Legacy package
-        package = autorun.gpmPackages
-        if package ~= nil then
-            local imported = {}
-
-            for _, filePath in ipairs( package ) do
-                local packagePath = string.match( filePath, "gpm/package/[^/]+" )
-                if not packagePath then continue end
-
-                if imported[ packagePath ] then continue end
-                imported[ packagePath ] = true
-
-                local ok, result = source.Import( source.GetInfo( packagePath ), package2 ):SafeAwait()
-                if not ok then return promise.Reject( result ) end
-            end
+        local pkg, environment = _PACKAGE, nil
+        if pkg ~= nil then
+            environment = pkg:GetEnvironment()
         end
 
         -- Client autorun
@@ -340,5 +301,22 @@ Import = promise.Async( function( info )
                 SWEP = nil
             end
         end
-    end, source.Files )
+
+        -- Packages
+        local packages = autorun.package
+        if packages ~= nil then
+            local imported = {}
+
+            for _, filePath in ipairs( packages ) do
+                local packagePath = string.match( filePath, "package/[^/]+" )
+                if not packagePath then continue end
+
+                if imported[ packagePath ] then continue end
+                imported[ packagePath ] = true
+
+                local ok, result = gpm.AsyncImport( packagePath, pkg, false ):SafeAwait()
+                if not ok then return promise.Reject( result ) end
+            end
+        end
+    end )
 end )

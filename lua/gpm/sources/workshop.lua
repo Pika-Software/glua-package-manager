@@ -1,3 +1,5 @@
+local gpm = gpm
+
 -- https://github.com/WilliamVenner/gmsv_workshop
 if SERVER and not steamworks then
     if not util.IsBinaryModuleInstalled( "workshop" ) then return end
@@ -5,7 +7,6 @@ if SERVER and not steamworks then
 end
 
 -- Libraries
-local sources = gpm.sources
 local promise = gpm.promise
 local gmad = gpm.gmad
 local fs = gpm.fs
@@ -90,5 +91,5 @@ Import = promise.Async( function( info )
         return
     end
 
-    return sources.gmad.Import( sources.gmad.GetInfo( result ) )
+    return gpm.AsyncImport( result, _PACKAGE, false )
 end )

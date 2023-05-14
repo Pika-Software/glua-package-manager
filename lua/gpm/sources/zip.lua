@@ -1,6 +1,7 @@
+local gpm = gpm
+
 -- Libraries
 local promise = gpm.promise
-local sources = gpm.sources
 local paths = gpm.paths
 local gmad = gpm.gmad
 local string = string
@@ -45,7 +46,7 @@ end
 Import = promise.Async( function( info )
     local cachePath = info.cachePath
     if fs.Exists( cachePath, "DATA" ) and fs.Time( cachePath, "DATA" ) > ( 60 * 60 * cacheLifetime:GetInt() ) then
-        return sources.gmad.Import( sources.gmad.GetInfo( "data/" .. cachePath ) )
+        return gpm.AsyncImport( "data/" .. cachePath, _PACKAGE, false )
     end
 
     local importPath = info.importPath
@@ -97,5 +98,5 @@ Import = promise.Async( function( info )
 
     gma:Close()
 
-    return sources.gmad.Import( sources.gmad.GetInfo( "data/" .. cachePath ) )
+    return gpm.AsyncImport( "data/" .. cachePath, _PACKAGE, false )
 end )

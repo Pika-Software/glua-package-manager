@@ -1,5 +1,6 @@
+local gpm = gpm
+
 -- Libraries
-local sources = gpm.sources
 local promise = gpm.promise
 local logger = gpm.Logger
 local http = gpm.http
@@ -35,7 +36,7 @@ Try = promise.Async( function( url )
         return promise.Reject( "invalid response http code - " .. result.code )
     end
 
-    local ok, result = sources.http.Import( sources.http.GetInfo( url ) ):SafeAwait()
+    local ok, result = gpm.AsyncImport( url, _PACKAGE, false ):SafeAwait()
     if ok then return result end
 
     ErrorNoHaltWithStack( result )

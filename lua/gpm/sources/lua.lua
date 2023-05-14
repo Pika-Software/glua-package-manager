@@ -1,3 +1,5 @@
+local gpm = gpm
+
 -- Libraries
 local package = gpm.package
 local promise = gpm.promise
@@ -8,13 +10,8 @@ local fs = gpm.fs
 -- Variables
 local CLIENT, SERVER, MENU_DLL = CLIENT, SERVER, MENU_DLL
 local AddCSLuaFile = AddCSLuaFile
-local setmetatable = setmetatable
-local CompileFile = CompileFile
 local luaRealm = gpm.LuaRealm
-local logger = gpm.Logger
 local ipairs = ipairs
-local rawset = rawset
-local pcall = pcall
 local type = type
 
 module( "gpm.sources.lua" )
@@ -22,20 +19,6 @@ module( "gpm.sources.lua" )
 function CanImport( filePath )
     return fs.Exists( filePath, luaRealm ) and string.EndsWith( filePath, ".lua" ) or fs.IsDir( filePath, luaRealm )
 end
-
-Files = setmetatable( {}, {
-    ["__index"] = function( self, filePath )
-        if type( filePath ) ~= "string" then return false end
-        if not fs.IsFile( filePath, luaRealm ) then return false end
-
-        local ok, result = pcall( CompileFile, filePath )
-        if not ok then return false end
-        if not result then return false end
-
-        rawset( self, filePath, result )
-        return result
-    end
-} )
 
 function GetInfo( filePath )
     local importPath = paths.Fix( filePath )
@@ -49,7 +32,7 @@ function GetInfo( filePath )
     local packagePath = folder .. "/package.lua"
     local hasPackageFile = fs.IsFile( packagePath, luaRealm )
     if hasPackageFile then
-        local func = Files[ packagePath ]
+        local func = gpm.CompileLua( packagePath )
         if func then
             info = package.GetMetadata( func )
         end
@@ -74,20 +57,45 @@ function GetInfo( filePath )
     info.importPath = importPath
     info.folder = folder
 
-    local mainFile = info.main
-    if not mainFile or not fs.IsFile( mainFile, luaRealm ) then
-        mainFile = importPath .. "/init.lua"
+    local main = info.main
+    if type( main ) ~= "string" then
+        main = "init.lua"
     end
 
-    if not fs.IsFile( mainFile, luaRealm ) then
-        mainFile = importPath .. "/" .. mainFile
+    if not fs.IsFile( main, luaRealm ) then
+        main = paths.Join( importPath, main )
+
+        if not fs.IsFile( main, luaRealm ) then
+            main = importPath .. "/init.lua"
+            if not fs.IsFile( main, luaRealm ) then
+                main = importPath .. "/main.lua"
+            end
+        end
     end
 
-    if not fs.IsFile( mainFile, luaRealm ) then
-        mainFile = importPath .. "/main.lua"
+    if fs.IsFile( main, luaRealm ) then
+        info.main = main
+    else
+        info.main = nil
     end
 
-    info.main = mainFile
+    local cl_main = info.cl_main
+    if type( cl_main ) ~= "string" then
+        cl_main = "cl_init.lua"
+    end
+
+    if type( cl_main ) == "string" and not fs.IsFile( cl_main, luaRealm ) then
+        cl_main = paths.Join( importPath, cl_main )
+        if not fs.IsFile( cl_main, luaRealm ) then
+            cl_main = importPath .. "/cl_init.lua"
+        end
+    end
+
+    if fs.IsFile( cl_main, luaRealm ) then
+        info.cl_main = cl_main
+    else
+        info.cl_main = nil
+    end
 
     if type( info.name ) ~= "string" then
         info.name = importPath
@@ -96,41 +104,50 @@ function GetInfo( filePath )
     return info
 end
 
-Import = promise.Async( function( info )
-    if CLIENT and not info.client then return end
-    if MENU_DLL and not info.menu then return end
-    local mainFile = info.main
+if SERVER then
 
-    local main = Files[ mainFile ]
-    if not main then
-        logger:Error( "Package `%s` import failed, main file is missing.", packagePath )
+    function SendToClient( info )
+        local packagePath = info.packagePath
+        if packagePath then
+            AddCSLuaFile( packagePath )
+        end
+
+        local cl_main = info.cl_main
+        if type( cl_main ) == "string" then
+            AddCSLuaFile( cl_main )
+        end
+
+        local main = info.main
+        if main then
+            AddCSLuaFile( info.main )
+        end
+
+        local send = info.send
+        if not send then return end
+
+        local folder = info.folder
+        for _, filePath in ipairs( send ) do
+            local localFilePath = folder .. "/" .. filePath
+            if fs.IsFile( localFilePath, luaRealm ) then
+                AddCSLuaFile( localFilePath )
+            elseif fs.IsFile( filePath, luaRealm ) then
+                AddCSLuaFile( filePath )
+            end
+        end
+    end
+
+end
+
+Import = promise.Async( function( info )
+    if MENU_DLL and not info.menu then return end
+    if CLIENT and not info.client then return end
+    if SERVER and not info.server then return end
+
+    local func = gpm.CompileLua( info.main )
+    if not func then
+        gpm.Error( info.importPath, "main file `" .. ( info.main or "init.lua" ) .. "` is missing." )
         return
     end
 
-    if SERVER then
-        if info.client then
-            AddCSLuaFile( mainFile )
-
-            local packagePath = info.packagePath
-            if packagePath then
-                AddCSLuaFile( packagePath )
-            end
-
-            local send = info.send
-            if send then
-                for _, filePath in ipairs( send ) do
-                    local localFilePath = packagePath .. "/" .. filePath
-                    if fs.IsFile( localFilePath, luaRealm ) then
-                        AddCSLuaFile( localFilePath )
-                    elseif fs.IsFile( filePath, luaRealm ) then
-                        AddCSLuaFile( filePath )
-                    end
-                end
-            end
-        end
-
-        if not info.server then return end
-    end
-
-    return package.Initialize( info, main, Files )
+    return package.Initialize( info, func )
 end )

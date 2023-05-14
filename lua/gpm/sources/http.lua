@@ -1,5 +1,6 @@
+local gpm = gpm
+
 -- Libraries
-local sources = gpm.sources
 local package = gpm.package
 local promise = gpm.promise
 local utils = gpm.utils
@@ -28,6 +29,7 @@ end
 
 function GetInfo( url )
     return {
+        ["extension"] = string.GetExtensionFromFilename( url ) or "json",
         ["importPath"] = url,
         ["url"] = url
     }
@@ -41,25 +43,15 @@ local allowedExtensions = {
 }
 
 Import = promise.Async( function( info )
-    local url = info.url
-
-    if string.match( url, "^https?://github.com/[^/]+/[^/]+$" ) ~= nil then
-        return sources.github.Import( sources.github.GetInfo( url ) )
-    end
-
-    local wsid = string.match( url, "steamcommunity%.com/sharedfiles/filedetails/%?id=(%d+)" )
-    if wsid ~= nil then
-        local workshop = sources.workshop
-        if not workshop then
-            logger:Error( "Package `%s` import failed, importing content from the workshop is not possible due to the missing steamworks library, you can download the binary module here: https://github.com/WilliamVenner/gmsv_workshop", wsid )
-            return
+    local url, extension = info.url, info.extension
+    if not allowedExtensions[ extension ] then
+        local wsid = string.match( url, "steamcommunity%.com/sharedfiles/filedetails/%?id=(%d+)" )
+        if wsid ~= nil then
+            return gpm.AsyncImport( wsid, _PACKAGE, false )
+        elseif string.match( url, "^https?://github.com/[^/]+/[^/]+$" ) ~= nil then
+            return gpm.AsyncImport( string.gsub( url, "^https?://", "" ), _PACKAGE, false )
         end
 
-        return workshop.Import( workshop.GetInfo( wsid ) )
-    end
-
-    local extension = string.GetExtensionFromFilename( url ) or "json"
-    if not allowedExtensions[ extension ] then
         logger:Error( "Package `%s` import failed, unsupported file extension. ", url )
         return
     end
@@ -67,21 +59,19 @@ Import = promise.Async( function( info )
     -- Local cache
     local cachePath = cacheFolder .. "http_" .. util.MD5( url ) .. "."  .. ( extension == "json" and "gma" or extension ) .. ".dat"
     if fs.Exists( cachePath, "DATA" ) and fs.Time( cachePath, "DATA" ) > ( 60 * 60 * cacheLifetime:GetInt() ) then
-        if extension == "zip" then
-            return sources.zip.Import( sources.zip.GetInfo( "data/" .. cachePath ) )
-        elseif extension == "gma" or extension == "json" then
-            return sources.gmad.Import( sources.gmad.GetInfo( "data/" .. cachePath ) )
-        elseif extension == "lua" then
-            local ok, result = fs.Compile( cachePath, "DATA" ):SafeAwait()
-            if not ok then
-                logger:Error( "Package `%s` import failed, cache `%s` compile error: %s. ", url, cachePath, result )
-                return
-            end
-
-            return package.Initialize( package.GetMetadata( {
-                ["name"] = url
-            } ), result, {} )
+        if extension ~= "lua" then
+            return gpm.AsyncImport( "data/" .. cachePath, _PACKAGE, false )
         end
+
+        local ok, result = fs.Compile( cachePath, "DATA" ):SafeAwait()
+        if not ok then
+            logger:Error( "Package `%s` import failed, cache `%s` compile error: %s. ", url, cachePath, result )
+            return
+        end
+
+        return package.Initialize( package.GetMetadata( {
+            ["name"] = url
+        } ), result, {} )
     end
 
     -- Downloading
@@ -106,10 +96,8 @@ Import = promise.Async( function( info )
             return
         end
 
-        if extension == "zip" then
-            return sources.zip.Import( sources.zip.GetInfo( "data/" .. cachePath ) )
-        elseif extension == "gma" then
-            return sources.gmad.Import( sources.gmad.GetInfo( "data/" .. cachePath ) )
+        if extension == "zip" or extension == "gma" then
+            return gpm.AsyncImport( "data/" .. cachePath, _PACKAGE, false )
         end
 
         logger:Error( "Package `%s` import failed, unknown file format.", url )
@@ -137,7 +125,7 @@ Import = promise.Async( function( info )
         return package.Initialize( package.GetMetadata( {
             ["name"] = url,
             ["autorun"] = true
-        } ), result, sources.lua.Files )
+        } ), result )
     end
 
     metadata = utils.LowerTableKeys( metadata )
@@ -204,15 +192,15 @@ Import = promise.Async( function( info )
             metadata.name = url
         end
 
-        local mainFile = metadata.main
-        if not mainFile then
-            mainFile = "init.lua"
+        local main = metadata.main
+        if not main then
+            main = "init.lua"
         end
 
-        local func = compiledFiles[ mainFile ]
+        local func = compiledFiles[ main ]
         if not func then
-            mainFile = "main.lua"
-            func = Files[ mainFile ]
+            main = "main.lua"
+            func = gpm.CompileLua( main )
         end
 
         if not func then
@@ -249,5 +237,5 @@ Import = promise.Async( function( info )
 
     gma:Close()
 
-    return sources.gmad.Import( sources.gmad.GetInfo( "data/" .. cachePath ) )
+    return gpm.AsyncImport( "data/" .. cachePath, _PACKAGE, false )
 end )
