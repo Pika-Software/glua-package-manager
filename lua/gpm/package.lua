@@ -1,5 +1,6 @@
--- Libraries
 local gpm = gpm
+
+-- Libraries
 local environment = gpm.environment
 local paths = gpm.paths
 local utils = gpm.utils
@@ -217,10 +218,27 @@ end
 
 SafeRun = safeRun
 
+-- This function will return compiled lua files by the path
+local function getCompiledFile( filePath, files )
+    local func = nil
+    if files then
+        func = files[ filePath ]
+    end
+
+    if not func then
+        func = gpm.CompileLua( filePath )
+    end
+
+    return func
+end
+
+GetCompiledFile = getCompiledFile
+
 function Initialize( metadata, func, files )
     gpm.ArgAssert( metadata, 1, "table" )
     gpm.ArgAssert( func, 2, "function" )
-    gpm.ArgAssert( files, 3, "table" )
+
+    files = type( files ) == "table" and files
 
     -- Measuring package startup time
     local stopwatch = SysTime()
@@ -246,8 +264,9 @@ function Initialize( metadata, func, files )
         env.http = gpm.http
         env.file = fs
 
-        -- Binding package object to gpm.Package
+        -- Binding package object to gpm.Package & _PACKAGE
         table.SetValue( env, "gpm.Package", package )
+        table.SetValue( env, "_PACKAGE", package )
 
         -- Logger
         if metadata.logger then
@@ -265,14 +284,14 @@ function Initialize( metadata, func, files )
             if currentFile then
                 local folder = string.GetPathFromFilename( paths.Localize( currentFile ) )
                 if folder then
-                    local func = files[ folder .. fileName ]
+                    local func = getCompiledFile( folder .. fileName, files )
                     if func then
                         return run( func, package )
                     end
                 end
             end
 
-            local func = files[ fileName ]
+            local func = getCompiledFile( fileName, files )
             if func then
                 return run( func, package )
             end
