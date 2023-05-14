@@ -1,25 +1,34 @@
+local realmName = MENU_DLL and "MENU" or ( SERVER and "SERVER" or "CLIENT" )
+local string_format = string.format
+local getmetatable = getmetatable
 local setmetatable = setmetatable
 local ArgAssert = gpm.ArgAssert
 local colors = gpm.Colors
+local os_date = os.date
+local MsgC = MsgC
+
+local developer = GetConVar( "developer" )
+local function debugFilter()
+    return developer:GetInt() > 0
+end
 
 -- Metatable
 local meta = {}
 meta.__index = meta
 
-function meta:__tostring()
-    return "Logger [" .. self:GetName() .. "]"
+function IsLogger( any )
+    return getmetatable( any ) == meta
 end
 
-do
+TYPE_LOGGER = gpm.AddType( "Logger", IsLogger )
 
-    local getmetatable = getmetatable
+module( "gpm.logger" )
 
-    function IsLogger( any )
-        return getmetatable( any ) == meta
-    end
+-- Metatable
+LOGGER = meta
 
-    TYPE_LOGGER = gpm.AddType( "Logger", IsLogger )
-
+function meta:__tostring()
+    return "Logger [" .. self:GetName() .. "]"
 end
 
 -- Logs name
@@ -63,30 +72,12 @@ function meta:SetDebugFilter( func )
 end
 
 -- Console log
-do
+function meta:Log( color, level, str, ... )
+    ArgAssert( color, 1, "Color" )
+    ArgAssert( level, 2, "string" )
 
-    local os_time = os.time
-    local os_date = os.date
-    local MsgC = MsgC
-
-    function meta:Log( levelColor, level, str, ... )
-        ArgAssert( levelColor, 1, "Color" )
-        ArgAssert( level, 2, "string" )
-
-        MsgC( colors.SecondaryText, os_date( "%d/%m/%Y %H:%M:%S ", os_time() ), levelColor, level, colors.SecondaryText, " --- ", colors.Realm, "[" .. (SERVER and "SERVER" or "CLIENT") .. "] ", self.Color, self.Name, colors.SecondaryText, " : ", self.TextColor, string.format( str, ... ), "\n"  )
-    end
-
+    MsgC( colors.SecondaryText, os_date( "%d/%m/%Y %H:%M:%S " ), color, level, colors.SecondaryText, " --- ", colors.Realm, "[" .. realmName .. "] ", self.Color, self.Name, colors.SecondaryText, " : ", self.TextColor, string_format( str, ... ), "\n"  )
 end
-
-local convar = GetConVar( "developer" )
-local function debugFilter()
-    return convar:GetInt() > 0
-end
-
-module( "gpm.logger" )
-
--- Metatable
-LOGGER = meta
 
 -- Info log
 function meta:Info( str, ... )
