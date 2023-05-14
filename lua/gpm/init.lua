@@ -1,5 +1,6 @@
 -- Libraries
 local string = string
+local table = table
 
 -- Variables
 local SERVER = SERVER
@@ -25,7 +26,7 @@ MsgN( [[
 
 module( "gpm", package.seeall )
 
-_VERSION = 011700
+_VERSION = 011800
 
 if not Colors then
     Colors = {
@@ -38,9 +39,10 @@ if not Colors then
         ["Debug"] = Color( 0, 200, 150 )
     }
 
+    LuaRealm = "LUA"
+
     if MENU_DLL then
         Colors.Realm = Color( 75, 175, 80 )
-        LuaRealm = "LUA"
     elseif CLIENT then
         Colors.Realm = Color( 225, 170, 10 )
         LuaRealm = "lcl"
@@ -49,6 +51,8 @@ if not Colors then
         LuaRealm = "lsv"
     end
 end
+
+local luaRealm = LuaRealm
 
 do
 
@@ -103,9 +107,35 @@ end
 
 IncludeComponent "package"
 
+local fs = fs
+
 CacheLifetime = CreateConVar( "gpm_cache_lifetime", "24", FCVAR_ARCHIVE, "Packages cache lifetime, in hours, sets after how many hours the downloaded gpm packages will not be relevant.", 0, 60480 )
 WorkshopPath = fs.CreateDir( "gpm/" .. ( SERVER and "server" or "client" ) .. "/workshop/" )
 CachePath = fs.CreateDir( "gpm/" .. ( SERVER and "server" or "client" ) .. "/packages/" )
+
+do
+
+    local CompileFile = CompileFile
+    local pcall = pcall
+    local files = {}
+
+    function GetCompiledFiles()
+        return files
+    end
+
+    function CompileLua( filePath )
+        if not filePath or not fs.Exists( filePath, luaRealm ) then return end
+
+        local func = files[ filePath ]
+        if func then return func end
+
+        local ok, result = pcall( CompileFile, filePath )
+        if not ok then return end
+        files[ filePath ] = result
+        return result
+    end
+
+end
 
 sources = sources or {}
 
@@ -152,7 +182,12 @@ do
                     return
                 end
 
+                local sendToClient = source.SendToClient
                 if autorun and not info.autorun then
+                    if SERVER and info.client and type( sendToClient ) == "function" then
+                        sendToClient( info )
+                    end
+
                     Logger:Debug( "Package `%s` autorun restricted.", packagePath )
                     return
                 end
@@ -174,6 +209,10 @@ do
                 if ( mapsType == "string" and maps ~= Map ) or ( mapsType == "table" and not table.HasIValue( maps, Map ) ) then
                     Logger:Error( "Package `%s` import failed, is not compatible with current map.", packagePath )
                     return
+                end
+
+                if SERVER and info.client and type( sendToClient ) == "function" then
+                    sendToClient( info )
                 end
 
                 task = source.Import( info )
@@ -244,14 +283,14 @@ end
 function ImportFolder( folderPath, package, autorun )
     folderPath = paths.Fix( folderPath )
 
-    if not fs.IsDir( folderPath, LuaRealm ) then
+    if not fs.IsDir( folderPath, luaRealm ) then
         Logger:Warn( "Import impossible, folder '%s' is empty, skipping...", folderPath )
         return
     end
 
     Logger:Info( "Starting to import packages from '%s'", folderPath )
 
-    local files, folders = fs.Find( folderPath .. "/*", LuaRealm )
+    local files, folders = fs.Find( folderPath .. "/*", luaRealm )
     for _, folderName in ipairs( folders ) do
         local packagePath = folderPath .. "/" .. folderName
 
@@ -359,7 +398,6 @@ if SERVER then
 
 end
 
-ImportFolder( "gpm/packages", nil, true )
 ImportFolder( "packages", nil, true )
 
 Logger:Info( "Time taken to start-up: %.4f sec.", SysTime() - stopwatch )
