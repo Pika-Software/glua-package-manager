@@ -74,8 +74,11 @@ singleplayer = false
 - ### Package entry point (`main`) (def. `init.lua`)
     The `main` in this case is the entry point to the package (where the code execution will start from), you can use either the full `lua/` path, for example 'lua/packages/example-package/init.lua' or a local path relative to your package folder.
 
-- ### Client and server (`client`, `server`) (def. `true`, `true`)
-    You can change the permissions to run a package, for example if you set `client` to `false` the client will not be able to run it, moreover it will not even know that such a package exists and therefore will not see its files.
+- ### Package client entry point (`cl_main`) ( def. `nil`)
+    An optional parameter that substitutes `main` with another file for the client, helps to easily separate the client and server sides.
+
+- ### Client and server (`client`, `server`, `menu`) (def. `true`, `true`, `false`)
+    You can change the permissions to run a package, for example if you set `client` to `false` the client will not be able to run it, moreover it will not even know that such a package exists and therefore will not see its files. `menu` is works only in menu realm.
 
 - ### Package autorun (`autorun`) (def. `false`)
     The default setting is `false`, if this parameter is set to `true` and the package is in a valid `lua/` directory, the package will automatically start and will not wait to be run externally.
