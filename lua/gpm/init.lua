@@ -8,6 +8,21 @@ local Color = Color
 local pairs = pairs
 local type = type
 
+MsgN( [[
+    ____    _____    ___ ___
+   /'_ `\ /\ '__`\ /' __` __`\
+  /\ \L\ \\ \ \L\ \/\ \/\ \/\ \
+  \ \____ \\ \ ,__/\ \_\ \_\ \_\
+   \/___L\ \\ \ \/  \/_/\/_/\/_/
+     /\____/ \ \_\
+     \_/__/   \/_/
+
+  GitHub: https://github.com/Pika-Software
+  Discord: https://discord.gg/3UVxhZ
+  Developers: Pika Software
+  License: MIT
+]] )
+
 module( "gpm", package.seeall )
 
 _VERSION = 011600
