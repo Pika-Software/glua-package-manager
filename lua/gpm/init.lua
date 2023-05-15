@@ -152,14 +152,15 @@ end
 do
 
     local sourceList = {}
-    local tasks = {}
 
-    for _, source in pairs( sources ) do
-        sourceList[ #sourceList + 1 ] = source
+    for sourceName in pairs( sources ) do
+        sourceList[ #sourceList + 1 ] = sourceName
     end
 
     function PackageExists( packagePath )
-        for _, source in ipairs( sourceList ) do
+        for _, sourceName in ipairs( sourceList ) do
+            local source = sources[ sourceName ]
+            if not source then continue end
             if not source.CanImport( packagePath ) then continue end
             return true
         end
@@ -167,63 +168,60 @@ do
         return false
     end
 
-    function AsyncImport( packagePath, package, autorun )
-        ArgAssert( packagePath, 1, "string" )
+    local tasks = {}
+
+    function SourceImport( sourceName, packagePath, package, autorun )
         packagePath = paths.Fix( packagePath )
 
         local task = tasks[ packagePath ]
-        if not promise.IsPromise( task ) then
-            for _, source in ipairs( sourceList ) do
-                if not source.CanImport( packagePath ) then continue end
+        if not task then
+            local source = sources[ sourceName ]
+            if not source or not source.CanImport( packagePath ) then return end
 
-                local info = source.GetInfo( packagePath )
-                if not info then
-                    Logger:Error( "Package `%s` import failed, no import info.", packagePath )
-                    return
-                end
+            local info = source.GetInfo( packagePath )
+            if not info then
+                Logger:Error( "Package `%s` import failed, no import info.", packagePath )
+                return false
+            end
 
-                local sendToClient = source.SendToClient
-                if autorun and not info.autorun then
-                    if SERVER and info.client and type( sendToClient ) == "function" then
-                        sendToClient( info )
-                    end
-
-                    Logger:Debug( "Package `%s` autorun restricted.", packagePath )
-                    return
-                end
-
-                if not info.singleplayer and SinglePlayer then
-                    Logger:Error( "Package `%s` import failed, cannot be executed in a single-player game.", packagePath )
-                    return
-                end
-
-                local gamemodes = info.gamemodes
-                local gamemodesType = type( gamemodes )
-                if ( gamemodesType == "string" and gamemodes ~= Gamemode ) or ( gamemodesType == "table" and not table.HasIValue( gamemodes, Gamemode ) ) then
-                    Logger:Error( "Package `%s` import failed, is not compatible with active gamemode.", packagePath )
-                    return
-                end
-
-                local maps = info.maps
-                local mapsType = type( maps )
-                if ( mapsType == "string" and maps ~= Map ) or ( mapsType == "table" and not table.HasIValue( maps, Map ) ) then
-                    Logger:Error( "Package `%s` import failed, is not compatible with current map.", packagePath )
-                    return
-                end
-
+            local sendToClient = source.SendToClient
+            if autorun and not info.autorun then
                 if SERVER and info.client and type( sendToClient ) == "function" then
                     sendToClient( info )
                 end
 
-                task = source.Import( info )
-                tasks[ packagePath ] = task
-                break
+                Logger:Debug( "Package `%s` autorun restricted.", packagePath )
+                return false
             end
 
-            if not promise.IsPromise( task ) then
-                Error( packagePath, "Requested package doesn't exist!" )
+            if not info.singleplayer and SinglePlayer then
+                Logger:Error( "Package `%s` import failed, cannot be executed in a single-player game.", packagePath )
+                return false
             end
+
+            local gamemodes = info.gamemodes
+            local gamemodesType = type( gamemodes )
+            if ( gamemodesType == "string" and gamemodes ~= Gamemode ) or ( gamemodesType == "table" and not table.HasIValue( gamemodes, Gamemode ) ) then
+                Logger:Error( "Package `%s` import failed, is not compatible with active gamemode.", packagePath )
+                return false
+            end
+
+            local maps = info.maps
+            local mapsType = type( maps )
+            if ( mapsType == "string" and maps ~= Map ) or ( mapsType == "table" and not table.HasIValue( maps, Map ) ) then
+                Logger:Error( "Package `%s` import failed, is not compatible with current map.", packagePath )
+                return false
+            end
+
+            if SERVER and info.client and type( sendToClient ) == "function" then
+                sendToClient( info )
+            end
+
+            task = source.Import( info )
+            tasks[ packagePath ] = task
         end
+
+        if not promise.IsPromise( task ) then return end
 
         if IsPackage( package ) then
             if task:IsPending() then
@@ -237,6 +235,27 @@ do
                     package:Link( package2 )
                 end
             end
+        end
+
+        return task
+    end
+
+    function AsyncImport( packagePath, package, autorun )
+        packagePath = paths.Fix( packagePath )
+
+        local task = tasks[ packagePath ]
+        if not task then
+            for _, sourceName in ipairs( sourceList ) do
+                local p = SourceImport( sourceName, packagePath, package, autorun )
+                if p == false then return end
+                if p == nil then continue end
+                task = p
+            end
+        end
+
+        if not task then
+            Error( packagePath, "Requested package doesn't exist!" )
+            return
         end
 
         return task

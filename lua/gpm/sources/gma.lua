@@ -314,7 +314,7 @@ Import = promise.Async( function( info )
                 if imported[ packagePath ] then continue end
                 imported[ packagePath ] = true
 
-                local ok, result = gpm.AsyncImport( packagePath, pkg, false ):SafeAwait()
+                local ok, result = gpm.SourceImport( "lua", packagePath, pkg, false ):SafeAwait()
                 if not ok then return promise.Reject( result ) end
             end
         end

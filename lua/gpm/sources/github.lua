@@ -36,7 +36,7 @@ Try = promise.Async( function( url )
         return promise.Reject( "invalid response http code - " .. result.code )
     end
 
-    local ok, result = gpm.AsyncImport( url, _PACKAGE, false ):SafeAwait()
+    local ok, result = gpm.SourceImport( "http", url, _PACKAGE, false ):SafeAwait()
     if ok then return result end
 
     ErrorNoHaltWithStack( result )

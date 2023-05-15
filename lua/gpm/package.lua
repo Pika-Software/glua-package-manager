@@ -331,7 +331,7 @@ function Initialize( metadata, func, files )
         environment.SetValue( env, "require", function( name )
             if util.IsBinaryModuleInstalled( name ) then return require( name ) end
 
-            local ok, result = import( "includes/modules/" .. name .. ".lua", true ):SafeAwait()
+            local ok, result = gpm.SourceImport( "lua", "includes/modules/" .. name .. ".lua", _PACKAGE, false ):SafeAwait()
             if ok then return result end
 
             ErrorNoHaltWithStack( "Module `" .. name .. "` not found!" )

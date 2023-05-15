@@ -47,9 +47,9 @@ Import = promise.Async( function( info )
     if not allowedExtensions[ extension ] then
         local wsid = string.match( url, "steamcommunity%.com/sharedfiles/filedetails/%?id=(%d+)" )
         if wsid ~= nil then
-            return gpm.AsyncImport( wsid, _PACKAGE, false )
+            return gpm.SourceImport( "workshop", wsid, _PACKAGE, false )
         elseif string.match( url, "^https?://github.com/[^/]+/[^/]+$" ) ~= nil then
-            return gpm.AsyncImport( string.gsub( url, "^https?://", "" ), _PACKAGE, false )
+            return gpm.SourceImport( "http", string.gsub( url, "^https?://", "" ), _PACKAGE, false )
         end
 
         logger:Error( "Package `%s` import failed, unsupported file extension. ", url )
@@ -60,7 +60,7 @@ Import = promise.Async( function( info )
     local cachePath = cacheFolder .. "http_" .. util.MD5( url ) .. "."  .. ( extension == "json" and "gma" or extension ) .. ".dat"
     if fs.Exists( cachePath, "DATA" ) and fs.Time( cachePath, "DATA" ) > ( 60 * 60 * cacheLifetime:GetInt() ) then
         if extension ~= "lua" then
-            return gpm.AsyncImport( "data/" .. cachePath, _PACKAGE, false )
+            return gpm.SourceImport( "gma", "data/" .. cachePath, _PACKAGE, false )
         end
 
         local ok, result = fs.Compile( cachePath, "DATA" ):SafeAwait()
@@ -97,7 +97,7 @@ Import = promise.Async( function( info )
         end
 
         if extension == "zip" or extension == "gma" then
-            return gpm.AsyncImport( "data/" .. cachePath, _PACKAGE, false )
+            return gpm.SourceImport( "gma", "data/" .. cachePath, _PACKAGE, false )
         end
 
         logger:Error( "Package `%s` import failed, unknown file format.", url )
@@ -237,5 +237,5 @@ Import = promise.Async( function( info )
 
     gma:Close()
 
-    return gpm.AsyncImport( "data/" .. cachePath, _PACKAGE, false )
+    return gpm.SourceImport( "gma", "data/" .. cachePath, _PACKAGE, false )
 end )
