@@ -53,7 +53,7 @@ end
 autorunTypes = typesCache
 typesCache = nil
 
-module( "gpm.sources.gmad" )
+module( "gpm.sources.gma" )
 
 function CanImport( filePath )
     return fs.Exists( filePath, "GAME" ) and string.EndsWith( filePath, ".gma.dat" ) or string.EndsWith( filePath, ".gma" )

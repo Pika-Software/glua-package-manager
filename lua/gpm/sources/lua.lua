@@ -146,7 +146,6 @@ Import = promise.Async( function( info )
     local func = gpm.CompileLua( info.main )
     if not func then
         gpm.Error( info.importPath, "main file `" .. ( info.main or "init.lua" ) .. "` is missing." )
-        return
     end
 
     return package.Initialize( info, func )

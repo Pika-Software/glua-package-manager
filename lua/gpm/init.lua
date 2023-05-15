@@ -91,6 +91,8 @@ libs.deflatelua = IncludeComponent "libs/deflatelua"
 Logger:Info( "%s %s is initialized.", libs.deflatelua._NAME, libs.deflatelua._VERSION )
 
 IncludeComponent "promise"
+local promise = promise
+
 Logger:Info( "gm_promise %s is initialized.", utils.Version( promise._VERSION_NUM ) )
 
 IncludeComponent "environment"
@@ -281,12 +283,10 @@ do
             local ok, result = task:SafeAwait()
             if not ok then
                 Error( packagePath, result )
-                return
             end
 
             if not result then
                 Error( packagePath, "This should never have happened, but the package was missing after the import." )
-                return
             end
 
             return result:GetResult()
