@@ -37,6 +37,20 @@ function Get( importPath )
     return gpm.Packages[ importPath ]
 end
 
+-- Get package by name/pattern
+function Find( searchable, ignoreImportNames, noPatterns )
+    local result = {}
+    for importPath, package in pairs( gpm.Packages ) do
+        if not ignoreImportNames and string.find( importPath, searchable, 1, noPatterns ) then
+            result[ #result + 1 ] = package
+        elseif package.name and string.find( package.name, searchable, 1, noPatterns ) then
+            result[ #result + 1 ] = package
+        end
+    end
+
+    return result
+end
+
 -- gpm.package.GetMetadata( source )
 do
 
