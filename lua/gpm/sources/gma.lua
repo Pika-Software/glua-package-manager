@@ -19,6 +19,7 @@ local game_MountGMA = game.MountGMA
 local logger = gpm.Logger
 local setfenv = setfenv
 local ipairs = ipairs
+local error = error
 local pcall = pcall
 
 local gamemodeResult
@@ -66,20 +67,16 @@ function GetInfo( filePath )
 end
 
 local runLua = promise.Async( function( filePath, environment )
-    local func = gpm.CompileLua( filePath )
-    if not func then return end
+    local ok, func = gpm.CompileLua( filePath )
+    if not ok then
+        error( func )
+    end
 
     if environment ~= nil then
         setfenv( func, environment )
     end
 
-    local ok, result = pcall( func )
-    if not ok then
-        ErrorNoHaltWithStack( result )
-        return
-    end
-
-    return result
+    return func()
 end )
 
 RunLua = runLua

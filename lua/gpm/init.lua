@@ -118,6 +118,7 @@ CachePath = fs.CreateDir( "gpm/" .. ( SERVER and "server" or "client" ) .. "/pac
 do
 
     local CompileFile = CompileFile
+    local ArgAssert = ArgAssert
     local pcall = pcall
     local files = {}
 
@@ -126,15 +127,18 @@ do
     end
 
     function CompileLua( filePath )
-        if not filePath or not fs.Exists( filePath, luaRealm ) then return end
+        ArgAssert( filePath, 1, "string" )
 
         local func = files[ filePath ]
         if func then return func end
 
         local ok, result = pcall( CompileFile, filePath )
-        if not ok then return end
-        files[ filePath ] = result
-        return result
+        if ok then
+            if not result then return false, "file '" .. filePath .. "' code compilation failed due to an unknown error." end
+            files[ filePath ] = result
+        end
+
+        return ok, result
     end
 
 end

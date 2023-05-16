@@ -31,9 +31,11 @@ function GetInfo( importPath )
     local packagePath = folder .. "/package.lua"
     local hasPackageFile = fs.IsFile( packagePath, luaRealm )
     if hasPackageFile then
-        local func = gpm.CompileLua( packagePath )
-        if func then
-            info = package.GetMetadata( func )
+        local ok, result = gpm.CompileLua( packagePath )
+        if ok then
+            info = package.GetMetadata( result )
+        else
+            gpm.Error( importPath, result, true )
         end
     end
 
@@ -142,10 +144,15 @@ Import = promise.Async( function( info )
     if CLIENT and not info.client then return end
     if SERVER and not info.server then return end
 
-    local func = gpm.CompileLua( info.main )
-    if not func then
-        gpm.Error( info.importPath, "main file '" .. ( info.main or "init.lua" ) .. "' is missing." )
+    local mainFile = info.main
+    if not fs.Exists( mainFile, luaRealm ) then
+        gpm.Error( info.importPath, "main file '" .. ( mainFile or "init.lua" ) .. "' is missing." )
     end
 
-    return package.Initialize( info, func )
+    local ok, result = gpm.CompileLua( mainFile )
+    if not ok then
+        gpm.Error( info.importPath, result )
+    end
+
+    return package.Initialize( info, result )
 end )

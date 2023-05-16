@@ -231,12 +231,15 @@ SafeRun = safeRun
 -- This function will return compiled lua files by the path
 local function getCompiledFile( filePath, files )
     local func = nil
-    if files then
+    if files ~= nil then
         func = files[ filePath ]
     end
 
-    if not func then
-        func = gpm.CompileLua( filePath )
+    if not func and fs.IsFile( filePath, luaRealm ) then
+        local ok, result = gpm.CompileLua( filePath )
+        if ok then
+            func = result
+        end
     end
 
     return func
