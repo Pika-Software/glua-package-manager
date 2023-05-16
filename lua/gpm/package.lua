@@ -339,6 +339,8 @@ function Initialize( metadata, func, files )
 
     end
 
+    local importPath = metadata.importPath
+
     -- Run
     local ok, result = safeRun( func, package, ErrorNoHaltWithStack )
     if not ok then
@@ -351,7 +353,7 @@ function Initialize( metadata, func, files )
 
     -- Saving in global table & final log
     logger:Info( "Package '%s' was successfully imported, it took %.4f seconds.", importPath, SysTime() - stopwatch )
-    gpm.Packages[ metadata.importPath ] = package
+    gpm.Packages[ importPath ] = package
 
     return package
 end

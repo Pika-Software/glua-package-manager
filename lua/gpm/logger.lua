@@ -1,6 +1,5 @@
 local realmName = MENU_DLL and "MENU" or ( SERVER and "SERVER" or "CLIENT" )
 local string_format = string.format
-local getmetatable = getmetatable
 local setmetatable = setmetatable
 local ArgAssert = gpm.ArgAssert
 local colors = gpm.Colors
@@ -16,8 +15,14 @@ end
 local meta = {}
 meta.__index = meta
 
-function IsLogger( any )
-    return getmetatable( any ) == meta
+do
+
+    local getmetatable = getmetatable
+
+    function IsLogger( any )
+        return getmetatable( any ) == meta
+    end
+
 end
 
 TYPE_LOGGER = gpm.AddType( "Logger", IsLogger )

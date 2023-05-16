@@ -79,9 +79,9 @@ do
 
     local error = error
 
-    function Error( packageName, ... )
+    function Error( packageName, message, errorLevel )
         Logger:Error( "Package '%s' import failed, see above to see the error.", packageName )
-        error( ... )
+        error( message, errorLevel )
     end
 
 end

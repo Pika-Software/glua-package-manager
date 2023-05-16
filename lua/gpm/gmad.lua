@@ -484,7 +484,7 @@ function Parse( fileClass )
     gmad.FilesPos = fileClass:Tell()
 
     local description = gmad.Description
-    if ( description ~= nil ) then
+    if description ~= nil then
         gmad.Description = util.JSONToTable( description ) or description
     end
 

@@ -20,8 +20,7 @@ function CanImport( filePath )
     return fs.Exists( filePath, luaRealm ) and string.EndsWith( filePath, ".lua" ) or fs.IsDir( filePath, luaRealm )
 end
 
-function GetInfo( filePath )
-    local importPath = paths.Fix( filePath )
+function GetInfo( importPath )
     local info = nil
 
     local folder = importPath
