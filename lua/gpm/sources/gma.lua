@@ -128,7 +128,7 @@ Import = promise.Async( function( info )
     end
 
     return package.Initialize( package.GetMetadata( info ), function()
-        local pkg, environment = _PACKAGE, nil
+        local pkg, environment = _PKG, nil
         if pkg ~= nil then
             environment = pkg:GetEnvironment()
         end

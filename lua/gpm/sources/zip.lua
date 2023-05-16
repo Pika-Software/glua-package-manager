@@ -46,7 +46,7 @@ end
 Import = promise.Async( function( info )
     local cachePath = info.cachePath
     if fs.Exists( cachePath, "DATA" ) and fs.Time( cachePath, "DATA" ) > ( 60 * 60 * cacheLifetime:GetInt() ) then
-        return gpm.SourceImport( "gma", "data/" .. cachePath, _PACKAGE, false )
+        return gpm.SourceImport( "gma", "data/" .. cachePath, _PKG, false )
     end
 
     local importPath = info.importPath
@@ -98,5 +98,5 @@ Import = promise.Async( function( info )
 
     gma:Close()
 
-    return gpm.SourceImport( "gma", "data/" .. cachePath, _PACKAGE, false )
+    return gpm.SourceImport( "gma", "data/" .. cachePath, _PKG, false )
 end )

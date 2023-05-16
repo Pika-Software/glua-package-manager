@@ -264,9 +264,9 @@ function Initialize( metadata, func, files )
         env.http = gpm.http
         env.file = fs
 
-        -- Binding package object to gpm.Package & _PACKAGE
+        -- Binding package object to gpm.Package & _PKG
         table.SetValue( env, "gpm.Package", package )
-        table.SetValue( env, "_PACKAGE", package )
+        table.SetValue( env, "_PKG", package )
 
         -- Logger
         if metadata.logger then
@@ -331,7 +331,7 @@ function Initialize( metadata, func, files )
         environment.SetValue( env, "require", function( name )
             if util.IsBinaryModuleInstalled( name ) then return require( name ) end
 
-            local ok, result = gpm.SourceImport( "lua", "includes/modules/" .. name .. ".lua", _PACKAGE, false ):SafeAwait()
+            local ok, result = gpm.SourceImport( "lua", "includes/modules/" .. name .. ".lua", _PKG, false ):SafeAwait()
             if ok then return result end
 
             ErrorNoHaltWithStack( "Module `" .. name .. "` not found!" )

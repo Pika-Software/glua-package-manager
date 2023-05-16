@@ -91,5 +91,5 @@ Import = promise.Async( function( info )
         return
     end
 
-    return gpm.SourceImport( "gma", result, _PACKAGE, false )
+    return gpm.SourceImport( "gma", result, _PKG, false )
 end )
