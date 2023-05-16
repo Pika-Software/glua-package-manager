@@ -144,12 +144,12 @@ Import = promise.Async( function( info )
     if CLIENT and not info.client then return end
     if SERVER and not info.server then return end
 
-    local mainFile = info.main
-    if not fs.IsFile( mainFile, luaRealm ) then
-        gpm.Error( info.importPath, "main file '" .. ( mainFile or "init.lua" ) .. "' is missing." )
+    local main = info.main
+    if not fs.IsFile( main, luaRealm ) then
+        gpm.Error( info.importPath, "main file '" .. ( main or "init.lua" ) .. "' is missing." )
     end
 
-    local ok, result = gpm.CompileLua( mainFile )
+    local ok, result = gpm.CompileLua( main )
     if not ok then
         gpm.Error( info.importPath, result )
     end
