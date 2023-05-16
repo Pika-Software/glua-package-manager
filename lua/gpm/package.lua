@@ -17,7 +17,6 @@ local setmetatable = setmetatable
 local logger = gpm.Logger
 local require = require
 local SysTime = SysTime
-local IsColor = IsColor
 local setfenv = setfenv
 local xpcall = xpcall
 local error = error
@@ -47,11 +46,16 @@ do
     local function getMetadata( source )
         if type( source ) == "table" then
             -- Package name & entry point
-            source.name = type( source.name ) == "string" and source.name or nil
+            if type( source.name ) ~= "string" then
+                source.name = nil
+            end
+
             if CLIENT and type( source.cl_main ) == "string" then
                 source.main = source.cl_main
-            else
-                source.main = type( source.main ) == "string" and source.main or nil
+            end
+
+            if type( source.main ) ~= "string" then
+                source.main = nil
             end
 
             -- Version
@@ -81,12 +85,18 @@ do
             source.isolation = source.isolation ~= false
             source.autorun = source.autorun == true
 
-            -- Color & logger
-            source.color = IsColor( source.color ) and source.color or nil
+            -- Color
+            if gpm.type( source.color ) ~= "Color" then
+                source.color = nil
+            end
+
+            -- Logger
             source.logger = source.logger == true
 
             -- Files to send to the client ( package and main will already be added and there is no need to specify them here )
-            source.send = type( source.send ) == "table" and source.send or nil
+            if type( source.send ) ~= "table" then
+                source.send = nil
+            end
 
             return source
         elseif type( source ) == "function" then
@@ -238,7 +248,7 @@ function Initialize( metadata, func, files )
     gpm.ArgAssert( metadata, 1, "table" )
     gpm.ArgAssert( func, 2, "function" )
 
-    files = type( files ) == "table" and files
+    if type( files ) ~= "table" then files = nil end
 
     -- Measuring package startup time
     local stopwatch = SysTime()
