@@ -33,10 +33,6 @@ Try = promise.Async( function( url )
         return promise.Reject( "invalid response http code - " .. result.code )
     end
 
-    -- local ok, result = gpm.SourceImport( "http", url, _PKG, false ):SafeAwait()
-    -- if ok then return result end
-
-    -- gpm.Error( url, result )
     return gpm.SourceImport( "http", url, _PKG, false )
 end )
 
