@@ -168,7 +168,7 @@ Import = promise.Async( function( info )
         end
 
         if not func then
-            gpm.Error( url, "main file is missing." )
+            gpm.Error( url, "main file '" .. main .. "' is missing." )
         end
 
         return package.Initialize( info, func, compiledFiles )
