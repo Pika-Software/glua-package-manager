@@ -30,8 +30,7 @@ end
 function GetInfo( url )
     return {
         ["extension"] = string.GetExtensionFromFilename( url ) or "json",
-        ["importPath"] = url,
-        ["url"] = url
+        ["importPath"] = url
     }
 end
 
@@ -43,7 +42,7 @@ local allowedExtensions = {
 }
 
 Import = promise.Async( function( info )
-    local url, extension = info.url, info.extension
+    local url, extension = info.importPath, info.extension
     if not allowedExtensions[ extension ] then
         local wsid = string.match( url, "steamcommunity%.com/sharedfiles/filedetails/%?id=(%d+)" )
         if wsid ~= nil then
@@ -67,13 +66,13 @@ Import = promise.Async( function( info )
 
         local ok, result = fs.Compile( cachePath, "DATA" ):SafeAwait()
         if not ok then
-            logger:Error( "Package `%s` import failed, cache `%s` compile error: %s. ", url, cachePath, result )
-            return
+            gpm.Error( url, result )
         end
 
         return package.Initialize( package.GetMetadata( {
+            ["autorun"] = true,
             ["name"] = url
-        } ), result, {} )
+        } ), result )
     end
 
     -- Downloading
@@ -94,55 +93,45 @@ Import = promise.Async( function( info )
     if extension ~= "json" then
         local ok, result = fs.AsyncWrite( cachePath, body ):SafeAwait()
         if not ok then
-            logger:Error( "Package `%s` import failed, %s.", url, result )
-            return
+            logger:Warn( "Cache creation for package '%s' failed, error: %s", url, result )
         end
 
-        if extension == "gma" then
-            return gpm.SourceImport( "gma", "data/" .. cachePath, _PKG, false )
-        elseif extension == "zip" then
-            return gpm.SourceImport( "zip", "data/" .. cachePath, _PKG, false )
+        if extension == "lua" then
+            local ok, result = pcall( CompileString, body, url )
+            if not ok then
+                gpm.Error( url, result )
+            end
+
+            return package.Initialize( package.GetMetadata( {
+                ["autorun"] = true,
+                ["name"] = url
+            } ), result )
+        elseif extension == "gma" or extension == "zip" then
+            return gpm.SourceImport( extension, "data/" .. cachePath, _PKG, false )
         end
 
-
-        logger:Error( "Package '%s' import failed, unknown file format.", url )
-        return
+        gpm.Error( url, "unsupported file format." )
     end
 
-    local metadata = util.JSONToTable( body )
-    if not metadata then
-        local ok, err = fs.AsyncWrite( cachePath, body ):SafeAwait()
-        if not ok then
-            logger:Error( "Package '%s' import cache '%s' write failed, %s", url, cachePath, err )
-        end
-
-        local ok, result = pcall( CompileString, body, url )
-        if not ok then
-            logger:Error( "Package '%s' import failed, %s.", url, result )
-            return
-        end
-
-        if not result then
-            logger:Error( "Package '%s' import failed, lua compilation failed.", url )
-            return
-        end
-
-        return package.Initialize( package.GetMetadata( {
-            ["name"] = url,
-            ["autorun"] = true
-        } ), result )
+    local json = util.JSONToTable( body )
+    if not json then
+        gpm.Error( url, "'package.json' file is corrupted." )
     end
 
-    metadata = utils.LowerTableKeys( metadata )
-    metadata.filePath = url
+    package.GetMetadata( table.Merge( info, utils.LowerTableKeys( json ) ) )
+    info.importPath = url
 
-    local urls = metadata.files
+    if not info.name then
+        info.name = url
+    end
+
+    local urls = info.files
     if type( urls ) ~= "table" then
         logger:Error( "Package '%s' import failed, no links to files, download canceled.", url )
         return
     end
 
-    metadata.files = nil
+    info.files = nil
 
     local files = {}
     for filePath, fileURL in pairs( urls ) do
@@ -159,9 +148,7 @@ Import = promise.Async( function( info )
         return
     end
 
-    if metadata.mount == false then
-        metadata = package.GetMetadata( metadata )
-
+    if info.mount == false then
         local compiledFiles = {}
         for _, data in ipairs( files ) do
             local ok, result = pcall( CompileString, data[ 2 ], data[ 1 ] )
@@ -170,45 +157,32 @@ Import = promise.Async( function( info )
             compiledFiles[ data[ 1 ] ] = result
         end
 
-        if not metadata.name then
-            metadata.name = url
-        end
-
-        local main = metadata.main
-        if not main then
+        local main = info.main
+        if type( main ) ~= "string" then
             main = "init.lua"
         end
 
-        local func = compiledFiles[ main ]
+        local func = package.GetCompiledFile( main, compiledFiles )
         if not func then
-            main = "main.lua"
-            func = gpm.CompileLua( main )
+            func = package.GetCompiledFile( "main.lua", compiledFiles )
         end
 
         if not func then
-            logger:Error( "Package '%s' import failed, main file is missing.", url )
-            return
+            gpm.Error( url, "main file is missing." )
         end
 
-        return package.Initialize( metadata, func, compiledFiles )
+        return package.Initialize( info, func, compiledFiles )
     end
 
     local gma = gmad.Write( cachePath )
     if not gma then
-        logger:Error( "Package '%s' import failed, cache construction error, mounting failed.", url )
-        return
+        gpm.Error( url, "cache construction error." )
     end
 
-    local name = metadata.name
-    if name ~= nil then
-        gma:SetTitle( name )
-    else
-        gma:SetTitle( url )
-    end
+    gma:SetTitle( info.name )
+    gma:SetDescription( util.TableToJSON( info ) )
 
-    gma:SetDescription( util.TableToJSON( metadata ) )
-
-    local author = metadata.author
+    local author = info.author
     if author ~= nil then
         gma:SetAuthor( author )
     end
