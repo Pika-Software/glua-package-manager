@@ -14,13 +14,13 @@ local CLIENT, SERVER = CLIENT, SERVER
 local AddCSLuaFile = AddCSLuaFile
 local getmetatable = getmetatable
 local setmetatable = setmetatable
-local tostring = tostring
 local logger = gpm.Logger
 local require = require
 local SysTime = SysTime
 local IsColor = IsColor
 local setfenv = setfenv
 local xpcall = xpcall
+local error = error
 local pairs = pairs
 local type = type
 local _G = _G
@@ -296,7 +296,7 @@ function Initialize( metadata, func, files )
                 return run( func, package )
             end
 
-            ErrorNoHaltWithStack( "Couldn't include file '" .. tostring( fileName ) .. "' - File not found" )
+            error( "Couldn't include file '" .. fileName .. "' - File not found" )
         end )
 
         -- AddCSLuaFile
@@ -323,7 +323,7 @@ function Initialize( metadata, func, files )
                     return AddCSLuaFile( fileName )
                 end
 
-                ErrorNoHaltWithStack( "Couldn't AddCSLuaFile file '" .. tostring( fileName ) .. "' - File not found" )
+                error( "Couldn't AddCSLuaFile file '" .. fileName .. "' - File not found" )
             end )
         end
 
@@ -334,7 +334,7 @@ function Initialize( metadata, func, files )
             local ok, result = gpm.SourceImport( "lua", "includes/modules/" .. name .. ".lua", _PKG, false ):SafeAwait()
             if ok then return result end
 
-            ErrorNoHaltWithStack( "Module `" .. name .. "` not found!" )
+            error( "Module '" .. name .. "' not found!" )
         end )
 
     end
