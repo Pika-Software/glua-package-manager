@@ -47,9 +47,9 @@ Import = promise.Async( function( info )
     if not allowedExtensions[ extension ] then
         local wsid = string.match( url, "steamcommunity%.com/sharedfiles/filedetails/%?id=(%d+)" )
         if wsid ~= nil then
-            return gpm.SourceImport( "workshop", wsid, _PACKAGE, false )
+            return gpm.SourceImport( "workshop", wsid, _PKG, false )
         elseif string.match( url, "^https?://github.com/[^/]+/[^/]+$" ) ~= nil then
-            return gpm.SourceImport( "http", string.gsub( url, "^https?://", "" ), _PACKAGE, false )
+            return gpm.SourceImport( "http", string.gsub( url, "^https?://", "" ), _PKG, false )
         end
 
         logger:Error( "Package `%s` import failed, unsupported file extension. ", url )
@@ -59,8 +59,10 @@ Import = promise.Async( function( info )
     -- Local cache
     local cachePath = cacheFolder .. "http_" .. util.MD5( url ) .. "."  .. ( extension == "json" and "gma" or extension ) .. ".dat"
     if fs.Exists( cachePath, "DATA" ) and fs.Time( cachePath, "DATA" ) > ( 60 * 60 * cacheLifetime:GetInt() ) then
-        if extension ~= "lua" then
-            return gpm.SourceImport( "gma", "data/" .. cachePath, _PACKAGE, false )
+        if extension == "gma" or extension == "json" then
+            return gpm.SourceImport( "gma", "data/" .. cachePath, _PKG, false )
+        elseif extension == "zip" then
+            return gpm.SourceImport( "zip", "data/" .. cachePath, _PKG, false )
         end
 
         local ok, result = fs.Compile( cachePath, "DATA" ):SafeAwait()
@@ -96,8 +98,10 @@ Import = promise.Async( function( info )
             return
         end
 
-        if extension == "zip" or extension == "gma" then
-            return gpm.SourceImport( "gma", "data/" .. cachePath, _PACKAGE, false )
+        if extension == "gma" then
+            return gpm.SourceImport( "gma", "data/" .. cachePath, _PKG, false )
+        elseif extension == "zip" then
+            return gpm.SourceImport( "zip", "data/" .. cachePath, _PKG, false )
         end
 
         logger:Error( "Package `%s` import failed, unknown file format.", url )
@@ -129,29 +133,6 @@ Import = promise.Async( function( info )
     end
 
     metadata = utils.LowerTableKeys( metadata )
-
-    -- Singleplayer
-    if not metadata.singleplayer and isSinglePlayer then
-        logger:Error( "Package `%s` import failed, cannot be executed in a single-player game.", url )
-        return
-    end
-
-    -- Gamemode
-    local gamemodes = metadata.gamemodes
-    local gamemodesType = type( gamemodes )
-    if ( gamemodesType == "string" and gamemodes ~= activeGamemode ) or ( gamemodesType == "table" and not table.HasIValue( gamemodes, activeGamemode ) ) then
-        logger:Error( "Package `%s` import failed, is not compatible with active gamemode.", url )
-        return
-    end
-
-    -- Map
-    local maps = metadata.maps
-    local mapsType = type( maps )
-    if ( mapsType == "string" and maps ~= currentMap ) or ( mapsType == "table" and not table.HasIValue( maps, currentMap ) ) then
-        logger:Error( "Package `%s` import failed, is not compatible with current map.", url )
-        return
-    end
-
     metadata.filePath = url
 
     local urls = metadata.files
@@ -237,5 +218,5 @@ Import = promise.Async( function( info )
 
     gma:Close()
 
-    return gpm.SourceImport( "gma", "data/" .. cachePath, _PACKAGE, false )
+    return gpm.SourceImport( "gma", "data/" .. cachePath, _PKG, false )
 end )
