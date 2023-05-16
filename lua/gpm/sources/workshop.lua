@@ -37,7 +37,7 @@ function Download( wsid )
     local p = promise.New()
 
     steamworks.DownloadUGC( wsid, function( filePath, fileClass )
-        if fs.Exists( filePath, "GAME" ) then
+        if fs.IsFile( filePath, "GAME" ) then
             p:Resolve( filePath )
             return
         end
@@ -50,7 +50,7 @@ function Download( wsid )
             end
 
             local cachePath = cacheFolder .. wsid .. ".gma.dat"
-            if fs.Exists( cachePath, "DATA" ) then
+            if fs.IsFile( cachePath, "DATA" ) then
                 if fs.Time( cachePath, "DATA" ) <= ( 60 * 60 * cacheLifetime:GetInt() ) then
                     p:Resolve( "data/" .. cachePath )
                     return
@@ -67,7 +67,7 @@ function Download( wsid )
                 gmaWriter.Metadata = gmaReader.Metadata
                 gmaWriter.Files = gmaReader.Files
                 gmaWriter:Close()
-            elseif fs.Exists( cachePath, "DATA" ) then
+            elseif fs.IsFile( cachePath, "DATA" ) then
                 logger:Warn( "Cache writing failed, probably file 'data/" .. cachePath .. "' was already mounted, need to restart the game." )
             else
                 p:Reject( "gma file writing failed" )

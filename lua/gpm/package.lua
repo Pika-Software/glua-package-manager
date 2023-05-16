@@ -14,6 +14,7 @@ local CLIENT, SERVER = CLIENT, SERVER
 local AddCSLuaFile = AddCSLuaFile
 local getmetatable = getmetatable
 local setmetatable = setmetatable
+local luaRealm = gpm.LuaRealm
 local logger = gpm.Logger
 local require = require
 local SysTime = SysTime
@@ -326,13 +327,13 @@ function Initialize( metadata, func, files )
                     local folder = string.GetPathFromFilename( paths.Localize( currentFile ) )
                     if folder then
                         local filePath = folder .. fileName
-                        if fs.Exists( filePath, gpm.LuaRealm ) then
+                        if fs.IsFile( filePath, luaRealm ) then
                             return AddCSLuaFile( filePath )
                         end
                     end
                 end
 
-                if fs.Exists( fileName, gpm.LuaRealm ) then
+                if fs.IsFile( fileName, luaRealm ) then
                     return AddCSLuaFile( fileName )
                 end
 

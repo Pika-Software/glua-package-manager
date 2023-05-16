@@ -57,7 +57,7 @@ Import = promise.Async( function( info )
 
     -- Local cache
     local cachePath = cacheFolder .. "http_" .. util.MD5( url ) .. "."  .. ( extension == "json" and "gma" or extension ) .. ".dat"
-    if fs.Exists( cachePath, "DATA" ) and fs.Time( cachePath, "DATA" ) > ( 60 * 60 * cacheLifetime:GetInt() ) then
+    if fs.IsFile( cachePath, "DATA" ) and fs.Time( cachePath, "DATA" ) > ( 60 * 60 * cacheLifetime:GetInt() ) then
         if extension == "gma" or extension == "json" then
             return gpm.SourceImport( "gma", "data/" .. cachePath, _PKG, false )
         elseif extension == "zip" then

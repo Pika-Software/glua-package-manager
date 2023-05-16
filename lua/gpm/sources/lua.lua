@@ -17,7 +17,7 @@ local type = type
 module( "gpm.sources.lua" )
 
 function CanImport( filePath )
-    return fs.Exists( filePath, luaRealm ) and string.EndsWith( filePath, ".lua" ) or fs.IsDir( filePath, luaRealm )
+    return fs.IsFile( filePath, luaRealm ) and string.EndsWith( filePath, ".lua" ) or fs.IsDir( filePath, luaRealm )
 end
 
 function GetInfo( importPath )
@@ -145,7 +145,7 @@ Import = promise.Async( function( info )
     if SERVER and not info.server then return end
 
     local mainFile = info.main
-    if not fs.Exists( mainFile, luaRealm ) then
+    if not fs.IsFile( mainFile, luaRealm ) then
         gpm.Error( info.importPath, "main file '" .. ( mainFile or "init.lua" ) .. "' is missing." )
     end
 

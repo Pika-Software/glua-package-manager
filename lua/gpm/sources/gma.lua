@@ -57,7 +57,7 @@ typesCache = nil
 module( "gpm.sources.gma" )
 
 function CanImport( filePath )
-    return fs.Exists( filePath, "GAME" ) and string.EndsWith( filePath, ".gma.dat" ) or string.EndsWith( filePath, ".gma" )
+    return fs.IsFile( filePath, "GAME" ) and string.EndsWith( filePath, ".gma.dat" ) or string.EndsWith( filePath, ".gma" )
 end
 
 function GetInfo( filePath )

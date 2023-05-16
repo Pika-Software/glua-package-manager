@@ -347,7 +347,7 @@ function ClearCache()
         local fileSize = fs.Size( filePath, "DATA" )
         fs.Delete( filePath )
 
-        if not fs.Exists( filePath, "DATA" ) then
+        if not fs.IsFile( filePath, "DATA" ) then
             size = size + fileSize
             count = count + 1
             continue
@@ -361,7 +361,7 @@ function ClearCache()
         local fileSize = fs.Size( filePath, "DATA" )
         fs.Delete( filePath )
 
-        if not fs.Exists( filePath, "DATA" ) then
+        if not fs.IsFile( filePath, "DATA" ) then
             size = size + fileSize
             count = count + 1
             continue
