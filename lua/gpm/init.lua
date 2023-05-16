@@ -77,10 +77,16 @@ Logger = logger.Create( "GPM@" .. utils.Version( _VERSION ), Color( 180, 180, 25
 
 do
 
+    local ErrorNoHaltWithStack = ErrorNoHaltWithStack
     local error = error
 
-    function Error( packageName, message, errorLevel )
+    function Error( packageName, message, noHalt, errorLevel )
         Logger:Error( "Package '%s' import failed, see above to see the error.", packageName )
+        if noHalt then
+            ErrorNoHaltWithStack( message )
+            return
+        end
+
         error( message, errorLevel )
     end
 
