@@ -6,9 +6,6 @@ local logger = gpm.Logger
 local http = gpm.http
 local string = string
 
--- Variables
-local ErrorNoHaltWithStack = ErrorNoHaltWithStack
-
 module( "gpm.sources.github" )
 
 function CanImport( filePath )
@@ -36,10 +33,11 @@ Try = promise.Async( function( url )
         return promise.Reject( "invalid response http code - " .. result.code )
     end
 
-    local ok, result = gpm.SourceImport( "http", url, _PACKAGE, false ):SafeAwait()
-    if ok then return result end
+    -- local ok, result = gpm.SourceImport( "http", url, _PKG, false ):SafeAwait()
+    -- if ok then return result end
 
-    ErrorNoHaltWithStack( result )
+    -- gpm.Error( url, result )
+    return gpm.SourceImport( "http", url, _PKG, false )
 end )
 
 TryTree = promise.Async( function( user, repository, tree )
@@ -77,5 +75,5 @@ Import = promise.Async( function( info )
     ok, result = TryTree( user, repository, "master" ):SafeAwait()
     if ok then return result end
 
-    logger:Error( "Package `%s` import failed, %s.", info.url, result )
+    gpm.Error( info.url, result )
 end )
