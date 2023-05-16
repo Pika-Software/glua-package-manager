@@ -161,6 +161,23 @@ Import = promise.Async( function( info )
             end
         end
 
+        -- Packages
+        local packages = autorun.package
+        if packages ~= nil then
+            local imported = {}
+
+            for _, filePath in ipairs( packages ) do
+                local packagePath = string.match( filePath, "package/[^/]+" )
+                if not packagePath then continue end
+
+                if imported[ packagePath ] then continue end
+                imported[ packagePath ] = true
+
+                local ok, result = gpm.SourceImport( "lua", packagePath, pkg, false ):SafeAwait()
+                if not ok then return promise.Reject( result ) end
+            end
+        end
+
         if MENU_DLL then return end
 
         -- Lua effects
@@ -299,23 +316,6 @@ Import = promise.Async( function( info )
                 if not ok then ErrorNoHaltWithStack( err ) end
 
                 SWEP = nil
-            end
-        end
-
-        -- Packages
-        local packages = autorun.package
-        if packages ~= nil then
-            local imported = {}
-
-            for _, filePath in ipairs( packages ) do
-                local packagePath = string.match( filePath, "package/[^/]+" )
-                if not packagePath then continue end
-
-                if imported[ packagePath ] then continue end
-                imported[ packagePath ] = true
-
-                local ok, result = gpm.SourceImport( "lua", packagePath, pkg, false ):SafeAwait()
-                if not ok then return promise.Reject( result ) end
             end
         end
     end )
