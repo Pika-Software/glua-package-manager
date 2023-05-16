@@ -52,7 +52,7 @@ Import = promise.Async( function( info )
     local importPath = info.importPath
     local fileClass = fs.Open( importPath, "rb", "GAME" )
     if not fileClass then
-        logger:Error( "Package `%s` import failed, file cannot be readed.", importPath )
+        logger:Error( "Package '%s' import failed, file cannot be readed.", importPath )
         return
     end
 
@@ -80,13 +80,13 @@ Import = promise.Async( function( info )
     fileClass:Close()
 
     if #files == 0 then
-        logger:Error( "Package `%s` import failed, no files to mount.", importPath )
+        logger:Error( "Package '%s' import failed, no files to mount.", importPath )
         return
     end
 
     local gma = gmad.Write( cachePath )
     if not gma then
-        logger:Error( "Package `%s` import failed, cache construction error, mounting failed.", importPath )
+        logger:Error( "Package '%s' import failed, cache construction error, mounting failed.", importPath )
         return
     end
 

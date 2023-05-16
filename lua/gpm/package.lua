@@ -342,7 +342,7 @@ function Initialize( metadata, func, files )
     -- Run
     local ok, result = safeRun( func, package, ErrorNoHaltWithStack )
     if not ok then
-        logger:Error( "Package `%s` import failed, see above for the reason.", metadata.importPath )
+        logger:Error( "Package '%s' import failed, see above for the reason.", importPath )
         return
     end
 
@@ -350,7 +350,7 @@ function Initialize( metadata, func, files )
     package.result = result
 
     -- Saving in global table & final log
-    logger:Info( "Package `%s` was successfully imported, it took %.4f seconds.", metadata.importPath, SysTime() - stopwatch )
+    logger:Info( "Package '%s' was successfully imported, it took %.4f seconds.", importPath, SysTime() - stopwatch )
     gpm.Packages[ metadata.importPath ] = package
 
     return package

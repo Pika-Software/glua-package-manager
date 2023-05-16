@@ -80,7 +80,7 @@ do
     local error = error
 
     function Error( packageName, ... )
-        Logger:Error( "Package `%s` import failed, see above to see the error.", packageName )
+        Logger:Error( "Package '%s' import failed, see above to see the error.", packageName )
         error( ... )
     end
 
@@ -184,7 +184,7 @@ do
 
             local info = source.GetInfo( packagePath )
             if not info then
-                Logger:Error( "Package `%s` import failed, no import info.", packagePath )
+                Logger:Error( "Package '%s' import failed, no import info.", packagePath )
                 return false
             end
 
@@ -194,26 +194,26 @@ do
                     sendToClient( info )
                 end
 
-                Logger:Debug( "Package `%s` autorun restricted.", packagePath )
+                Logger:Debug( "Package '%s' autorun restricted.", packagePath )
                 return false
             end
 
             if not info.singleplayer and SinglePlayer then
-                Logger:Error( "Package `%s` import failed, cannot be executed in a single-player game.", packagePath )
+                Logger:Error( "Package '%s' import failed, cannot be executed in a single-player game.", packagePath )
                 return false
             end
 
             local gamemodes = info.gamemodes
             local gamemodesType = type( gamemodes )
             if ( gamemodesType == "string" and gamemodes ~= Gamemode ) or ( gamemodesType == "table" and not table.HasIValue( gamemodes, Gamemode ) ) then
-                Logger:Error( "Package `%s` import failed, is not compatible with active gamemode.", packagePath )
+                Logger:Error( "Package '%s' import failed, is not compatible with active gamemode.", packagePath )
                 return false
             end
 
             local maps = info.maps
             local mapsType = type( maps )
             if ( mapsType == "string" and maps ~= Map ) or ( mapsType == "table" and not table.HasIValue( maps, Map ) ) then
-                Logger:Error( "Package `%s` import failed, is not compatible with current map.", packagePath )
+                Logger:Error( "Package '%s' import failed, is not compatible with current map.", packagePath )
                 return false
             end
 
@@ -349,7 +349,7 @@ function ClearCache()
             continue
         end
 
-        Logger:Warn( "Unable to remove file `%s` probably used by the game, restart game and try again.", filePath )
+        Logger:Warn( "Unable to remove file '%s' probably used by the game, restart game and try again.", filePath )
     end
 
     for _, fileName in ipairs( fs.Find( WorkshopPath .. "*", "DATA" ) ) do
@@ -363,7 +363,7 @@ function ClearCache()
             continue
         end
 
-        Logger:Warn( "Unable to remove file `%s` probably used by the game, restart game and try again.", filePath )
+        Logger:Warn( "Unable to remove file '%s' probably used by the game, restart game and try again.", filePath )
     end
 
     Logger:Info( "Deleted %d cache files, freeing up %dMB of space.", count, size / 1024 / 1024 )

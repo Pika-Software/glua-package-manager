@@ -49,13 +49,13 @@ end )
 Import = promise.Async( function( info )
     local user = info.user
     if not user then
-        logger:Error( "Package `%s` import failed, attempt to download failed - repository not recognized.", info.url )
+        logger:Error( "Package '%s' import failed, attempt to download failed - repository not recognized.", info.url )
         return
     end
 
     local repository = info.repository
     if not repository then
-        logger:Error( "Package `%s` import failed, attempt to download failed - user not recognized.", info.url )
+        logger:Error( "Package '%s' import failed, attempt to download failed - user not recognized.", info.url )
         return
     end
 

@@ -89,7 +89,7 @@ Import = promise.Async( function( info )
 
     local gma = gmad.Open( importPath, "GAME" )
     if not gma then
-        logger:Error( "Package `%s` import failed, gma file cannot be readed.", importPath )
+        logger:Error( "Package '%s' import failed, gma file cannot be readed.", importPath )
         return
     end
 
@@ -109,7 +109,7 @@ Import = promise.Async( function( info )
 
     local ok, files = game_MountGMA( importPath )
     if not ok then
-        logger:Error( "Package `%s` import failed, gma file cannot be mounted.", importPath )
+        logger:Error( "Package '%s' import failed, gma file cannot be mounted.", importPath )
         return
     end
 

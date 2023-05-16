@@ -68,7 +68,7 @@ function Download( wsid )
                 gmaWriter.Files = gmaReader.Files
                 gmaWriter:Close()
             elseif fs.Exists( cachePath, "DATA" ) then
-                logger:Warn( "Cache writing failed, probably file `data/" .. cachePath .. "` was already mounted, need to restart the game." )
+                logger:Warn( "Cache writing failed, probably file 'data/" .. cachePath .. "' was already mounted, need to restart the game." )
             else
                 p:Reject( "gma file writing failed" )
                 return
@@ -87,7 +87,7 @@ end
 Import = promise.Async( function( info )
     local ok, result = Download( info.wsid ):SafeAwait()
     if not ok then
-        logger:Error( "Package `%s` import failed, %s.", info.wsid, result )
+        logger:Error( "Package '%s' import failed, %s.", info.wsid, result )
         return
     end
 

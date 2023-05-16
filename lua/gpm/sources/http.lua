@@ -52,7 +52,7 @@ Import = promise.Async( function( info )
             return gpm.SourceImport( "http", string.gsub( url, "^https?://", "" ), _PKG, false )
         end
 
-        logger:Error( "Package `%s` import failed, unsupported file extension. ", url )
+        logger:Error( "Package '%s' import failed, unsupported file extension. ", url )
         return
     end
 
@@ -77,15 +77,15 @@ Import = promise.Async( function( info )
     end
 
     -- Downloading
-    logger:Info( "Package `%s` is downloading...", url )
+    logger:Info( "Package '%s' is downloading...", url )
     local ok, result = http.Fetch( url, nil, 120 ):SafeAwait()
     if not ok then
-        logger:Error( "Package `%s` import failed, %s.", url, result )
+        logger:Error( "Package '%s' import failed, %s.", url, result )
         return
     end
 
     if result.code ~= 200 then
-        logger:Error( "Package `%s` import failed, invalid response code: %d.", url, result.code )
+        logger:Error( "Package '%s' import failed, invalid response code: %d.", url, result.code )
         return
     end
 
@@ -104,7 +104,8 @@ Import = promise.Async( function( info )
             return gpm.SourceImport( "zip", "data/" .. cachePath, _PKG, false )
         end
 
-        logger:Error( "Package `%s` import failed, unknown file format.", url )
+
+        logger:Error( "Package '%s' import failed, unknown file format.", url )
         return
     end
 
@@ -112,17 +113,17 @@ Import = promise.Async( function( info )
     if not metadata then
         local ok, err = fs.AsyncWrite( cachePath, body ):SafeAwait()
         if not ok then
-            logger:Error( "Package `%s` import cache `%s` write failed, %s", url, cachePath, err )
+            logger:Error( "Package '%s' import cache '%s' write failed, %s", url, cachePath, err )
         end
 
         local ok, result = pcall( CompileString, body, url )
         if not ok then
-            logger:Error( "Package `%s` import failed, %s.", url, result )
+            logger:Error( "Package '%s' import failed, %s.", url, result )
             return
         end
 
         if not result then
-            logger:Error( "Package `%s` import failed, lua compilation failed.", url )
+            logger:Error( "Package '%s' import failed, lua compilation failed.", url )
             return
         end
 
@@ -137,7 +138,7 @@ Import = promise.Async( function( info )
 
     local urls = metadata.files
     if type( urls ) ~= "table" then
-        logger:Error( "Package `%s` import failed, no links to files, download canceled.", url )
+        logger:Error( "Package '%s' import failed, no links to files, download canceled.", url )
         return
     end
 
@@ -145,16 +146,16 @@ Import = promise.Async( function( info )
 
     local files = {}
     for filePath, fileURL in pairs( urls ) do
-        logger:Debug( "Package `%s`, file `%s` (%s) download has started.", url, filePath, fileURL )
+        logger:Debug( "Package '%s', file '%s' (%s) download has started.", url, filePath, fileURL )
 
         local ok, result = http.Fetch( fileURL, nil, 120 ):SafeAwait()
-        if not ok then return promise.Reject( "file `" .. filePath .. "` download failed, " .. result ) end
-        if result.code ~= 200 then return promise.Reject( "file `" .. filePath .. "` download failed, invalid response code: " .. result.code .. "." ) end
+        if not ok then return promise.Reject( "file '" .. filePath .. "' download failed, " .. result ) end
+        if result.code ~= 200 then return promise.Reject( "file '" .. filePath .. "' download failed, invalid response code: " .. result.code .. "." ) end
         files[ #files + 1 ] = { filePath, result.body }
     end
 
     if #files == 0 then
-        logger:Error( "Package `%s` import failed, no files to download.", url )
+        logger:Error( "Package '%s' import failed, no files to download.", url )
         return
     end
 
@@ -164,8 +165,8 @@ Import = promise.Async( function( info )
         local compiledFiles = {}
         for _, data in ipairs( files ) do
             local ok, result = pcall( CompileString, data[ 2 ], data[ 1 ] )
-            if not ok then return promise.Reject( "file `" .. data[ 1 ] .. "` compile failed, " .. result .. "." ) end
-            if not result then return promise.Reject( "file `" ..  data[ 1 ] .. "` compile failed, no result." ) end
+            if not ok then return promise.Reject( "file '" .. data[ 1 ] .. "' compile failed, " .. result .. "." ) end
+            if not result then return promise.Reject( "file '" ..  data[ 1 ] .. "' compile failed, no result." ) end
             compiledFiles[ data[ 1 ] ] = result
         end
 
@@ -185,7 +186,7 @@ Import = promise.Async( function( info )
         end
 
         if not func then
-            logger:Error( "Package `%s` import failed, main file is missing.", url )
+            logger:Error( "Package '%s' import failed, main file is missing.", url )
             return
         end
 
@@ -194,7 +195,7 @@ Import = promise.Async( function( info )
 
     local gma = gmad.Write( cachePath )
     if not gma then
-        logger:Error( "Package `%s` import failed, cache construction error, mounting failed.", url )
+        logger:Error( "Package '%s' import failed, cache construction error, mounting failed.", url )
         return
     end
 

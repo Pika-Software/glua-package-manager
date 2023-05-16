@@ -257,7 +257,7 @@ function GMA:AddFile( filePath, content )
 
     ArgAssert( filePath, 1, "string" )
     if not IsAllowedFilePath( filePath ) then
-        logger:Warn( "File `%s` was not written to gma because its path is not valid.", filePath )
+        logger:Warn( "File '%s' was not written to gma because its path is not valid.", filePath )
         return
     end
 
