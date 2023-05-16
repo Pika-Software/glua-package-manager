@@ -164,8 +164,8 @@ do
         return self.result
     end
 
-    function PACKAGE:GetFilePath()
-        return table.Lookup( self, "metadata.filePath" )
+    function PACKAGE:GetImportPath()
+        return table.Lookup( self, "metadata.importPath" )
     end
 
     function PACKAGE:GetFolder()
