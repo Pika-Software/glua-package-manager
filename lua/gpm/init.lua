@@ -173,7 +173,9 @@ do
     local tasks = {}
 
     function SourceImport( sourceName, packagePath, package, autorun )
-        packagePath = paths.Fix( packagePath )
+        if not string.IsURL( packagePath ) then
+            packagePath = paths.Fix( packagePath )
+        end
 
         local task = tasks[ packagePath ]
         if not task then
@@ -243,7 +245,6 @@ do
     end
 
     function AsyncImport( packagePath, package, autorun )
-        packagePath = paths.Fix( packagePath )
 
         local task = tasks[ packagePath ]
         if not task then
