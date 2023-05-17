@@ -1,20 +1,19 @@
 local promise = gpm.promise
+local logger = gpm.Logger
 local ipairs = ipairs
 local util = util
 local type = type
 
 -- https://github.com/WilliamVenner/gmsv_reqwest
-if SERVER and not reqwest and not CHTTP and game.IsDedicated() then
+-- https://github.com/timschumi/gmod-chttp
+if SERVER and game.IsDedicated() then
     if util.IsBinaryModuleInstalled( "reqwest" ) then
+        logger:Info( "A third-party http client 'reqwest' has been initialized." )
         require( "reqwest" )
     elseif util.IsBinaryModuleInstalled( "chttp" ) then
+        logger:Info( "A third-party http client 'chttp' has been initialized." )
         require( "chttp" )
     end
-end
-
--- https://github.com/timschumi/gmod-chttp
-if CLIENT and not CHTTP and util.IsBinaryModuleInstalled( "chttp" ) then
-    require( "chttp" )
 end
 
 local defaultTimeout = CreateConVar( "gpm_http_timeout", "10", FCVAR_ARCHIVE, "Default http timeout for gpm http library.", 5, 300 )
@@ -33,7 +32,10 @@ local queue = {}
 function HTTP( parameters )
     local p = promise.New()
 
-    parameters.headers = parameters.headers or {}
+    if type( parameters.headers ) ~= "table" then
+        parameters.headers = {}
+    end
+
     parameters.headers["User-Agent"] = userAgent
 
     parameters.success = function( code, body, headers )
