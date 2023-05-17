@@ -3,6 +3,7 @@ local string = string
 local table = table
 
 -- Variables
+local MENU_DLL = MENU_DLL
 local SERVER = SERVER
 local ipairs = ipairs
 local Color = Color
@@ -26,7 +27,7 @@ MsgN( [[
 
 module( "gpm", package.seeall )
 
-_VERSION = 012000
+_VERSION = 012100
 
 if not Colors then
     Colors = {
