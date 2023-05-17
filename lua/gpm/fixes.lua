@@ -1,17 +1,14 @@
 -- Libraries
+local system = system
 local string = string
-local table = table
-local file = file
 local gpm = gpm
+local jit = jit
 
 -- Variables
-local SERVER = SERVER
-
--- Global table
-local gluaFixes = gpm.GLuaFixes
-if not gluaFixes then
-    gluaFixes = {}; gpm.GLuaFixes = gluaFixes
-end
+local file_Exists = file.Exists
+local MENU_DLL = MENU_DLL
+local CLIENT = CLIENT
+local type = type
 
 -- https://wiki.facepunch.com/gmod/string.StartsWith
 string.StartsWith = string.StartsWith or string.StartWith
@@ -19,84 +16,6 @@ string.StartsWith = string.StartsWith or string.StartWith
 -- https://wiki.facepunch.com/gmod/string.Split
 function string.Split( str, separator )
     return string.Explode( separator, str, false )
-end
-
-do
-
-    local file_Exists = table.SetValue( gluaFixes, "file.Exists", file.Exists, true )
-    local file_IsDir = table.SetValue( gluaFixes, "file.IsDir", file.IsDir, true )
-
-    -- https://wiki.facepunch.com/gmod/file.IsDir
-    function file.IsDir( filePath, gamePath )
-        if SERVER then return file_IsDir( filePath, gamePath ) end
-        if file_IsDir( filePath, gamePath ) then return true end
-
-        local _, folders = file.Find( filePath .. "*", gamePath )
-        if folders == nil or #folders == 0 then return false end
-
-        local splits = string.Split( filePath, "/" )
-        return table.HasIValue( folders, splits[ #splits ] )
-    end
-
-    -- https://wiki.facepunch.com/gmod/file.Exists
-    function file.Exists( filePath, gamePath )
-        if SERVER then return file_Exists( filePath, gamePath ) end
-        if file_Exists( filePath, gamePath ) then return true end
-
-        local files, folders = file.Find( filePath .. "*", gamePath )
-        if not files or not folders then return false end
-        if #files == 0 and #folders == 0 then return false end
-
-        local splits = string.Split( filePath, "/" )
-        local fileName = splits[ #splits ]
-
-        return table.HasIValue( files, fileName ) or table.HasIValue( folders, fileName )
-    end
-
-    -- file.IsFile( filePath, gamePath )
-    function file.IsFile( filePath, gamePath )
-        if SERVER then
-            return file_Exists( filePath, gamePath ) and not file_IsDir( filePath, gamePath )
-        end
-
-        if file_Exists( filePath, gamePath ) and not file_IsDir( filePath, gamePath ) then
-            return true
-        end
-
-        local files, _ = file.Find( filePath .. "*", gamePath )
-        if not files or #files == 0 then return false end
-        local splits = string.Split( filePath, "/" )
-
-        return table.HasIValue( files, splits[ #splits ] )
-    end
-
-end
-
--- https://wiki.facepunch.com/gmod/Global.CompileFile
-do
-
-    local _CompileFile = table.SetValue( gluaFixes, "CompileFile", CompileFile, true )
-    local CompileString = CompileString
-
-    function CompileFile( filePath )
-        local f = file.Open( filePath, "r", gpm.LuaRealm )
-        if not f then
-            if not _CompileFile then return end
-            return _CompileFile( filePath )
-        end
-
-        local code = f:Read( f:Size() )
-        f:Close()
-
-        local func = CompileString( code, filePath, true )
-        if not func then
-            if not _CompileFile then return end
-            return _CompileFile( filePath )
-        end
-
-        return func
-    end
-
 end
 
 -- https://wiki.facepunch.com/gmod/util.IsBinaryModuleInstalled
@@ -109,13 +28,13 @@ do
     function util.IsBinaryModuleInstalled( name )
         gpm.ArgAssert( name, 1, "string" )
 
-        if file.Exists( string.format( fmt, name, suffix ), "GAME" ) then
+        if file_Exists( string.format( fmt, name, suffix ), "GAME" ) then
             return true
         end
 
         -- Edge case - on Linux 32-bit x86-64 branch, linux32 is also supported as a suffix
         if jit.versionnum ~= 20004 and jit.arch == "x86" and system.IsLinux() then
-            return file.Exists( string.format( fmt, name, "linux32" ), "GAME" )
+            return file_Exists( string.format( fmt, name, "linux32" ), "GAME" )
         end
 
         return false
@@ -123,36 +42,40 @@ do
 
 end
 
-local GetConVar = GetConVar
+do
 
--- https://wiki.facepunch.com/gmod/cvars.String
-function cvars.String( name, default )
-    local convar = GetConVar( name )
-    if ( convar ~= nil ) then
-        return convar:GetString()
+    local GetConVar = GetConVar
+
+    -- https://wiki.facepunch.com/gmod/cvars.String
+    function cvars.String( name, default )
+        local convar = GetConVar( name )
+        if convar ~= nil then
+            return convar:GetString()
+        end
+
+        return default
     end
 
-    return default
-end
+    -- https://wiki.facepunch.com/gmod/cvars.Number
+    function cvars.Number( name, default )
+        local convar = GetConVar( name )
+        if convar ~= nil then
+            return convar:GetFloat()
+        end
 
--- https://wiki.facepunch.com/gmod/cvars.Number
-function cvars.Number( name, default )
-    local convar = GetConVar( name )
-    if ( convar ~= nil ) then
-        return convar:GetFloat()
+        return default
     end
 
-    return default
-end
+    -- https://wiki.facepunch.com/gmod/cvars.Bool
+    function cvars.Bool( name, default )
+        local convar = GetConVar( name )
+        if convar ~= nil then
+            return convar:GetBool()
+        end
 
--- https://wiki.facepunch.com/gmod/cvars.Bool
-function cvars.Bool( name, default )
-    local convar = GetConVar( name )
-    if ( convar ~= nil ) then
-        return convar:GetBool()
+        return default
     end
 
-    return default
 end
 
 -- https://wiki.facepunch.com/gmod/Global.IsColor
@@ -160,7 +83,6 @@ do
 
     local meta = FindMetaTable( "Color" )
     local getmetatable = getmetatable
-    local type = type
 
     function IsColor( any )
         if getmetatable( any ) == meta then

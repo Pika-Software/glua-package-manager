@@ -123,6 +123,7 @@ CachePath = fs.CreateDir( "gpm/" .. ( SERVER and "server" or "client" ) .. "/pac
 
 do
 
+    local CompileString = CompileString
     local CompileFile = CompileFile
     local ArgAssert = ArgAssert
     local pcall = pcall
@@ -138,13 +139,26 @@ do
         local func = files[ filePath ]
         if func then return func end
 
-        local ok, result = pcall( CompileFile, filePath )
-        if ok then
+        local fileClass = file.Open( filePath, "r", luaRealm )
+        if fileClass then
+            local code = fileClass:Read( fileClass:Size() )
+            fileClass:Close()
+
+            local ok, result = pcall( CompileString, code, filePath, true )
+            if not ok then return ok, result end
             if not result then return false, "file '" .. filePath .. "' code compilation failed due to an unknown error." end
-            files[ filePath ] = result
+            func = result
         end
 
-        return ok, result
+        if not func and not MENU_DLL then
+            local ok, result = pcall( CompileFile, filePath )
+            if not ok then return ok, result end
+            if not result then return false, "file '" .. filePath .. "' code compilation failed due to an unknown error." end
+            func = result
+        end
+
+        files[ filePath ] = func
+        return true, func
     end
 
 end
