@@ -36,20 +36,19 @@ local contentFolders = {
 }
 
 function GetInfo( filePath )
-    local importPath = paths.Fix( filePath )
     return {
-        ["cachePath"] = cacheFolder .. "zip_" .. util.MD5( importPath ) .. ".gma.dat",
-        ["importPath"] = importPath
+        ["importPath"] = paths.Fix( filePath )
     }
 end
 
 Import = promise.Async( function( info )
-    local cachePath = info.cachePath
+    local importPath = info.importPath
+
+    local cachePath = cacheFolder .. "zip_" .. util.MD5( importPath ) .. ".gma.dat"
     if fs.IsFile( cachePath, "DATA" ) and fs.Time( cachePath, "DATA" ) > ( 60 * 60 * cacheLifetime:GetInt() ) then
         return gpm.SourceImport( "gma", "data/" .. cachePath, _PKG, false )
     end
 
-    local importPath = info.importPath
     local fileClass = fs.Open( importPath, "rb", "GAME" )
     if not fileClass then
         logger:Error( "Package '%s' import failed, file cannot be readed.", importPath )
