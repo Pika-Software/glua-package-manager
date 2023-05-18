@@ -302,6 +302,11 @@ function Initialize( metadata, func, files )
             table.SetValue( env, "gpm.Logger", package.logger )
         end
 
+        -- import
+        environment.SetValue( env, "gpm.Import", function( filePath, async, package2 )
+            return gpm.Import( filePath, async, gpm.IsPackage( package2 ) and package2 or package )
+        end )
+
         environment.SetValue( env, "import", function( filePath, async )
             return gpm.Import( filePath, async, package )
         end )
