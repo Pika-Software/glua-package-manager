@@ -27,7 +27,7 @@ MsgN( [[
 
 module( "gpm", package.seeall )
 
-_VERSION = 012100
+_VERSION = 012101
 
 if not Colors then
     Colors = {
