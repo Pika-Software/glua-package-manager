@@ -2,7 +2,6 @@ local gpm = gpm
 
 -- Libraries
 local promise = gpm.promise
-local paths = gpm.paths
 local gmad = gpm.gmad
 local string = string
 local table = table
@@ -36,9 +35,7 @@ local contentFolders = {
 }
 
 function GetInfo( filePath )
-    return {
-        ["importPath"] = paths.Fix( filePath )
-    }
+    return {}
 end
 
 Import = promise.Async( function( info )

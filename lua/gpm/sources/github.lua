@@ -17,7 +17,6 @@ function GetInfo( url )
     return {
         ["tree"] = string.match( url, "/tree/([%w_%-%.%/]+)"),
         ["repository"] = repository,
-        ["importPath"] = url,
         ["user"] = user,
         ["url"] = url
     }

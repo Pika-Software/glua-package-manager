@@ -10,7 +10,6 @@ local fs = gpm.fs
 local table_HasIValue = table.HasIValue
 local game_MountGMA = game.MountGMA
 local gmad_Open = gpm.gmad.Open
-local paths_Fix = gpm.paths.Fix
 local logger = gpm.Logger
 local ipairs = ipairs
 local pairs = pairs
@@ -23,9 +22,7 @@ function CanImport( filePath )
 end
 
 function GetInfo( filePath )
-    return {
-        ["importPath"] = paths_Fix( filePath )
-    }
+    return {}
 end
 
 Import = promise.Async( function( info )
@@ -59,9 +56,9 @@ Import = promise.Async( function( info )
 
     local packages = {}
     for _, filePath in ipairs( files ) do
-        if not string.StartsWith( filePath, "lua/package/" ) then continue end
+        if not string.StartsWith( filePath, "lua/packages/" ) then continue end
 
-        local importPath = string.match( string.sub( filePath, 5 ), "package/[^/]+" )
+        local importPath = string.match( string.sub( filePath, 5 ), "packages/[^/]+" )
         if not importPath then continue end
 
         if table_HasIValue( packages, importPath ) then continue end

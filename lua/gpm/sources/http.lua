@@ -30,8 +30,7 @@ end
 
 function GetInfo( url )
     return {
-        ["extension"] = string.GetExtensionFromFilename( url ) or "json",
-        ["importPath"] = url
+        ["extension"] = string.GetExtensionFromFilename( url ) or "json"
     }
 end
 
@@ -121,10 +120,6 @@ Import = promise.Async( function( info )
 
     package.GetMetadata( table_Merge( info, utils.LowerTableKeys( json ) ) )
     info.importPath = url
-
-    if not info.name then
-        info.name = url
-    end
 
     local urls = info.files
     if type( urls ) ~= "table" then

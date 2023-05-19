@@ -17,7 +17,9 @@ local type = type
 module( "gpm.sources.lua" )
 
 function CanImport( filePath )
-    return fs.IsFile( filePath, luaRealm ) and string.EndsWith( filePath, ".lua" ) or fs.IsDir( filePath, luaRealm )
+    if fs.IsFile( filePath, luaRealm ) and ( string.EndsWith( filePath, ".lua" ) or string.EndsWith( filePath, "lua.dat" ) ) then return true end
+    if fs.IsDir( filePath, luaRealm ) then return true end
+    return false
 end
 
 function GetInfo( importPath )
@@ -39,6 +41,7 @@ function GetInfo( importPath )
         end
     end
 
+    -- For single file
     if not info then
         info = {
             ["autorun"] = true
@@ -55,9 +58,9 @@ function GetInfo( importPath )
         info.packagePath = packagePath
     end
 
-    info.importPath = importPath
     info.folder = folder
 
+    -- Shared init
     local main = info.main
     if type( main ) ~= "string" then
         main = "init.lua"
@@ -75,11 +78,12 @@ function GetInfo( importPath )
     end
 
     if fs.IsFile( main, luaRealm ) then
-        info.main = main
+        info.main = paths.Fix( main )
     else
         info.main = nil
     end
 
+    -- Client init
     local cl_main = info.cl_main
     if type( cl_main ) ~= "string" then
         cl_main = "cl_init.lua"
@@ -93,13 +97,9 @@ function GetInfo( importPath )
     end
 
     if fs.IsFile( cl_main, luaRealm ) then
-        info.cl_main = cl_main
+        info.cl_main = paths.Fix( cl_main )
     else
         info.cl_main = nil
-    end
-
-    if type( info.name ) ~= "string" then
-        info.name = importPath
     end
 
     return info

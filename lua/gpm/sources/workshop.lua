@@ -27,10 +27,7 @@ function CanImport( filePath )
 end
 
 function GetInfo( wsid )
-    return {
-        ["importPath"] = wsid,
-        ["wsid"] = wsid
-    }
+    return {}
 end
 
 function Download( wsid )
@@ -85,9 +82,10 @@ function Download( wsid )
 end
 
 Import = promise.Async( function( info )
-    local ok, result = Download( info.wsid ):SafeAwait()
+    local wsid = info.importPath
+    local ok, result = Download( wsid ):SafeAwait()
     if not ok then
-        logger:Error( "Package '%s' import failed, %s.", info.wsid, result )
+        logger:Error( "Package '%s' import failed, %s.", wsid, result )
         return
     end
 
