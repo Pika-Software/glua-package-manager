@@ -352,7 +352,7 @@ function Initialize( metadata, func, files )
                     end
                 end
 
-                if fs.IsFile( fileName, luaRealm ) then
+                if type( fileName ) == "string" and fs.IsFile( fileName, luaRealm ) then
                     return AddCSLuaFile( fileName )
                 end
 
