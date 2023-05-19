@@ -12,6 +12,7 @@ local util = util
 
 -- Variables
 local CompileString = CompileString
+local table_Merge = table.Merge
 local logger = gpm.Logger
 local ipairs = ipairs
 local pairs = pairs
@@ -118,7 +119,7 @@ Import = promise.Async( function( info )
         gpm.Error( url, "'package.json' file is corrupted." )
     end
 
-    package.GetMetadata( table.Merge( info, utils.LowerTableKeys( json ) ) )
+    package.GetMetadata( table_Merge( info, utils.LowerTableKeys( json ) ) )
     info.importPath = url
 
     if not info.name then
