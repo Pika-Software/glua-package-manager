@@ -176,6 +176,8 @@ for _, filePath in ipairs( fs.Find( "gpm/sources/*", "LUA" ) ) do
     include( filePath )
 end
 
+local IsPackage = IsPackage
+
 do
 
     local sourceList = {}
@@ -311,7 +313,7 @@ do
                 Error( packagePath, result )
             end
 
-            if not result then
+            if not IsPackage( result ) then
                 Error( packagePath, "This should never have happened, but the package was missing after the import." )
             end
 
