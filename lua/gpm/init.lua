@@ -211,9 +211,14 @@ do
 
             local info = source.GetInfo( importPath )
             if not info then
-                Error( importPath, "Not enough information to start importing.", false, sourceName )
+                return "not enough information to start importing"
             end
 
+            if type( info.name ) ~= "string" then
+                info.name = importPath
+            end
+
+            info.importPath = importPath
             info.source = sourceName
 
             if autorun and not info.autorun then
@@ -223,23 +228,23 @@ do
                 end
 
                 Logger:Debug( "[%s] Package '%s' autorun restricted.", sourceName, importPath )
-                return
+                return false
             end
 
             if not info.singleplayer and SinglePlayer then
-                Error( importPath, "Package cannot be executed in a singleplayer game.", false, sourceName )
+                return "cannot be executed in a singleplayer game"
             end
 
             local gamemodes = info.gamemodes
             local gamemodesType = type( gamemodes )
             if ( gamemodesType == "string" and gamemodes ~= Gamemode ) or ( gamemodesType == "table" and not table.HasIValue( gamemodes, Gamemode ) ) then
-                Error( importPath, "Package does not support active gamemode.", false, sourceName )
+                return "does not support active gamemode"
             end
 
             local maps = info.maps
             local mapsType = type( maps )
             if ( mapsType == "string" and maps ~= Map ) or ( mapsType == "table" and not table.HasIValue( maps, Map ) ) then
-                Error( importPath, "Package does not support current map.", false, sourceName )
+                return "does not support current map"
             end
 
             local sendToClient = source.SendToClient
@@ -274,13 +279,21 @@ do
     end
 
     function AsyncImport( importPath, package, autorun )
-
         local task = tasks[ importPath ]
         if not task then
             for _, sourceName in ipairs( sourceList ) do
-                local p = SourceImport( sourceName, importPath, package, autorun )
-                if not p then continue end
-                task = p
+                local result = SourceImport( sourceName, importPath, package or _PKG, autorun )
+                if result == false then return end
+
+                if type( result ) == "string" then
+                    Logger:Error( "Package '%s' import failed, %s.", importPath, result )
+                    return
+                end
+
+                if promise.IsPromise( result ) then
+                    task = result
+                    break
+                end
             end
         end
 
