@@ -82,7 +82,7 @@ do
     local error = error
 
     function Error( importPath, message, noHalt, sourceName )
-        Logger:Error( "[%s] Package '%s' import failed, see above to see the error.", importPath, sourceName or "unknown" )
+        Logger:Error( "[%s] Package '%s' import failed, see above to see the error.", sourceName or "unknown", importPath )
         if noHalt then
             ErrorNoHaltWithStack( message )
             return

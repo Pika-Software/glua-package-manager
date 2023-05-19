@@ -14,6 +14,7 @@ local paths_Fix = gpm.paths.Fix
 local logger = gpm.Logger
 local ipairs = ipairs
 local pairs = pairs
+local type = type
 
 module( "gpm.sources.gma" )
 
