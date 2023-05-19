@@ -81,14 +81,14 @@ do
     local ErrorNoHaltWithStack = ErrorNoHaltWithStack
     local error = error
 
-    function Error( packageName, message, noHalt, errorLevel )
-        Logger:Error( "Package '%s' import failed, see above to see the error.", packageName )
+    function Error( importPath, message, noHalt, sourceName )
+        Logger:Error( "[%s] Package '%s' import failed, see above to see the error.", importPath, sourceName or "unknown" )
         if noHalt then
             ErrorNoHaltWithStack( message )
             return
         end
 
-        error( message, errorLevel )
+        error( message )
     end
 
 end
@@ -186,11 +186,11 @@ do
         sourceList[ #sourceList + 1 ] = sourceName
     end
 
-    function PackageExists( packagePath )
+    function PackageExists( importPath )
         for _, sourceName in ipairs( sourceList ) do
             local source = sources[ sourceName ]
             if not source then continue end
-            if not source.CanImport( packagePath ) then continue end
+            if not source.CanImport( importPath ) then continue end
             return true
         end
 
@@ -199,60 +199,62 @@ do
 
     local tasks = {}
 
-    function SourceImport( sourceName, packagePath, package, autorun )
-        if not string.IsURL( packagePath ) then
-            packagePath = paths.Fix( packagePath )
+    function SourceImport( sourceName, importPath, package, autorun )
+        if not string.IsURL( importPath ) then
+            importPath = paths.Fix( importPath )
         end
 
-        local task = tasks[ packagePath ]
+        local task = tasks[ importPath ]
         if not task then
             local source = sources[ sourceName ]
-            if not source or not source.CanImport( packagePath ) then return end
+            if not source or not source.CanImport( importPath ) then return end
 
-            local info = source.GetInfo( packagePath )
+            local info = source.GetInfo( importPath )
             if not info then
-                Logger:Error( "Package '%s' import failed, no import info.", packagePath )
-                return false
+                Error( importPath, "Not enough information to start importing.", false, sourceName )
             end
 
-            local sendToClient = source.SendToClient
+            info.source = sourceName
+
             if autorun and not info.autorun then
+                local sendToClient = source.SendToClient
                 if SERVER and info.client and type( sendToClient ) == "function" then
                     sendToClient( info )
                 end
 
-                Logger:Debug( "Package '%s' autorun restricted.", packagePath )
-                return false
+                Logger:Debug( "[%s] Package '%s' autorun restricted.", sourceName, importPath )
+                return
             end
 
             if not info.singleplayer and SinglePlayer then
-                Logger:Error( "Package '%s' import failed, cannot be executed in a single-player game.", packagePath )
-                return false
+                Error( importPath, "Package cannot be executed in a singleplayer game.", false, sourceName )
             end
 
             local gamemodes = info.gamemodes
             local gamemodesType = type( gamemodes )
             if ( gamemodesType == "string" and gamemodes ~= Gamemode ) or ( gamemodesType == "table" and not table.HasIValue( gamemodes, Gamemode ) ) then
-                Logger:Error( "Package '%s' import failed, is not compatible with active gamemode.", packagePath )
-                return false
+                Error( importPath, "Package does not support active gamemode.", false, sourceName )
             end
 
             local maps = info.maps
             local mapsType = type( maps )
             if ( mapsType == "string" and maps ~= Map ) or ( mapsType == "table" and not table.HasIValue( maps, Map ) ) then
-                Logger:Error( "Package '%s' import failed, is not compatible with current map.", packagePath )
-                return false
+                Error( importPath, "Package does not support current map.", false, sourceName )
             end
 
+            local sendToClient = source.SendToClient
             if SERVER and info.client and type( sendToClient ) == "function" then
                 sendToClient( info )
             end
 
             task = source.Import( info )
-            tasks[ packagePath ] = task
+            tasks[ importPath ] = task
         end
 
         if not promise.IsPromise( task ) then return end
+        task:Catch( function( message )
+            Error( importPath, message, true, sourceName )
+        end )
 
         if IsPackage( package ) then
             if task:IsPending() then
@@ -271,20 +273,19 @@ do
         return task
     end
 
-    function AsyncImport( packagePath, package, autorun )
+    function AsyncImport( importPath, package, autorun )
 
-        local task = tasks[ packagePath ]
+        local task = tasks[ importPath ]
         if not task then
             for _, sourceName in ipairs( sourceList ) do
-                local p = SourceImport( sourceName, packagePath, package, autorun )
-                if p == false then return end
-                if p == nil then continue end
+                local p = SourceImport( sourceName, importPath, package, autorun )
+                if not p then continue end
                 task = p
             end
         end
 
         if not task then
-            Error( packagePath, "Requested package doesn't exist!" )
+            Error( importPath, "Requested package doesn't exist!" )
             return
         end
 
@@ -301,20 +302,20 @@ do
 
     local assert = assert
 
-    function Import( packagePath, async, package )
+    function Import( importPath, async, package )
         assert( async or promise.RunningInAsync(), "import supposed to be running in coroutine/async function (do you running it from package)" )
 
-        local task = AsyncImport( packagePath, package, false )
+        local task = AsyncImport( importPath, package, false )
         if not task then return end
 
         if not async then
             local ok, result = task:SafeAwait()
             if not ok then
-                Error( packagePath, result )
+                Error( importPath, result )
             end
 
             if not IsPackage( result ) then
-                Error( packagePath, "This should never have happened, but the package was missing after the import." )
+                Error( importPath, "This should never have happened, but the package was missing after the import." )
             end
 
             return result:GetResult()
@@ -339,24 +340,24 @@ function ImportFolder( folderPath, package, autorun )
 
     local files, folders = fs.Find( folderPath .. "/*", luaRealm )
     for _, folderName in ipairs( folders ) do
-        local packagePath = folderPath .. "/" .. folderName
+        local importPath = folderPath .. "/" .. folderName
 
-        local p = AsyncImport( packagePath, package, autorun )
+        local p = AsyncImport( importPath, package, autorun )
         if not p then continue end
 
         p:Catch( function( result )
-            Error( packagePath, result )
+            Error( importPath, result )
         end )
     end
 
     for _, fileName in ipairs( files ) do
-        local packagePath = folderPath .. "/" .. fileName
+        local importPath = folderPath .. "/" .. fileName
 
-        local p = AsyncImport( packagePath, package, autorun )
+        local p = AsyncImport( importPath, package, autorun )
         if not p then continue end
 
         p:Catch( function( result )
-            Error( packagePath, result )
+            Error( importPath, result )
         end )
     end
 
