@@ -428,6 +428,12 @@ do
 
 end
 
+function Reload()
+    hook.Run( "GPM - Reload" )
+    include( "gpm/init.lua" )
+    hook.Run( "GPM - Reloaded" )
+end
+
 if SERVER then
 
     concommand.Add( "gpm_clear_cache", function( ply )
@@ -448,9 +454,8 @@ if SERVER then
 
     concommand.Add( "gpm_reload", function( ply )
         if not ply or ply:IsSuperAdmin() then
-            BroadcastLua( "include( \"gpm/init.lua\" )" )
-            include( "gpm/init.lua" )
-            hook.Run( "GPM - Reloaded" )
+            BroadcastLua( "gpm.Reload()" )
+            Reload()
             return
         end
 
