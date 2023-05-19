@@ -75,7 +75,7 @@ Import = promise.Async( function( info )
             tasks[ #tasks + 1 ] = gpm.SourceImport( "lua", importPath, pkg, false )
         end
 
-        if #tasks ~= 1 then continue end
+        if #tasks ~= 1 then return end
         return tasks[1]
     end )
 end )
