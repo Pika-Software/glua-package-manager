@@ -145,7 +145,7 @@ Import = promise.Async( function( info )
     if SERVER and not info.server then return end
 
     local main = info.main
-    if not fs.IsFile( main, luaRealm ) then
+    if not main or not fs.IsFile( main, luaRealm ) then
         return promise.Reject( "main file '" .. ( main or "init.lua" ) .. "' is missing." )
     end
 
