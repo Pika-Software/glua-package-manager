@@ -146,12 +146,12 @@ Import = promise.Async( function( info )
 
     local main = info.main
     if not fs.IsFile( main, luaRealm ) then
-        gpm.Error( info.importPath, "main file '" .. ( main or "init.lua" ) .. "' is missing." )
+        return promise.Reject( "main file '" .. ( main or "init.lua" ) .. "' is missing." )
     end
 
     local ok, result = gpm.CompileLua( main )
     if not ok then
-        gpm.Error( info.importPath, result )
+        return promise.Reject( result )
     end
 
     return package.Initialize( info, result )
