@@ -85,7 +85,7 @@ function GetInfo( importPath )
         cl_main = "cl_init.lua"
     end
 
-    if type( cl_main ) == "string" and not fs.IsFile( cl_main, luaRealm ) then
+    if not fs.IsFile( cl_main, luaRealm ) then
         cl_main = paths.Join( importPath, cl_main )
         if not fs.IsFile( cl_main, luaRealm ) then
             cl_main = importPath .. "/cl_init.lua"
