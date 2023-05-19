@@ -44,7 +44,7 @@ Import = promise.Async( function( info )
     gma:Close()
 
     local description = info.description
-    if description then
+    if type( description ) == "table" then
         for key, value in pairs( description ) do
             info[ key ] = value
         end
