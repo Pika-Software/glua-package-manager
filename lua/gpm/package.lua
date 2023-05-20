@@ -19,9 +19,9 @@ local logger = gpm.Logger
 local require = require
 local SysTime = SysTime
 local setfenv = setfenv
-local xpcall = xpcall
 local error = error
 local pairs = pairs
+local pcall = pcall
 local type = type
 local _G = _G
 
@@ -118,12 +118,15 @@ do
             local metadata = {}
 
             setmetatable( metadata, environment )
-            setfenv( source, metadata )
-
-            local ok, result = xpcall( source, ErrorNoHaltWithStack )
+                setfenv( source, metadata )
+                local ok, result = pcall( source )
             setmetatable( metadata, nil )
 
-            if not ok then return end
+            if not ok then
+                ErrorNoHaltWithStack( result )
+                return
+            end
+
             result = result or metadata
 
             if type( result ) ~= "table" then return end
@@ -239,13 +242,6 @@ local function run( func, package )
 end
 
 Run = run
-
--- Safe function run in package
-local function safeRun( func, package, errorHandler )
-    return xpcall( run, errorHandler, func, package )
-end
-
-SafeRun = safeRun
 
 -- This function will return compiled lua files by the path
 local function getCompiledFile( filePath, files )
@@ -379,10 +375,9 @@ function Initialize( metadata, func, files )
     local importPath = metadata.importPath
 
     -- Run
-    local ok, result = safeRun( func, package, ErrorNoHaltWithStack )
+    local ok, result = pcall( run, func, pkg )
     if not ok then
-        logger:Error( "[%s] Package '%s' import failed, see above for the reason.", package:GetSourceName(), importPath )
-        return
+        gpm.Error( importPath, result, false, pkg:GetSourceName() )
     end
 
     -- Saving result to package
