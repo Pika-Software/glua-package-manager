@@ -4,14 +4,13 @@ local gpm = gpm
 local package = gpm.package
 local promise = gpm.promise
 local string = string
+local table = table
 local fs = gpm.fs
 
 -- Variables
-local table_HasIValue = table.HasIValue
 local game_MountGMA = game.MountGMA
 local gmad_Open = gpm.gmad.Open
 local ipairs = ipairs
-local pairs = pairs
 local type = type
 
 module( "gpm.sources.gma" )
@@ -30,18 +29,18 @@ Import = promise.Async( function( info )
     local gma = gmad_Open( importPath, "GAME" )
     if not gma then return promise.Reject( "gma file '" .. importPath .. "' cannot be readed" ) end
 
-    info.requiredContent = gma:GetRequiredContent()
-    info.description = gma:GetDescription()
-    info.timestamp = gma:GetTimestamp()
-    info.author = gma:GetAuthor()
     info.name = gma:GetTitle()
+    info.description = gma:GetDescription()
+
+    info.author = gma:GetAuthor()
+    info.timestamp = gma:GetTimestamp()
+    info.requiredContent = gma:GetRequiredContent()
+
     gma:Close()
 
-    local description = info.description
+    local description = util.JSONToTable( info.description )
     if type( description ) == "table" then
-        for key, value in pairs( description ) do
-            info[ key ] = value
-        end
+        table.Merge( info, description )
     end
 
     local ok, files = game_MountGMA( importPath )
@@ -54,7 +53,7 @@ Import = promise.Async( function( info )
         local importPath = string.match( string.sub( filePath, 5 ), "packages/[^/]+" )
         if not importPath then continue end
 
-        if table_HasIValue( packages, importPath ) then continue end
+        if table.HasIValue( packages, importPath ) then continue end
         packages[ #packages + 1 ] = importPath
     end
 
@@ -66,7 +65,9 @@ Import = promise.Async( function( info )
             tasks[ #tasks + 1 ] = gpm.SourceImport( "lua", importPath, pkg, false )
         end
 
-        if #tasks ~= 1 then return end
-        return tasks[1]
+        local count = #tasks
+        if count == 0 then return end
+        if count == 1 then return tasks[1] end
+        return tasks
     end )
 end )
