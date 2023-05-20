@@ -363,10 +363,12 @@ function Initialize( metadata, func, files )
         environment.SetValue( env, "require", function( name )
             if util.IsBinaryModuleInstalled( name ) then return require( name ) end
 
-            local ok, result = gpm.SourceImport( "lua", "includes/modules/" .. name .. ".lua", _PKG, false ):SafeAwait()
-            if ok then return result end
+            local importPath = "includes/modules/" .. name .. ".lua"
+            if not fs.Exists( importPath, luaRealm ) then
+                importPath = name
+            end
 
-            error( "Module '" .. name .. "' not found!" )
+            return gpm.Import( importPath, false, pkg )
         end )
 
     end
