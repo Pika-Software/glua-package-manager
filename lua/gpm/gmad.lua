@@ -482,11 +482,6 @@ function Parse( fileClass )
 
     metadata.FilesPos = fileClass:Tell()
 
-    local description = metadata.Description
-    if description ~= nil then
-        metadata.Description = util.JSONToTable( description ) or description
-    end
-
     return metadata
 end
 
