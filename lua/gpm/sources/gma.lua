@@ -10,7 +10,6 @@ local fs = gpm.fs
 local table_HasIValue = table.HasIValue
 local game_MountGMA = game.MountGMA
 local gmad_Open = gpm.gmad.Open
-local logger = gpm.Logger
 local ipairs = ipairs
 local pairs = pairs
 local type = type
@@ -29,10 +28,7 @@ Import = promise.Async( function( info )
     local importPath = info.importPath
 
     local gma = gmad_Open( importPath, "GAME" )
-    if not gma then
-        logger:Error( "Package '%s' import failed, gma file cannot be readed.", importPath )
-        return
-    end
+    if not gma then return promise.Reject( "gma file '" .. importPath .. "' cannot be readed" ) end
 
     info.requiredContent = gma:GetRequiredContent()
     info.description = gma:GetDescription()
@@ -49,10 +45,7 @@ Import = promise.Async( function( info )
     end
 
     local ok, files = game_MountGMA( importPath )
-    if not ok then
-        logger:Error( "Package '%s' import failed, gma file cannot be mounted.", importPath )
-        return
-    end
+    if not ok then return promise.Reject( "gma file '" .. importPath .. "' cannot be mounted" ) end
 
     local packages = {}
     for _, filePath in ipairs( files ) do
