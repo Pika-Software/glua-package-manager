@@ -15,8 +15,8 @@ if util.IsBinaryModuleInstalled( "moonloader" ) then
 end
 
 -- Libraries
-local promise = gpm.promise
 local asyncio = asyncio
+local promise = promise
 local string = string
 local table = table
 local file = file

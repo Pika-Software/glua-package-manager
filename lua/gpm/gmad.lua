@@ -183,7 +183,6 @@ function GMA:SetDescription( description )
 
     local metadata = self.Metadata
     if not metadata then return end
-
     metadata.Description = description
 end
 
@@ -434,12 +433,12 @@ function Parse( fileClass )
     local version = fileClass:ReadByte()
     if ( version > GMA.Version ) then return end
 
-    local gmad = {}
-
-    gmad.FileVersion = version
+    local metadata = {
+        ["FileVersion"] = version
+    }
 
     fileClass:Skip( 8 )
-    gmad.FileTimestamp = fileClass:ReadULong()
+    metadata.FileTimestamp = fileClass:ReadULong()
     fileClass:Skip( 4 )
 
     if version > 1 then
@@ -451,21 +450,21 @@ function Parse( fileClass )
             required[ #required + 1 ] = content
         end
 
-        gmad.RequiredContent = required
+        metadata.RequiredContent = required
     end
 
     -- Addon info
-    gmad.Title = fileClass:ReadString()
-    gmad.Description = fileClass:ReadString()
-    gmad.Author = fileClass:ReadString()
+    metadata.Title = fileClass:ReadString()
+    metadata.Description = fileClass:ReadString()
+    metadata.Author = fileClass:ReadString()
 
     -- Addon version (unused)
-    gmad.Version = fileClass:ReadLong()
+    metadata.Version = fileClass:ReadLong()
 
     -- Files
     local fileNum = 1
     local offset = 0
-    gmad.Files = {}
+    metadata.Files = {}
 
     while fileClass:ReadULong() ~= 0 do
         local entry = {}
@@ -476,19 +475,14 @@ function Parse( fileClass )
         entry.CRC = fileClass:ReadULong()
         entry.Offset = offset
 
-        gmad.Files[ fileNum ] = entry
+        metadata.Files[ fileNum ] = entry
         offset = offset + entry.Size
         fileNum = fileNum + 1
     end
 
-    gmad.FilesPos = fileClass:Tell()
+    metadata.FilesPos = fileClass:Tell()
 
-    local description = gmad.Description
-    if description ~= nil then
-        gmad.Description = util.JSONToTable( description ) or description
-    end
-
-    return gmad
+    return metadata
 end
 
 function Read( fileClass )
@@ -497,11 +491,12 @@ function Read( fileClass )
     local metadata = Parse( fileClass )
     if not metadata then return end
 
-    local instance = setmetatable( {}, GMA )
-    instance.Metadata = metadata
-    instance.File = fileClass
+    local instance = setmetatable( {
+        ["Files"] = table.Merge( {}, metadata.Files ),
+        ["Metadata"] = metadata,
+        ["File"] = fileClass
+    }, GMA )
 
-    instance.Files = metadata.Files
     metadata.Files = nil
 
     return instance
@@ -529,18 +524,15 @@ function Write( filePath )
     local fileClass = file.Open( filePath, "wb", "DATA" )
     if not fileClass then return end
 
-    local instance = setmetatable( {}, GMA )
-    instance.File = fileClass
-    instance.WriteMode = true
-    instance.Files = {}
-
-    instance.Metadata = {
-        ["Title"] = "Garry\'s Mod Addon",
-        ["Description"] = "Builded by GLua Package Manager",
-        ["Author"] = "GLua Package Manager",
-        ["RequiredContent"] = {},
-        ["Files"] = {}
-    }
-
-    return instance
+    return setmetatable( {
+        ["WriteMode"] = true,
+        ["File"] = fileClass,
+        ["Files"] = {},
+        ["Metadata"] = {
+            ["Title"] = "Garry\'s Mod Addon",
+            ["Description"] = "Builded by GLua Package Manager",
+            ["Author"] = "GLua Package Manager",
+            ["RequiredContent"] = {}
+        }
+    }, GMA )
 end

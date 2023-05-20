@@ -19,9 +19,9 @@ local logger = gpm.Logger
 local require = require
 local SysTime = SysTime
 local setfenv = setfenv
-local xpcall = xpcall
 local error = error
 local pairs = pairs
+local pcall = pcall
 local type = type
 local _G = _G
 
@@ -118,12 +118,15 @@ do
             local metadata = {}
 
             setmetatable( metadata, environment )
-            setfenv( source, metadata )
-
-            local ok, result = xpcall( source, ErrorNoHaltWithStack )
+                setfenv( source, metadata )
+                local ok, result = pcall( source )
             setmetatable( metadata, nil )
 
-            if not ok then return end
+            if not ok then
+                ErrorNoHaltWithStack( result )
+                return
+            end
+
             result = result or metadata
 
             if type( result ) ~= "table" then return end
@@ -163,6 +166,10 @@ do
         local identifier = string.format( "%s@%s", self:GetName(), self:GetVersion() )
         if type( name ) ~= "string" then return identifier end
         return identifier .. "::" .. name
+    end
+
+    function PACKAGE:GetSourceName()
+        return table.Lookup( self, "metadata.source", "unknown" )
     end
 
     PACKAGE.__tostring = PACKAGE.GetIdentifier
@@ -236,13 +243,6 @@ end
 
 Run = run
 
--- Safe function run in package
-local function safeRun( func, package, errorHandler )
-    return xpcall( run, errorHandler, func, package )
-end
-
-SafeRun = safeRun
-
 -- This function will return compiled lua files by the path
 local function getCompiledFile( filePath, files )
     local func = nil
@@ -272,38 +272,42 @@ function Initialize( metadata, func, files )
     local stopwatch = SysTime()
 
     -- Creating package object
-    local package = setmetatable( {}, PACKAGE )
-    package.metadata = metadata
-    package.files = files
+    local pkg = setmetatable( {}, PACKAGE )
+    pkg.metadata = metadata
+    pkg.files = files
 
     if metadata.isolation then
 
         -- Creating environment for package
         local env = environment.Create( func, _G )
-        package.environment = env
+        pkg.environment = env
 
         -- Globals
         environment.SetLinkedTable( env, "gpm", gpm )
         env._VERSION = metadata.version
         env.ArgAssert = gpm.ArgAssert
-        env.promise = gpm.promise
         env.TypeID = gpm.TypeID
         env.type = gpm.type
         env.http = gpm.http
         env.file = fs
 
         -- Binding package object to gpm.Package & _PKG
-        table.SetValue( env, "gpm.Package", package )
-        table.SetValue( env, "_PKG", package )
+        table.SetValue( env, "gpm.Package", pkg )
+        table.SetValue( env, "_PKG", pkg )
 
         -- Logger
         if metadata.logger then
-            package.logger = gpm.logger.Create( package:GetIdentifier(), metadata.color )
-            table.SetValue( env, "gpm.Logger", package.logger )
+            pkg.logger = gpm.logger.Create( pkg:GetIdentifier(), metadata.color )
+            table.SetValue( env, "gpm.Logger", pkg.logger )
         end
 
+        -- import
+        environment.SetValue( env, "gpm.Import", function( filePath, async, pkg2 )
+            return gpm.Import( filePath, async, gpm.IsPackage( pkg2 ) and pkg2 or pkg )
+        end )
+
         environment.SetValue( env, "import", function( filePath, async )
-            return gpm.Import( filePath, async, package )
+            return gpm.Import( filePath, async, pkg )
         end )
 
         -- include
@@ -314,14 +318,14 @@ function Initialize( metadata, func, files )
                 if folder then
                     local func = getCompiledFile( folder .. fileName, files )
                     if func then
-                        return run( func, package )
+                        return run( func, pkg )
                     end
                 end
             end
 
             local func = getCompiledFile( fileName, files )
             if func then
-                return run( func, package )
+                return run( func, pkg )
             end
 
             error( "Couldn't include file '" .. fileName .. "' - File not found" )
@@ -347,7 +351,7 @@ function Initialize( metadata, func, files )
                     end
                 end
 
-                if fs.IsFile( fileName, luaRealm ) then
+                if type( fileName ) == "string" and fs.IsFile( fileName, luaRealm ) then
                     return AddCSLuaFile( fileName )
                 end
 
@@ -359,10 +363,12 @@ function Initialize( metadata, func, files )
         environment.SetValue( env, "require", function( name )
             if util.IsBinaryModuleInstalled( name ) then return require( name ) end
 
-            local ok, result = gpm.SourceImport( "lua", "includes/modules/" .. name .. ".lua", _PKG, false ):SafeAwait()
-            if ok then return result end
+            local importPath = "includes/modules/" .. name .. ".lua"
+            if not fs.Exists( importPath, luaRealm ) then
+                importPath = name
+            end
 
-            error( "Module '" .. name .. "' not found!" )
+            return gpm.Import( importPath, false, pkg )
         end )
 
     end
@@ -370,18 +376,17 @@ function Initialize( metadata, func, files )
     local importPath = metadata.importPath
 
     -- Run
-    local ok, result = safeRun( func, package, ErrorNoHaltWithStack )
+    local ok, result = pcall( run, func, pkg )
     if not ok then
-        logger:Error( "Package '%s' import failed, see above for the reason.", importPath )
-        return
+        gpm.Error( importPath, result, false, pkg:GetSourceName() )
     end
 
     -- Saving result to package
-    package.result = result
+    pkg.result = result
 
     -- Saving in global table & final log
-    logger:Info( "Package '%s' was successfully imported, it took %.4f seconds.", importPath, SysTime() - stopwatch )
-    gpm.Packages[ importPath ] = package
+    logger:Info( "[%s] Package '%s' was successfully imported, it took %.4f seconds.", pkg:GetSourceName(), importPath, SysTime() - stopwatch )
+    gpm.Packages[ importPath ] = pkg
 
-    return package
+    return pkg
 end

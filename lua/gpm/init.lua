@@ -27,7 +27,7 @@ MsgN( [[
 
 module( "gpm", package.seeall )
 
-_VERSION = 012101
+_VERSION = 012300
 
 if not Colors then
     Colors = {
@@ -81,14 +81,14 @@ do
     local ErrorNoHaltWithStack = ErrorNoHaltWithStack
     local error = error
 
-    function Error( packageName, message, noHalt, errorLevel )
-        Logger:Error( "Package '%s' import failed, see above to see the error.", packageName )
+    function Error( importPath, message, noHalt, sourceName )
+        Logger:Error( "[%s] Package '%s' import failed, see above to see the error.", sourceName or "unknown", importPath )
         if noHalt then
             ErrorNoHaltWithStack( message )
             return
         end
 
-        error( message, errorLevel )
+        error( message )
     end
 
 end
@@ -97,7 +97,7 @@ libs = {}
 libs.deflatelua = IncludeComponent "libs/deflatelua"
 Logger:Info( "%s %s is initialized.", libs.deflatelua._NAME, libs.deflatelua._VERSION )
 
-IncludeComponent "promise"
+IncludeComponent "libs/promise"
 local promise = promise
 
 Logger:Info( "gm_promise %s is initialized.", utils.Version( promise._VERSION_NUM ) )
@@ -176,6 +176,8 @@ for _, filePath in ipairs( fs.Find( "gpm/sources/*", "LUA" ) ) do
     include( filePath )
 end
 
+local IsPackage = IsPackage
+
 do
 
     local sourceList = {}
@@ -184,11 +186,11 @@ do
         sourceList[ #sourceList + 1 ] = sourceName
     end
 
-    function PackageExists( packagePath )
+    function PackageExists( importPath )
         for _, sourceName in ipairs( sourceList ) do
             local source = sources[ sourceName ]
             if not source then continue end
-            if not source.CanImport( packagePath ) then continue end
+            if not source.CanImport( importPath ) then continue end
             return true
         end
 
@@ -197,93 +199,119 @@ do
 
     local tasks = {}
 
-    function SourceImport( sourceName, packagePath, package, autorun )
-        if not string.IsURL( packagePath ) then
-            packagePath = paths.Fix( packagePath )
+    function SourceImport( sourceName, importPath, pkg, autorun )
+        if not string.IsURL( importPath ) then
+            importPath = paths.Fix( importPath )
         end
 
-        local task = tasks[ packagePath ]
+        local task = tasks[ importPath ]
         if not task then
             local source = sources[ sourceName ]
-            if not source or not source.CanImport( packagePath ) then return end
+            if not source or not source.CanImport( importPath ) then return end
 
-            local info = source.GetInfo( packagePath )
+            local info = source.GetInfo( importPath )
             if not info then
-                Logger:Error( "Package '%s' import failed, no import info.", packagePath )
-                return false
+                return false, "not enough information to start importing"
             end
 
-            local sendToClient = source.SendToClient
+            if type( info.name ) ~= "string" then
+                info.name = importPath
+            end
+
+            info.importPath = importPath
+            info.source = sourceName
+
             if autorun and not info.autorun then
+                local sendToClient = source.SendToClient
                 if SERVER and info.client and type( sendToClient ) == "function" then
                     sendToClient( info )
                 end
 
-                Logger:Debug( "Package '%s' autorun restricted.", packagePath )
+                Logger:Debug( "[%s] Package '%s' autorun restricted.", sourceName, importPath )
                 return false
             end
 
             if not info.singleplayer and SinglePlayer then
-                Logger:Error( "Package '%s' import failed, cannot be executed in a single-player game.", packagePath )
-                return false
+                return false, "cannot be executed in a singleplayer game"
             end
 
             local gamemodes = info.gamemodes
             local gamemodesType = type( gamemodes )
             if ( gamemodesType == "string" and gamemodes ~= Gamemode ) or ( gamemodesType == "table" and not table.HasIValue( gamemodes, Gamemode ) ) then
-                Logger:Error( "Package '%s' import failed, is not compatible with active gamemode.", packagePath )
-                return false
+                return false, "does not support active gamemode"
             end
 
             local maps = info.maps
             local mapsType = type( maps )
             if ( mapsType == "string" and maps ~= Map ) or ( mapsType == "table" and not table.HasIValue( maps, Map ) ) then
-                Logger:Error( "Package '%s' import failed, is not compatible with current map.", packagePath )
-                return false
+                return false, "does not support current map"
             end
 
+            local sendToClient = source.SendToClient
             if SERVER and info.client and type( sendToClient ) == "function" then
                 sendToClient( info )
             end
 
             task = source.Import( info )
-            tasks[ packagePath ] = task
+            tasks[ importPath ] = task
         end
 
-        if not promise.IsPromise( task ) then return end
+        if not promise.IsPromise( task ) then
+            return false, "package task does not exist"
+        end
 
-        if IsPackage( package ) then
+        if task:IsPending() then
+            task:Catch( function( message )
+                Error( importPath, message, true, sourceName )
+            end )
+        end
+
+        if IsPackage( pkg ) then
             if task:IsPending() then
                 task:Then( function( package2 )
-                    if not IsPackage( package2 ) then return end
-                    package:Link( package2 )
+                    if IsPackage( package2 ) then
+                        pkg:Link( package2 )
+                    end
                 end )
             elseif task:IsFulfilled() then
                 local package2 = task:GetResult()
                 if IsPackage( package2 ) then
-                    package:Link( package2 )
+                    pkg:Link( package2 )
                 end
             end
         end
 
-        return task
+        return true, task
     end
 
-    function AsyncImport( packagePath, package, autorun )
+    function SimpleSourceImport( sourceName, importPath, ... )
+        local ok, result = gpm.SourceImport( sourceName, importPath, ... )
+        if not ok then
+            gpm.Error( importPath, result or "import from this source is impossible", false, sourceName )
+        end
 
-        local task = tasks[ packagePath ]
+        return result
+    end
+
+    function AsyncImport( importPath, pkg, autorun )
+        local task = tasks[ importPath ]
         if not task then
             for _, sourceName in ipairs( sourceList ) do
-                local p = SourceImport( sourceName, packagePath, package, autorun )
-                if p == false then return end
-                if p == nil then continue end
-                task = p
+                local ok, result = SourceImport( sourceName, importPath, pkg or _PKG, autorun )
+                if ok == nil then continue end
+                if ok then
+                    task = result
+                    break
+                end
+
+                if result == nil then return end
+                Error( importPath, result, autorun, sourceName )
+                return
             end
         end
 
         if not task then
-            Error( packagePath, "Requested package doesn't exist!" )
-            return
+            Error( importPath, "Requested package doesn't exist!" )
         end
 
         return task
@@ -299,22 +327,16 @@ do
 
     local assert = assert
 
-    function Import( packagePath, async, package )
+    function Import( importPath, async, pkg )
         assert( async or promise.RunningInAsync(), "import supposed to be running in coroutine/async function (do you running it from package)" )
 
-        local task = AsyncImport( packagePath, package, false )
+        local task = AsyncImport( importPath, pkg, false )
         if not task then return end
 
         if not async then
             local ok, result = task:SafeAwait()
-            if not ok then
-                Error( packagePath, result )
-            end
-
-            if not result then
-                Error( packagePath, "This should never have happened, but the package was missing after the import." )
-            end
-
+            if not ok then return promise.Reject( result ) end
+            if not IsPackage( result ) then return result end
             return result:GetResult()
         end
 
@@ -325,7 +347,7 @@ do
 
 end
 
-function ImportFolder( folderPath, package, autorun )
+function ImportFolder( folderPath, pkg, autorun )
     folderPath = paths.Fix( folderPath )
 
     if not fs.IsDir( folderPath, luaRealm ) then
@@ -339,27 +361,12 @@ function ImportFolder( folderPath, package, autorun )
     end
     local files, folders = fs.Find( folderPath .. "/*", luaRealm )
     for _, folderName in ipairs( folders ) do
-        local packagePath = folderPath .. "/" .. folderName
-
-        local p = AsyncImport( packagePath, package, autorun )
-        if not p then continue end
-
-        p:Catch( function( result )
-            Error( packagePath, result )
-        end )
+        AsyncImport( folderPath .. "/" .. folderName, pkg, autorun )
     end
 
     for _, fileName in ipairs( files ) do
-        local packagePath = folderPath .. "/" .. fileName
-
-        local p = AsyncImport( packagePath, package, autorun )
-        if not p then continue end
-
-        p:Catch( function( result )
-            Error( packagePath, result )
-        end )
+        AsyncImport( folderPath .. "/" .. fileName, pkg, autorun )
     end
-
 end
 
 function ClearCache()
@@ -404,14 +411,20 @@ do
         MsgC( Colors.Realm, SERVER and "Server" or "Client", Colors.PrimaryText, " packages:\n" )
 
         local total = 0
-        for name, package in pairs( Packages ) do
-            MsgC( Colors.Realm, "\t* ", Colors.PrimaryText, string.format( "%s@%s\n", name, package:GetVersion() ) )
+        for name, pkg in pairs( Packages ) do
+            MsgC( Colors.Realm, "\t* ", Colors.PrimaryText, string.format( "%s@%s\n", name, pkg:GetVersion() ) )
             total = total + 1
         end
 
         MsgC( Colors.Realm, "\tTotal: ", Colors.PrimaryText, total, "\n" )
     end
 
+end
+
+function Reload()
+    hook.Run( "GPM - Reload" )
+    include( "gpm/init.lua" )
+    hook.Run( "GPM - Reloaded" )
 end
 
 if SERVER then
@@ -434,9 +447,7 @@ if SERVER then
 
     concommand.Add( "gpm_reload", function( ply )
         if not ply or ply:IsSuperAdmin() then
-            BroadcastLua( "include( \"gpm/init.lua\" )" )
-            include( "gpm/init.lua" )
-            hook.Run( "GPM - Reloaded" )
+            Reload(); BroadcastLua( "gpm.Reload()" )
             return
         end
 
@@ -445,7 +456,9 @@ if SERVER then
 
 end
 
-ImportFolder( "packages", nil, true )
-
 Logger:Info( "Time taken to start-up: %.4f sec.", SysTime() - stopwatch )
 hook.Run( "GPM - Initialized" )
+
+util.NextTick( function()
+    ImportFolder( "packages", _PKG, true )
+end )
