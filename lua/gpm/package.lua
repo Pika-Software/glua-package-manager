@@ -165,6 +165,10 @@ do
         return identifier .. "::" .. name
     end
 
+    function PACKAGE:GetSourceName()
+        return table.Lookup( self, "metadata.source", "unknown" )
+    end
+
     PACKAGE.__tostring = PACKAGE.GetIdentifier
 
     function PACKAGE:GetEnvironment()
