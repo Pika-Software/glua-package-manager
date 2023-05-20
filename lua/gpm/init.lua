@@ -454,8 +454,7 @@ if SERVER then
 
     concommand.Add( "gpm_reload", function( ply )
         if not ply or ply:IsSuperAdmin() then
-            BroadcastLua( "gpm.Reload()" )
-            Reload()
+            Reload(); BroadcastLua( "gpm.Reload()" )
             return
         end
 
