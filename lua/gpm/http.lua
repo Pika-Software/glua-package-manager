@@ -1,5 +1,5 @@
-local promise = gpm.promise
 local logger = gpm.Logger
+local promise = promise
 local ipairs = ipairs
 local util = util
 local type = type

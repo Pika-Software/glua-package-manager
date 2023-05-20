@@ -2,7 +2,7 @@ local gpm = gpm
 
 -- Libraries
 local package = gpm.package
-local promise = gpm.promise
+local promise = promise
 local paths = gpm.paths
 local string = string
 local fs = gpm.fs

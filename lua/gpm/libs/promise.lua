@@ -45,7 +45,7 @@ local pcall = pcall
 local error = error
 local _HTTP = HTTP
 
-module( "gpm.promise" )
+module( "promise" )
 
 _VERSION = "1.2.0" -- major.minor.patch
 _VERSION_NUM = 010200 -- _VERSION in number format: 1.2.3 -> 010203 | 99.56.13 -> 995613

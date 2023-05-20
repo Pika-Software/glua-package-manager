@@ -2,7 +2,7 @@ local gpm = gpm
 
 -- Libraries
 local package = gpm.package
-local promise = gpm.promise
+local promise = promise
 local utils = gpm.utils
 local gmad = gpm.gmad
 local http = gpm.http
@@ -46,9 +46,12 @@ Import = promise.Async( function( info )
     if not allowedExtensions[ extension ] then
         local wsid = string.match( url, "steamcommunity%.com/sharedfiles/filedetails/%?id=(%d+)" )
         if wsid ~= nil then
-            return gpm.SourceImport( "workshop", wsid, _PKG, false )
-        elseif string.match( url, "^https?://github.com/[^/]+/[^/]+$" ) ~= nil then
-            return gpm.SourceImport( "http", string.gsub( url, "^https?://", "" ), _PKG, false )
+            return gpm.SimpleSourceImport( "workshop", wsid, _PKG )
+        end
+
+        local gitHub = string.match( url, "^https?://(github.com/[^/]+/[^/]+)$" )
+        if gitHub ~= nil then
+            return gpm.SimpleSourceImport( "github", gitHub, _PKG )
         end
 
         return promise.Reject( "'" .. ( extension or "none" ) .. "' is unsupported file format" )
@@ -58,9 +61,9 @@ Import = promise.Async( function( info )
     local cachePath = cacheFolder .. "http_" .. util.MD5( url ) .. "."  .. ( extension == "json" and "gma" or extension ) .. ".dat"
     if fs.IsFile( cachePath, "DATA" ) and fs.Time( cachePath, "DATA" ) > ( 60 * 60 * cacheLifetime:GetInt() ) then
         if extension == "gma" or extension == "json" then
-            return gpm.SourceImport( "gma", "data/" .. cachePath, _PKG, false )
+            return gpm.SimpleSourceImport( "gma", "data/" .. cachePath, _PKG )
         elseif extension == "zip" then
-            return gpm.SourceImport( "zip", "data/" .. cachePath, _PKG, false )
+            return gpm.SimpleSourceImport( "zip", "data/" .. cachePath, _PKG )
         end
 
         local ok, result = fs.Compile( cachePath, "DATA" ):SafeAwait()
@@ -102,24 +105,20 @@ Import = promise.Async( function( info )
                 ["name"] = url
             } ), result )
         elseif extension == "gma" or extension == "zip" then
-            return gpm.SourceImport( extension, "data/" .. cachePath, _PKG, false )
+            return gpm.SimpleSourceImport( extension, "data/" .. cachePath, _PKG )
         end
 
         return promise.Reject( "how you did it?!" )
     end
 
     local json = util.JSONToTable( body )
-    if not json then
-        return promise.Reject( "file 'package.json' is corrupted" )
-    end
+    if not json then return promise.Reject( "file 'package.json' is corrupted" ) end
 
     package.GetMetadata( table_Merge( info, utils.LowerTableKeys( json ) ) )
     info.importPath = url
 
     local urls = info.files
-    if type( urls ) ~= "table" then
-        return promise.Reject( "files list is nil ( no links to files ), download canceled" )
-    end
+    if type( urls ) ~= "table" then return promise.Reject( "files list is nil ( no links to files ), download canceled" ) end
 
     info.files = nil
 
@@ -133,9 +132,7 @@ Import = promise.Async( function( info )
         files[ #files + 1 ] = { filePath, result.body }
     end
 
-    if #files == 0 then
-        return promise.Reject( "no files to compile, file list is empty" )
-    end
+    if #files == 0 then return promise.Reject( "no files to compile, file list is empty" ) end
 
     if info.mount == false then
         local compiledFiles = {}
@@ -182,5 +179,5 @@ Import = promise.Async( function( info )
 
     gma:Close()
 
-    return gpm.SourceImport( "gma", "data/" .. cachePath, _PKG, false )
+    return gpm.SimpleSourceImport( "gma", "data/" .. cachePath, _PKG )
 end )

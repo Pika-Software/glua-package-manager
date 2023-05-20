@@ -1,7 +1,7 @@
 local gpm = gpm
 
 -- Libraries
-local promise = gpm.promise
+local promise = promise
 local http = gpm.http
 local string = string
 
@@ -21,7 +21,7 @@ function GetInfo( url )
     }
 end
 
-ImportTree = promise.Async( function( user, repository, tree )
+IsAvailable = promise.Async( function( user, repository, tree )
     local url = string.format( "https://github.com/%s/%s/archive/refs/heads/%s.zip", user, repository, tree )
 
     local ok, result = http.Fetch( url ):SafeAwait()
@@ -33,8 +33,17 @@ ImportTree = promise.Async( function( user, repository, tree )
         return promise.Reject( "invalid response http code - " .. result.code )
     end
 
-    return gpm.SourceImport( "http", url, _PKG, false )
+    return url
 end )
+
+function ImportByHTTP( url )
+    local ok, result = gpm.SourceImport( "http", url, _PKG, false )
+    if not ok then
+        return promise.Reject( result or "import from this source is impossible" )
+    end
+
+    return result
+end
 
 Import = promise.Async( function( info )
     local user = info.user
@@ -45,15 +54,15 @@ Import = promise.Async( function( info )
 
     local tree = info.tree
     if tree ~= nil then
-        local ok, result = ImportTree( user, repository, tree ):SafeAwait()
-        if ok then return result end
+        local ok, result = IsAvailable( user, repository, tree ):SafeAwait()
+        if ok then return ImportByHTTP( result ) end
     end
 
-    local ok, result = ImportTree( user, repository, "main" ):SafeAwait()
-    if ok then return result end
+    local ok, result = IsAvailable( user, repository, "main" ):SafeAwait()
+    if ok then return ImportByHTTP( result ) end
 
-    ok, result = ImportTree( user, repository, "master" ):SafeAwait()
-    if ok then return result end
+    ok, result = IsAvailable( user, repository, "master" ):SafeAwait()
+    if ok then return ImportByHTTP( result ) end
 
     return promise.Reject( result )
 end )
