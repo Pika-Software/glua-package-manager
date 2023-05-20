@@ -2,7 +2,6 @@ local gpm = gpm
 
 -- Libraries
 local promise = gpm.promise
-local logger = gpm.Logger
 local http = gpm.http
 local string = string
 
@@ -31,7 +30,7 @@ ImportTree = promise.Async( function( user, repository, tree )
     end
 
     if result.code ~= 200 then
-        return promise.Reject( "[github] Invalid response http code - " .. result.code )
+        return promise.Reject( "invalid response http code - " .. result.code )
     end
 
     return gpm.SourceImport( "http", url, _PKG, false )
@@ -39,19 +38,13 @@ end )
 
 Import = promise.Async( function( info )
     local user = info.user
-    if not user then
-        logger:Error( "[github] Package '%s' import failed, attempt to download failed - repository not recognized.", info.url )
-        return
-    end
+    if not user then return promise.Reject( "attempt to download failed - repository not recognized" ) end
 
     local repository = info.repository
-    if not repository then
-        logger:Error( "[github] Package '%s' import failed, attempt to download failed - user not recognized.", info.url )
-        return
-    end
+    if not repository then return promise.Reject( "attempt to download failed - user not recognized" ) end
 
     local tree = info.tree
-    if tree then
+    if tree ~= nil then
         local ok, result = ImportTree( user, repository, tree ):SafeAwait()
         if ok then return result end
     end
@@ -62,5 +55,5 @@ Import = promise.Async( function( info )
     ok, result = ImportTree( user, repository, "master" ):SafeAwait()
     if ok then return result end
 
-    gpm.Error( info.url, result )
+    return promise.Reject( result )
 end )
