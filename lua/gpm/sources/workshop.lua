@@ -86,5 +86,5 @@ Import = promise.Async( function( info )
     local ok, result = Download( wsid ):SafeAwait()
     if not ok then return promise.Reject( result ) end
 
-    return gpm.SourceImport( "gma", result, _PKG, false )
+    return gpm.SimpleSourceImport( "gma", result, _PKG )
 end )

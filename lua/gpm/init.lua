@@ -211,7 +211,7 @@ do
 
             local info = source.GetInfo( importPath )
             if not info then
-                return "not enough information to start importing"
+                return false, "not enough information to start importing"
             end
 
             if type( info.name ) ~= "string" then
@@ -232,19 +232,19 @@ do
             end
 
             if not info.singleplayer and SinglePlayer then
-                return "cannot be executed in a singleplayer game"
+                return false, "cannot be executed in a singleplayer game"
             end
 
             local gamemodes = info.gamemodes
             local gamemodesType = type( gamemodes )
             if ( gamemodesType == "string" and gamemodes ~= Gamemode ) or ( gamemodesType == "table" and not table.HasIValue( gamemodes, Gamemode ) ) then
-                return "does not support active gamemode"
+                return false, "does not support active gamemode"
             end
 
             local maps = info.maps
             local mapsType = type( maps )
             if ( mapsType == "string" and maps ~= Map ) or ( mapsType == "table" and not table.HasIValue( maps, Map ) ) then
-                return "does not support current map"
+                return false, "does not support current map"
             end
 
             local sendToClient = source.SendToClient
@@ -256,50 +256,62 @@ do
             tasks[ importPath ] = task
         end
 
-        if not promise.IsPromise( task ) then return end
-        task:Catch( function( message )
-            Error( importPath, message, true, sourceName )
-        end )
+        if not promise.IsPromise( task ) then
+            return false, "package task does not exist"
+        end
 
-        if IsPackage( package ) then
+        if task:IsPending() then
+            task:Catch( function( message )
+                Error( importPath, message, true, sourceName )
+            end )
+        end
+
+        if IsPackage( pkg ) then
             if task:IsPending() then
                 task:Then( function( package2 )
-                    if not IsPackage( package2 ) then return end
-                    package:Link( package2 )
+                    if IsPackage( package2 ) then
+                        pkg:Link( package2 )
+                    end
                 end )
             elseif task:IsFulfilled() then
                 local package2 = task:GetResult()
                 if IsPackage( package2 ) then
-                    package:Link( package2 )
+                    pkg:Link( package2 )
                 end
             end
         end
 
-        return task
+        return true, task
     end
 
-    function AsyncImport( importPath, package, autorun )
+    function SimpleSourceImport( sourceName, importPath, ... )
+        local ok, result = gpm.SourceImport( sourceName, importPath, ... )
+        if not ok then
+            gpm.Error( importPath, result or "import from this source is impossible", false, sourceName )
+        end
+
+        return result
+    end
+
+    function AsyncImport( importPath, pkg, autorun )
         local task = tasks[ importPath ]
         if not task then
             for _, sourceName in ipairs( sourceList ) do
-                local result = SourceImport( sourceName, importPath, package or _PKG, autorun )
-                if result == false then return end
-
-                if type( result ) == "string" then
-                    Logger:Error( "[%s] Package '%s' import failed, %s.", sourceName, importPath, result )
-                    return
-                end
-
-                if promise.IsPromise( result ) then
+                local ok, result = SourceImport( sourceName, importPath, pkg or _PKG, autorun )
+                if ok == nil then continue end
+                if ok then
                     task = result
                     break
                 end
+
+                if result == nil then return end
+                Error( importPath, result, autorun, sourceName )
+                return
             end
         end
 
         if not task then
             Error( importPath, "Requested package doesn't exist!" )
-            return
         end
 
         return task
@@ -323,14 +335,8 @@ do
 
         if not async then
             local ok, result = task:SafeAwait()
-            if not ok then
-                Error( importPath, result )
-            end
-
-            if not IsPackage( result ) then
-                Error( importPath, "This should never have happened, but the package was missing after the import." )
-            end
-
+            if not ok then return promise.Reject( result ) end
+            if not IsPackage( result ) then return result end
             return result:GetResult()
         end
 
@@ -353,27 +359,12 @@ function ImportFolder( folderPath, pkg, autorun )
 
     local files, folders = fs.Find( folderPath .. "/*", luaRealm )
     for _, folderName in ipairs( folders ) do
-        local importPath = folderPath .. "/" .. folderName
-
-        local p = AsyncImport( importPath, pkg, autorun )
-        if not p then continue end
-
-        p:Catch( function( result )
-            Error( importPath, result )
-        end )
+        AsyncImport( folderPath .. "/" .. folderName, pkg, autorun )
     end
 
     for _, fileName in ipairs( files ) do
-        local importPath = folderPath .. "/" .. fileName
-
-        local p = AsyncImport( importPath, pkg, autorun )
-        if not p then continue end
-
-        p:Catch( function( result )
-            Error( importPath, result )
-        end )
+        AsyncImport( folderPath .. "/" .. fileName, pkg, autorun )
     end
-
 end
 
 function ClearCache()

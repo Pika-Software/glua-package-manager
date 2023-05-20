@@ -42,7 +42,7 @@ Import = promise.Async( function( info )
 
     local cachePath = cacheFolder .. "zip_" .. util.MD5( importPath ) .. ".gma.dat"
     if fs.IsFile( cachePath, "DATA" ) and fs.Time( cachePath, "DATA" ) > ( 60 * 60 * cacheLifetime:GetInt() ) then
-        return gpm.SourceImport( "gma", "data/" .. cachePath, _PKG, false )
+        return gpm.SimpleSourceImport( "gma", "data/" .. cachePath, _PKG )
     end
 
     local fileClass = fs.Open( importPath, "rb", "GAME" )
@@ -90,5 +90,5 @@ Import = promise.Async( function( info )
 
     gma:Close()
 
-    return gpm.SourceImport( "gma", "data/" .. cachePath, _PKG, false )
+    return gpm.SimpleSourceImport( "gma", "data/" .. cachePath, _PKG )
 end )
