@@ -1,7 +1,7 @@
 local gpm = gpm
 
 -- Libraries
-local promise = gpm.promise
+local promise = promise
 local http = gpm.http
 local string = string
 

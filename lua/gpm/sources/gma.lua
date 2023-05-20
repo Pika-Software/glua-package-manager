@@ -1,8 +1,7 @@
 local gpm = gpm
 
 -- Libraries
-local package = gpm.package
-local promise = gpm.promise
+local promise = promise
 local string = string
 local table = table
 local fs = gpm.fs

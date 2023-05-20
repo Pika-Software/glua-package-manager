@@ -1,7 +1,7 @@
 local gpm = gpm
 
 -- Libraries
-local promise = gpm.promise
+local promise = promise
 local gmad = gpm.gmad
 local string = string
 local table = table

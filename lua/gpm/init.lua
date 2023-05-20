@@ -97,7 +97,7 @@ libs = {}
 libs.deflatelua = IncludeComponent "libs/deflatelua"
 Logger:Info( "%s %s is initialized.", libs.deflatelua._NAME, libs.deflatelua._VERSION )
 
-IncludeComponent "promise"
+IncludeComponent "libs/promise"
 local promise = promise
 
 Logger:Info( "gm_promise %s is initialized.", utils.Version( promise._VERSION_NUM ) )

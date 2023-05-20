@@ -9,8 +9,8 @@ elseif SERVER and util.IsBinaryModuleInstalled( "async_write" ) then
 end
 
 -- Libraries
-local promise = gpm.promise
 local asyncio = asyncio
+local promise = promise
 local string = string
 local table = table
 local file = file

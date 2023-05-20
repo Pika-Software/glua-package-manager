@@ -7,7 +7,7 @@ if SERVER and not steamworks then
 end
 
 -- Libraries
-local promise = gpm.promise
+local promise = promise
 local gmad = gpm.gmad
 local fs = gpm.fs
 

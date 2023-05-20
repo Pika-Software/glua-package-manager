@@ -286,7 +286,6 @@ function Initialize( metadata, func, files )
         environment.SetLinkedTable( env, "gpm", gpm )
         env._VERSION = metadata.version
         env.ArgAssert = gpm.ArgAssert
-        env.promise = gpm.promise
         env.TypeID = gpm.TypeID
         env.type = gpm.type
         env.http = gpm.http
