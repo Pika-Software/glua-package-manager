@@ -8,12 +8,6 @@ elseif SERVER and util.IsBinaryModuleInstalled( "async_write" ) then
     require( "async_write" )
 end
 
--- https://github.com/Pika-Software/gm_moonloader
-if util.IsBinaryModuleInstalled( "moonloader" ) then
-    gpm.Logger:Info( "Moonloader engaged." )
-    require( "moonloader" )
-end
-
 -- Libraries
 local asyncio = asyncio
 local promise = promise
