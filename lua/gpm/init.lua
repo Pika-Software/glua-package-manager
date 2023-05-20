@@ -199,7 +199,7 @@ do
 
     local tasks = {}
 
-    function SourceImport( sourceName, importPath, package, autorun )
+    function SourceImport( sourceName, importPath, pkg, autorun )
         if not string.IsURL( importPath ) then
             importPath = paths.Fix( importPath )
         end
@@ -315,10 +315,10 @@ do
 
     local assert = assert
 
-    function Import( importPath, async, package )
+    function Import( importPath, async, pkg )
         assert( async or promise.RunningInAsync(), "import supposed to be running in coroutine/async function (do you running it from package)" )
 
-        local task = AsyncImport( importPath, package, false )
+        local task = AsyncImport( importPath, pkg, false )
         if not task then return end
 
         if not async then
@@ -341,7 +341,7 @@ do
 
 end
 
-function ImportFolder( folderPath, package, autorun )
+function ImportFolder( folderPath, pkg, autorun )
     folderPath = paths.Fix( folderPath )
 
     if not fs.IsDir( folderPath, luaRealm ) then
@@ -355,7 +355,7 @@ function ImportFolder( folderPath, package, autorun )
     for _, folderName in ipairs( folders ) do
         local importPath = folderPath .. "/" .. folderName
 
-        local p = AsyncImport( importPath, package, autorun )
+        local p = AsyncImport( importPath, pkg, autorun )
         if not p then continue end
 
         p:Catch( function( result )
@@ -366,7 +366,7 @@ function ImportFolder( folderPath, package, autorun )
     for _, fileName in ipairs( files ) do
         local importPath = folderPath .. "/" .. fileName
 
-        local p = AsyncImport( importPath, package, autorun )
+        local p = AsyncImport( importPath, pkg, autorun )
         if not p then continue end
 
         p:Catch( function( result )
@@ -418,8 +418,8 @@ do
         MsgC( Colors.Realm, SERVER and "Server" or "Client", Colors.PrimaryText, " packages:\n" )
 
         local total = 0
-        for name, package in pairs( Packages ) do
-            MsgC( Colors.Realm, "\t* ", Colors.PrimaryText, string.format( "%s@%s\n", name, package:GetVersion() ) )
+        for name, pkg in pairs( Packages ) do
+            MsgC( Colors.Realm, "\t* ", Colors.PrimaryText, string.format( "%s@%s\n", name, pkg:GetVersion() ) )
             total = total + 1
         end
 

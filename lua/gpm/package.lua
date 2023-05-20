@@ -272,15 +272,15 @@ function Initialize( metadata, func, files )
     local stopwatch = SysTime()
 
     -- Creating package object
-    local package = setmetatable( {}, PACKAGE )
-    package.metadata = metadata
-    package.files = files
+    local pkg = setmetatable( {}, PACKAGE )
+    pkg.metadata = metadata
+    pkg.files = files
 
     if metadata.isolation then
 
         -- Creating environment for package
         local env = environment.Create( func, _G )
-        package.environment = env
+        pkg.environment = env
 
         -- Globals
         environment.SetLinkedTable( env, "gpm", gpm )
@@ -293,22 +293,22 @@ function Initialize( metadata, func, files )
         env.file = fs
 
         -- Binding package object to gpm.Package & _PKG
-        table.SetValue( env, "gpm.Package", package )
-        table.SetValue( env, "_PKG", package )
+        table.SetValue( env, "gpm.Package", pkg )
+        table.SetValue( env, "_PKG", pkg )
 
         -- Logger
         if metadata.logger then
-            package.logger = gpm.logger.Create( package:GetIdentifier(), metadata.color )
-            table.SetValue( env, "gpm.Logger", package.logger )
+            pkg.logger = gpm.logger.Create( pkg:GetIdentifier(), metadata.color )
+            table.SetValue( env, "gpm.Logger", pkg.logger )
         end
 
         -- import
-        environment.SetValue( env, "gpm.Import", function( filePath, async, package2 )
-            return gpm.Import( filePath, async, gpm.IsPackage( package2 ) and package2 or package )
+        environment.SetValue( env, "gpm.Import", function( filePath, async, pkg2 )
+            return gpm.Import( filePath, async, gpm.IsPackage( pkg2 ) and pkg2 or pkg )
         end )
 
         environment.SetValue( env, "import", function( filePath, async )
-            return gpm.Import( filePath, async, package )
+            return gpm.Import( filePath, async, pkg )
         end )
 
         -- include
@@ -319,14 +319,14 @@ function Initialize( metadata, func, files )
                 if folder then
                     local func = getCompiledFile( folder .. fileName, files )
                     if func then
-                        return run( func, package )
+                        return run( func, pkg )
                     end
                 end
             end
 
             local func = getCompiledFile( fileName, files )
             if func then
-                return run( func, package )
+                return run( func, pkg )
             end
 
             error( "Couldn't include file '" .. fileName .. "' - File not found" )
@@ -381,11 +381,11 @@ function Initialize( metadata, func, files )
     end
 
     -- Saving result to package
-    package.result = result
+    pkg.result = result
 
     -- Saving in global table & final log
-    logger:Info( "[%s] Package '%s' was successfully imported, it took %.4f seconds.", package:GetSourceName(), importPath, SysTime() - stopwatch )
-    gpm.Packages[ importPath ] = package
+    logger:Info( "[%s] Package '%s' was successfully imported, it took %.4f seconds.", pkg:GetSourceName(), importPath, SysTime() - stopwatch )
+    gpm.Packages[ importPath ] = pkg
 
-    return package
+    return pkg
 end
