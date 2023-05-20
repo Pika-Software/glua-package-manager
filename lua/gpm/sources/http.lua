@@ -47,8 +47,11 @@ Import = promise.Async( function( info )
         local wsid = string.match( url, "steamcommunity%.com/sharedfiles/filedetails/%?id=(%d+)" )
         if wsid ~= nil then
             return gpm.SourceImport( "workshop", wsid, _PKG, false )
-        elseif string.match( url, "^https?://github.com/[^/]+/[^/]+$" ) ~= nil then
-            return gpm.SourceImport( "http", string.gsub( url, "^https?://", "" ), _PKG, false )
+        end
+
+        local gitHub = string.match( url, "^https?://(github.com/[^/]+/[^/]+)$" )
+        if gitHub ~= nil then
+            return gpm.SourceImport( "github", gitHub, _PKG, false )
         end
 
         return promise.Reject( "'" .. ( extension or "none" ) .. "' is unsupported file format" )
