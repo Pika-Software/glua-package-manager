@@ -34,7 +34,7 @@ function Download( wsid )
     local p = promise.New()
 
     steamworks.DownloadUGC( wsid, function( filePath, fileClass )
-        if fs.IsFile( filePath, "GAME" ) then
+        if type( filePath ) == "string" and fs.IsFile( filePath, "GAME" ) then
             p:Resolve( filePath )
             return
         end
@@ -84,10 +84,7 @@ end
 Import = promise.Async( function( info )
     local wsid = info.importPath
     local ok, result = Download( wsid ):SafeAwait()
-    if not ok then
-        logger:Error( "Package '%s' import failed, %s.", wsid, result )
-        return
-    end
+    if not ok then return promise.Reject( result ) end
 
     return gpm.SourceImport( "gma", result, _PKG, false )
 end )
