@@ -12,7 +12,6 @@ local fs = gpm.fs
 -- Variables
 local cacheLifetime = GetConVar( "gpm_cache_lifetime" )
 local cacheFolder = gpm.CachePath
-local logger = gpm.Logger
 local ipairs = ipairs
 
 module( "gpm.sources.zip" )
@@ -48,8 +47,7 @@ Import = promise.Async( function( info )
 
     local fileClass = fs.Open( importPath, "rb", "GAME" )
     if not fileClass then
-        logger:Error( "Package '%s' import failed, file cannot be readed.", importPath )
-        return
+        return promise.Reject( "file '" .. importPath .. "' cannot be readed" )
     end
 
     local files = {}
@@ -76,14 +74,12 @@ Import = promise.Async( function( info )
     fileClass:Close()
 
     if #files == 0 then
-        logger:Error( "Package '%s' import failed, no files to mount.", importPath )
-        return
+        return promise.Reject( "zip archive is empty ( no files to mount )" )
     end
 
     local gma = gmad.Write( cachePath )
     if not gma then
-        logger:Error( "Package '%s' import failed, cache construction error, mounting failed.", importPath )
-        return
+        return promise.Reject( "cache file '" .. cachePath .. "' construction error, mounting failed" )
     end
 
     gma:SetTitle( importPath )
