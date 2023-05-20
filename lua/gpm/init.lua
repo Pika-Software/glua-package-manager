@@ -286,7 +286,7 @@ do
                 if result == false then return end
 
                 if type( result ) == "string" then
-                    Logger:Error( "Package '%s' import failed, %s.", importPath, result )
+                    Logger:Error( "[%s] Package '%s' import failed, %s.", sourceName, importPath, result )
                     return
                 end
 
