@@ -463,8 +463,9 @@ if SERVER then
 
 end
 
+Logger:Info( "Time taken to start-up: %.4f sec.", SysTime() - stopwatch )
+hook.Run( "GPM - Initialized" )
+
 util.NextTick( function()
     ImportFolder( "packages", _PKG, true )
-    Logger:Info( "Time taken to start-up: %.4f sec.", SysTime() - stopwatch )
-    hook.Run( "GPM - Initialized" )
 end )
