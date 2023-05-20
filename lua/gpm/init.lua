@@ -347,6 +347,8 @@ do
 
 end
 
+local moonloader = moonloader
+
 function ImportFolder( folderPath, pkg, autorun )
     folderPath = paths.Fix( folderPath )
 
@@ -356,6 +358,10 @@ function ImportFolder( folderPath, pkg, autorun )
     end
 
     Logger:Info( "Starting to import packages from '%s'", folderPath )
+
+    if moonloader then
+        moonloader.PreCacheDir( folderPath )
+    end
 
     local files, folders = fs.Find( folderPath .. "/*", luaRealm )
     for _, folderName in ipairs( folders ) do
