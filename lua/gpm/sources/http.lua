@@ -12,6 +12,7 @@ local util = util
 
 -- Variables
 local CompileString = CompileString
+local table_Merge = table.Merge
 local logger = gpm.Logger
 local ipairs = ipairs
 local pairs = pairs
@@ -29,8 +30,7 @@ end
 
 function GetInfo( url )
     return {
-        ["extension"] = string.GetExtensionFromFilename( url ) or "json",
-        ["importPath"] = url
+        ["extension"] = string.GetExtensionFromFilename( url ) or "json"
     }
 end
 
@@ -51,8 +51,7 @@ Import = promise.Async( function( info )
             return gpm.SourceImport( "http", string.gsub( url, "^https?://", "" ), _PKG, false )
         end
 
-        logger:Error( "Package '%s' import failed, unsupported file extension. ", url )
-        return
+        return promise.Reject( "'" .. ( extension or "none" ) .. "' is unsupported file format" )
     end
 
     -- Local cache
@@ -76,16 +75,12 @@ Import = promise.Async( function( info )
     end
 
     -- Downloading
-    logger:Info( "Package '%s' is downloading...", url )
+    logger:Info( "[%s] Package '%s' is downloading...", info.source, url )
     local ok, result = http.Fetch( url, nil, 120 ):SafeAwait()
-    if not ok then
-        logger:Error( "Package '%s' import failed, %s.", url, result )
-        return
-    end
+    if not ok then return promise.Reject( result ) end
 
     if result.code ~= 200 then
-        logger:Error( "Package '%s' import failed, invalid response code: %d.", url, result.code )
-        return
+        return promise.Reject( "invalid response code: " .. result.code )
     end
 
     -- Processing
@@ -93,7 +88,7 @@ Import = promise.Async( function( info )
     if extension ~= "json" then
         local ok, result = fs.AsyncWrite( cachePath, body ):SafeAwait()
         if not ok then
-            logger:Warn( "Cache creation for package '%s' failed, error: %s", url, result )
+            logger:Warn( "[%s] Cache creation for package '%s' failed, error: %s", info.source, url, result )
         end
 
         if extension == "lua" then
@@ -110,32 +105,27 @@ Import = promise.Async( function( info )
             return gpm.SourceImport( extension, "data/" .. cachePath, _PKG, false )
         end
 
-        gpm.Error( url, "unsupported file format." )
+        return promise.Reject( "how you did it?!" )
     end
 
     local json = util.JSONToTable( body )
     if not json then
-        gpm.Error( url, "'package.json' file is corrupted." )
+        return promise.Reject( "file 'package.json' is corrupted" )
     end
 
-    package.GetMetadata( table.Merge( info, utils.LowerTableKeys( json ) ) )
+    package.GetMetadata( table_Merge( info, utils.LowerTableKeys( json ) ) )
     info.importPath = url
-
-    if not info.name then
-        info.name = url
-    end
 
     local urls = info.files
     if type( urls ) ~= "table" then
-        logger:Error( "Package '%s' import failed, no links to files, download canceled.", url )
-        return
+        return promise.Reject( "files list is nil ( no links to files ), download canceled" )
     end
 
     info.files = nil
 
     local files = {}
     for filePath, fileURL in pairs( urls ) do
-        logger:Debug( "Package '%s', file '%s' (%s) download has started.", url, filePath, fileURL )
+        logger:Debug( "[%s] Package '%s', file '%s' (%s) download has started.", info.source, url, filePath, fileURL )
 
         local ok, result = http.Fetch( fileURL, nil, 120 ):SafeAwait()
         if not ok then return promise.Reject( "file '" .. filePath .. "' download failed, " .. result ) end
@@ -144,8 +134,7 @@ Import = promise.Async( function( info )
     end
 
     if #files == 0 then
-        logger:Error( "Package '%s' import failed, no files to download.", url )
-        return
+        return promise.Reject( "no files to compile, file list is empty" )
     end
 
     if info.mount == false then
@@ -168,7 +157,7 @@ Import = promise.Async( function( info )
         end
 
         if not func then
-            gpm.Error( url, "main file '" .. main .. "' is missing." )
+            return promise.Reject( "main file '" .. main .. "' is missing or compilation was failed" )
         end
 
         return package.Initialize( info, func, compiledFiles )
@@ -176,7 +165,7 @@ Import = promise.Async( function( info )
 
     local gma = gmad.Write( cachePath )
     if not gma then
-        gpm.Error( url, "cache construction error." )
+        return promise.Reject( "cache file '" .. cachePath .. "' construction error, mounting failed" )
     end
 
     gma:SetTitle( info.name )

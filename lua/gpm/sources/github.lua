@@ -2,7 +2,6 @@ local gpm = gpm
 
 -- Libraries
 local promise = gpm.promise
-local logger = gpm.Logger
 local http = gpm.http
 local string = string
 
@@ -17,13 +16,14 @@ function GetInfo( url )
     return {
         ["tree"] = string.match( url, "/tree/([%w_%-%.%/]+)"),
         ["repository"] = repository,
-        ["importPath"] = url,
         ["user"] = user,
         ["url"] = url
     }
 end
 
-Try = promise.Async( function( url )
+ImportTree = promise.Async( function( user, repository, tree )
+    local url = string.format( "https://github.com/%s/%s/archive/refs/heads/%s.zip", user, repository, tree )
+
     local ok, result = http.Fetch( url ):SafeAwait()
     if not ok then
         return promise.Reject( result )
@@ -36,40 +36,24 @@ Try = promise.Async( function( url )
     return gpm.SourceImport( "http", url, _PKG, false )
 end )
 
-TryTree = promise.Async( function( user, repository, tree )
-    local ok, result = Try( string.format( "https://raw.githubusercontent.com/%s/%s/%s/package.json", user, repository, tree ) ):SafeAwait()
-    if ok then return result end
-
-    ok, result = Try( string.format( "https://github.com/%s/%s/archive/refs/heads/%s.zip", user, repository, tree ) ):SafeAwait()
-    if ok then return result end
-
-    return promise.Reject( result )
-end )
-
 Import = promise.Async( function( info )
     local user = info.user
-    if not user then
-        logger:Error( "Package '%s' import failed, attempt to download failed - repository not recognized.", info.url )
-        return
-    end
+    if not user then return promise.Reject( "attempt to download failed - repository not recognized" ) end
 
     local repository = info.repository
-    if not repository then
-        logger:Error( "Package '%s' import failed, attempt to download failed - user not recognized.", info.url )
-        return
-    end
+    if not repository then return promise.Reject( "attempt to download failed - user not recognized" ) end
 
     local tree = info.tree
-    if tree then
-        local ok, result = TryTree( user, repository, tree ):SafeAwait()
+    if tree ~= nil then
+        local ok, result = ImportTree( user, repository, tree ):SafeAwait()
         if ok then return result end
     end
 
-    local ok, result = TryTree( user, repository, "main" ):SafeAwait()
+    local ok, result = ImportTree( user, repository, "main" ):SafeAwait()
     if ok then return result end
 
-    ok, result = TryTree( user, repository, "master" ):SafeAwait()
+    ok, result = ImportTree( user, repository, "master" ):SafeAwait()
     if ok then return result end
 
-    gpm.Error( info.url, result )
+    return promise.Reject( result )
 end )

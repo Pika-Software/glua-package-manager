@@ -27,17 +27,14 @@ function CanImport( filePath )
 end
 
 function GetInfo( wsid )
-    return {
-        ["importPath"] = wsid,
-        ["wsid"] = wsid
-    }
+    return {}
 end
 
 function Download( wsid )
     local p = promise.New()
 
     steamworks.DownloadUGC( wsid, function( filePath, fileClass )
-        if fs.IsFile( filePath, "GAME" ) then
+        if type( filePath ) == "string" and fs.IsFile( filePath, "GAME" ) then
             p:Resolve( filePath )
             return
         end
@@ -85,11 +82,9 @@ function Download( wsid )
 end
 
 Import = promise.Async( function( info )
-    local ok, result = Download( info.wsid ):SafeAwait()
-    if not ok then
-        logger:Error( "Package '%s' import failed, %s.", info.wsid, result )
-        return
-    end
+    local wsid = info.importPath
+    local ok, result = Download( wsid ):SafeAwait()
+    if not ok then return promise.Reject( result ) end
 
     return gpm.SourceImport( "gma", result, _PKG, false )
 end )

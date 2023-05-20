@@ -165,6 +165,10 @@ do
         return identifier .. "::" .. name
     end
 
+    function PACKAGE:GetSourceName()
+        return table.Lookup( self, "metadata.source", "unknown" )
+    end
+
     PACKAGE.__tostring = PACKAGE.GetIdentifier
 
     function PACKAGE:GetEnvironment()
@@ -302,6 +306,11 @@ function Initialize( metadata, func, files )
             table.SetValue( env, "gpm.Logger", package.logger )
         end
 
+        -- import
+        environment.SetValue( env, "gpm.Import", function( filePath, async, package2 )
+            return gpm.Import( filePath, async, gpm.IsPackage( package2 ) and package2 or package )
+        end )
+
         environment.SetValue( env, "import", function( filePath, async )
             return gpm.Import( filePath, async, package )
         end )
@@ -347,7 +356,7 @@ function Initialize( metadata, func, files )
                     end
                 end
 
-                if fs.IsFile( fileName, luaRealm ) then
+                if type( fileName ) == "string" and fs.IsFile( fileName, luaRealm ) then
                     return AddCSLuaFile( fileName )
                 end
 
@@ -372,7 +381,7 @@ function Initialize( metadata, func, files )
     -- Run
     local ok, result = safeRun( func, package, ErrorNoHaltWithStack )
     if not ok then
-        logger:Error( "Package '%s' import failed, see above for the reason.", importPath )
+        logger:Error( "[%s] Package '%s' import failed, see above for the reason.", package:GetSourceName(), importPath )
         return
     end
 
@@ -380,7 +389,7 @@ function Initialize( metadata, func, files )
     package.result = result
 
     -- Saving in global table & final log
-    logger:Info( "Package '%s' was successfully imported, it took %.4f seconds.", importPath, SysTime() - stopwatch )
+    logger:Info( "[%s] Package '%s' was successfully imported, it took %.4f seconds.", package:GetSourceName(), importPath, SysTime() - stopwatch )
     gpm.Packages[ importPath ] = package
 
     return package

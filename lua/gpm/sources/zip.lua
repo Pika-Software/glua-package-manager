@@ -2,7 +2,6 @@ local gpm = gpm
 
 -- Libraries
 local promise = gpm.promise
-local paths = gpm.paths
 local gmad = gpm.gmad
 local string = string
 local table = table
@@ -13,7 +12,6 @@ local fs = gpm.fs
 -- Variables
 local cacheLifetime = GetConVar( "gpm_cache_lifetime" )
 local cacheFolder = gpm.CachePath
-local logger = gpm.Logger
 local ipairs = ipairs
 
 module( "gpm.sources.zip" )
@@ -36,24 +34,20 @@ local contentFolders = {
 }
 
 function GetInfo( filePath )
-    local importPath = paths.Fix( filePath )
-    return {
-        ["cachePath"] = cacheFolder .. "zip_" .. util.MD5( importPath ) .. ".gma.dat",
-        ["importPath"] = importPath
-    }
+    return {}
 end
 
 Import = promise.Async( function( info )
-    local cachePath = info.cachePath
+    local importPath = info.importPath
+
+    local cachePath = cacheFolder .. "zip_" .. util.MD5( importPath ) .. ".gma.dat"
     if fs.IsFile( cachePath, "DATA" ) and fs.Time( cachePath, "DATA" ) > ( 60 * 60 * cacheLifetime:GetInt() ) then
         return gpm.SourceImport( "gma", "data/" .. cachePath, _PKG, false )
     end
 
-    local importPath = info.importPath
     local fileClass = fs.Open( importPath, "rb", "GAME" )
     if not fileClass then
-        logger:Error( "Package '%s' import failed, file cannot be readed.", importPath )
-        return
+        return promise.Reject( "file '" .. importPath .. "' cannot be readed" )
     end
 
     local files = {}
@@ -80,14 +74,12 @@ Import = promise.Async( function( info )
     fileClass:Close()
 
     if #files == 0 then
-        logger:Error( "Package '%s' import failed, no files to mount.", importPath )
-        return
+        return promise.Reject( "zip archive is empty ( no files to mount )" )
     end
 
     local gma = gmad.Write( cachePath )
     if not gma then
-        logger:Error( "Package '%s' import failed, cache construction error, mounting failed.", importPath )
-        return
+        return promise.Reject( "cache file '" .. cachePath .. "' construction error, mounting failed" )
     end
 
     gma:SetTitle( importPath )
