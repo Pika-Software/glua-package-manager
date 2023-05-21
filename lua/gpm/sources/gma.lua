@@ -19,28 +19,24 @@ function CanImport( filePath )
     return fs.IsFile( filePath, "GAME" ) and string.EndsWith( filePath, ".gma.dat" ) or string.EndsWith( filePath, ".gma" )
 end
 
-function GetInfo( filePath )
-    return {}
-end
-
-Import = promise.Async( function( info )
-    local importPath = info.importPath
+Import = promise.Async( function( metadata )
+    local importPath = metadata.import_path
 
     local gma = gmad_Open( importPath, "GAME" )
     if not gma then return promise.Reject( "gma file '" .. importPath .. "' cannot be readed" ) end
 
-    info.name = gma:GetTitle()
-    info.description = gma:GetDescription()
+    metadata.name = gma:GetTitle()
+    metadata.description = gma:GetDescription()
 
-    info.author = gma:GetAuthor()
-    info.timestamp = gma:GetTimestamp()
-    info.requiredContent = gma:GetRequiredContent()
+    metadata.author = gma:GetAuthor()
+    metadata.timestamp = gma:GetTimestamp()
+    metadata.requiredContent = gma:GetRequiredContent()
 
     gma:Close()
 
-    local description = util_JSONToTable( info.description )
+    local description = util_JSONToTable( metadata.description )
     if type( description ) == "table" then
-        table.Merge( info, description )
+        table.Merge( metadata, description )
     end
 
     local ok, files = game_MountGMA( importPath )
@@ -59,7 +55,7 @@ Import = promise.Async( function( info )
 
     local results = {}
     for _, importPath in ipairs( importPaths ) do
-        results[ #results + 1 ] = gpm.SimpleSourceImport( "lua", importPath, pkg ):Await()
+        results[ #results + 1 ] = gpm.SourceImport( "lua", importPath )
     end
 
     local count = #results
