@@ -379,11 +379,11 @@ function Initialize( metadata, func, files )
             if util.IsBinaryModuleInstalled( name ) then return require( name ) end
 
             local importPath = "includes/modules/" .. name .. ".lua"
-            if not fs.Exists( importPath, luaRealm ) then
-                importPath = name
+            if fs.Exists( importPath, luaRealm ) then
+                return gpm.Import( importPath, false, pkg )
             end
 
-            return gpm.Import( gpm.LocatePackage( importPath, alternative ), false, pkg )
+            return gpm.Import( gpm.LocatePackage( name, alternative ), false, pkg )
         end )
 
     end
