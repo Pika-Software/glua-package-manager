@@ -197,6 +197,21 @@ do
         return false
     end
 
+    function LinkTaskToPackage( task, pkg )
+        if task:IsPending() then
+            task:Then( function( pkg2 )
+                if IsPackage( pkg2 ) then
+                    pkg:Link( pkg2 )
+                end
+            end )
+        elseif task:IsFulfilled() then
+            local pkg2 = task:GetResult()
+            if IsPackage( pkg2 ) then
+                pkg:Link( pkg2 )
+            end
+        end
+    end
+
     local tasks = {}
 
     function SourceImport( sourceName, importPath, pkg, autorun )
@@ -267,18 +282,7 @@ do
         end
 
         if IsPackage( pkg ) then
-            if task:IsPending() then
-                task:Then( function( package2 )
-                    if IsPackage( package2 ) then
-                        pkg:Link( package2 )
-                    end
-                end )
-            elseif task:IsFulfilled() then
-                local package2 = task:GetResult()
-                if IsPackage( package2 ) then
-                    pkg:Link( package2 )
-                end
-            end
+            LinkTaskToPackage( task, pkg )
         end
 
         return true, task
@@ -312,6 +316,10 @@ do
 
         if not task then
             Error( importPath, "Requested package doesn't exist!" )
+        end
+
+        if IsPackage( pkg ) then
+            LinkTaskToPackage( task, pkg )
         end
 
         return task

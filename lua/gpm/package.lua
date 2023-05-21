@@ -220,6 +220,7 @@ do
         local env2 = package2:GetEnvironment()
         if not env2 then return end
 
+        logger:Debug( "'%s' -> '%s'", package2:GetIdentifier(), self:GetIdentifier() )
         environment.LinkMetaTables( env, env2 )
     end
 
