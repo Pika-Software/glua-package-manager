@@ -2,6 +2,7 @@ local gpm = gpm
 
 -- Libraries
 local environment = gpm.environment
+local promise = promise
 local paths = gpm.paths
 local utils = gpm.utils
 local string = string
@@ -186,7 +187,7 @@ do
     end
 
     function PACKAGE:GetImportPath()
-        return table.Lookup( self, "metadata.importPath" )
+        return table.Lookup( self, "metadata.import_path" )
     end
 
     function PACKAGE:GetFolder()
@@ -249,6 +250,7 @@ Initialize = promise.Async( function( metadata, func, files )
         -- Creating environment for package
         local env = environment.Create( func, _G )
         pkg.environment = env
+        setfenv( func, env )
 
         -- Globals
         environment.SetLinkedTable( env, "gpm", gpm )
@@ -356,7 +358,7 @@ Initialize = promise.Async( function( metadata, func, files )
 
     end
 
-    local importPath = metadata.importPath
+    local importPath = metadata.import_path
 
     -- Run
     local ok, result = pcall( func, pkg )
