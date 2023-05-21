@@ -312,20 +312,34 @@ function Initialize( metadata, func, files )
 
         -- include
         environment.SetValue( env, "include", function( fileName )
-            local currentFile = utils.GetCurrentFile()
-            if currentFile then
-                local folder = string.GetPathFromFilename( paths.Localize( currentFile ) )
-                if folder then
-                    local func = getCompiledFile( folder .. fileName, files )
-                    if func then
-                        return run( func, pkg )
+            gpm.ArgAssert( fileName, 1, "string" )
+            fileName = paths.Fix( fileName )
+
+            local func = nil
+            if files ~= nil then
+                func = files[ fileName ]
+            end
+
+            if type( func ) ~= "function" then
+                local currentFile = utils.GetCurrentFile()
+                if currentFile then
+                    local folder = string.GetPathFromFilename( paths.Localize( currentFile ) )
+                    if folder then
+                        local filePath = paths.Fix( folder .. fileName )
+                        if fs.IsFile( filePath, luaRealm ) then
+                            func = gpm.CompileLua( filePath ):Await()
+                        end
                     end
                 end
             end
 
-            local func = getCompiledFile( fileName, files )
-            if func then
-                return run( func, pkg )
+            if type( func ) ~= "function" and fs.IsFile( fileName, luaRealm ) then
+                func = gpm.CompileLua( fileName ):Await()
+            end
+
+            if type( func ) == "function" then
+                setfenv( func, env )
+                return func()
             end
 
             error( "Couldn't include file '" .. fileName .. "' - File not found" )
