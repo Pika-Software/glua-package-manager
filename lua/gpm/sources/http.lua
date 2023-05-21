@@ -69,10 +69,7 @@ Import = promise.Async( function( info )
         local ok, result = fs.Compile( cachePath, "DATA" ):SafeAwait()
         if not ok then return promise.Reject( result ) end
 
-        return package.Initialize( package.GetMetadata( {
-            ["autorun"] = true,
-            ["name"] = url
-        } ), result )
+        return package.Initialize( package.GetMetadata( info ), result )
     end
 
     -- Downloading
@@ -98,10 +95,7 @@ Import = promise.Async( function( info )
                 gpm.Error( url, result )
             end
 
-            return package.Initialize( package.GetMetadata( {
-                ["autorun"] = true,
-                ["name"] = url
-            } ), result )
+            return package.Initialize( package.GetMetadata( info ), result )
         elseif extension == "gma" or extension == "zip" then
             return gpm.SimpleSourceImport( extension, "data/" .. cachePath, _PKG )
         end
@@ -111,7 +105,6 @@ Import = promise.Async( function( info )
 
     local json = util.JSONToTable( body )
     if not json then return promise.Reject( "file 'package.json' is corrupted" ) end
-
     package.GetMetadata( table_Merge( info, utils.LowerTableKeys( json ) ) )
     info.importPath = url
 
