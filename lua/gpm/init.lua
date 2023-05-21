@@ -27,7 +27,7 @@ MsgN( [[
 
 module( "gpm", package.seeall )
 
-_VERSION = 012401
+_VERSION = 012402
 
 if not Colors then
     Colors = {
@@ -288,11 +288,7 @@ do
             return false, "package task does not exist"
         end
 
-        if task:IsPending() then
-            task:Catch( function( message )
-                Error( importPath, message, true, sourceName )
-            end )
-        end
+        task:Catch( ErrorNoHaltWithStack )
 
         if IsPackage( pkg ) then
             LinkTaskToPackage( task, pkg )
