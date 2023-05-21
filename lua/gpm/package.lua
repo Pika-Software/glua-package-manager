@@ -349,7 +349,7 @@ Initialize = promise.Async( function( metadata, func, files )
             if util.IsBinaryModuleInstalled( name ) then return require( name ) end
 
             local importPath = "includes/modules/" .. name .. ".lua"
-            if fs.Exists( importPath, luaRealm ) then
+            if fs.IsFile( importPath, luaRealm ) then
                 return gpm.Import( importPath, false, pkg )
             end
 
