@@ -33,16 +33,12 @@ local contentFolders = {
     ["lua"] = true
 }
 
-function GetInfo( filePath )
-    return {}
-end
-
-Import = promise.Async( function( info )
-    local importPath = info.importPath
+Import = promise.Async( function( metadata )
+    local importPath = metadata.import_path
 
     local cachePath = cacheFolder .. "zip_" .. util.MD5( importPath ) .. ".gma.dat"
     if fs.IsFile( cachePath, "DATA" ) and fs.Time( cachePath, "DATA" ) > ( 60 * 60 * cacheLifetime:GetInt() ) then
-        return gpm.SimpleSourceImport( "gma", "data/" .. cachePath, _PKG )
+        return gpm.SourceImport( "gma", "data/" .. cachePath )
     end
 
     local fileClass = fs.Open( importPath, "rb", "GAME" )
@@ -90,5 +86,5 @@ Import = promise.Async( function( info )
 
     gma:Close()
 
-    return gpm.SimpleSourceImport( "gma", "data/" .. cachePath, _PKG )
+    return gpm.SourceImport( "gma", "data/" .. cachePath )
 end )
