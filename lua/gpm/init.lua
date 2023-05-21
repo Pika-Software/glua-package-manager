@@ -364,6 +364,12 @@ do
 
 end
 
+-- https://github.com/Pika-Software/gm_moonloader
+if util.IsBinaryModuleInstalled( "moonloader" ) then
+    gpm.Logger:Info( "Moonloader engaged." )
+    require( "moonloader" )
+end
+
 local moonloader = moonloader
 
 function ImportFolder( folderPath, pkg, autorun )
