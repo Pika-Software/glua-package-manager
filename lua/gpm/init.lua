@@ -125,7 +125,6 @@ CachePath = fs.CreateDir( "gpm/" .. ( SERVER and "server" or "client" ) .. "/pac
 
 do
 
-    local CompileString = CompileString
     local CompileFile = CompileFile
     local ArgAssert = ArgAssert
     local pcall = pcall
@@ -135,33 +134,29 @@ do
         return files
     end
 
-    function CompileLua( filePath )
+    CompileLua = promise.Async( function( filePath )
         ArgAssert( filePath, 1, "string" )
 
         local func = files[ filePath ]
         if func then return func end
 
-        local fileClass = file.Open( filePath, "r", luaRealm )
-        if fileClass then
-            local code = fileClass:Read( fileClass:Size() )
-            fileClass:Close()
-
-            local ok, result = pcall( CompileString, code, filePath, true )
-            if not ok then return ok, result end
-            if not result then return false, "file '" .. filePath .. "' code compilation failed due to an unknown error." end
+        local ok, result = fs.Compile( filePath, luaRealm ):SafeAwait()
+        if ok then
             func = result
+        elseif MENU_DLL then
+            return promise.Reject( result )
+        else
+            ok, result = pcall( CompileFile, filePath )
+            if not ok then return promise.Reject( result ) end
         end
 
-        if not func and not MENU_DLL then
-            local ok, result = pcall( CompileFile, filePath )
-            if not ok then return ok, result end
-            if not result then return false, "file '" .. filePath .. "' code compilation failed due to an unknown error." end
-            func = result
+        if ok and type( result ) == "function" then
+            files[ filePath ] = result
+            return result
         end
 
-        files[ filePath ] = func
-        return true, func
-    end
+        return promise.Reject( "File '" .. filePath .. "' code compilation failed due to an unknown error." )
+    end )
 
 end
 
