@@ -284,8 +284,8 @@ do
         return true, task
     end
 
-    function SimpleSourceImport( sourceName, importPath, ... )
-        local ok, result = gpm.SourceImport( sourceName, importPath, ... )
+    function SimpleSourceImport( sourceName, importPath, pkg )
+        local ok, result = gpm.SourceImport( sourceName, importPath, pkg, false )
         if not ok then
             gpm.Error( importPath, result or "import from this source is impossible", false, sourceName )
         end

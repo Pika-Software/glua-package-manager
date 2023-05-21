@@ -67,9 +67,7 @@ Import = promise.Async( function( info )
         end
 
         local ok, result = fs.Compile( cachePath, "DATA" ):SafeAwait()
-        if not ok then
-            gpm.Error( url, result )
-        end
+        if not ok then return promise.Reject( result ) end
 
         return package.Initialize( package.GetMetadata( {
             ["autorun"] = true,
