@@ -2,6 +2,7 @@ local gpm = gpm
 
 -- Libraries
 local environment = gpm.environment
+local promise = promise
 local paths = gpm.paths
 local utils = gpm.utils
 local string = string
@@ -40,18 +41,17 @@ end
 -- Get package by name/pattern
 function Find( searchable, ignoreImportNames, noPatterns )
     local result = {}
-    for importPath, package in pairs( gpm.Packages ) do
+    for importPath, pkg in pairs( gpm.Packages ) do
         if not ignoreImportNames and string.find( importPath, searchable, 1, noPatterns ) then
-            result[ #result + 1 ] = package
-        elseif package.name and string.find( package.name, searchable, 1, noPatterns ) then
-            result[ #result + 1 ] = package
+            result[ #result + 1 ] = pkg
+        elseif pkg.name and string.find( pkg.name, searchable, 1, noPatterns ) then
+            result[ #result + 1 ] = pkg
         end
     end
 
     return result
 end
 
--- gpm.package.GetMetadata( source )
 do
 
     local environment = {
@@ -60,6 +60,8 @@ do
 
     local function getMetadata( source )
         if type( source ) == "table" then
+            utils.LowerTableKeys( source )
+
             -- Package name & entry point
             if type( source.name ) ~= "string" then
                 source.name = nil
@@ -130,13 +132,11 @@ do
             result = result or metadata
 
             if type( result ) ~= "table" then return end
-            result = utils.LowerTableKeys( result )
-
-            if type( result.package ) ~= "table" then
-                return getMetadata( result )
+            if type( result.package ) == "table" then
+                result = result.package
             end
 
-            return getMetadata( result.package )
+            return getMetadata( result )
         end
     end
 
@@ -187,7 +187,7 @@ do
     end
 
     function PACKAGE:GetImportPath()
-        return table.Lookup( self, "metadata.importPath" )
+        return table.Lookup( self, "metadata.import_path" )
     end
 
     function PACKAGE:GetFolder()
@@ -232,42 +232,10 @@ do
 
 end
 
--- Function run in package
-local function run( func, package )
-    local environment = package:GetEnvironment()
-    if environment then
-        setfenv( func, environment )
+Initialize = promise.Async( function( metadata, func, files )
+    if type( files ) ~= "table" then
+        files = nil
     end
-
-    return func()
-end
-
-Run = run
-
--- This function will return compiled lua files by the path
-local function getCompiledFile( filePath, files )
-    local func = nil
-    if files ~= nil then
-        func = files[ filePath ]
-    end
-
-    if not func and fs.IsFile( filePath, luaRealm ) then
-        local ok, result = gpm.CompileLua( filePath )
-        if ok then
-            func = result
-        end
-    end
-
-    return func
-end
-
-GetCompiledFile = getCompiledFile
-
-function Initialize( metadata, func, files )
-    gpm.ArgAssert( metadata, 1, "table" )
-    gpm.ArgAssert( func, 2, "function" )
-
-    if type( files ) ~= "table" then files = nil end
 
     -- Measuring package startup time
     local stopwatch = SysTime()
@@ -282,6 +250,7 @@ function Initialize( metadata, func, files )
         -- Creating environment for package
         local env = environment.Create( func, _G )
         pkg.environment = env
+        setfenv( func, env )
 
         -- Globals
         environment.SetLinkedTable( env, "gpm", gpm )
@@ -303,30 +272,44 @@ function Initialize( metadata, func, files )
         end
 
         -- import
-        environment.SetValue( env, "gpm.Import", function( filePath, async, pkg2 )
-            return gpm.Import( filePath, async, gpm.IsPackage( pkg2 ) and pkg2 or pkg )
+        environment.SetValue( env, "gpm.Import", function( importPath, async, pkg2 )
+            return gpm.Import( importPath, async, gpm.IsPackage( pkg2 ) and pkg2 or pkg )
         end )
 
-        environment.SetValue( env, "import", function( filePath, async )
-            return gpm.Import( filePath, async, pkg )
+        environment.SetValue( env, "import", function( importPath, async )
+            return gpm.Import( importPath, async, pkg )
         end )
 
         -- include
         environment.SetValue( env, "include", function( fileName )
-            local currentFile = utils.GetCurrentFile()
-            if currentFile then
-                local folder = string.GetPathFromFilename( paths.Localize( currentFile ) )
-                if folder then
-                    local func = getCompiledFile( folder .. fileName, files )
-                    if func then
-                        return run( func, pkg )
+            gpm.ArgAssert( fileName, 1, "string" )
+            fileName = paths.Fix( fileName )
+
+            local func = nil
+            if files ~= nil then
+                func = files[ fileName ]
+            end
+
+            if type( func ) ~= "function" then
+                local currentFile = utils.GetCurrentFile()
+                if currentFile then
+                    local folder = string.GetPathFromFilename( paths.Localize( currentFile ) )
+                    if folder then
+                        local filePath = paths.Fix( folder .. fileName )
+                        if fs.IsFile( filePath, luaRealm ) then
+                            func = gpm.CompileLua( filePath ):Await()
+                        end
                     end
                 end
             end
 
-            local func = getCompiledFile( fileName, files )
-            if func then
-                return run( func, pkg )
+            if type( func ) ~= "function" and fs.IsFile( fileName, luaRealm ) then
+                func = gpm.CompileLua( fileName ):Await()
+            end
+
+            if type( func ) == "function" then
+                setfenv( func, env )
+                return func()
             end
 
             error( "Couldn't include file '" .. fileName .. "' - File not found" )
@@ -337,13 +320,14 @@ function Initialize( metadata, func, files )
             environment.SetValue( env, "AddCSLuaFile", function( fileName )
                 local currentFile = utils.GetCurrentFile()
                 if currentFile then
+                    local luaPath = paths.Localize( currentFile )
                     if fileName ~= nil then
                         gpm.ArgAssert( fileName, 1, "string" )
                     else
-                        fileName = currentFile
+                        fileName = string.GetFileFromFilename( luaPath )
                     end
 
-                    local folder = string.GetPathFromFilename( paths.Localize( currentFile ) )
+                    local folder = string.GetPathFromFilename( luaPath )
                     if folder then
                         local filePath = folder .. fileName
                         if fs.IsFile( filePath, luaRealm ) then
@@ -365,22 +349,20 @@ function Initialize( metadata, func, files )
             if util.IsBinaryModuleInstalled( name ) then return require( name ) end
 
             local importPath = "includes/modules/" .. name .. ".lua"
-            if not fs.Exists( importPath, luaRealm ) then
-                importPath = name
+            if fs.Exists( importPath, luaRealm ) then
+                return gpm.Import( importPath, false, pkg )
             end
 
-            return gpm.Import( gpm.LocatePackage( importPath, alternative ), false, pkg )
+            return gpm.Import( gpm.LocatePackage( name, alternative ), false, pkg )
         end )
 
     end
 
-    local importPath = metadata.importPath
+    local importPath = metadata.import_path
 
     -- Run
-    local ok, result = pcall( run, func, pkg )
-    if not ok then
-        gpm.Error( importPath, result, false, pkg:GetSourceName() )
-    end
+    local ok, result = pcall( func, pkg )
+    if not ok then return promise.Reject( result ) end
 
     -- Saving result to package
     pkg.result = result
@@ -390,4 +372,4 @@ function Initialize( metadata, func, files )
     gpm.Packages[ importPath ] = pkg
 
     return pkg
-end
+end )

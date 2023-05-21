@@ -27,7 +27,7 @@ MsgN( [[
 
 module( "gpm", package.seeall )
 
-_VERSION = 012403
+_VERSION = 012500
 
 if not Colors then
     Colors = {
@@ -76,9 +76,10 @@ IncludeComponent "logger"
 
 Logger = logger.Create( "GPM@" .. utils.Version( _VERSION ), Color( 180, 180, 255 ) )
 
+local ErrorNoHaltWithStack = ErrorNoHaltWithStack
+
 do
 
-    local ErrorNoHaltWithStack = ErrorNoHaltWithStack
     local error = error
 
     function Error( importPath, message, noHalt, sourceName )
@@ -124,7 +125,6 @@ CachePath = fs.CreateDir( "gpm/" .. ( SERVER and "server" or "client" ) .. "/pac
 
 do
 
-    local CompileString = CompileString
     local CompileFile = CompileFile
     local ArgAssert = ArgAssert
     local pcall = pcall
@@ -134,33 +134,29 @@ do
         return files
     end
 
-    function CompileLua( filePath )
+    CompileLua = promise.Async( function( filePath )
         ArgAssert( filePath, 1, "string" )
 
         local func = files[ filePath ]
         if func then return func end
 
-        local fileClass = file.Open( filePath, "r", luaRealm )
-        if fileClass then
-            local code = fileClass:Read( fileClass:Size() )
-            fileClass:Close()
-
-            local ok, result = pcall( CompileString, code, filePath, true )
-            if not ok then return ok, result end
-            if not result then return false, "file '" .. filePath .. "' code compilation failed due to an unknown error." end
+        local ok, result = fs.Compile( filePath, luaRealm ):SafeAwait()
+        if ok then
             func = result
+        elseif MENU_DLL then
+            return promise.Reject( result )
+        else
+            ok, result = pcall( CompileFile, filePath )
+            if not ok then return promise.Reject( result ) end
         end
 
-        if not func and not MENU_DLL then
-            local ok, result = pcall( CompileFile, filePath )
-            if not ok then return ok, result end
-            if not result then return false, "file '" .. filePath .. "' code compilation failed due to an unknown error." end
-            func = result
+        if ok and type( result ) == "function" then
+            files[ filePath ] = result
+            return result
         end
 
-        files[ filePath ] = func
-        return true, func
-    end
+        return promise.Reject( "File '" .. filePath .. "' code compilation failed due to an unknown error." )
+    end )
 
 end
 
@@ -186,7 +182,7 @@ do
         sourceList[ #sourceList + 1 ] = sourceName
     end
 
-    function PackageExists( importPath )
+    function CanImport( importPath )
         for _, sourceName in ipairs( sourceList ) do
             local source = sources[ sourceName ]
             if not source then continue end
@@ -199,7 +195,7 @@ do
 
     function LocatePackage( importPath, alternative )
         ArgAssert( importPath, 1, "string" )
-        if PackageExists( importPath ) then
+        if CanImport( importPath ) then
             return importPath
         end
 
@@ -225,106 +221,113 @@ do
         end
     end
 
-    local tasks = {}
+    local tasks, metadatas = {}, {}
+    local package = package
 
-    function SourceImport( sourceName, importPath, pkg, autorun )
+    SourceImport = promise.Async( function( sourceName, importPath )
+        local task = tasks[ importPath ]
+        if not task then
+            local source = sources[ sourceName ]
+            if not source then
+                return promise.Reject( "Requested package source not found." )
+            end
+
+            local metadata = metadatas[ sourceName .. ";" .. importPath ]
+            if not metadata then
+                if type( source.GetMetadata ) == "function" then
+                    metadata = package.GetMetadata( source.GetMetadata( importPath ):Await() )
+                else
+                    metadata = package.GetMetadata( {} )
+                end
+
+                metadatas[ sourceName .. ";" .. importPath ] = metadata
+            end
+
+            if CLIENT and not metadata.client then return promise.Reject( "Package does not support running on the client." ) end
+            if MENU_DLL and not metadata.menu then return promise.Reject( "Package does not support running in menu." ) end
+
+            if type( metadata.name ) ~= "string" then
+                metadata.name = importPath
+            end
+
+            metadata.import_path = importPath
+            metadata.source = sourceName
+
+            if not metadata.singleplayer and SinglePlayer then
+                return promise.Reject( "Package cannot be executed in a singleplayer game." )
+            end
+
+            local gamemodes = metadata.gamemodes
+            local gamemodesType = type( gamemodes )
+            if ( gamemodesType == "string" and gamemodes ~= Gamemode ) or ( gamemodesType == "table" and not table.HasIValue( gamemodes, Gamemode ) ) then
+                return promise.Reject( "Package does not support active gamemode." )
+            end
+
+            local maps = metadata.maps
+            local mapsType = type( maps )
+            if ( mapsType == "string" and maps ~= Map ) or ( mapsType == "table" and not table.HasIValue( maps, Map ) ) then
+                return promise.Reject( "Package does not support current map." )
+            end
+
+            if SERVER then
+                if metadata.client then
+                    if type( source.SendToClient ) == "function" then
+                        source.SendToClient( metadata )
+                    end
+                elseif not metadata.server then
+                    return promise.Reject( "Package does not support running on the server." )
+                end
+            end
+
+            task = source.Import( metadata )
+            tasks[ importPath ] = task
+        end
+
+        return task
+    end )
+
+    AsyncImport = promise.Async( function( importPath, pkg, autorun )
         if not string.IsURL( importPath ) then
             importPath = paths.Fix( importPath )
         end
 
         local task = tasks[ importPath ]
         if not task then
-            local source = sources[ sourceName ]
-            if not source or not source.CanImport( importPath ) then return end
-
-            local info = source.GetInfo( importPath )
-            if not info then
-                return false, "not enough information to start importing"
-            end
-
-            if type( info.name ) ~= "string" then
-                info.name = importPath
-            end
-
-            info.importPath = importPath
-            info.source = sourceName
-
-            if autorun and not info.autorun then
-                local sendToClient = source.SendToClient
-                if SERVER and info.client and type( sendToClient ) == "function" then
-                    sendToClient( info )
-                end
-
-                Logger:Debug( "[%s] Package '%s' autorun restricted.", sourceName, importPath )
-                return false
-            end
-
-            if not info.singleplayer and SinglePlayer then
-                return false, "cannot be executed in a singleplayer game"
-            end
-
-            local gamemodes = info.gamemodes
-            local gamemodesType = type( gamemodes )
-            if ( gamemodesType == "string" and gamemodes ~= Gamemode ) or ( gamemodesType == "table" and not table.HasIValue( gamemodes, Gamemode ) ) then
-                return false, "does not support active gamemode"
-            end
-
-            local maps = info.maps
-            local mapsType = type( maps )
-            if ( mapsType == "string" and maps ~= Map ) or ( mapsType == "table" and not table.HasIValue( maps, Map ) ) then
-                return false, "does not support current map"
-            end
-
-            local sendToClient = source.SendToClient
-            if SERVER and info.client and type( sendToClient ) == "function" then
-                sendToClient( info )
-            end
-
-            task = source.Import( info )
-            tasks[ importPath ] = task
-        end
-
-        if not promise.IsPromise( task ) then
-            return false, "package task does not exist"
-        end
-
-        task:Catch( ErrorNoHaltWithStack )
-
-        if IsPackage( pkg ) then
-            LinkTaskToPackage( task, pkg )
-        end
-
-        return true, task
-    end
-
-    function SimpleSourceImport( sourceName, importPath, pkg )
-        local ok, result = gpm.SourceImport( sourceName, importPath, pkg, false )
-        if not ok then
-            gpm.Error( importPath, result or "import from this source is impossible", false, sourceName )
-        end
-
-        return result
-    end
-
-    function AsyncImport( importPath, pkg, autorun )
-        local task = tasks[ importPath ]
-        if not task then
             for _, sourceName in ipairs( sourceList ) do
-                local ok, result = SourceImport( sourceName, importPath, pkg or _PKG, autorun )
-                if ok == nil then continue end
-                if ok then
-                    task = result
-                    break
+                local source = sources[ sourceName ]
+                if not source then continue end
+
+                if not source.CanImport( importPath ) then continue end
+
+                if autorun then
+                    local metadata = metadatas[ sourceName .. ";" .. importPath ]
+                    if not metadata then
+                        if type( source.GetMetadata ) == "function" then
+                            metadata = package.GetMetadata( source.GetMetadata( importPath ):Await() )
+                        else
+                            metadata = package.GetMetadata( {} )
+                        end
+
+                        metadatas[ sourceName .. ";" .. importPath ] = metadata
+                    end
+
+                    if not metadata.autorun then
+                        Logger:Debug( "[%s] Package '%s' autorun restricted.", sourceName, importPath )
+                        if SERVER and metadata.client and type( source.SendToClient ) == "function" then
+                            source.SendToClient( metadata )
+                        end
+
+                        return
+                    end
                 end
 
-                if result == nil then return end
-                Error( importPath, result, autorun, sourceName )
-                return
+                task = SourceImport( sourceName, importPath, autorun )
+                break
             end
         end
 
         if not task then
-            Error( importPath, "Requested package doesn't exist!" )
+            return promise.Reject( "Requested package doesn't exist." )
         end
 
         if IsPackage( pkg ) then
@@ -332,7 +335,7 @@ do
         end
 
         return task
-    end
+    end )
 
 end
 
@@ -347,30 +350,31 @@ do
     function Import( importPath, async, pkg )
         assert( async or promise.RunningInAsync(), "import supposed to be running in coroutine/async function (do you running it from package)" )
 
-        local task = AsyncImport( importPath, pkg, false )
-        if not task then return end
-
+        local import = AsyncImport( importPath, pkg )
         if not async then
-            local ok, result = task:SafeAwait()
-            if not ok then return promise.Reject( result ) end
-            if not IsPackage( result ) then return result end
-            return result:GetResult()
+            local pkg = import:Await()
+            if not pkg then return end
+            return pkg:GetResult(), pkg
         end
 
-        return task
+        return import
     end
 
     _G.import = Import
 
 end
 
+-- https://github.com/Pika-Software/gm_moonloader
+if util.IsBinaryModuleInstalled( "moonloader" ) then
+    gpm.Logger:Info( "Moonloader engaged." )
+    require( "moonloader" )
+end
+
 local moonloader = moonloader
 
 function ImportFolder( folderPath, pkg, autorun )
-    folderPath = paths.Fix( folderPath )
-
     if not fs.IsDir( folderPath, luaRealm ) then
-        Logger:Warn( "Import impossible, folder '%s' is empty, skipping...", folderPath )
+        Logger:Warn( "Import impossible, folder '%s' does not exist, skipping...", folderPath )
         return
     end
 
@@ -382,11 +386,17 @@ function ImportFolder( folderPath, pkg, autorun )
 
     local files, folders = fs.Find( folderPath .. "/*", luaRealm )
     for _, folderName in ipairs( folders ) do
-        AsyncImport( folderPath .. "/" .. folderName, pkg, autorun )
+        local importPath = folderPath .. "/" .. folderName
+        AsyncImport( importPath, pkg, autorun ):Catch( function( message )
+            Error( importPath, message, true, "lua" )
+        end )
     end
 
     for _, fileName in ipairs( files ) do
-        AsyncImport( folderPath .. "/" .. fileName, pkg, autorun )
+        local importPath = folderPath .. "/" .. fileName
+        AsyncImport( importPath, pkg, autorun ):Catch( function( message )
+            Error( importPath, message, true, "lua" )
+        end )
     end
 end
 
@@ -451,7 +461,7 @@ end
 if SERVER then
 
     concommand.Add( "gpm_clear_cache", function( ply )
-        if not ply or ply:IsListenServerHost() then
+        if not IsValid( ply ) or ply:IsListenServerHost() then
             ClearCache()
         end
 
@@ -459,7 +469,7 @@ if SERVER then
     end )
 
     concommand.Add( "gpm_list", function( ply )
-        if not ply or ply:IsListenServerHost() then
+        if not IsValid( ply ) or ply:IsListenServerHost() then
             PrintPackageList()
         end
 
@@ -467,7 +477,7 @@ if SERVER then
     end )
 
     concommand.Add( "gpm_reload", function( ply )
-        if not ply or ply:IsSuperAdmin() then
+        if not IsValid( ply ) or ply:IsSuperAdmin() then
             Reload(); BroadcastLua( "gpm.Reload()" )
             return
         end
@@ -481,5 +491,5 @@ Logger:Info( "Time taken to start-up: %.4f sec.", SysTime() - stopwatch )
 hook.Run( "GPM - Initialized" )
 
 util.NextTick( function()
-    ImportFolder( "packages", _PKG, true )
+    ImportFolder( "packages", nil, true )
 end )

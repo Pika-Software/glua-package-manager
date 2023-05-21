@@ -26,10 +26,6 @@ function CanImport( filePath )
     return type( tonumber( filePath ) ) == "number"
 end
 
-function GetInfo( wsid )
-    return {}
-end
-
 function Download( wsid )
     local p = promise.New()
 
@@ -81,10 +77,10 @@ function Download( wsid )
     return p
 end
 
-Import = promise.Async( function( info )
-    local wsid = info.importPath
+Import = promise.Async( function( metadata )
+    local wsid = metadata.import_path
     local ok, result = Download( wsid ):SafeAwait()
     if not ok then return promise.Reject( result ) end
 
-    return gpm.SimpleSourceImport( "gma", result, _PKG )
+    return gpm.SourceImport( "gma", result )
 end )
