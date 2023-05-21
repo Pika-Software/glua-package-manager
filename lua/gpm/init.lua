@@ -221,67 +221,71 @@ do
         end
     end
 
-    local tasks = {}
+    local tasks, metadatas = {}, {}
+    local package = package
 
-    function SourceImport( sourceName, importPath, pkg, autorun )
-        if not string.IsURL( importPath ) then
-            importPath = paths.Fix( importPath )
-        end
-
+    SourceImport = promise.Async( function( sourceName, importPath )
         local task = tasks[ importPath ]
         if not task then
             local source = sources[ sourceName ]
-            if not source or not source.CanImport( importPath ) then return end
-
-            local info = source.GetInfo( importPath )
-            if not info then
-                return false, "not enough information to start importing"
+            if not source then
+                return promise.Reject( "Requested package source not found." )
             end
 
-            if type( info.name ) ~= "string" then
-                info.name = importPath
-            end
-
-            info.importPath = importPath
-            info.source = sourceName
-
-            if autorun and not info.autorun then
-                local sendToClient = source.SendToClient
-                if SERVER and info.client and type( sendToClient ) == "function" then
-                    sendToClient( info )
+            local metadata = metadatas[ sourceName .. ";" .. importPath ]
+            if not metadata then
+                if type( source.GetMetadata ) == "function" then
+                    metadata = package.GetMetadata( source.GetMetadata( importPath ):Await() )
+                else
+                    metadata = package.GetMetadata( {} )
                 end
 
-                Logger:Debug( "[%s] Package '%s' autorun restricted.", sourceName, importPath )
-                return false
+                metadatas[ sourceName .. ";" .. importPath ] = metadata
             end
 
-            if not info.singleplayer and SinglePlayer then
-                return false, "cannot be executed in a singleplayer game"
+            if CLIENT and not metadata.client then return promise.Reject( "Package does not support running on the client." ) end
+            if MENU_DLL and not metadata.menu then return promise.Reject( "Package does not support running in menu." ) end
+
+            if type( metadata.name ) ~= "string" then
+                metadata.name = importPath
             end
 
-            local gamemodes = info.gamemodes
+            metadata.import_path = importPath
+            metadata.source = sourceName
+
+            if not metadata.singleplayer and SinglePlayer then
+                return promise.Reject( "Package cannot be executed in a singleplayer game." )
+            end
+
+            local gamemodes = metadata.gamemodes
             local gamemodesType = type( gamemodes )
             if ( gamemodesType == "string" and gamemodes ~= Gamemode ) or ( gamemodesType == "table" and not table.HasIValue( gamemodes, Gamemode ) ) then
-                return false, "does not support active gamemode"
+                return promise.Reject( "Package does not support active gamemode." )
             end
 
-            local maps = info.maps
+            local maps = metadata.maps
             local mapsType = type( maps )
             if ( mapsType == "string" and maps ~= Map ) or ( mapsType == "table" and not table.HasIValue( maps, Map ) ) then
-                return false, "does not support current map"
+                return promise.Reject( "Package does not support current map." )
             end
 
-            local sendToClient = source.SendToClient
-            if SERVER and info.client and type( sendToClient ) == "function" then
-                sendToClient( info )
+            if SERVER then
+                if metadata.client then
+                    if type( source.SendToClient ) == "function" then
+                        source.SendToClient( metadata )
+                    end
+                elseif not metadata.server then
+                    return promise.Reject( "Package does not support running on the server." )
+                end
             end
 
-            task = source.Import( info )
+            task = source.Import( metadata )
             tasks[ importPath ] = task
         end
 
-        if not promise.IsPromise( task ) then
-            return false, "package task does not exist"
+        return task
+    end )
+
         end
 
         task:Catch( ErrorNoHaltWithStack )
