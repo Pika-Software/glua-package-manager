@@ -231,42 +231,10 @@ do
 
 end
 
--- Function run in package
-local function run( func, package )
-    local environment = package:GetEnvironment()
-    if environment then
-        setfenv( func, environment )
+Initialize = promise.Async( function( metadata, func, files )
+    if type( files ) ~= "table" then
+        files = nil
     end
-
-    return func()
-end
-
-Run = run
-
--- This function will return compiled lua files by the path
-local function getCompiledFile( filePath, files )
-    local func = nil
-    if files ~= nil then
-        func = files[ filePath ]
-    end
-
-    if not func and fs.IsFile( filePath, luaRealm ) then
-        local ok, result = gpm.CompileLua( filePath )
-        if ok then
-            func = result
-        end
-    end
-
-    return func
-end
-
-GetCompiledFile = getCompiledFile
-
-function Initialize( metadata, func, files )
-    gpm.ArgAssert( metadata, 1, "table" )
-    gpm.ArgAssert( func, 2, "function" )
-
-    if type( files ) ~= "table" then files = nil end
 
     -- Measuring package startup time
     local stopwatch = SysTime()
@@ -391,10 +359,8 @@ function Initialize( metadata, func, files )
     local importPath = metadata.importPath
 
     -- Run
-    local ok, result = pcall( run, func, pkg )
-    if not ok then
-        gpm.Error( importPath, result, false, pkg:GetSourceName() )
-    end
+    local ok, result = pcall( func, pkg )
+    if not ok then return promise.Reject( result ) end
 
     -- Saving result to package
     pkg.result = result
@@ -404,4 +370,4 @@ function Initialize( metadata, func, files )
     gpm.Packages[ importPath ] = pkg
 
     return pkg
-end
+end )
