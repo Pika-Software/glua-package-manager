@@ -8,8 +8,8 @@ local string = string
 local fs = gpm.fs
 
 -- Variables
-local CLIENT, SERVER, MENU_DLL = CLIENT, SERVER, MENU_DLL
-local AddCSLuaFile = AddCSLuaFile
+local SERVER = SERVER
+local AddCSLuaFile = SERVER and AddCSLuaFile
 local luaRealm = gpm.LuaRealm
 local ipairs = ipairs
 local type = type

@@ -40,18 +40,17 @@ end
 -- Get package by name/pattern
 function Find( searchable, ignoreImportNames, noPatterns )
     local result = {}
-    for importPath, package in pairs( gpm.Packages ) do
+    for importPath, pkg in pairs( gpm.Packages ) do
         if not ignoreImportNames and string.find( importPath, searchable, 1, noPatterns ) then
-            result[ #result + 1 ] = package
-        elseif package.name and string.find( package.name, searchable, 1, noPatterns ) then
-            result[ #result + 1 ] = package
+            result[ #result + 1 ] = pkg
+        elseif pkg.name and string.find( pkg.name, searchable, 1, noPatterns ) then
+            result[ #result + 1 ] = pkg
         end
     end
 
     return result
 end
 
--- gpm.package.GetMetadata( source )
 do
 
     local environment = {
@@ -60,6 +59,8 @@ do
 
     local function getMetadata( source )
         if type( source ) == "table" then
+            utils.LowerTableKeys( source )
+
             -- Package name & entry point
             if type( source.name ) ~= "string" then
                 source.name = nil
@@ -130,13 +131,11 @@ do
             result = result or metadata
 
             if type( result ) ~= "table" then return end
-            result = utils.LowerTableKeys( result )
-
-            if type( result.package ) ~= "table" then
-                return getMetadata( result )
+            if type( result.package ) == "table" then
+                result = result.package
             end
 
-            return getMetadata( result.package )
+            return getMetadata( result )
         end
     end
 
@@ -303,12 +302,12 @@ function Initialize( metadata, func, files )
         end
 
         -- import
-        environment.SetValue( env, "gpm.Import", function( filePath, async, pkg2 )
-            return gpm.Import( filePath, async, gpm.IsPackage( pkg2 ) and pkg2 or pkg )
+        environment.SetValue( env, "gpm.Import", function( importPath, async, pkg2 )
+            return gpm.Import( importPath, async, gpm.IsPackage( pkg2 ) and pkg2 or pkg )
         end )
 
-        environment.SetValue( env, "import", function( filePath, async )
-            return gpm.Import( filePath, async, pkg )
+        environment.SetValue( env, "import", function( importPath, async )
+            return gpm.Import( importPath, async, pkg )
         end )
 
         -- include

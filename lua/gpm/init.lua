@@ -76,9 +76,10 @@ IncludeComponent "logger"
 
 Logger = logger.Create( "GPM@" .. utils.Version( _VERSION ), Color( 180, 180, 255 ) )
 
+local ErrorNoHaltWithStack = ErrorNoHaltWithStack
+
 do
 
-    local ErrorNoHaltWithStack = ErrorNoHaltWithStack
     local error = error
 
     function Error( importPath, message, noHalt, sourceName )
@@ -373,10 +374,8 @@ end
 local moonloader = moonloader
 
 function ImportFolder( folderPath, pkg, autorun )
-    folderPath = paths.Fix( folderPath )
-
     if not fs.IsDir( folderPath, luaRealm ) then
-        Logger:Warn( "Import impossible, folder '%s' is empty, skipping...", folderPath )
+        Logger:Warn( "Import impossible, folder '%s' does not exist, skipping...", folderPath )
         return
     end
 
@@ -457,7 +456,7 @@ end
 if SERVER then
 
     concommand.Add( "gpm_clear_cache", function( ply )
-        if not ply or ply:IsListenServerHost() then
+        if not IsValid( ply ) or ply:IsListenServerHost() then
             ClearCache()
         end
 
@@ -465,7 +464,7 @@ if SERVER then
     end )
 
     concommand.Add( "gpm_list", function( ply )
-        if not ply or ply:IsListenServerHost() then
+        if not IsValid( ply ) or ply:IsListenServerHost() then
             PrintPackageList()
         end
 
@@ -473,7 +472,7 @@ if SERVER then
     end )
 
     concommand.Add( "gpm_reload", function( ply )
-        if not ply or ply:IsSuperAdmin() then
+        if not IsValid( ply ) or ply:IsSuperAdmin() then
             Reload(); BroadcastLua( "gpm.Reload()" )
             return
         end
@@ -487,5 +486,5 @@ Logger:Info( "Time taken to start-up: %.4f sec.", SysTime() - stopwatch )
 hook.Run( "GPM - Initialized" )
 
 util.NextTick( function()
-    ImportFolder( "packages", _PKG, true )
+    ImportFolder( "packages", nil, true )
 end )
