@@ -182,7 +182,7 @@ do
         sourceList[ #sourceList + 1 ] = sourceName
     end
 
-    function PackageExists( importPath )
+    function CanImport( importPath )
         for _, sourceName in ipairs( sourceList ) do
             local source = sources[ sourceName ]
             if not source then continue end
@@ -195,7 +195,7 @@ do
 
     function LocatePackage( importPath, alternative )
         ArgAssert( importPath, 1, "string" )
-        if PackageExists( importPath ) then
+        if CanImport( importPath ) then
             return importPath
         end
 
