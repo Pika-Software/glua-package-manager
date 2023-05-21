@@ -350,13 +350,14 @@ function Initialize( metadata, func, files )
             environment.SetValue( env, "AddCSLuaFile", function( fileName )
                 local currentFile = utils.GetCurrentFile()
                 if currentFile then
+                    local luaPath = paths.Localize( currentFile )
                     if fileName ~= nil then
                         gpm.ArgAssert( fileName, 1, "string" )
                     else
-                        fileName = currentFile
+                        fileName = string.GetFileFromFilename( luaPath )
                     end
 
-                    local folder = string.GetPathFromFilename( paths.Localize( currentFile ) )
+                    local folder = string.GetPathFromFilename( luaPath )
                     if folder then
                         local filePath = folder .. fileName
                         if fs.IsFile( filePath, luaRealm ) then
