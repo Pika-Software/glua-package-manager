@@ -197,6 +197,19 @@ do
         return false
     end
 
+    function LocatePackage( importPath, alternative )
+        ArgAssert( importPath, 1, "string" )
+        if PackageExists( importPath ) then
+            return importPath
+        end
+
+        if type( alternative ) ~= "string" then
+            return importPath
+        end
+
+        return alternative
+    end
+
     function LinkTaskToPackage( task, pkg )
         if task:IsPending() then
             task:Then( function( pkg2 )
