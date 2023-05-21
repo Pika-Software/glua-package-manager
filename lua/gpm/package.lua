@@ -220,6 +220,7 @@ do
         local env2 = package2:GetEnvironment()
         if not env2 then return end
 
+        logger:Debug( "'%s' -> '%s'", package2:GetIdentifier(), self:GetIdentifier() )
         environment.LinkMetaTables( env, env2 )
     end
 
@@ -360,7 +361,7 @@ function Initialize( metadata, func, files )
         end
 
         -- require
-        environment.SetValue( env, "require", function( name )
+        environment.SetValue( env, "require", function( name, alternative )
             if util.IsBinaryModuleInstalled( name ) then return require( name ) end
 
             local importPath = "includes/modules/" .. name .. ".lua"
@@ -368,7 +369,7 @@ function Initialize( metadata, func, files )
                 importPath = name
             end
 
-            return gpm.Import( importPath, false, pkg )
+            return gpm.Import( gpm.LocatePackage( importPath, alternative ), false, pkg )
         end )
 
     end

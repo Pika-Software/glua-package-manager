@@ -59,12 +59,7 @@ Import = promise.Async( function( info )
 
     local results = {}
     for _, importPath in ipairs( importPaths ) do
-        local ok, result = gpm.SimpleSourceImport( "lua", importPath, pkg ):SafeAwait()
-        if not ok then
-            gpm.Error( importPath, result, false, info.source )
-        end
-
-        results[ #results + 1 ] = result
+        results[ #results + 1 ] = gpm.SimpleSourceImport( "lua", importPath, pkg ):Await()
     end
 
     local count = #results

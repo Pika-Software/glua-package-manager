@@ -27,7 +27,7 @@ MsgN( [[
 
 module( "gpm", package.seeall )
 
-_VERSION = 012300
+_VERSION = 012400
 
 if not Colors then
     Colors = {
@@ -197,6 +197,34 @@ do
         return false
     end
 
+    function LocatePackage( importPath, alternative )
+        ArgAssert( importPath, 1, "string" )
+        if PackageExists( importPath ) then
+            return importPath
+        end
+
+        if type( alternative ) ~= "string" then
+            return importPath
+        end
+
+        return alternative
+    end
+
+    function LinkTaskToPackage( task, pkg )
+        if task:IsPending() then
+            task:Then( function( pkg2 )
+                if IsPackage( pkg2 ) then
+                    pkg:Link( pkg2 )
+                end
+            end )
+        elseif task:IsFulfilled() then
+            local pkg2 = task:GetResult()
+            if IsPackage( pkg2 ) then
+                pkg:Link( pkg2 )
+            end
+        end
+    end
+
     local tasks = {}
 
     function SourceImport( sourceName, importPath, pkg, autorun )
@@ -267,25 +295,14 @@ do
         end
 
         if IsPackage( pkg ) then
-            if task:IsPending() then
-                task:Then( function( package2 )
-                    if IsPackage( package2 ) then
-                        pkg:Link( package2 )
-                    end
-                end )
-            elseif task:IsFulfilled() then
-                local package2 = task:GetResult()
-                if IsPackage( package2 ) then
-                    pkg:Link( package2 )
-                end
-            end
+            LinkTaskToPackage( task, pkg )
         end
 
         return true, task
     end
 
-    function SimpleSourceImport( sourceName, importPath, ... )
-        local ok, result = gpm.SourceImport( sourceName, importPath, ... )
+    function SimpleSourceImport( sourceName, importPath, pkg )
+        local ok, result = gpm.SourceImport( sourceName, importPath, pkg, false )
         if not ok then
             gpm.Error( importPath, result or "import from this source is impossible", false, sourceName )
         end
@@ -312,6 +329,10 @@ do
 
         if not task then
             Error( importPath, "Requested package doesn't exist!" )
+        end
+
+        if IsPackage( pkg ) then
+            LinkTaskToPackage( task, pkg )
         end
 
         return task

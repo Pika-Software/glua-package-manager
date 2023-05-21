@@ -47,8 +47,8 @@ local _HTTP = HTTP
 
 module( "promise" )
 
-_VERSION = "1.2.0" -- major.minor.patch
-_VERSION_NUM = 010200 -- _VERSION in number format: 1.2.3 -> 010203 | 99.56.13 -> 995613
+_VERSION = "1.3.0" -- major.minor.patch
+_VERSION_NUM = 010300 -- _VERSION in number format: 1.2.3 -> 010203 | 99.56.13 -> 995613
 
 -- Promise object
 do
@@ -365,4 +365,12 @@ function HTTP(parameters)
     local ok = _HTTP(parameters)
     if not ok then p:Reject("failed to make http request") end
     return p
+end
+
+function Sleep( delay )
+    if not RunningInAsync() then
+        error( "sleep should be performed in the coroutine/async function" )
+    end
+
+    Delay( delay ):Await()
 end
