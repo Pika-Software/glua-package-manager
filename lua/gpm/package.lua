@@ -346,11 +346,31 @@ Initialize = promise.Async( function( metadata, func, files )
 
         -- require
         environment.SetValue( env, "require", function( name, alternative )
-            if util.IsBinaryModuleInstalled( name ) then return require( name ) end
+            gpm.ArgAssert( name, 1, "string" )
+
+            local hasAlternative = type( alternative ) == "string"
+            if util.IsBinaryModuleInstalled( name ) then
+                return require( name )
+            elseif hasAlternative and util.IsBinaryModuleInstalled( alternative ) then
+                return require( alternative )
+            end
+
+            if string.IsURL( name ) then
+                return gpm.Import( name, false, pkg )
+            end
 
             local importPath = "includes/modules/" .. name .. ".lua"
             if fs.IsFile( importPath, luaRealm ) then
                 return gpm.Import( importPath, false, pkg )
+            elseif hasAlternative then
+                if string.IsURL( alternative ) then
+                    return gpm.Import( alternative, false, pkg )
+                end
+
+                importPath = "includes/modules/" .. alternative .. ".lua"
+                if fs.IsFile( importPath, luaRealm ) then
+                    return gpm.Import( importPath, false, pkg )
+                end
             end
 
             return gpm.Import( gpm.LocatePackage( name, alternative ), false, pkg )
