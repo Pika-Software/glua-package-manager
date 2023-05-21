@@ -389,11 +389,17 @@ function ImportFolder( folderPath, pkg, autorun )
 
     local files, folders = fs.Find( folderPath .. "/*", luaRealm )
     for _, folderName in ipairs( folders ) do
-        AsyncImport( folderPath .. "/" .. folderName, pkg, autorun )
+        local importPath = folderPath .. "/" .. folderName
+        AsyncImport( importPath, pkg, autorun ):Catch( function( message )
+            Error( importPath, message, true, "lua" )
+        end )
     end
 
     for _, fileName in ipairs( files ) do
-        AsyncImport( folderPath .. "/" .. fileName, pkg, autorun )
+        local importPath = folderPath .. "/" .. fileName
+        AsyncImport( importPath, pkg, autorun ):Catch( function( message )
+            Error( importPath, message, true, "lua" )
+        end )
     end
 end
 
