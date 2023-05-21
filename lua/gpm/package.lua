@@ -83,7 +83,7 @@ do
             end
 
             -- Single-player
-            source.singleplayer = source.singleplayer ~= false
+            source.singleplayer = source.singleplayer == true
 
             -- Maps
             local mapsType = type( source.maps )
