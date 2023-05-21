@@ -350,17 +350,14 @@ do
     function Import( importPath, async, pkg )
         assert( async or promise.RunningInAsync(), "import supposed to be running in coroutine/async function (do you running it from package)" )
 
-        local task = AsyncImport( importPath, pkg, false )
-        if not task then return end
-
+        local import = AsyncImport( importPath, pkg )
         if not async then
-            local ok, result = task:SafeAwait()
-            if not ok then return promise.Reject( result ) end
-            if not IsPackage( result ) then return result end
-            return result:GetResult()
+            local pkg = import:Await()
+            if not pkg then return end
+            return pkg:GetResult(), pkg
         end
 
-        return task
+        return import
     end
 
     _G.import = Import
