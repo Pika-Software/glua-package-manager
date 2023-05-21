@@ -286,45 +286,48 @@ do
         return task
     end )
 
+    AsyncImport = promise.Async( function( importPath, pkg, autorun )
+        if not string.IsURL( importPath ) then
+            importPath = paths.Fix( importPath )
         end
 
-        task:Catch( ErrorNoHaltWithStack )
-
-        if IsPackage( pkg ) then
-            LinkTaskToPackage( task, pkg )
-        end
-
-        return true, task
-    end
-
-    function SimpleSourceImport( sourceName, importPath, pkg )
-        local ok, result = gpm.SourceImport( sourceName, importPath, pkg, false )
-        if not ok then
-            gpm.Error( importPath, result or "import from this source is impossible", false, sourceName )
-        end
-
-        return result
-    end
-
-    function AsyncImport( importPath, pkg, autorun )
         local task = tasks[ importPath ]
         if not task then
             for _, sourceName in ipairs( sourceList ) do
-                local ok, result = SourceImport( sourceName, importPath, pkg or _PKG, autorun )
-                if ok == nil then continue end
-                if ok then
-                    task = result
-                    break
+                local source = sources[ sourceName ]
+                if not source then continue end
+
+                if not source.CanImport( importPath ) then continue end
+
+                if autorun then
+                    local metadata = metadatas[ sourceName .. ";" .. importPath ]
+                    if not metadata then
+                        if type( source.GetMetadata ) == "function" then
+                            metadata = package.GetMetadata( source.GetMetadata( importPath ):Await() )
+                        else
+                            metadata = package.GetMetadata( {} )
+                        end
+
+                        metadatas[ sourceName .. ";" .. importPath ] = metadata
+                    end
+
+                    if not metadata.autorun then
+                        Logger:Debug( "[%s] Package '%s' autorun restricted.", sourceName, importPath )
+                        if SERVER and metadata.client and type( source.SendToClient ) == "function" then
+                            source.SendToClient( metadata )
+                        end
+
+                        return
+                    end
                 end
 
-                if result == nil then return end
-                Error( importPath, result, autorun, sourceName )
-                return
+                task = SourceImport( sourceName, importPath, autorun )
+                break
             end
         end
 
         if not task then
-            Error( importPath, "Requested package doesn't exist!" )
+            return promise.Reject( "Requested package doesn't exist." )
         end
 
         if IsPackage( pkg ) then
@@ -332,7 +335,7 @@ do
         end
 
         return task
-    end
+    end )
 
 end
 
