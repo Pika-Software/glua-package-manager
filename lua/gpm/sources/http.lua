@@ -28,12 +28,6 @@ function CanImport( filePath )
     return string.IsURL( filePath )
 end
 
-function GetInfo( url )
-    return {
-        ["extension"] = string.GetExtensionFromFilename( url ) or "json"
-    }
-end
-
 local allowedExtensions = {
     ["lua"] = true,
     ["zip"] = true,

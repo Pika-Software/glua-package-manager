@@ -26,10 +26,6 @@ function CanImport( filePath )
     return type( tonumber( filePath ) ) == "number"
 end
 
-function GetInfo( wsid )
-    return {}
-end
-
 function Download( wsid )
     local p = promise.New()
 

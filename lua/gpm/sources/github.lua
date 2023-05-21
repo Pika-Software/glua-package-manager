@@ -11,7 +11,7 @@ function CanImport( filePath )
     return string.match( filePath, "github.com/(.+)" ) ~= nil
 end
 
-function GetInfo( url )
+GetMetadata = promise.Async( function( url )
     local user, repository = string.match( url, "github.com/([%w_%-%.]+)/([%w_%-%.]+)" )
     return {
         ["tree"] = string.match( url, "/tree/([%w_%-%.%/]+)"),
@@ -19,7 +19,7 @@ function GetInfo( url )
         ["user"] = user,
         ["url"] = url
     }
-end
+end )
 
 IsAvailable = promise.Async( function( user, repository, tree )
     local url = string.format( "https://github.com/%s/%s/archive/refs/heads/%s.zip", user, repository, tree )

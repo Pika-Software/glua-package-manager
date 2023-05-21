@@ -22,10 +22,7 @@ function CanImport( filePath )
     return false
 end
 
-function GetInfo( importPath )
-    local info = nil
-
-    local folder = importPath
+GetMetadata = promise.Async( function( importPath )
     if not fs.IsDir( folder, luaRealm ) then
         folder = string.GetPathFromFilename( importPath )
     end
@@ -103,7 +100,7 @@ function GetInfo( importPath )
     end
 
     return info
-end
+end )
 
 if SERVER then
 
