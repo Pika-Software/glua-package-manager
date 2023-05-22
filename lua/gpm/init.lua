@@ -27,7 +27,7 @@ MsgN( [[
 
 module( "gpm", package.seeall )
 
-_VERSION = 012500
+_VERSION = 012501
 
 if not Colors then
     Colors = {
@@ -351,6 +351,10 @@ do
         assert( async or promise.RunningInAsync(), "import supposed to be running in coroutine/async function (do you running it from package)" )
 
         local import = AsyncImport( importPath, pkg )
+        import:Catch( function( message )
+            Error( importPath, message, true )
+        end )
+
         if not async then
             local pkg = import:Await()
             if not pkg then return end

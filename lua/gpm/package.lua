@@ -346,19 +346,29 @@ Initialize = promise.Async( function( metadata, func, files )
 
         -- require
         environment.SetValue( env, "require", function( name, alternative )
-            if util.IsBinaryModuleInstalled( name ) then return require( name ) end
+            gpm.ArgAssert( name, 1, "string" )
+
+            local hasAlternative = type( alternative ) == "string"
+            if util.IsBinaryModuleInstalled( name ) then
+                return require( name )
+            elseif hasAlternative and util.IsBinaryModuleInstalled( alternative ) then
+                return require( alternative )
+            end
 
             local importPath = "includes/modules/" .. name .. ".lua"
-            if fs.Exists( importPath, luaRealm ) then
+            if fs.IsFile( importPath, luaRealm ) then
                 return gpm.Import( importPath, false, pkg )
+            elseif hasAlternative then
+                importPath = "includes/modules/" .. alternative .. ".lua"
+                if fs.IsFile( importPath, luaRealm ) then
+                    return gpm.Import( importPath, false, pkg )
+                end
             end
 
             return gpm.Import( gpm.LocatePackage( name, alternative ), false, pkg )
         end )
 
     end
-
-    local importPath = metadata.import_path
 
     -- Run
     local ok, result = pcall( func, pkg )
@@ -368,6 +378,7 @@ Initialize = promise.Async( function( metadata, func, files )
     pkg.result = result
 
     -- Saving in global table & final log
+    local importPath = metadata.import_path
     logger:Info( "[%s] Package '%s' was successfully imported, it took %.4f seconds.", pkg:GetSourceName(), importPath, SysTime() - stopwatch )
     gpm.Packages[ importPath ] = pkg
 
