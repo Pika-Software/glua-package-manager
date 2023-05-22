@@ -101,7 +101,7 @@ function CreateDir( folderPath )
         if not folderName then continue end
 
         currentPath = currentPath and ( currentPath .. "/" .. folderName ) or folderName
-        if file.IsDir( currentPath, "DATA" ) then continue end
+        if IsDir( currentPath, "DATA" ) then continue end
 
         file.Delete( currentPath )
         file.CreateDir( currentPath )

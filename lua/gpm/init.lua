@@ -27,7 +27,7 @@ MsgN( [[
 
 module( "gpm", package.seeall )
 
-_VERSION = 012501
+_VERSION = 012502
 
 if not Colors then
     Colors = {
@@ -253,7 +253,7 @@ do
             metadata.import_path = importPath
             metadata.source = sourceName
 
-            if not metadata.singleplayer and SinglePlayer then
+            if metadata.singleplayer and not SinglePlayer then
                 return promise.Reject( "Package cannot be executed in a singleplayer game." )
             end
 
