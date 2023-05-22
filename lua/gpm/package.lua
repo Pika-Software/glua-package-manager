@@ -355,18 +355,10 @@ Initialize = promise.Async( function( metadata, func, files )
                 return require( alternative )
             end
 
-            if string.IsURL( name ) then
-                return gpm.Import( name, false, pkg )
-            end
-
             local importPath = "includes/modules/" .. name .. ".lua"
             if fs.IsFile( importPath, luaRealm ) then
                 return gpm.Import( importPath, false, pkg )
             elseif hasAlternative then
-                if string.IsURL( alternative ) then
-                    return gpm.Import( alternative, false, pkg )
-                end
-
                 importPath = "includes/modules/" .. alternative .. ".lua"
                 if fs.IsFile( importPath, luaRealm ) then
                     return gpm.Import( importPath, false, pkg )
@@ -378,8 +370,6 @@ Initialize = promise.Async( function( metadata, func, files )
 
     end
 
-    local importPath = metadata.import_path
-
     -- Run
     local ok, result = pcall( func, pkg )
     if not ok then return promise.Reject( result ) end
@@ -388,6 +378,7 @@ Initialize = promise.Async( function( metadata, func, files )
     pkg.result = result
 
     -- Saving in global table & final log
+    local importPath = metadata.import_path
     logger:Info( "[%s] Package '%s' was successfully imported, it took %.4f seconds.", pkg:GetSourceName(), importPath, SysTime() - stopwatch )
     gpm.Packages[ importPath ] = pkg
 
