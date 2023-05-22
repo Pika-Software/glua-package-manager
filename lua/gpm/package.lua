@@ -379,7 +379,7 @@ Initialize = promise.Async( function( metadata, func, files )
 
     -- Saving in global table & final log
     local importPath = metadata.import_path
-    logger:Info( "[%s] Package '%s' was successfully imported, it took %.4f seconds.", pkg:GetSourceName(), importPath, SysTime() - stopwatch )
+    logger:Info( "[%s] Package '%s' was successfully imported, it took %.4f seconds.", pkg:GetSourceName(), pkg:GetIdentifier(), SysTime() - stopwatch )
     gpm.Packages[ importPath ] = pkg
 
     return pkg
