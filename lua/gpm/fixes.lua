@@ -96,6 +96,4 @@ do
         return false
     end
 
-    TYPE_COLOR = gpm.AddType( "Color", IsColor )
-
 end
