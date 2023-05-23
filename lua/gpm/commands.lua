@@ -78,32 +78,36 @@ end
 
 if SERVER then
 
+    local concommand_Add = concommand.Add
     local BroadcastLua = BroadcastLua
     local IsValid = IsValid
 
-    concommand.Add( "gpm_clear_cache", function( ply )
-        if not IsValid( ply ) or ply:IsListenServerHost() then
-            gpm.ClearCache()
+    concommand_Add( "gpm_clear_cache", function( ply )
+        if IsValid( ply ) then
+            ply:SendLua( "gpm.ClearCache()" )
+            if not ply:IsListenServerHost() then return end
         end
 
-        ply:SendLua( "gpm.ClearCache()" )
+        gpm.ClearCache()
     end )
 
-    concommand.Add( "gpm_list", function( ply )
-        if not IsValid( ply ) or ply:IsListenServerHost() then
-            gpm.PrintPackageList()
+    concommand_Add( "gpm_list", function( ply )
+        if IsValid( ply ) then
+            ply:SendLua( "gpm.PrintPackageList()" )
+            if not ply:IsListenServerHost() then return end
         end
 
-        ply:SendLua( "gpm.PrintPackageList()" )
+        gpm.PrintPackageList()
     end )
 
-    concommand.Add( "gpm_reload", function( ply )
-        if not IsValid( ply ) or ply:IsSuperAdmin() then
-            gpm.Reload(); BroadcastLua( "gpm.Reload()" )
+    concommand_Add( "gpm_reload", function( ply )
+        if IsValid( ply ) and not ply:IsSuperAdmin() then
+            ply:ChatPrint( "[GPM] You do not have enough permissions to execute this command." )
             return
         end
 
-        ply:ChatPrint( "[GPM] You do not have enough permissions to execute this command." )
+        gpm.Reload()
+        BroadcastLua( "gpm.Reload()" )
     end )
 
 end
