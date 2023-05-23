@@ -99,7 +99,8 @@ Logger:Info( "%s %s is initialized.", libs.deflatelua._NAME, libs.deflatelua._VE
 IncludeComponent "libs/promise"
 local promise = promise
 
-Logger:Info( "gm_promise %s is initialized.", utils.Version( promise._VERSION_NUM ) )
+IncludeComponent "libs/gmad"
+Logger:Info( "gmad v%s is initialized.", utils.Version( gmad.GMA.Version ) )
 
 IncludeComponent "environment"
 IncludeComponent "gmad"
