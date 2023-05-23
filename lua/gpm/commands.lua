@@ -47,19 +47,20 @@ end
 do
 
     local string_format = string.format
+    local colors = gpm.Colors
     local pairs = pairs
     local MsgC = MsgC
 
     function gpm.PrintPackageList()
-        MsgC( Colors.Realm, gpm.Realm, Colors.PrimaryText, " packages:\n" )
+        MsgC( colors.Realm, gpm.Realm, colors.PrimaryText, " packages:\n" )
 
         local total = 0
-        for name, pkg in pairs( Packages ) do
-            MsgC( Colors.Realm, "\t* ", Colors.PrimaryText, string_format( "%s@%s\n", name, pkg:GetVersion() ) )
+        for name, pkg in pairs( gpm.Packages ) do
+            MsgC( colors.Realm, "\t* ", colors.PrimaryText, string_format( "%s@%s\n", name, pkg:GetVersion() ) )
             total = total + 1
         end
 
-        MsgC( Colors.Realm, "\tTotal: ", Colors.PrimaryText, total, "\n" )
+        MsgC( colors.Realm, "\tTotal: ", colors.PrimaryText, total, "\n" )
     end
 
 end

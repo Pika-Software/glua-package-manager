@@ -92,13 +92,6 @@ do
                 return promise.Reject( "Package does not support running in menu." )
             end
 
-            if type( metadata.name ) ~= "string" then
-                metadata.name = importPath
-            end
-
-            metadata.import_path = importPath
-            metadata.source = sourceName
-
             if metadata.singleplayer and not singlePlayer then
                 return promise.Reject( "Package cannot be executed in a singleplayer game." )
             end
@@ -115,12 +108,19 @@ do
                 return promise.Reject( "Package does not support current map." )
             end
 
+            if type( metadata.name ) ~= "string" then
+                metadata.name = importPath
+            end
+
+            metadata.import_path = importPath
+            metadata.source = sourceName
+
             if SERVER then
-                if metadata.client then
-                    if type( source.SendToClient ) == "function" then
-                        source.SendToClient( metadata )
-                    end
-                elseif not metadata.server then
+                if metadata.client and type( source.SendToClient ) == "function" then
+                    source.SendToClient( metadata )
+                end
+
+                if not metadata.server then
                     return promise.Reject( "Package does not support running on the server." )
                 end
             end
@@ -145,29 +145,34 @@ do
 
                 if not source.CanImport( importPath ) then continue end
 
-                if autorun then
-                    local metadata = metadatas[ sourceName .. ";" .. importPath ]
-                    if not metadata then
-                        if type( source.GetMetadata ) == "function" then
-                            metadata = package.GetMetadata( source.GetMetadata( importPath ):Await() )
-                        else
-                            metadata = package.GetMetadata( {} )
-                        end
-
-                        metadatas[ sourceName .. ";" .. importPath ] = metadata
+                local metadata = metadatas[ sourceName .. ";" .. importPath ]
+                if not metadata then
+                    if type( source.GetMetadata ) == "function" then
+                        metadata = package.GetMetadata( source.GetMetadata( importPath ):Await() )
+                    else
+                        metadata = package.GetMetadata( {} )
                     end
 
+                    metadatas[ sourceName .. ";" .. importPath ] = metadata
+                end
+
+                if SERVER and metadata.client and type( source.SendToClient ) == "function" then
+                    source.SendToClient( metadata )
+                end
+
+                if autorun then
+                    if SERVER and not metadata.server then return end
                     if not metadata.autorun then
                         logger:Debug( "[%s] Package '%s' autorun restricted.", sourceName, importPath )
-                        if SERVER and metadata.client and type( source.SendToClient ) == "function" then
-                            source.SendToClient( metadata )
-                        end
-
                         return
                     end
                 end
 
-                task = gpm.SourceImport( sourceName, importPath, autorun )
+                if SERVER and not metadata.server then
+                    return promise.Reject( "Package does not support running on the server." )
+                end
+
+                task = gpm.SourceImport( sourceName, importPath )
                 break
             end
         end

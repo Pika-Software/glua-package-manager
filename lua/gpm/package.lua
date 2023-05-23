@@ -67,7 +67,11 @@ do
                 source.name = nil
             end
 
-            if CLIENT and type( source.cl_main ) == "string" then
+            -- Menu
+            source.menu = source.menu == true
+
+            -- Main file
+            if CLIENT and type( source.cl_main ) == "string" and not source.menu then
                 source.main = source.cl_main
             end
 
@@ -80,7 +84,7 @@ do
 
             -- Gamemodes
             local gamemodesType = type( source.gamemodes )
-            if gamemodesType ~= "string" and gamemodesType ~= "table" then
+            if ( gamemodesType ~= "string" and gamemodesType ~= "table" ) or source.menu then
                 source.gamemodes = nil
             end
 
@@ -89,14 +93,13 @@ do
 
             -- Maps
             local mapsType = type( source.maps )
-            if mapsType ~= "string" and mapsType ~= "table" then
+            if ( mapsType ~= "string" and mapsType ~= "table" ) or source.menu then
                 source.maps = nil
             end
 
             -- Realms
-            source.client = source.client ~= false
-            source.server = source.server ~= false
-            source.menu = source.menu == true
+            source.client = source.client ~= false and not source.menu
+            source.server = source.server ~= false and not source.menu
 
             -- Isolation & autorun
             source.isolation = source.isolation ~= false
@@ -111,7 +114,7 @@ do
             source.logger = source.logger == true
 
             -- Files to send to the client ( package and main will already be added and there is no need to specify them here )
-            if type( source.send ) ~= "table" then
+            if type( source.send ) ~= "table" or source.menu then
                 source.send = nil
             end
 
