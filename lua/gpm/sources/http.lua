@@ -3,9 +3,9 @@ local gpm = gpm
 -- Libraries
 local package = gpm.package
 local promise = promise
-local gmad = gpm.gmad
 local http = gpm.http
 local string = string
+local gmad = gmad
 local fs = gpm.fs
 local util = util
 
@@ -18,7 +18,7 @@ local pairs = pairs
 local pcall = pcall
 local type = type
 
-local cacheLifetime = GetConVar( "gpm_cache_lifetime" )
+local cacheLifetime = gpm.CacheLifetime
 local cacheFolder = gpm.CachePath
 
 module( "gpm.sources.http" )

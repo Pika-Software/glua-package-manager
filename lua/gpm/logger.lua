@@ -1,4 +1,4 @@
-local realmName = MENU_DLL and "MENU" or ( SERVER and "SERVER" or "CLIENT" )
+local realm = string.upper( gpm.Realm )
 local string_format = string.format
 local setmetatable = setmetatable
 local ArgAssert = gpm.ArgAssert
@@ -25,7 +25,7 @@ do
 
 end
 
-TYPE_LOGGER = gpm.AddType( "Logger", IsLogger )
+_G.TYPE_LOGGER = gpm.AddType( "Logger", IsLogger )
 
 module( "gpm.logger" )
 
@@ -81,7 +81,7 @@ function meta:Log( color, level, str, ... )
     ArgAssert( color, 1, "Color" )
     ArgAssert( level, 2, "string" )
 
-    MsgC( colors.SecondaryText, os_date( "%d/%m/%Y %H:%M:%S " ), color, level, colors.SecondaryText, " --- ", colors.Realm, "[" .. realmName .. "] ", self.Color, self.Name, colors.SecondaryText, " : ", self.TextColor, string_format( str, ... ), "\n"  )
+    MsgC( colors.SecondaryText, os_date( "%d/%m/%Y %H:%M:%S " ), color, level, colors.SecondaryText, " --- ", colors.Realm, "[" .. realm .. "] ", self.Color, self.Name, colors.SecondaryText, " : ", self.TextColor, string_format( str, ... ), "\n"  )
 end
 
 -- Info log

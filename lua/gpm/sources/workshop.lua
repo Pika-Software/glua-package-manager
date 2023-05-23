@@ -8,7 +8,7 @@ end
 
 -- Libraries
 local promise = promise
-local gmad = gpm.gmad
+local gmad = gmad
 local fs = gpm.fs
 
 -- Variables
@@ -17,7 +17,7 @@ local logger = gpm.Logger
 local tonumber = tonumber
 local type = type
 
-local cacheLifetime = GetConVar( "gpm_cache_lifetime" )
+local cacheLifetime = gpm.CacheLifetime
 local cacheFolder = gpm.WorkshopPath
 
 module( "gpm.sources.workshop" )
