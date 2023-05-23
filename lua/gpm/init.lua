@@ -94,16 +94,17 @@ end
 
 libs = {}
 libs.deflatelua = IncludeComponent "libs/deflatelua"
-Logger:Info( "%s %s is initialized.", libs.deflatelua._NAME, libs.deflatelua._VERSION )
+Logger:Info( "%s v%s is initialized.", libs.deflatelua._NAME, libs.deflatelua._VERSION )
 
 IncludeComponent "libs/promise"
 local promise = promise
+
+Logger:Info( "gm_promise v%s is initialized.", utils.Version( promise._VERSION_NUM ) )
 
 IncludeComponent "libs/gmad"
 Logger:Info( "gmad v%s is initialized.", utils.Version( gmad.GMA.Version ) )
 
 IncludeComponent "environment"
-IncludeComponent "gmad"
 IncludeComponent "http"
 IncludeComponent "fs"
 IncludeComponent "zip"
