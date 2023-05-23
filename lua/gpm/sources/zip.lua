@@ -2,15 +2,15 @@ local gpm = gpm
 
 -- Libraries
 local promise = promise
-local gmad = gpm.gmad
 local string = string
 local table = table
 local zip = gpm.zip
+local gmad = gmad
 local util = util
 local fs = gpm.fs
 
 -- Variables
-local cacheLifetime = GetConVar( "gpm_cache_lifetime" )
+local cacheLifetime = gpm.CacheLifetime
 local cacheFolder = gpm.CachePath
 local ipairs = ipairs
 

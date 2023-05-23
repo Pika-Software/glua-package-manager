@@ -12,7 +12,9 @@ local pairs = pairs
 
 do
 
-    local typeIDs = {}
+    local typeIDs = {
+        { IsColor, TYPE_COLOR }
+    }
 
     -- https://wiki.facepunch.com/gmod/Global.TypeID
     do
@@ -73,6 +75,7 @@ do
         [TYPE_IMESH] = "IMesh",
         [TYPE_PANEL] = "Panel",
         [TYPE_ANGLE] = "Angle",
+        [TYPE_COLOR] = "Color",
         [TYPE_TABLE] = "table",
         [TYPE_SAVE] = "ISave",
         [TYPE_FILE] = "File",
@@ -82,10 +85,7 @@ do
     -- https://wiki.facepunch.com/gmod/Global.type
     function gpm.type( any )
         local str = types[ gpm.TypeID( any ) ]
-        if ( str ~= nil ) then
-            return str
-        end
-
+        if str ~= nil then return str end
         return types[ TYPE_NONE ] or "unknown"
     end
 

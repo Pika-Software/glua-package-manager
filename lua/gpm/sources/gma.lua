@@ -9,7 +9,7 @@ local fs = gpm.fs
 -- Variables
 local util_JSONToTable = util.JSONToTable
 local game_MountGMA = game.MountGMA
-local gmad_Open = gpm.gmad.Open
+local gmad_Open = gmad.Open
 local ipairs = ipairs
 local type = type
 

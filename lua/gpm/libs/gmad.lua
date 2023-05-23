@@ -13,7 +13,7 @@ local os_time = os.time
 local assert = assert
 local ipairs = ipairs
 
-module( "gpm.gmad" )
+module( "gmad" )
 
 -- TypeExists( any )
 do
