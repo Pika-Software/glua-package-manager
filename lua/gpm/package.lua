@@ -12,10 +12,10 @@ local fs = gpm.fs
 -- Variables
 local ErrorNoHaltWithStack = ErrorNoHaltWithStack
 local CLIENT, SERVER = CLIENT, SERVER
+local luaGamePath = gpm.LuaGamePath
 local AddCSLuaFile = AddCSLuaFile
 local getmetatable = getmetatable
 local setmetatable = setmetatable
-local luaRealm = gpm.LuaRealm
 local logger = gpm.Logger
 local require = require
 local SysTime = SysTime
@@ -295,15 +295,15 @@ Initialize = promise.Async( function( metadata, func, files )
                 if currentFile then
                     local folder = string.GetPathFromFilename( paths.Localize( currentFile ) )
                     if folder then
-                        local filePath = paths.Fix( folder .. fileName )
-                        if fs.IsFile( filePath, luaRealm ) then
+                        local filePath = folder .. fileName
+                        if fs.IsFile( filePath, luaGamePath ) then
                             func = gpm.CompileLua( filePath ):Await()
                         end
                     end
                 end
             end
 
-            if type( func ) ~= "function" and fs.IsFile( fileName, luaRealm ) then
+            if type( func ) ~= "function" and fs.IsFile( fileName, luaGamePath ) then
                 func = gpm.CompileLua( fileName ):Await()
             end
 
@@ -330,13 +330,13 @@ Initialize = promise.Async( function( metadata, func, files )
                     local folder = string.GetPathFromFilename( luaPath )
                     if folder then
                         local filePath = folder .. fileName
-                        if fs.IsFile( filePath, luaRealm ) then
+                        if fs.IsFile( filePath, luaGamePath ) then
                             return AddCSLuaFile( filePath )
                         end
                     end
                 end
 
-                if type( fileName ) == "string" and fs.IsFile( fileName, luaRealm ) then
+                if type( fileName ) == "string" and fs.IsFile( fileName, luaGamePath ) then
                     return AddCSLuaFile( fileName )
                 end
 
@@ -356,11 +356,11 @@ Initialize = promise.Async( function( metadata, func, files )
             end
 
             local importPath = "includes/modules/" .. name .. ".lua"
-            if fs.IsFile( importPath, luaRealm ) then
+            if fs.IsFile( importPath, luaGamePath ) then
                 return gpm.Import( importPath, false, pkg )
             elseif hasAlternative then
                 importPath = "includes/modules/" .. alternative .. ".lua"
-                if fs.IsFile( importPath, luaRealm ) then
+                if fs.IsFile( importPath, luaGamePath ) then
                     return gpm.Import( importPath, false, pkg )
                 end
             end

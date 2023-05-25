@@ -24,7 +24,7 @@ MsgN( [[
 
 module( "gpm", package.seeall )
 
-_VERSION = 012600
+_VERSION = 012800
 
 if not Colors then
     Colors = {
@@ -38,18 +38,18 @@ if not Colors then
     }
 
     Realm = "unknown"
-    LuaRealm = "LUA"
+    LuaGamePath = "LUA"
 
     if MENU_DLL then
         Colors.Realm = Color( 75, 175, 80 )
         Realm = "Menu"
     elseif CLIENT then
         Colors.Realm = Color( 225, 170, 10 )
-        LuaRealm = "lcl"
+        LuaGamePath = "lcl"
         Realm = "Client"
     elseif SERVER then
         Colors.Realm = Color( 5, 170, 250 )
-        LuaRealm = "lsv"
+        LuaGamePath = "lsv"
         Realm = "Server"
     end
 end
@@ -126,8 +126,8 @@ CachePath = fs.CreateDir( "gpm/" .. ( SERVER and "server" or "client" ) .. "/pac
 do
 
     local CompileFile = CompileFile
+    local luaGamePath = LuaGamePath
     local ArgAssert = ArgAssert
-    local luaRealm = LuaRealm
     local pcall = pcall
     local files = {}
 
@@ -141,7 +141,7 @@ do
         local func = files[ filePath ]
         if func then return func end
 
-        local ok, result = fs.Compile( filePath, luaRealm ):SafeAwait()
+        local ok, result = fs.Compile( filePath, luaGamePath ):SafeAwait()
         if ok then
             func = result
         elseif MENU_DLL then

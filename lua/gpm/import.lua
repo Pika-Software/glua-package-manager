@@ -1,7 +1,6 @@
 local gpm = gpm
 
 -- Libraries
-local moonloader = moonloader
 local package = gpm.package
 local promise = promise
 local string = string
@@ -11,7 +10,7 @@ local fs = gpm.fs
 local CLIENT, SERVER, MENU_DLL = CLIENT, SERVER, MENU_DLL
 local table_HasIValue = table.HasIValue
 local IsPackage = gpm.IsPackage
-local luaRealm = gpm.LuaRealm
+local luaGamePath = gpm.LuaGamePath
 local logger = gpm.Logger
 local Error = gpm.Error
 local ipairs = ipairs
@@ -216,18 +215,14 @@ end
 _G.import = Import
 
 function ImportFolder( folderPath, pkg, autorun )
-    if not fs.IsDir( folderPath, luaRealm ) then
+    if not fs.IsDir( folderPath, luaGamePath ) then
         logger:Warn( "Import impossible, folder '%s' does not exist, skipping...", folderPath )
         return
     end
 
     logger:Info( "Starting to import packages from '%s'", folderPath )
 
-    if moonloader then
-        moonloader.PreCacheDir( folderPath )
-    end
-
-    local files, folders = fs.Find( folderPath .. "/*", luaRealm )
+    local files, folders = fs.Find( folderPath .. "/*", luaGamePath )
     for _, folderName in ipairs( folders ) do
         local importPath = folderPath .. "/" .. folderName
         gpm.AsyncImport( importPath, pkg, autorun ):Catch( function( message )

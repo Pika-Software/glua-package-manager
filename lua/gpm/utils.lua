@@ -241,6 +241,10 @@ function table.SetValue( tbl, str, value, ifEmpty )
     end
 end
 
+function util.IsLuaModuleInstalled( name )
+    return gpm.fs.IsFile( "includes/modules/" .. name .. ".lua", gpm.LuaGamePath )
+end
+
 module( "gpm.utils" )
 
 function LowerTableKeys( tbl )
