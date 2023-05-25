@@ -361,7 +361,7 @@ Initialize = promise.Async( function( metadata, func, files )
             local importPath = "includes/modules/" .. name .. ".lua"
             if fs.IsFile( importPath, luaRealm ) then
                 return gpm.Import( importPath, false, pkg )
-            elseif hasAlternative then
+            elseif hasAlternative and not string.IsURL( alternative ) then
                 importPath = "includes/modules/" .. alternative .. ".lua"
                 if fs.IsFile( importPath, luaRealm ) then
                     return gpm.Import( importPath, false, pkg )
