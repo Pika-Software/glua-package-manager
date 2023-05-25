@@ -296,9 +296,9 @@ Initialize = promise.Async( function( metadata, func, files )
             if type( func ) ~= "function" then
                 local currentFile = utils.GetCurrentFile()
                 if currentFile then
-                    local folder = string.GetPathFromFilename( paths.Localize( currentFile ) )
+                    local folder = paths.Localize( string.GetPathFromFilename( currentFile ) )
                     if folder then
-                        local filePath = paths.Fix( folder .. fileName )
+                        local filePath = folder .. fileName
                         if fs.IsFile( filePath, luaRealm ) then
                             func = gpm.CompileLua( filePath ):Await()
                         end
@@ -361,7 +361,7 @@ Initialize = promise.Async( function( metadata, func, files )
             local importPath = "includes/modules/" .. name .. ".lua"
             if fs.IsFile( importPath, luaRealm ) then
                 return gpm.Import( importPath, false, pkg )
-            elseif hasAlternative then
+            elseif hasAlternative and not string.IsURL( alternative ) then
                 importPath = "includes/modules/" .. alternative .. ".lua"
                 if fs.IsFile( importPath, luaRealm ) then
                     return gpm.Import( importPath, false, pkg )

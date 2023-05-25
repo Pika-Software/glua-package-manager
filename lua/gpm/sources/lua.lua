@@ -11,20 +11,30 @@ local fs = gpm.fs
 local SERVER = SERVER
 local AddCSLuaFile = SERVER and AddCSLuaFile
 local luaRealm = gpm.LuaRealm
+local moonloader = moonloader
 local ipairs = ipairs
 local type = type
 
 module( "gpm.sources.lua" )
 
 function CanImport( filePath )
-    if fs.IsFile( filePath, luaRealm ) and ( string.EndsWith( filePath, ".lua" ) or string.EndsWith( filePath, "lua.dat" ) ) then return true end
     if fs.IsDir( filePath, luaRealm ) then return true end
+    if fs.IsFile( filePath, luaRealm ) then
+        local extension = string.GetExtensionFromFilename( filePath )
+        if extension == "moon" then return moonloader ~= nil end
+        if extension == "lua" then return true end
+    end
+
     return false
 end
 
 GetMetadata = promise.Async( function( importPath )
     local metadata, folder = nil, importPath
-    if not fs.IsDir( folder, luaRealm ) then
+    if fs.IsDir( folder, luaRealm ) then
+        if moonloader ~= nil then
+            moonloader.PreCacheDir( folder )
+        end
+    else
         folder = string.GetPathFromFilename( importPath )
     end
 
@@ -42,13 +52,17 @@ GetMetadata = promise.Async( function( importPath )
         metadata = package.GetMetadata( result )
     end
 
-    -- For single file
+    -- Single file
     if not metadata then
         metadata = {
             ["autorun"] = true
         }
 
         if fs.IsFile( importPath, luaRealm ) then
+            if string.EndsWith( importPath, ".moon" ) and moonloader ~= nil and not moonloader.PreCacheFile( importPath ) then
+                return promise.Reject( "Compiling Moonscript file '" .. importPath .. "' into Lua is failed!" )
+            end
+
             metadata.main = importPath
         end
     end
@@ -61,7 +75,9 @@ GetMetadata = promise.Async( function( importPath )
 
     -- Shared init
     local main = metadata.main
-    if type( main ) ~= "string" then
+    if type( main ) == "string" then
+        main = paths.Fix( main )
+    else
         main = "init.lua"
     end
 
@@ -77,14 +93,16 @@ GetMetadata = promise.Async( function( importPath )
     end
 
     if fs.IsFile( main, luaRealm ) then
-        metadata.main = paths.Fix( main )
+        metadata.main = main
     else
         metadata.main = nil
     end
 
     -- Client init
     local cl_main = metadata.cl_main
-    if type( cl_main ) ~= "string" then
+    if type( cl_main ) == "string" then
+        cl_main = paths.Fix( cl_main )
+    else
         cl_main = "cl_init.lua"
     end
 
@@ -96,7 +114,7 @@ GetMetadata = promise.Async( function( importPath )
     end
 
     if fs.IsFile( cl_main, luaRealm ) then
-        metadata.cl_main = paths.Fix( cl_main )
+        metadata.cl_main = cl_main
     else
         metadata.cl_main = nil
     end
