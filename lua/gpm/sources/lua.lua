@@ -50,7 +50,7 @@ GetMetadata = promise.Async( function( importPath )
         metadata = package.GetMetadata( result )
     end
 
-    -- For single file
+    -- Single file
     if not metadata then
         metadata = {
             ["autorun"] = true
@@ -73,7 +73,9 @@ GetMetadata = promise.Async( function( importPath )
 
     -- Shared init
     local main = metadata.main
-    if type( main ) ~= "string" then
+    if type( main ) == "string" then
+        main = paths.Fix( main )
+    else
         main = "init.lua"
     end
 
@@ -89,14 +91,16 @@ GetMetadata = promise.Async( function( importPath )
     end
 
     if fs.IsFile( main, luaRealm ) then
-        metadata.main = paths.Fix( main )
+        metadata.main = main
     else
         metadata.main = nil
     end
 
     -- Client init
     local cl_main = metadata.cl_main
-    if type( cl_main ) ~= "string" then
+    if type( cl_main ) == "string" then
+        cl_main = paths.Fix( cl_main )
+    else
         cl_main = "cl_init.lua"
     end
 
@@ -108,7 +112,7 @@ GetMetadata = promise.Async( function( importPath )
     end
 
     if fs.IsFile( cl_main, luaRealm ) then
-        metadata.cl_main = paths.Fix( cl_main )
+        metadata.cl_main = cl_main
     else
         metadata.cl_main = nil
     end

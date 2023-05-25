@@ -53,17 +53,17 @@ Import = promise.Async( function( metadata )
         importPaths[ #importPaths + 1 ] = importPath
     end
 
-    local results = {}
+    local packages = {}
     for _, importPath in ipairs( importPaths ) do
-        results[ #results + 1 ] = gpm.SourceImport( "lua", importPath )
+        packages[ #packages + 1 ] = gpm.SourceImport( "lua", importPath ):Await()
     end
 
-    local count = #results
+    local count = #packages
     if count > 0 then
         if count == 1 then
-            return results[ 1 ]
+            return packages[ 1 ]
         end
 
-        return results
+        return packages
     end
 end )
