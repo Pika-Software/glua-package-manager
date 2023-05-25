@@ -31,7 +31,9 @@ end
 GetMetadata = promise.Async( function( importPath )
     local metadata, folder = nil, importPath
     if fs.IsDir( folder, luaRealm ) then
-        moonloader.PreCacheDir( folder )
+        if moonloader ~= nil then
+            moonloader.PreCacheDir( folder )
+        end
     else
         folder = string.GetPathFromFilename( importPath )
     end
@@ -57,7 +59,7 @@ GetMetadata = promise.Async( function( importPath )
         }
 
         if fs.IsFile( importPath, luaRealm ) then
-            if string.EndsWith( importPath, ".moon" ) and not moonloader.PreCacheFile( importPath ) then
+            if string.EndsWith( importPath, ".moon" ) and moonloader ~= nil and not moonloader.PreCacheFile( importPath ) then
                 return promise.Reject( "Compiling Moonscript file '" .. importPath .. "' into Lua is failed!" )
             end
 
