@@ -101,6 +101,12 @@ local promise = promise
 
 Logger:Info( "gm_promise v%s is initialized.", utils.Version( promise._VERSION_NUM ) )
 
+-- https://github.com/Pika-Software/gm_moonloader
+if util.IsBinaryModuleInstalled( "moonloader" ) then
+    gpm.Logger:Info( "Moonloader engaged." )
+    require( "moonloader" )
+end
+
 IncludeComponent "libs/gmad"
 Logger:Info( "gmad v%s is initialized.", utils.Version( gmad.GMA.Version ) )
 
@@ -159,12 +165,6 @@ do
         return promise.Reject( "File '" .. filePath .. "' code compilation failed due to an unknown error." )
     end )
 
-end
-
--- https://github.com/Pika-Software/gm_moonloader
-if util.IsBinaryModuleInstalled( "moonloader" ) then
-    gpm.Logger:Info( "Moonloader engaged." )
-    require( "moonloader" )
 end
 
 IncludeComponent "import"
