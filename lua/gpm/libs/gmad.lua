@@ -7,8 +7,10 @@ local util = util
 -- Variables
 local setmetatable = setmetatable
 local ArgAssert = gpm.ArgAssert
+local moonloader = moonloader
 local tonumber = tonumber
 local logger = gpm.Logger
+local SysTime = SysTime
 local os_time = os.time
 local assert = assert
 local ipairs = ipairs
@@ -253,8 +255,14 @@ end
 
 function GMA:AddFile( filePath, content )
     assert( self.WriteMode, "To change a gmad file, write mode is required." )
-
     ArgAssert( filePath, 1, "string" )
+
+    local isMoon, moonPath = string.EndsWith( filePath, ".moon" ) and moonloader ~= nil
+    if isMoon then
+        moonPath = filePath
+        filePath = string.Replace( filePath, ".moon", ".lua" )
+    end
+
     if not IsAllowedFilePath( filePath ) then
         logger:Warn( "File '%s' was not written to gma because its path is not valid.", filePath )
         return
@@ -270,6 +278,17 @@ function GMA:AddFile( filePath, content )
             table.remove( files, number )
             break
         end
+    end
+
+    if isMoon then
+        local startTime = SysTime()
+        content = moonloader.ToLua( content )
+        if not content then
+            logger:Error( "Compiling Moonscript file '%s' into Lua file '%s' is failed, took %f seconds.", moonPath, filePath, SysTime() - startTime )
+            return
+        end
+
+        logger:Debug( "Compiling Moonscript file '%s' into Lua file '%s' is finished, took %f seconds.", moonPath, filePath, SysTime() - startTime )
     end
 
     files[ #files + 1 ] = {

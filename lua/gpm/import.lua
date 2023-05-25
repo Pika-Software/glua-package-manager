@@ -1,7 +1,6 @@
 local gpm = gpm
 
 -- Libraries
-local moonloader = moonloader
 local package = gpm.package
 local promise = promise
 local string = string
@@ -227,10 +226,6 @@ function ImportFolder( folderPath, pkg, autorun )
     end
 
     logger:Info( "Starting to import packages from '%s'", folderPath )
-
-    if moonloader then
-        moonloader.PreCacheDir( folderPath )
-    end
 
     local files, folders = fs.Find( folderPath .. "/*", luaRealm )
     for _, folderName in ipairs( folders ) do

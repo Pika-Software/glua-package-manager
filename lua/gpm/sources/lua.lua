@@ -11,20 +11,28 @@ local fs = gpm.fs
 local SERVER = SERVER
 local AddCSLuaFile = SERVER and AddCSLuaFile
 local luaRealm = gpm.LuaRealm
+local moonloader = moonloader
 local ipairs = ipairs
 local type = type
 
 module( "gpm.sources.lua" )
 
 function CanImport( filePath )
-    if fs.IsFile( filePath, luaRealm ) and ( string.EndsWith( filePath, ".lua" ) or string.EndsWith( filePath, "lua.dat" ) ) then return true end
     if fs.IsDir( filePath, luaRealm ) then return true end
+    if fs.IsFile( filePath, luaRealm ) then
+        local extension = string.GetExtensionFromFilename( filePath )
+        if extension == "moon" then return moonloader ~= nil end
+        if extension == "lua" then return true end
+    end
+
     return false
 end
 
 GetMetadata = promise.Async( function( importPath )
     local metadata, folder = nil, importPath
-    if not fs.IsDir( folder, luaRealm ) then
+    if fs.IsDir( folder, luaRealm ) then
+        moonloader.PreCacheDir( folder )
+    else
         folder = string.GetPathFromFilename( importPath )
     end
 
@@ -49,6 +57,10 @@ GetMetadata = promise.Async( function( importPath )
         }
 
         if fs.IsFile( importPath, luaRealm ) then
+            if string.EndsWith( importPath, ".moon" ) and not moonloader.PreCacheFile( importPath ) then
+                return promise.Reject( "Compiling Moonscript file '" .. importPath .. "' into Lua is failed!" )
+            end
+
             metadata.main = importPath
         end
     end
