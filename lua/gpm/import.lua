@@ -203,21 +203,21 @@ end
 function gpm.Import( importPath, async, pkg )
     assert( async or promise.RunningInAsync(), "import supposed to be running in coroutine/async function (do you running it from package)" )
 
-    local import = gpm.AsyncImport( importPath, pkg )
-    import:Catch( function( message )
+    local task = gpm.AsyncImport( importPath, pkg )
+    task:Catch( function( message )
         Error( importPath, message, true )
     end )
 
     if not async then
-        local pkg = import:Await()
+        local pkg = task:Await()
         if not pkg then return end
         return pkg:GetResult(), pkg
     end
 
-    return import
+    return task
 end
 
-_G.import = Import
+_G.import = gpm.Import
 
 function ImportFolder( folderPath, pkg, autorun )
     if not fs.IsDir( folderPath, luaRealm ) then
