@@ -231,14 +231,14 @@ function ImportFolder( folderPath, pkg, autorun )
     for _, folderName in ipairs( folders ) do
         local importPath = folderPath .. "/" .. folderName
         gpm.AsyncImport( importPath, pkg, autorun ):Catch( function( message )
-            gpm.Error( importPath, message, true, "lua" )
+            Error( importPath, message, true, "lua" )
         end )
     end
 
     for _, fileName in ipairs( files ) do
         local importPath = folderPath .. "/" .. fileName
         gpm.AsyncImport( importPath, pkg, autorun ):Catch( function( message )
-            gpm.Error( importPath, message, true, "lua" )
+            Error( importPath, message, true, "lua" )
         end )
     end
 end
