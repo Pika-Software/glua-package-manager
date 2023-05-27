@@ -285,6 +285,19 @@ Initialize = promise.Async( function( metadata, func, files )
 
         env.gpm.Import = env.import
 
+        -- install
+        environment.SetValue( env, "install", function( ... )
+            return gpm.Install( pkg, false, ... )
+        end )
+
+        environment.SetValue( env, "gpm.Install", function( pkg2, async, ... )
+            if gpm.IsPackage( pkg2 ) then
+                return gpm.Install( pkg2, async, ... )
+            end
+
+            return gpm.Install( pkg, async, ... )
+        end )
+
         -- include
         environment.SetValue( env, "include", function( fileName )
             gpm.ArgAssert( fileName, 1, "string" )
