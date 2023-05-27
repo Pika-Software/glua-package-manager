@@ -211,6 +211,24 @@ end
 
 _G.import = gpm.Import
 
+gpm.AsyncInstall = promise.Async( function( pkg2, ... )
+    local arguments = {...}
+    local lenght = #arguments
+
+    for number, importPath in ipairs( arguments ) do
+        if not gpm.CanImport( importPath ) then continue end
+
+        local ok, result = gpm.AsyncImport( importPath, pkg2, false ):SafeAwait()
+        if not ok then
+            if number ~= lenght then continue end
+            return promise.Reject( result )
+        end
+
+        return result
+    end
+
+    error( "Not one of the listed packages could be imported." )
+end )
 function ImportFolder( folderPath, pkg2, autorun )
     if not fs.IsDir( folderPath, luaGamePath ) then
         logger:Warn( "Import impossible, folder '%s' does not exist, skipping...", folderPath )
