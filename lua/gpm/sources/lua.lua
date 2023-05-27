@@ -10,7 +10,7 @@ local fs = gpm.fs
 -- Variables
 local SERVER = SERVER
 local AddCSLuaFile = SERVER and AddCSLuaFile
-local luaRealm = gpm.LuaRealm
+local luaGamePath = gpm.LuaGamePath
 local moonloader = moonloader
 local ipairs = ipairs
 local type = type
@@ -18,8 +18,8 @@ local type = type
 module( "gpm.sources.lua" )
 
 function CanImport( filePath )
-    if fs.IsDir( filePath, luaRealm ) then return true end
-    if fs.IsFile( filePath, luaRealm ) then
+    if fs.IsDir( filePath, luaGamePath ) then return true end
+    if fs.IsFile( filePath, luaGamePath ) then
         local extension = string.GetExtensionFromFilename( filePath )
         if extension == "moon" then return moonloader ~= nil end
         if extension == "lua" then return true end
@@ -30,7 +30,7 @@ end
 
 GetMetadata = promise.Async( function( importPath )
     local metadata, folder = nil, importPath
-    if fs.IsDir( folder, luaRealm ) then
+    if fs.IsDir( folder, luaGamePath ) then
         if moonloader ~= nil then
             moonloader.PreCacheDir( folder )
         end
@@ -43,7 +43,7 @@ GetMetadata = promise.Async( function( importPath )
         hasPackageFile = false
     else
         packagePath = paths.Fix( folder .. "/package.lua" )
-        hasPackageFile = fs.IsFile( packagePath, luaRealm )
+        hasPackageFile = fs.IsFile( packagePath, luaGamePath )
     end
 
     if hasPackageFile then
@@ -58,7 +58,7 @@ GetMetadata = promise.Async( function( importPath )
             ["autorun"] = true
         }
 
-        if fs.IsFile( importPath, luaRealm ) then
+        if fs.IsFile( importPath, luaGamePath ) then
             if string.EndsWith( importPath, ".moon" ) and moonloader ~= nil and not moonloader.PreCacheFile( importPath ) then
                 return promise.Reject( "Compiling Moonscript file '" .. importPath .. "' into Lua is failed!" )
             end
@@ -81,18 +81,18 @@ GetMetadata = promise.Async( function( importPath )
         main = "init.lua"
     end
 
-    if not fs.IsFile( main, luaRealm ) then
+    if not fs.IsFile( main, luaGamePath ) then
         main = paths.Join( importPath, main )
 
-        if not fs.IsFile( main, luaRealm ) then
+        if not fs.IsFile( main, luaGamePath ) then
             main = importPath .. "/init.lua"
-            if not fs.IsFile( main, luaRealm ) then
+            if not fs.IsFile( main, luaGamePath ) then
                 main = importPath .. "/main.lua"
             end
         end
     end
 
-    if fs.IsFile( main, luaRealm ) then
+    if fs.IsFile( main, luaGamePath ) then
         metadata.main = main
     else
         metadata.main = nil
@@ -106,14 +106,14 @@ GetMetadata = promise.Async( function( importPath )
         cl_main = "cl_init.lua"
     end
 
-    if not fs.IsFile( cl_main, luaRealm ) then
+    if not fs.IsFile( cl_main, luaGamePath ) then
         cl_main = paths.Join( importPath, cl_main )
-        if not fs.IsFile( cl_main, luaRealm ) then
+        if not fs.IsFile( cl_main, luaGamePath ) then
             cl_main = importPath .. "/cl_init.lua"
         end
     end
 
-    if fs.IsFile( cl_main, luaRealm ) then
+    if fs.IsFile( cl_main, luaGamePath ) then
         metadata.cl_main = cl_main
     else
         metadata.cl_main = nil
@@ -146,9 +146,9 @@ if SERVER then
         local folder = metadata.folder
         for _, filePath in ipairs( send ) do
             local localFilePath = folder .. "/" .. filePath
-            if fs.IsFile( localFilePath, luaRealm ) then
+            if fs.IsFile( localFilePath, luaGamePath ) then
                 AddCSLuaFile( localFilePath )
-            elseif fs.IsFile( filePath, luaRealm ) then
+            elseif fs.IsFile( filePath, luaGamePath ) then
                 AddCSLuaFile( filePath )
             end
         end
@@ -158,7 +158,7 @@ end
 
 Import = promise.Async( function( metadata )
     local main = metadata.main
-    if not main or not fs.IsFile( main, luaRealm ) then
+    if not main or not fs.IsFile( main, luaGamePath ) then
         return promise.Reject( "main file '" .. ( main or "init.lua" ) .. "' is missing." )
     end
 

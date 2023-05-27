@@ -10,7 +10,7 @@ local fs = gpm.fs
 local CLIENT, SERVER, MENU_DLL = CLIENT, SERVER, MENU_DLL
 local table_HasIValue = table.HasIValue
 local IsPackage = gpm.IsPackage
-local luaRealm = gpm.LuaRealm
+local luaGamePath = gpm.LuaGamePath
 local logger = gpm.Logger
 local Error = gpm.Error
 local ipairs = ipairs
@@ -42,24 +42,17 @@ do
         for _, sourceName in ipairs( sourceList ) do
             local source = sources[ sourceName ]
             if not source then continue end
-            if not source.CanImport( importPath ) then continue end
-            return true
+            if source.CanImport( importPath ) then return true end
         end
 
         return false
     end
 
-    function gpm.LocatePackage( importPath, alternative )
-        gpm.ArgAssert( importPath, 1, "string" )
-        if gpm.CanImport( importPath ) then
-            return importPath
+    function gpm.LocatePackage( ... )
+        for number, importPath in ipairs( {...} ) do
+            gpm.ArgAssert( importPath, number, "string" )
+            if gpm.CanImport( importPath ) then return importPath end
         end
-
-        if type( alternative ) ~= "string" then
-            return importPath
-        end
-
-        return alternative
     end
 
     local tasks, metadatas = {}, {}
@@ -141,7 +134,6 @@ do
             for _, sourceName in ipairs( sourceList ) do
                 local source = sources[ sourceName ]
                 if not source then continue end
-
                 if not source.CanImport( importPath ) then continue end
 
                 local metadata = metadatas[ sourceName .. ";" .. importPath ]
@@ -200,10 +192,10 @@ do
 
 end
 
-function gpm.Import( importPath, async, pkg )
+function gpm.Import( importPath, async, pkg2 )
     assert( async or promise.RunningInAsync(), "import supposed to be running in coroutine/async function (do you running it from package)" )
 
-    local task = gpm.AsyncImport( importPath, pkg )
+    local task = gpm.AsyncImport( importPath, pkg2 )
     task:Catch( function( message )
         Error( importPath, message, true )
     end )
@@ -219,26 +211,62 @@ end
 
 _G.import = gpm.Import
 
-function ImportFolder( folderPath, pkg, autorun )
-    if not fs.IsDir( folderPath, luaRealm ) then
+gpm.AsyncInstall = promise.Async( function( pkg2, ... )
+    local arguments = {...}
+    local lenght = #arguments
+
+    for number, importPath in ipairs( arguments ) do
+        if not gpm.CanImport( importPath ) then continue end
+
+        local ok, result = gpm.AsyncImport( importPath, pkg2, false ):SafeAwait()
+        if not ok then
+            if number ~= lenght then continue end
+            return promise.Reject( result )
+        end
+
+        return result
+    end
+
+    error( "Not one of the listed packages could be imported." )
+end )
+
+function gpm.Install( pkg2, async, ... )
+    assert( async or promise.RunningInAsync(), "import supposed to be running in coroutine/async function (do you running it from package)" )
+
+    local task = gpm.AsyncInstall( pkg2, ... )
+    task:Catch( ErrorNoHaltWithStack )
+
+    if not async then
+        local pkg = task:Await()
+        if not pkg then return end
+        return pkg:GetResult(), pkg
+    end
+
+    return task
+end
+
+_G.install = gpm.Install
+
+function ImportFolder( folderPath, pkg2, autorun )
+    if not fs.IsDir( folderPath, luaGamePath ) then
         logger:Warn( "Import impossible, folder '%s' does not exist, skipping...", folderPath )
         return
     end
 
     logger:Info( "Starting to import packages from '%s'", folderPath )
 
-    local files, folders = fs.Find( folderPath .. "/*", luaRealm )
+    local files, folders = fs.Find( folderPath .. "/*", luaGamePath )
     for _, folderName in ipairs( folders ) do
         local importPath = folderPath .. "/" .. folderName
-        gpm.AsyncImport( importPath, pkg, autorun ):Catch( function( message )
-            gpm.Error( importPath, message, true, "lua" )
+        gpm.AsyncImport( importPath, pkg2, autorun ):Catch( function( message )
+            Error( importPath, message, true, "lua" )
         end )
     end
 
     for _, fileName in ipairs( files ) do
         local importPath = folderPath .. "/" .. fileName
-        gpm.AsyncImport( importPath, pkg, autorun ):Catch( function( message )
-            gpm.Error( importPath, message, true, "lua" )
+        gpm.AsyncImport( importPath, pkg2, autorun ):Catch( function( message )
+            Error( importPath, message, true, "lua" )
         end )
     end
 end

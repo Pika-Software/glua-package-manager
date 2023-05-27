@@ -12,10 +12,10 @@ local fs = gpm.fs
 -- Variables
 local ErrorNoHaltWithStack = ErrorNoHaltWithStack
 local CLIENT, SERVER = CLIENT, SERVER
+local luaGamePath = gpm.LuaGamePath
 local AddCSLuaFile = AddCSLuaFile
 local getmetatable = getmetatable
 local setmetatable = setmetatable
-local luaRealm = gpm.LuaRealm
 local logger = gpm.Logger
 local require = require
 local SysTime = SysTime
@@ -275,12 +275,27 @@ Initialize = promise.Async( function( metadata, func, files )
         end
 
         -- import
-        environment.SetValue( env, "gpm.Import", function( importPath, async, pkg2 )
-            return gpm.Import( importPath, async, gpm.IsPackage( pkg2 ) and pkg2 or pkg )
+        environment.SetValue( env, "import", function( importPath, async, pkg2 )
+            if gpm.IsPackage( pkg2 ) then
+                return gpm.Import( importPath, async, pkg2 )
+            end
+
+            return gpm.Import( importPath, async, pkg )
         end )
 
-        environment.SetValue( env, "import", function( importPath, async )
-            return gpm.Import( importPath, async, pkg )
+        env.gpm.Import = env.import
+
+        -- install
+        environment.SetValue( env, "install", function( ... )
+            return gpm.Install( pkg, false, ... )
+        end )
+
+        environment.SetValue( env, "gpm.Install", function( pkg2, async, ... )
+            if gpm.IsPackage( pkg2 ) then
+                return gpm.Install( pkg2, async, ... )
+            end
+
+            return gpm.Install( pkg, async, ... )
         end )
 
         -- include
@@ -299,14 +314,14 @@ Initialize = promise.Async( function( metadata, func, files )
                     local folder = paths.Localize( string.GetPathFromFilename( currentFile ) )
                     if folder then
                         local filePath = folder .. fileName
-                        if fs.IsFile( filePath, luaRealm ) then
+                        if fs.IsFile( filePath, luaGamePath ) then
                             func = gpm.CompileLua( filePath ):Await()
                         end
                     end
                 end
             end
 
-            if type( func ) ~= "function" and fs.IsFile( fileName, luaRealm ) then
+            if type( func ) ~= "function" and fs.IsFile( fileName, luaGamePath ) then
                 func = gpm.CompileLua( fileName ):Await()
             end
 
@@ -333,13 +348,13 @@ Initialize = promise.Async( function( metadata, func, files )
                     local folder = string.GetPathFromFilename( luaPath )
                     if folder then
                         local filePath = folder .. fileName
-                        if fs.IsFile( filePath, luaRealm ) then
+                        if fs.IsFile( filePath, luaGamePath ) then
                             return AddCSLuaFile( filePath )
                         end
                     end
                 end
 
-                if type( fileName ) == "string" and fs.IsFile( fileName, luaRealm ) then
+                if type( fileName ) == "string" and fs.IsFile( fileName, luaGamePath ) then
                     return AddCSLuaFile( fileName )
                 end
 
@@ -348,27 +363,37 @@ Initialize = promise.Async( function( metadata, func, files )
         end
 
         -- require
-        environment.SetValue( env, "require", function( name, alternative )
-            gpm.ArgAssert( name, 1, "string" )
+        environment.SetValue( env, "require", function( ... )
+            local arguments = {...}
+            local lenght = #arguments
 
-            local hasAlternative = type( alternative ) == "string"
-            if util.IsBinaryModuleInstalled( name ) then
-                return require( name )
-            elseif hasAlternative and util.IsBinaryModuleInstalled( alternative ) then
-                return require( alternative )
-            end
+            for number, name in ipairs( arguments ) do
+                gpm.ArgAssert( name, number, "string" )
 
-            local importPath = "includes/modules/" .. name .. ".lua"
-            if fs.IsFile( importPath, luaRealm ) then
-                return gpm.Import( importPath, false, pkg )
-            elseif hasAlternative and not string.IsURL( alternative ) then
-                importPath = "includes/modules/" .. alternative .. ".lua"
-                if fs.IsFile( importPath, luaRealm ) then
-                    return gpm.Import( importPath, false, pkg )
+                if not string.IsURL( name ) then
+                    if util.IsBinaryModuleInstalled( name ) then
+                        return require( name )
+                    end
+
+                    if util.IsLuaModuleInstalled( name ) then
+                        local pkg2 = gpm.SourceImport( "lua", "includes/modules/" .. name .. ".lua" ):Await()
+                        pkg:Link( pkg2 )
+                        return pkg2:GetResult()
+                    end
                 end
+
+                if not gpm.CanImport( name ) then continue end
+
+                local ok, result = gpm.AsyncImport( name, pkg, false ):SafeAwait()
+                if not ok then
+                    if number ~= lenght then continue end
+                    return promise.Reject( result )
+                end
+
+                return result
             end
 
-            return gpm.Import( gpm.LocatePackage( name, alternative ), false, pkg )
+            error( "Not one of the listed packages could be imported." )
         end )
 
     end
