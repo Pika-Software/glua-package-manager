@@ -42,8 +42,7 @@ do
         for _, sourceName in ipairs( sourceList ) do
             local source = sources[ sourceName ]
             if not source then continue end
-            if not source.CanImport( importPath ) then continue end
-            return true
+            if source.CanImport( importPath ) then return true end
         end
 
         return false
@@ -135,7 +134,6 @@ do
             for _, sourceName in ipairs( sourceList ) do
                 local source = sources[ sourceName ]
                 if not source then continue end
-
                 if not source.CanImport( importPath ) then continue end
 
                 local metadata = metadatas[ sourceName .. ";" .. importPath ]
@@ -194,10 +192,10 @@ do
 
 end
 
-function gpm.Import( importPath, async, pkg )
+function gpm.Import( importPath, async, pkg2 )
     assert( async or promise.RunningInAsync(), "import supposed to be running in coroutine/async function (do you running it from package)" )
 
-    local task = gpm.AsyncImport( importPath, pkg )
+    local task = gpm.AsyncImport( importPath, pkg2 )
     task:Catch( function( message )
         Error( importPath, message, true )
     end )
@@ -213,7 +211,7 @@ end
 
 _G.import = gpm.Import
 
-function ImportFolder( folderPath, pkg, autorun )
+function ImportFolder( folderPath, pkg2, autorun )
     if not fs.IsDir( folderPath, luaGamePath ) then
         logger:Warn( "Import impossible, folder '%s' does not exist, skipping...", folderPath )
         return
@@ -224,14 +222,14 @@ function ImportFolder( folderPath, pkg, autorun )
     local files, folders = fs.Find( folderPath .. "/*", luaGamePath )
     for _, folderName in ipairs( folders ) do
         local importPath = folderPath .. "/" .. folderName
-        gpm.AsyncImport( importPath, pkg, autorun ):Catch( function( message )
+        gpm.AsyncImport( importPath, pkg2, autorun ):Catch( function( message )
             Error( importPath, message, true, "lua" )
         end )
     end
 
     for _, fileName in ipairs( files ) do
         local importPath = folderPath .. "/" .. fileName
-        gpm.AsyncImport( importPath, pkg, autorun ):Catch( function( message )
+        gpm.AsyncImport( importPath, pkg2, autorun ):Catch( function( message )
             Error( importPath, message, true, "lua" )
         end )
     end
