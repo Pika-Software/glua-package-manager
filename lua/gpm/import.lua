@@ -229,6 +229,24 @@ gpm.AsyncInstall = promise.Async( function( pkg2, ... )
 
     error( "Not one of the listed packages could be imported." )
 end )
+
+function gpm.Install( pkg2, async, ... )
+    assert( async or promise.RunningInAsync(), "import supposed to be running in coroutine/async function (do you running it from package)" )
+
+    local task = gpm.AsyncInstall( pkg2, ... )
+    task:Catch( ErrorNoHaltWithStack )
+
+    if not async then
+        local pkg = task:Await()
+        if not pkg then return end
+        return pkg:GetResult(), pkg
+    end
+
+    return task
+end
+
+_G.install = gpm.Install
+
 function ImportFolder( folderPath, pkg2, autorun )
     if not fs.IsDir( folderPath, luaGamePath ) then
         logger:Warn( "Import impossible, folder '%s' does not exist, skipping...", folderPath )
