@@ -275,13 +275,15 @@ Initialize = promise.Async( function( metadata, func, files )
         end
 
         -- import
-        environment.SetValue( env, "gpm.Import", function( importPath, async, pkg2 )
-            return gpm.Import( importPath, async, gpm.IsPackage( pkg2 ) and pkg2 or pkg )
-        end )
+        environment.SetValue( env, "import", function( importPath, async, pkg2 )
+            if gpm.IsPackage( pkg2 ) then
+                return gpm.Import( importPath, async, pkg2 )
+            end
 
-        environment.SetValue( env, "import", function( importPath, async )
             return gpm.Import( importPath, async, pkg )
         end )
+
+        env.gpm.Import = env.import
 
         -- include
         environment.SetValue( env, "include", function( fileName )
