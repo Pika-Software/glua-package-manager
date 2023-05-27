@@ -49,17 +49,11 @@ do
         return false
     end
 
-    function gpm.LocatePackage( importPath, alternative )
-        gpm.ArgAssert( importPath, 1, "string" )
-        if gpm.CanImport( importPath ) then
-            return importPath
+    function gpm.LocatePackage( ... )
+        for number, importPath in ipairs( {...} ) do
+            gpm.ArgAssert( importPath, number, "string" )
+            if gpm.CanImport( importPath ) then return importPath end
         end
-
-        if type( alternative ) ~= "string" then
-            return importPath
-        end
-
-        return alternative
     end
 
     local tasks, metadatas = {}, {}
