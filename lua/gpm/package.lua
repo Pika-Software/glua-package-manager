@@ -363,27 +363,37 @@ Initialize = promise.Async( function( metadata, func, files )
         end
 
         -- require
-        environment.SetValue( env, "require", function( name, alternative )
-            gpm.ArgAssert( name, 1, "string" )
+        environment.SetValue( env, "require", function( ... )
+            local arguments = {...}
+            local lenght = #arguments
 
-            local hasAlternative = type( alternative ) == "string"
-            if util.IsBinaryModuleInstalled( name ) then
-                return require( name )
-            elseif hasAlternative and util.IsBinaryModuleInstalled( alternative ) then
-                return require( alternative )
-            end
+            for number, name in ipairs( arguments ) do
+                gpm.ArgAssert( name, number, "string" )
 
-            local importPath = "includes/modules/" .. name .. ".lua"
-            if fs.IsFile( importPath, luaGamePath ) then
-                return gpm.Import( importPath, false, pkg )
-            elseif hasAlternative and not string.IsURL( alternative ) then
-                importPath = "includes/modules/" .. alternative .. ".lua"
-                if fs.IsFile( importPath, luaGamePath ) then
-                    return gpm.Import( importPath, false, pkg )
+                if not string.IsURL( name ) then
+                    if util.IsBinaryModuleInstalled( name ) then
+                        return require( name )
+                    end
+
+                    if util.IsLuaModuleInstalled( name ) then
+                        local pkg2 = gpm.SourceImport( "lua", "includes/modules/" .. name .. ".lua" ):Await()
+                        pkg:Link( pkg2 )
+                        return pkg2:GetResult()
+                    end
                 end
+
+                if not gpm.CanImport( name ) then continue end
+
+                local ok, result = gpm.AsyncImport( name, pkg, false ):SafeAwait()
+                if not ok then
+                    if number ~= lenght then continue end
+                    return promise.Reject( result )
+                end
+
+                return result
             end
 
-            return gpm.Import( gpm.LocatePackage( name, alternative ), false, pkg )
+            error( "Not one of the listed packages could be imported." )
         end )
 
     end
