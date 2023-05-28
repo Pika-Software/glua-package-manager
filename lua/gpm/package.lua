@@ -265,8 +265,8 @@ Initialize = promise.Async( function( metadata, func, files )
         env.file = fs
 
         -- Binding package object to gpm.Package & _PKG
-        table.SetValue( env, "gpm.Package", pkg )
-        table.SetValue( env, "_PKG", pkg )
+        env.gpm.Package = pkg
+        env._PKG = pkg
 
         -- Logger
         if metadata.logger then
