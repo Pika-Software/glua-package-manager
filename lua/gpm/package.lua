@@ -12,7 +12,6 @@ local fs = gpm.fs
 -- Variables
 local ErrorNoHaltWithStack = ErrorNoHaltWithStack
 local CLIENT, SERVER = CLIENT, SERVER
-local luaGamePath = gpm.LuaGamePath
 local AddCSLuaFile = AddCSLuaFile
 local getmetatable = getmetatable
 local setmetatable = setmetatable
@@ -265,8 +264,8 @@ Initialize = promise.Async( function( metadata, func, files )
         env.file = fs
 
         -- Binding package object to gpm.Package & _PKG
-        table.SetValue( env, "gpm.Package", pkg )
-        table.SetValue( env, "_PKG", pkg )
+        env.gpm.Package = pkg
+        env._PKG = pkg
 
         -- Logger
         if metadata.logger then
@@ -314,14 +313,14 @@ Initialize = promise.Async( function( metadata, func, files )
                     local folder = paths.Localize( string.GetPathFromFilename( currentFile ) )
                     if folder then
                         local filePath = folder .. fileName
-                        if fs.IsFile( filePath, luaGamePath ) then
+                        if fs.IsFile( "lua/" .. filePath, "GAME" ) then
                             func = gpm.CompileLua( filePath ):Await()
                         end
                     end
                 end
             end
 
-            if type( func ) ~= "function" and fs.IsFile( fileName, luaGamePath ) then
+            if type( func ) ~= "function" and fs.IsFile( "lua/" .. fileName, "GAME" ) then
                 func = gpm.CompileLua( fileName ):Await()
             end
 
@@ -348,13 +347,13 @@ Initialize = promise.Async( function( metadata, func, files )
                     local folder = string.GetPathFromFilename( luaPath )
                     if folder then
                         local filePath = folder .. fileName
-                        if fs.IsFile( filePath, luaGamePath ) then
+                        if fs.IsFile( filePath, "lsv" ) then
                             return AddCSLuaFile( filePath )
                         end
                     end
                 end
 
-                if type( fileName ) == "string" and fs.IsFile( fileName, luaGamePath ) then
+                if type( fileName ) == "string" and fs.IsFile( fileName, "lsv" ) then
                     return AddCSLuaFile( fileName )
                 end
 

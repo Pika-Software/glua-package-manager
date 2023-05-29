@@ -10,7 +10,6 @@ local fs = gpm.fs
 local CLIENT, SERVER, MENU_DLL = CLIENT, SERVER, MENU_DLL
 local table_HasIValue = table.HasIValue
 local IsPackage = gpm.IsPackage
-local luaGamePath = gpm.LuaGamePath
 local logger = gpm.Logger
 local Error = gpm.Error
 local ipairs = ipairs
@@ -55,7 +54,30 @@ do
         end
     end
 
-    local tasks, metadatas = {}, {}
+    local metadatas = {}
+
+    local function getMetadata( importPath, sourceName, source )
+        local metadata = metadatas[ sourceName .. ";" .. importPath ]
+        if not metadata then
+            if type( source.GetMetadata ) == "function" then
+                metadata = package.GetMetadata( source.GetMetadata( importPath ):Await() )
+            else
+                metadata = package.GetMetadata( {} )
+            end
+
+            metadatas[ sourceName .. ";" .. importPath ] = metadata
+        end
+
+        return metadata
+    end
+
+    local function sendToClient( metadata, source )
+        if not metadata.client then return end
+        if type( source.SendToClient ) ~= "function" then return end
+        source.SendToClient( metadata )
+    end
+
+    local tasks = {}
 
     gpm.SourceImport = promise.Async( function( sourceName, importPath )
         local task = tasks[ importPath ]
@@ -65,19 +87,17 @@ do
                 return promise.Reject( "Requested package source not found." )
             end
 
-            local metadata = metadatas[ sourceName .. ";" .. importPath ]
-            if not metadata then
-                if type( source.GetMetadata ) == "function" then
-                    metadata = package.GetMetadata( source.GetMetadata( importPath ):Await() )
-                else
-                    metadata = package.GetMetadata( {} )
-                end
-
-                metadatas[ sourceName .. ";" .. importPath ] = metadata
-            end
+            local metadata = getMetadata( importPath, sourceName, source )
 
             if CLIENT and not metadata.client then
                 return promise.Reject( "Package does not support running on the client." )
+            end
+
+            if SERVER then
+                sendToClient( metadata, source )
+                if not metadata.server then
+                    return promise.Reject( "Package does not support running on the server." )
+                end
             end
 
             if MENU_DLL and not metadata.menu then
@@ -107,16 +127,6 @@ do
             metadata.import_path = importPath
             metadata.source = sourceName
 
-            if SERVER then
-                if metadata.client and type( source.SendToClient ) == "function" then
-                    source.SendToClient( metadata )
-                end
-
-                if not metadata.server then
-                    return promise.Reject( "Package does not support running on the server." )
-                end
-            end
-
             task = source.Import( metadata )
             tasks[ importPath ] = task
         end
@@ -136,32 +146,20 @@ do
                 if not source then continue end
                 if not source.CanImport( importPath ) then continue end
 
-                local metadata = metadatas[ sourceName .. ";" .. importPath ]
-                if not metadata then
-                    if type( source.GetMetadata ) == "function" then
-                        metadata = package.GetMetadata( source.GetMetadata( importPath ):Await() )
-                    else
-                        metadata = package.GetMetadata( {} )
-                    end
+                local metadata = getMetadata( importPath, sourceName, source )
 
-                    metadatas[ sourceName .. ";" .. importPath ] = metadata
+                if SERVER then
+                    sendToClient( metadata, source )
+                    if not metadata.server then return end
                 end
 
-                if SERVER and metadata.client and type( source.SendToClient ) == "function" then
-                    source.SendToClient( metadata )
+                if autorun and not metadata.autorun then
+                    logger:Debug( "[%s] Package '%s' autorun restricted.", sourceName, importPath )
+                    return
                 end
 
-                if autorun then
-                    if SERVER and not metadata.server then return end
-                    if not metadata.autorun then
-                        logger:Debug( "[%s] Package '%s' autorun restricted.", sourceName, importPath )
-                        return
-                    end
-                end
-
-                if SERVER and not metadata.server then
-                    return promise.Reject( "Package does not support running on the server." )
-                end
+                if CLIENT and not metadata.client then return end
+                if MENU_DLL and not metadata.menu then return end
 
                 task = gpm.SourceImport( sourceName, importPath )
                 break
@@ -248,14 +246,14 @@ end
 _G.install = gpm.Install
 
 function ImportFolder( folderPath, pkg2, autorun )
-    if not fs.IsDir( folderPath, luaGamePath ) then
+    if not fs.IsDir( "lua/" .. folderPath, "GAME" ) then
         logger:Warn( "Import impossible, folder '%s' does not exist, skipping...", folderPath )
         return
     end
 
     logger:Info( "Starting to import packages from '%s'", folderPath )
 
-    local files, folders = fs.Find( folderPath .. "/*", luaGamePath )
+    local files, folders = fs.Find( "lua/" .. folderPath .. "/*", "GAME" )
     for _, folderName in ipairs( folders ) do
         local importPath = folderPath .. "/" .. folderName
         gpm.AsyncImport( importPath, pkg2, autorun ):Catch( function( message )

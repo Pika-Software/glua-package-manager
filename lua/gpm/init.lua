@@ -1,3 +1,5 @@
+AddCSLuaFile()
+
 -- Libraries
 local table = table
 
@@ -24,9 +26,10 @@ MsgN( [[
 
 module( "gpm", package.seeall )
 
-_VERSION = 012800
+_VERSION = 012900
 
 if not Colors then
+    Realm = "unknown"
     Colors = {
         ["SecondaryText"] = Color( 150, 150, 150 ),
         ["PrimaryText"] = Color( 200, 200, 200 ),
@@ -37,19 +40,14 @@ if not Colors then
         ["Debug"] = Color( 0, 200, 150 )
     }
 
-    Realm = "unknown"
-    LuaGamePath = "LUA"
-
     if MENU_DLL then
         Colors.Realm = Color( 75, 175, 80 )
         Realm = "Menu"
     elseif CLIENT then
         Colors.Realm = Color( 225, 170, 10 )
-        LuaGamePath = "lcl"
         Realm = "Client"
     elseif SERVER then
         Colors.Realm = Color( 5, 170, 250 )
-        LuaGamePath = "lsv"
         Realm = "Server"
     end
 end
@@ -70,7 +68,6 @@ end
 local stopwatch = SysTime()
 
 IncludeComponent "utils"
-IncludeComponent "fixes"
 IncludeComponent "logger"
 
 Logger = logger.Create( "GPM@" .. utils.Version( _VERSION ), Color( 180, 180, 255 ) )
@@ -87,7 +84,7 @@ do
             return
         end
 
-        error( message )
+        error( message, 2 )
     end
 
 end
@@ -132,7 +129,6 @@ CachePath = fs.CreateDir( "gpm/" .. ( SERVER and "server" or "client" ) .. "/pac
 do
 
     local CompileFile = CompileFile
-    local luaGamePath = LuaGamePath
     local ArgAssert = ArgAssert
     local pcall = pcall
     local files = {}
@@ -147,7 +143,7 @@ do
         local func = files[ filePath ]
         if func then return func end
 
-        local ok, result = fs.Compile( filePath, luaGamePath ):SafeAwait()
+        local ok, result = fs.Compile( "lua/" .. filePath, "GAME" ):SafeAwait()
         if ok then
             func = result
         elseif MENU_DLL then
