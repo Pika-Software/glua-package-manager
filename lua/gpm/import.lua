@@ -146,32 +146,20 @@ do
                 if not source then continue end
                 if not source.CanImport( importPath ) then continue end
 
-                local metadata = metadatas[ sourceName .. ";" .. importPath ]
-                if not metadata then
-                    if type( source.GetMetadata ) == "function" then
-                        metadata = package.GetMetadata( source.GetMetadata( importPath ):Await() )
-                    else
-                        metadata = package.GetMetadata( {} )
-                    end
+                local metadata = getMetadata( importPath, sourceName, source )
 
-                    metadatas[ sourceName .. ";" .. importPath ] = metadata
+                if SERVER then
+                    sendToClient( metadata, source )
+                    if not metadata.server then return end
                 end
 
-                if SERVER and metadata.client and type( source.SendToClient ) == "function" then
-                    source.SendToClient( metadata )
+                if autorun and not metadata.autorun then
+                    logger:Debug( "[%s] Package '%s' autorun restricted.", sourceName, importPath )
+                    return
                 end
 
-                if autorun then
-                    if SERVER and not metadata.server then return end
-                    if not metadata.autorun then
-                        logger:Debug( "[%s] Package '%s' autorun restricted.", sourceName, importPath )
-                        return
-                    end
-                end
-
-                if SERVER and not metadata.server then
-                    return promise.Reject( "Package does not support running on the server." )
-                end
+                if CLIENT and not metadata.client then return end
+                if MENU_DLL and not metadata.menu then return end
 
                 task = gpm.SourceImport( sourceName, importPath )
                 break
