@@ -89,7 +89,7 @@ do
             return
         end
 
-        error( message )
+        error( message, 2 )
     end
 
 end
