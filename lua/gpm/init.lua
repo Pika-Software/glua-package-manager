@@ -72,7 +72,6 @@ end
 local stopwatch = SysTime()
 
 IncludeComponent "utils"
-IncludeComponent "fixes"
 IncludeComponent "logger"
 
 Logger = logger.Create( "GPM@" .. utils.Version( _VERSION ), Color( 180, 180, 255 ) )

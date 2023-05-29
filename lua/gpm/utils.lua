@@ -9,6 +9,15 @@ local tonumber = tonumber
 local module = module
 local ipairs = ipairs
 local pairs = pairs
+local type = type
+
+-- https://wiki.facepunch.com/gmod/string.StartsWith
+string.StartsWith = string.StartsWith or string.StartWith
+
+-- https://wiki.facepunch.com/gmod/string.Split
+function string.Split( str, separator )
+    return string.Explode( separator, str, false )
+end
 
 do
 
@@ -177,6 +186,26 @@ do
 
 end
 
+-- https://wiki.facepunch.com/gmod/Global.IsColor
+do
+
+    local meta = FindMetaTable( "Color" )
+    local getmetatable = getmetatable
+
+    function IsColor( any )
+        if getmetatable( any ) == meta then
+            return true
+        end
+
+        if type( any ) == "table" then
+            return type( any.r ) == "number" and type( any.g ) == "number" and type( any.b ) == "number"
+        end
+
+        return false
+    end
+
+end
+
 do
 
     local timer_Simple = timer.Simple
@@ -233,7 +262,7 @@ function table.SetValue( tbl, str, value, ifEmpty )
         local nextValue = tbl[ key ]
         if nextValue == nil then
             tbl[ key ] = {}
-        elseif gpm.type( nextValue ) ~= "table" then
+        elseif type( nextValue ) ~= "table" then
             return
         end
 
@@ -249,8 +278,8 @@ module( "gpm.utils" )
 
 function LowerTableKeys( tbl )
     for key, value in pairs( tbl ) do
-        if gpm.type( value ) == "table" then value = LowerTableKeys( value ) end
-        if gpm.type( key ) ~= "string" then continue end
+        if type( value ) == "table" then value = LowerTableKeys( value ) end
+        if type( key ) ~= "string" then continue end
         tbl[ key ] = nil; tbl[ string.lower( key ) ] = value
     end
 
@@ -259,7 +288,7 @@ end
 
 function Version( number )
     if not number then return "unknown" end
-    if gpm.type( number ) == "string" then return number end
+    if type( number ) == "string" then return number end
     local version = string.format( "%06d", number )
     return string.format( "%d.%d.%d", tonumber( string.sub( version, 0, 2 ) ), tonumber( string.sub( version, 3, 4 ) ), tonumber( string.sub( version, 5 ) ) )
 end
