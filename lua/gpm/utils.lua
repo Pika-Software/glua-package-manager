@@ -271,7 +271,7 @@ function table.SetValue( tbl, str, value, ifEmpty )
 end
 
 function util.IsLuaModuleInstalled( name )
-    return gpm.fs.IsFile( "includes/modules/" .. name .. ".lua", gpm.LuaGamePath )
+    return gpm.fs.IsFile( "lua/includes/modules/" .. name .. ".lua", "GAME" )
 end
 
 module( "gpm.utils" )
