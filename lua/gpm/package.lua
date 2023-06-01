@@ -1,3 +1,4 @@
+
 local gpm = gpm
 
 -- Libraries
@@ -8,6 +9,7 @@ local utils = gpm.utils
 local string = string
 local table = table
 local fs = gpm.fs
+local util = util
 
 -- Variables
 local ErrorNoHaltWithStack = ErrorNoHaltWithStack
@@ -19,6 +21,7 @@ local logger = gpm.Logger
 local require = require
 local SysTime = SysTime
 local setfenv = setfenv
+local ipairs = ipairs
 local error = error
 local pairs = pairs
 local pcall = pcall
@@ -234,6 +237,38 @@ do
 
 end
 
+if SERVER then
+
+    function AddClientLuaFile( fileName )
+        local currentFile = utils.GetCurrentFile()
+        if currentFile then
+            local luaPath = paths.Localize( currentFile )
+            if fileName ~= nil then
+                gpm.ArgAssert( fileName, 1, "string" )
+            else
+                fileName = string.GetFileFromFilename( luaPath )
+            end
+
+            local folder = string.GetPathFromFilename( luaPath )
+            if folder then
+                local filePath = folder .. fileName
+                if fs.IsFile( filePath, "lsv" ) then
+                    return AddCSLuaFile( filePath )
+                end
+            end
+        end
+
+        if type( fileName ) == "string" and fs.IsFile( fileName, "lsv" ) then
+            return AddCSLuaFile( fileName )
+        end
+
+        error( "Couldn't AddCSLuaFile file '" .. fileName .. "' - File not found" )
+    end
+
+end
+
+local addClientLuaFile = SERVER and AddClientLuaFile
+
 Initialize = promise.Async( function( metadata, func, files )
     if type( files ) ~= "table" then
         files = nil
@@ -274,31 +309,65 @@ Initialize = promise.Async( function( metadata, func, files )
         end
 
         -- import
-        environment.SetValue( env, "import", function( importPath, async, pkg2 )
+        env["gpm.Import"] = function( importPath, async, pkg2 )
             if gpm.IsPackage( pkg2 ) then
                 return gpm.Import( importPath, async, pkg2 )
             end
 
             return gpm.Import( importPath, async, pkg )
-        end )
+        end
 
-        env.gpm.Import = env.import
+        env.import = env["gpm.Import"]
 
         -- install
-        environment.SetValue( env, "install", function( ... )
-            return gpm.Install( pkg, false, ... )
-        end )
-
-        environment.SetValue( env, "gpm.Install", function( pkg2, async, ... )
+        env["gpm.Install"] = function( pkg2, async, ... )
             if gpm.IsPackage( pkg2 ) then
                 return gpm.Install( pkg2, async, ... )
             end
 
             return gpm.Install( pkg, async, ... )
-        end )
+        end
+
+        env.install = function( ... )
+            return gpm.Install( pkg, false, ... )
+        end
+
+        -- require
+        env.require = function( ... )
+            local arguments = {...}
+            local lenght = #arguments
+
+            for number, name in ipairs( arguments ) do
+                gpm.ArgAssert( name, number, "string" )
+
+                if string.IsURL( name ) then
+                    if not gpm.CanImport( name ) then continue end
+
+                    local ok, result = gpm.AsyncImport( name, pkg, false ):SafeAwait()
+                    if not ok then
+                        if number ~= lenght then continue end
+                        error( result )
+                    end
+
+                    return result
+                end
+
+                if util.IsBinaryModuleInstalled( name ) then
+                    return require( name )
+                end
+
+                if util.IsLuaModuleInstalled( name ) then
+                    local pkg2 = gpm.SourceImport( "lua", "includes/modules/" .. name .. ".lua" ):Await()
+                    pkg:Link( pkg2 )
+                    return pkg2:GetResult()
+                end
+            end
+
+            error( "Not one of the listed packages could be required." )
+        end
 
         -- include
-        environment.SetValue( env, "include", function( fileName )
+        env.include = function( fileName )
             gpm.ArgAssert( fileName, 1, "string" )
             fileName = paths.Fix( fileName )
 
@@ -325,81 +394,25 @@ Initialize = promise.Async( function( metadata, func, files )
             end
 
             if type( func ) == "function" then
-                setfenv( func, env )
+                setfenv( func, pkg:GetEnvironment() )
                 return func()
             end
 
             error( "Couldn't include file '" .. fileName .. "' - File not found" )
-        end )
+        end
 
         -- AddCSLuaFile
         if SERVER then
-            environment.SetValue( env, "AddCSLuaFile", function( fileName )
-                local currentFile = utils.GetCurrentFile()
-                if currentFile then
-                    local luaPath = paths.Localize( currentFile )
-                    if fileName ~= nil then
-                        gpm.ArgAssert( fileName, 1, "string" )
-                    else
-                        fileName = string.GetFileFromFilename( luaPath )
-                    end
-
-                    local folder = string.GetPathFromFilename( luaPath )
-                    if folder then
-                        local filePath = folder .. fileName
-                        if fs.IsFile( filePath, "lsv" ) then
-                            return AddCSLuaFile( filePath )
-                        end
-                    end
-                end
-
-                if type( fileName ) == "string" and fs.IsFile( fileName, "lsv" ) then
-                    return AddCSLuaFile( fileName )
-                end
-
-                error( "Couldn't AddCSLuaFile file '" .. fileName .. "' - File not found" )
-            end )
+            env.AddCSLuaFile = addClientLuaFile
         end
-
-        -- require
-        environment.SetValue( env, "require", function( ... )
-            local arguments = {...}
-            local lenght = #arguments
-
-            for number, name in ipairs( arguments ) do
-                gpm.ArgAssert( name, number, "string" )
-
-                if not string.IsURL( name ) then
-                    if util.IsBinaryModuleInstalled( name ) then
-                        return require( name )
-                    end
-
-                    if util.IsLuaModuleInstalled( name ) then
-                        local pkg2 = gpm.SourceImport( "lua", "includes/modules/" .. name .. ".lua" ):Await()
-                        pkg:Link( pkg2 )
-                        return pkg2:GetResult()
-                    end
-                end
-
-                if not gpm.CanImport( name ) then continue end
-
-                local ok, result = gpm.AsyncImport( name, pkg, false ):SafeAwait()
-                if not ok then
-                    if number ~= lenght then continue end
-                    return promise.Reject( result )
-                end
-
-                return result
-            end
-
-            error( "Not one of the listed packages could be imported." )
-        end )
 
     end
 
     -- Run
     local ok, result = pcall( func, pkg )
-    if not ok then return promise.Reject( result ) end
+    if not ok then
+        return promise.Reject( result )
+    end
 
     -- Saving result to package
     pkg.result = result
