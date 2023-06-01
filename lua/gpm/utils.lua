@@ -270,6 +270,32 @@ function table.SetValue( tbl, str, value, ifEmpty )
     end
 end
 
+do
+
+    local file_Exists = file.Exists
+    local system = system
+    local jit = jit
+
+    local suffix = ( { "osx64", "osx", "linux64", "linux", "win64", "win32" } )[ ( system.IsWindows() and 4 or 0 ) + ( system.IsLinux() and 2 or 0 ) + ( jit.arch == "x86" and 1 or 0 ) + 1 ]
+    local fmt = "lua/bin/gm" .. ( CLIENT and "cl" or "sv" ) .. "_%s_%s.dll"
+    local fmt = "lua/bin/gm" .. ( ( CLIENT and not MENU_DLL ) and "cl" or "sv" ) .. "_%s_%s.dll"
+
+    function util.IsBinaryModuleInstalled( name )
+        gpm.ArgAssert( name, 1, "string" )
+
+        if file_Exists( string.format( fmt, name, suffix ), "GAME" ) then
+            return true
+        end
+
+        if jit.versionnum ~= 20004 and jit.arch == "x86" and system.IsLinux() then
+            return file_Exists( string.format( fmt, name, "linux32" ), "GAME" )
+        end
+
+        return false
+    end
+
+end
+
 function util.IsLuaModuleInstalled( name )
     return gpm.fs.IsFile( "lua/includes/modules/" .. name .. ".lua", "GAME" )
 end
