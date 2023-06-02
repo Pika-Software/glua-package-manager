@@ -252,6 +252,7 @@ if SERVER then
             local folder = string.GetPathFromFilename( luaPath )
             if folder then
                 local filePath = folder .. fileName
+                filePath = paths.Fix(paths.Localize(filePath))
                 if fs.IsFile( filePath, "lsv" ) then
                     return AddCSLuaFile( filePath )
                 end
@@ -382,6 +383,7 @@ Initialize = promise.Async( function( metadata, func, files )
                     local folder = paths.Localize( string.GetPathFromFilename( currentFile ) )
                     if folder then
                         local filePath = folder .. fileName
+                        filePath = paths.Fix(paths.Localize(filePath))
                         if fs.IsFile( "lua/" .. filePath, "GAME" ) then
                             func = gpm.CompileLua( filePath ):Await()
                         end
