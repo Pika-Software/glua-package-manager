@@ -240,7 +240,7 @@ end
 local function getCurrentLuaPath()
     local filePath = utils.GetCurrentFile()
     if not filePath then return end
-    return paths.Fix( paths.Localize( filePath ) )
+    return paths.Localize( paths.Fix( filePath ) )
 end
 
 if SERVER then
@@ -387,7 +387,7 @@ Initialize = promise.Async( function( metadata, func, files )
                 local luaPath = getCurrentLuaPath()
                 if luaPath then
                     local folder = string.GetPathFromFilename( luaPath )
-                    if folder then
+                    if folder and folder ~= "" then
                         local filePath = paths.Fix( folder .. fileName )
                         if fs.IsFile( "lua/" .. filePath, "GAME" ) then
                             func = gpm.CompileLua( filePath ):Await()
