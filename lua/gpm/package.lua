@@ -246,6 +246,7 @@ end
 if SERVER then
 
     function AddClientLuaFile( fileName )
+        local filePath = nil
         local luaPath = getCurrentLuaPath()
         if luaPath then
             if fileName ~= nil then
@@ -255,19 +256,19 @@ if SERVER then
             end
 
             local folder = string.GetPathFromFilename( luaPath )
-            if folder then
-                local filePath = paths.Fix( folder .. fileName )
-                if fs.IsFile( filePath, "lsv" ) then
-                    return AddCSLuaFile( filePath )
-                end
+            if folder and #folder > 0 then
+                filePath = paths.Fix( folder .. fileName )
             end
+        else
+            gpm.ArgAssert( fileName, 1, "string" )
         end
 
-        if type( fileName ) == "string" then
-            local filePath = paths.Fix( fileName )
-            if fs.IsFile( filePath, "lsv" ) then
-                return AddCSLuaFile( filePath )
-            end
+        if filePath ~= nil and not fs.IsFile( "lua/" .. filePath, "GAME" ) then
+            filePath = paths.Fix( fileName )
+        end
+
+        if fs.IsFile( "lua/" .. filePath, "GAME" ) then
+            return AddCSLuaFile( filePath )
         end
 
         error( "Couldn't AddCSLuaFile file '" .. fileName .. "' - File not found" )
@@ -387,7 +388,7 @@ Initialize = promise.Async( function( metadata, func, files )
                 local luaPath = getCurrentLuaPath()
                 if luaPath then
                     local folder = string.GetPathFromFilename( luaPath )
-                    if folder and folder ~= "" then
+                    if folder and #folder > 0 then
                         local filePath = paths.Fix( folder .. fileName )
                         if fs.IsFile( "lua/" .. filePath, "GAME" ) then
                             func = gpm.CompileLua( filePath ):Await()
