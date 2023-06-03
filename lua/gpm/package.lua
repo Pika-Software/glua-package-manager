@@ -263,11 +263,11 @@ if SERVER then
             gpm.ArgAssert( fileName, 1, "string" )
         end
 
-        if filePath ~= nil and not fs.IsFile( "lua/" .. filePath, "GAME" ) then
+        if fileName and fs.IsFile( "lua/" .. fileName, "GAME" ) then
             filePath = paths.Fix( fileName )
         end
 
-        if fs.IsFile( "lua/" .. filePath, "GAME" ) then
+        if filePath and fs.IsFile( "lua/" .. filePath, "GAME" ) then
             return AddCSLuaFile( filePath )
         end
 
