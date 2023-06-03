@@ -26,7 +26,7 @@ MsgN( [[
 
 module( "gpm", package.seeall )
 
-_VERSION = 013000
+_VERSION = 013001
 
 if not Colors then
     Realm = "unknown"

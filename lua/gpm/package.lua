@@ -237,12 +237,17 @@ do
 
 end
 
+local function getCurrentLuaPath()
+    local filePath = utils.GetCurrentFile()
+    if not filePath then return end
+    return paths.Fix( paths.Localize( filePath ) )
+end
+
 if SERVER then
 
     function AddClientLuaFile( fileName )
-        local currentFile = utils.GetCurrentFile()
-        if currentFile then
-            local luaPath = paths.Localize( currentFile )
+        local luaPath = getCurrentLuaPath()
+        if luaPath then
             if fileName ~= nil then
                 gpm.ArgAssert( fileName, 1, "string" )
             else
@@ -251,16 +256,18 @@ if SERVER then
 
             local folder = string.GetPathFromFilename( luaPath )
             if folder then
-                local filePath = folder .. fileName
-                filePath = paths.Fix(paths.Localize(filePath))
+                local filePath = paths.Fix( folder .. fileName )
                 if fs.IsFile( filePath, "lsv" ) then
                     return AddCSLuaFile( filePath )
                 end
             end
         end
 
-        if type( fileName ) == "string" and fs.IsFile( fileName, "lsv" ) then
-            return AddCSLuaFile( fileName )
+        if type( fileName ) == "string" then
+            local filePath = paths.Fix( fileName )
+            if fs.IsFile( filePath, "lsv" ) then
+                return AddCSLuaFile( filePath )
+            end
         end
 
         error( "Couldn't AddCSLuaFile file '" .. fileName .. "' - File not found" )
@@ -370,20 +377,18 @@ Initialize = promise.Async( function( metadata, func, files )
         -- include
         env.include = function( fileName )
             gpm.ArgAssert( fileName, 1, "string" )
-            fileName = paths.Fix( fileName )
 
             local func = nil
             if files ~= nil then
-                func = files[ fileName ]
+                func = files[ paths.Fix( fileName ) ]
             end
 
             if type( func ) ~= "function" then
-                local currentFile = utils.GetCurrentFile()
-                if currentFile then
-                    local folder = paths.Localize( string.GetPathFromFilename( currentFile ) )
+                local luaPath = getCurrentLuaPath()
+                if luaPath then
+                    local folder = string.GetPathFromFilename( luaPath )
                     if folder then
-                        local filePath = folder .. fileName
-                        filePath = paths.Fix(paths.Localize(filePath))
+                        local filePath = paths.Fix( folder .. fileName )
                         if fs.IsFile( "lua/" .. filePath, "GAME" ) then
                             func = gpm.CompileLua( filePath ):Await()
                         end
@@ -391,12 +396,15 @@ Initialize = promise.Async( function( metadata, func, files )
                 end
             end
 
-            if type( func ) ~= "function" and fs.IsFile( "lua/" .. fileName, "GAME" ) then
-                func = gpm.CompileLua( fileName ):Await()
+            if type( func ) ~= "function" then
+                local filePath = paths.Fix( fileName )
+                if fs.IsFile( "lua/" .. filePath, "GAME" ) then
+                    func = gpm.CompileLua( filePath ):Await()
+                end
             end
 
             if type( func ) == "function" then
-                setfenv( func, pkg:GetEnvironment() )
+                setfenv( func, env )
                 return func()
             end
 
