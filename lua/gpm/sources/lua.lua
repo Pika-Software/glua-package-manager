@@ -9,7 +9,7 @@ local fs = gpm.fs
 
 -- Variables
 local SERVER = SERVER
-local AddCSLuaFile = SERVER and AddCSLuaFile
+local addClientLuaFile = SERVER and package.AddClientLuaFile
 local moonloader = moonloader
 local ipairs = ipairs
 local type = type
@@ -126,17 +126,17 @@ if SERVER then
     function SendToClient( metadata )
         local packagePath = metadata.package_path
         if packagePath then
-            AddCSLuaFile( packagePath )
+            addClientLuaFile( packagePath )
         end
 
         local cl_main = metadata.cl_main
         if type( cl_main ) == "string" then
-            AddCSLuaFile( cl_main )
+            addClientLuaFile( cl_main )
         end
 
         local main = metadata.main
         if main then
-            AddCSLuaFile( metadata.main )
+            addClientLuaFile( metadata.main )
         end
 
         local send = metadata.send
@@ -146,9 +146,9 @@ if SERVER then
         for _, filePath in ipairs( send ) do
             local localFilePath = folder .. "/" .. filePath
             if fs.IsFile( "lua/" .. localFilePath, "GAME" ) then
-                AddCSLuaFile( localFilePath )
+                addClientLuaFile( localFilePath )
             elseif fs.IsFile( "lua/" .. filePath, "GAME" ) then
-                AddCSLuaFile( filePath )
+                addClientLuaFile( filePath )
             end
         end
     end

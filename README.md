@@ -69,7 +69,7 @@ singleplayer = false
     The name of the package is just text that will be displayed in the format `name@version`, for example `My Awesome Package@0.0.1`.
 
 - ### Package version (`version`) (def. `nil`)
-    By default, the version is a number whose format is { 00 } { 00 } { 00 } { 00 } = 0.0.0, you can also use your own version format, just put your version here as a string.
+    By default, the version is a number whose format is { 00 } { 00 } { 00 } = 0.0.0, you can also use your own version format, just put your version here as a string.
 
 - ### Package entry point (`main`) (def. `init.lua`)
     The `main` in this case is the entry point to the package (where the code execution will start from), you can use either the full `lua/` path, for example 'lua/packages/example-package/init.lua' or a local path relative to your package folder.
