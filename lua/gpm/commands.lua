@@ -69,7 +69,14 @@ do
 
     local hook_Run = hook.Run
 
-    function gpm.Reload()
+    function gpm.Reload( packageName )
+        if type( packageName ) == "string" and #packageName > 0 then
+
+            -- TODO: PACKAGE RELOAD HERE
+
+            return
+        end
+
         hook_Run( "GPM - Reload" )
         include( "gpm/init.lua" )
         hook_Run( "GPM - Reloaded" )
@@ -101,14 +108,14 @@ if SERVER then
         gpm.PrintPackageList()
     end )
 
-    concommand_Add( "gpm_reload", function( ply )
+    concommand_Add( "gpm_reload", function( ply, _, __, packageName )
         if IsValid( ply ) and not ply:IsSuperAdmin() then
             ply:ChatPrint( "[GPM] You do not have enough permissions to execute this command." )
             return
         end
 
-        gpm.Reload()
-        BroadcastLua( "gpm.Reload()" )
+        gpm.Reload( packageName )
+        BroadcastLua( "gpm.Reload(\"" .. packageName .. "\")" )
     end )
 
 end
