@@ -344,7 +344,7 @@ Initialize = promise.Async( function( metadata, func, files )
         -- require
         env.require = function( ... )
             local arguments = {...}
-            local lenght = #arguments
+            local length = #arguments
 
             for number, name in ipairs( arguments ) do
                 gpm.ArgAssert( name, number, "string" )
@@ -354,7 +354,7 @@ Initialize = promise.Async( function( metadata, func, files )
 
                     local ok, result = gpm.AsyncImport( name, pkg, false ):SafeAwait()
                     if not ok then
-                        if number ~= lenght then continue end
+                        if number ~= length then continue end
                         error( result )
                     end
 

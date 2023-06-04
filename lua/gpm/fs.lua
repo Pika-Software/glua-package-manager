@@ -70,11 +70,11 @@ function IsFile( filePath, gamePath )
     return table.HasIValue( files, splits[ #splits ] )
 end
 
-function Read( filePath, gamePath, lenght )
+function Read( filePath, gamePath, length )
     local fileClass = file.Open( filePath, "rb", gamePath )
     if not fileClass then return end
 
-    local fileContent = fileClass:Read( type( lenght ) == "number" and math_max( 0, lenght ) or fileClass:Size() )
+    local fileContent = fileClass:Read( type( length ) == "number" and math_max( 0, length ) or fileClass:Size() )
     fileClass:Close()
 
     return fileContent

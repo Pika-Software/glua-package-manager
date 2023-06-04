@@ -211,14 +211,14 @@ _G.import = gpm.Import
 
 gpm.AsyncInstall = promise.Async( function( pkg2, ... )
     local arguments = {...}
-    local lenght = #arguments
+    local length = #arguments
 
     for number, importPath in ipairs( arguments ) do
         if not gpm.CanImport( importPath ) then continue end
 
         local ok, result = gpm.AsyncImport( importPath, pkg2, false ):SafeAwait()
         if not ok then
-            if number ~= lenght then continue end
+            if number ~= length then continue end
             return promise.Reject( result )
         end
 
