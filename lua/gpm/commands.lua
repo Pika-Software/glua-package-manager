@@ -71,8 +71,15 @@ do
 
     function gpm.Reload( packageName )
         if type( packageName ) == "string" and #packageName > 0 then
+            local pkgs = gpm.package.Find( packageName, false, true )
+            if not pkgs then
+                logger:Error( "Package reload failed, packages with name '%s' is not found.", packageName )
+                return
+            end
 
-            -- TODO: PACKAGE RELOAD HERE
+            for i = 1, #pkgs do
+                pkgs[ i ]:Install()
+            end
 
             return
         end
