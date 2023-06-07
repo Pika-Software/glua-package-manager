@@ -267,8 +267,9 @@ do
         return result
     end )
 
-        local env2 = package2:GetEnvironment()
-        if not env2 then return end
+    function PACKAGE:IsInstalled()
+        return self.installed
+    end
 
         logger:Debug( "'%s' -> '%s'", package2:GetIdentifier(), self:GetIdentifier() )
         environment.LinkMetaTables( env, env2 )
