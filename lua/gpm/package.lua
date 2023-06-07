@@ -229,8 +229,43 @@ do
         environment.Link( environment1, environment2 )
         return true
     end
+
+    PACKAGE.Install = promise.Async( function( self )
+        local func = self.main
+        if not func then
+            return promise.Reject( "Missing package '" .. self:GetIdentifier() ..  "' entry point." )
+        end
+
+        local stopwatch = SysTime()
+
+        -- Enviroment for `main.lua`
         local env = self:GetEnvironment()
-        if not env then return end
+        if env ~= nil then
+            setfenv( func, env )
+        end
+
+        -- Running `main.lua`
+        local ok, result = pcall( func, self )
+        if not ok then
+            return promise.Reject( result )
+        end
+
+        -- Saving result to package
+        self.result = result
+
+        -- GM:PackageInstalled( `Package` pkg )
+        local ok, err = pcall( hook_Run, "PackageInstalled", self )
+        if not ok then
+            ErrorNoHaltWithStack( err )
+        end
+
+        gpm.Packages[ self:GetImportPath() ] = self
+        self.installed = true
+
+        logger:Info( "Package '%s' was successfully installed, it took %.4f seconds.", self:GetIdentifier(), SysTime() - stopwatch )
+
+        return result
+    end )
 
         local env2 = package2:GetEnvironment()
         if not env2 then return end
