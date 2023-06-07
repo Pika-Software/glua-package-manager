@@ -271,11 +271,18 @@ do
         return self.installed
     end
 
-        logger:Debug( "'%s' -> '%s'", package2:GetIdentifier(), self:GetIdentifier() )
-        environment.LinkMetaTables( env, env2 )
-    end
+    function PACKAGE:Remove()
+        -- GM:PackageRemoved( `Package` pkg )
+        local ok, err = pcall( hook_Run, "PackageRemoved", self )
+        if not ok then
+            ErrorNoHaltWithStack( err )
+        end
 
-    local function isPackage( any ) return getmetatable( any ) == PACKAGE end
+        gpm.Packages[ self:GetImportPath() ] = nil
+        self.installed = nil
+
+        -- TODO: Remove hooks, networks and other here
+    end
     gpm.IsPackage = isPackage
     _G.IsPackage = isPackage
 
