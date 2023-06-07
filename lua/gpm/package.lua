@@ -219,6 +219,16 @@ do
     function PACKAGE:Link( package2 )
         gpm.ArgAssert( package2, 1, "Package" )
 
+        local environment1 = self:GetEnvironment()
+        if not environment1 then return false end
+
+        local environment2 = package2:GetEnvironment()
+        if not environment2 then return false end
+
+        logger:Debug( "'%s' -> '%s'", package2:GetIdentifier(), self:GetIdentifier() )
+        environment.Link( environment1, environment2 )
+        return true
+    end
         local env = self:GetEnvironment()
         if not env then return end
 
