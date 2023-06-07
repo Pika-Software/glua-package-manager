@@ -17,6 +17,7 @@ local CLIENT, SERVER = CLIENT, SERVER
 local AddCSLuaFile = AddCSLuaFile
 local getmetatable = getmetatable
 local setmetatable = setmetatable
+local hook_Run = hook.Run
 local logger = gpm.Logger
 local require = require
 local SysTime = SysTime
@@ -159,8 +160,16 @@ do
         return self.metadata
     end
 
+    function PACKAGE:GetImportPath()
+        return table.Lookup( self, "metadata.import_path" )
+    end
+
+    function PACKAGE:GetFolder()
+        return table.Lookup( self, "metadata.folder" )
+    end
+
     function PACKAGE:GetName()
-        return table.Lookup( self, "metadata.name", "unknown" )
+        return table.Lookup( self, "metadata.name", self:GetImportPath() or "unknown" )
     end
 
     function PACKAGE:GetVersion()
@@ -191,13 +200,6 @@ do
         return self.result
     end
 
-    function PACKAGE:GetImportPath()
-        return table.Lookup( self, "metadata.import_path" )
-    end
-
-    function PACKAGE:GetFolder()
-        return table.Lookup( self, "metadata.folder" )
-    end
 
     function PACKAGE:GetFiles()
         return self.files
@@ -283,6 +285,11 @@ do
 
         -- TODO: Remove hooks, networks and other here
     end
+
+    local function isPackage( any )
+        return getmetatable( any ) == PACKAGE
+    end
+
     gpm.IsPackage = isPackage
     _G.IsPackage = isPackage
 
@@ -336,20 +343,18 @@ Initialize = promise.Async( function( metadata, func, files )
         files = nil
     end
 
-    -- Measuring package startup time
-    local stopwatch = SysTime()
-
     -- Creating package object
     local pkg = setmetatable( {}, PACKAGE )
     pkg.metadata = metadata
+    pkg.installed = false
     pkg.files = files
+    pkg.main = func
 
     if metadata.isolation then
 
         -- Creating environment for package
-        local env = environment.Create( func, _G )
+        local env = environment.Create( _G )
         pkg.environment = env
-        setfenv( func, env )
 
         -- Globals
         environment.SetLinkedTable( env, "gpm", gpm )
@@ -472,19 +477,8 @@ Initialize = promise.Async( function( metadata, func, files )
 
     end
 
-    -- Run
-    local ok, result = pcall( func, pkg )
-    if not ok then
-        return promise.Reject( result )
-    end
-
-    -- Saving result to package
-    pkg.result = result
-
-    -- Saving in global table & final log
-    local importPath = metadata.import_path
-    logger:Info( "[%s] Package '%s' was successfully imported, it took %.4f seconds.", pkg:GetSourceName(), pkg:GetIdentifier(), SysTime() - stopwatch )
-    gpm.Packages[ importPath ] = pkg
+    -- Installing
+    pkg:Install():Await()
 
     return pkg
 end )
