@@ -92,7 +92,7 @@ Import = promise.Async( function( metadata )
             return gpm.SourceImport( extension, "data/" .. cachePath )
         end
 
-        return promise.Reject( "how you did it?!" )
+        return promise.Reject( "how did you do that?!" )
     end
 
     local json = util.JSONToTable( body )
