@@ -1,3 +1,4 @@
+local ipairs = ipairs
 local gpm = gpm
 
 do
@@ -5,7 +6,6 @@ do
     local workshopPath = gpm.WorkshopPath
     local cachePath = gpm.CachePath
     local logger = gpm.Logger
-    local ipairs = ipairs
     local fs = gpm.fs
 
     function gpm.ClearCache()

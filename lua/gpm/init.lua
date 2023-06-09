@@ -166,9 +166,7 @@ end
 IncludeComponent "import"
 IncludeComponent "commands"
 
+ImportFolder( "packages", nil, true )
+
 Logger:Info( "Time taken to start-up: %.4f sec.", SysTime() - stopwatch )
 hook.Run( "GPM - Initialized" )
-
-util.NextTick( function()
-    ImportFolder( "packages", nil, true )
-end )

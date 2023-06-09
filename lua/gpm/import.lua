@@ -245,7 +245,7 @@ end
 
 _G.install = gpm.Install
 
-function ImportFolder( folderPath, pkg2, autorun )
+function gpm.ImportFolder( folderPath, pkg2, autorun )
     if not fs.IsDir( "lua/" .. folderPath, "GAME" ) then
         logger:Warn( "Import impossible, folder '%s' does not exist, skipping...", folderPath )
         return
