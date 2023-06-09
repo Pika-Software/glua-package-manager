@@ -69,20 +69,30 @@ do
 
     local hook_Run = hook.Run
 
-    function gpm.Reload( packageName )
-        if type( packageName ) == "string" and #packageName > 0 then
+    function gpm.Reload( ... )
+        local packageNames = {...}
+        if table.IsEmpty( packageNames ) then
+            hook_Run( "GPM - Reload" )
+            include( "gpm/init.lua" )
+            return hook_Run( "GPM - Reloaded" )
+        end
+
+        for _, packageName in ipairs( packageNames ) do
+            if #packageName == 0 then continue end
+
             local pkgs = gpm.package.Find( packageName, false, true )
             if not pkgs then
                 logger:Error( "Package reload failed, packages with name '%s' is not found.", packageName )
-                return
+                continue
             end
 
-            for i = 1, #pkgs do
-                pkgs[ i ]:Install()
+            for _, pkg in ipairs( pkgs ) do
+                pkg:Install()
             end
-
-            return
         end
+    end
+
+end
 
         hook_Run( "GPM - Reload" )
         include( "gpm/init.lua" )
