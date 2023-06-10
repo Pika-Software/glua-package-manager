@@ -33,25 +33,35 @@ do
         ENVIRONMENT = {}
     end
 
+    function GetLinks( environment )
+        return rawget( environment, "__indexes" )
+    end
+
     function ENVIRONMENT:__index( key )
-        for _, index in ipairs( rawget( self, "__indexes" ) ) do
-            local value = index[ key ]
-            if value ~= nil then
-                return value
-            end
+        local links = GetLinks( self )
+        for index = 1, #links do
+            local value = links[ index ][ key ]
+            if value == nil then continue end
+            return value
         end
     end
 
-    function Link( a, b )
-        local indexes = rawget( a, "__indexes" )
-        table.RemoveByValue( indexes, b )
-        table.insert( indexes, 1, b )
-        return a
+    function Link( environment1, environment2 )
+        UnLink( environment1, environment2 )
+        table.insert( GetLinks( environment1 ), 1, environment2 )
+        return environment1
     end
 
-    function UnLink( a, b )
-        table.RemoveByValue( rawget( a, "__indexes" ), b )
-        return a
+    function UnLink( environment1, environment2 )
+        local links = GetLinks( environment1 )
+        for index, environment in ipairs( links ) do
+            if environment == environment2 then
+                table.remove( links, index )
+                break
+            end
+        end
+
+        return environment1
     end
 
     function Create( tbl )
