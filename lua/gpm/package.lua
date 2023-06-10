@@ -1,4 +1,3 @@
-
 local gpm = gpm
 
 -- Libraries
@@ -293,7 +292,8 @@ do
             ErrorNoHaltWithStack( err )
         end
 
-        if self:IsIsolated() then
+        local env = self:GetEnvironment()
+        if type( env ) == "table" then
             for _, pkg in ipairs( self.Children ) do
                 if noDependencies then
                     logger:Error( "Package '%s' uninstallation failed, dependencies found, try use -f to force uninstallation, took %.4f seconds.", self:GetIdentifier(), SysTime() - stopwatch )
@@ -473,7 +473,7 @@ Initialize = promise.Async( function( metadata, func, files )
         env.file = fs
 
         -- Binding package object to gpm.Package & _PKG
-        env.gpm.Package = pkg
+        environment.SetValue( env, "gpm.Package", pkg )
         env._PKG = pkg
 
         -- Logger
@@ -483,7 +483,7 @@ Initialize = promise.Async( function( metadata, func, files )
         end
 
         -- import
-        env["gpm.Import"] = function( importPath, async, pkg2 )
+        env.import = function( importPath, async, pkg2 )
             if gpm.IsPackage( pkg2 ) then
                 return gpm.Import( importPath, async, pkg2 )
             end
@@ -491,20 +491,20 @@ Initialize = promise.Async( function( metadata, func, files )
             return gpm.Import( importPath, async, pkg )
         end
 
-        env.import = env["gpm.Import"]
+        environment.SetValue( env, "gpm.Import", env.import )
 
         -- install
-        env["gpm.Install"] = function( pkg2, async, ... )
+        env.install = function( ... )
+            return gpm.Install( pkg, false, ... )
+        end
+
+        environment.SetValue( env, "gpm.Install", function( pkg2, async, ... )
             if gpm.IsPackage( pkg2 ) then
                 return gpm.Install( pkg2, async, ... )
             end
 
             return gpm.Install( pkg, async, ... )
-        end
-
-        env.install = function( ... )
-            return gpm.Install( pkg, false, ... )
-        end
+        end )
 
         -- require
         env.require = function( ... )
