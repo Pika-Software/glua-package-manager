@@ -29,7 +29,9 @@ end
 
 do
 
-    local ENVIRONMENT = {}
+    if type( ENVIRONMENT ) ~= "table" then
+        ENVIRONMENT = {}
+    end
 
     function ENVIRONMENT:__index( key )
         for _, index in ipairs( rawget( self, "__indexes" ) ) do
@@ -44,6 +46,11 @@ do
         local indexes = rawget( a, "__indexes" )
         table.RemoveByValue( indexes, b )
         table.insert( indexes, 1, b )
+        return a
+    end
+
+    function UnLink( a, b )
+        table.RemoveByValue( rawget( a, "__indexes" ), b )
         return a
     end
 
