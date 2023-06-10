@@ -297,7 +297,7 @@ do
 end
 
 function util.IsLuaModuleInstalled( name )
-    return gpm.fs.IsFile( "lua/includes/modules/" .. name .. ".lua", "GAME" )
+    return gpm.fs.IsFile( "includes/modules/" .. name .. ".lua", "LUA" )
 end
 
 module( "gpm.utils" )

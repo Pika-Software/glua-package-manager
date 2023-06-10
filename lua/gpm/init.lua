@@ -26,7 +26,7 @@ MsgN( [[
 
 module( "gpm", package.seeall )
 
-_VERSION = 013100
+_VERSION = 013200
 
 if not Colors then
     Realm = "unknown"
@@ -100,8 +100,8 @@ Logger:Info( "gm_promise v%s is initialized.", utils.Version( promise._VERSION_N
 
 -- https://github.com/Pika-Software/gm_moonloader
 if util.IsBinaryModuleInstalled( "moonloader" ) then
-    gpm.Logger:Info( "Moonloader engaged." )
     require( "moonloader" )
+    gpm.Logger:Info( "Moonloader is initialized, MoonScript support is active." )
 end
 
 IncludeComponent "libs/gmad"
@@ -129,36 +129,28 @@ CachePath = fs.CreateDir( "gpm/" .. ( SERVER and "server" or "client" ) .. "/pac
 do
 
     local CompileFile = CompileFile
-    local ArgAssert = ArgAssert
     local pcall = pcall
-    local files = {}
-
-    function GetCompiledFiles()
-        return files
-    end
 
     CompileLua = promise.Async( function( filePath )
-        ArgAssert( filePath, 1, "string" )
-
-        local func = files[ filePath ]
-        if func then return func end
-
         local ok, result = fs.Compile( "lua/" .. filePath, "GAME" ):SafeAwait()
         if ok then
-            func = result
-        elseif MENU_DLL then
-            return promise.Reject( result )
-        else
-            ok, result = pcall( CompileFile, filePath )
-            if not ok then return promise.Reject( result ) end
-        end
-
-        if ok and type( result ) == "function" then
-            files[ filePath ] = result
             return result
         end
 
-        return promise.Reject( "File '" .. filePath .. "' code compilation failed due to an unknown error." )
+        if MENU_DLL then
+            return promise.Reject( result )
+        end
+
+        local ok, result = pcall( CompileFile, filePath )
+        if ok then
+            if type( result ) == "function" then
+                return result
+            end
+
+            return promise.Reject( "File '" .. filePath .. "' code compilation failed due to an unknown error." )
+        end
+
+        return promise.Reject( result )
     end )
 
 end
