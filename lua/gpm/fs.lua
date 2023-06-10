@@ -19,7 +19,7 @@ local file = file
 local CompileString = CompileString
 local math_max = math.max
 local ipairs = ipairs
-local pcall = pcall
+local assert = assert
 local type = type
 
 module( "gpm.fs" )
@@ -111,14 +111,10 @@ function CreateDir( folderPath )
 end
 
 Compile = promise.Async( function( filePath, gamePath, handleError )
-    local ok, result = AsyncRead( filePath, gamePath ):SafeAwait()
-    if not ok then return promise.Reject( result ) end
-
-    local ok, result = pcall( CompileString, result.fileContent, result.filePath, handleError )
-    if not ok then return promise.Reject( result ) end
-    if not result then return promise.Reject( "file '" .. filePath .. "' (" .. gamePath .. ") compilation failed." ) end
-
-    return result
+    local data = AsyncRead( filePath, gamePath ):Await()
+    local func = CompileString( data.fileContent, data.filePath, handleError )
+    assert( type( func ) == "function", "file '" .. filePath .. "' (" .. gamePath .. ") compilation failed." )
+    return func
 end )
 
 if type( asyncio ) == "table" then
