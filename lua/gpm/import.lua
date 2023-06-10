@@ -77,7 +77,10 @@ do
         source.SendToClient( metadata )
     end
 
-    local tasks = {}
+    local tasks = gpm.ImportTasks
+    if type( tasks ) ~= "table" then
+        tasks = {}; gpm.ImportTasks = tasks
+    end
 
     gpm.SourceImport = promise.Async( function( sourceName, importPath )
         local task = tasks[ importPath ]
@@ -245,7 +248,7 @@ end
 
 _G.install = gpm.Install
 
-function ImportFolder( folderPath, pkg2, autorun )
+function gpm.ImportFolder( folderPath, pkg2, autorun )
     if not fs.IsDir( "lua/" .. folderPath, "GAME" ) then
         logger:Warn( "Import impossible, folder '%s' does not exist, skipping...", folderPath )
         return

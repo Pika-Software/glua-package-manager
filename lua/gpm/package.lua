@@ -1,15 +1,20 @@
-
 local gpm = gpm
 
 -- Libraries
 local environment = gpm.environment
+local concommand = concommand
+local properties = properties
 local promise = promise
 local paths = gpm.paths
 local utils = gpm.utils
 local string = string
 local table = table
+local cvars = cvars
+local timer = timer
 local fs = gpm.fs
 local util = util
+local hook = hook
+local net = net
 
 -- Variables
 local ErrorNoHaltWithStack = ErrorNoHaltWithStack
@@ -17,10 +22,12 @@ local CLIENT, SERVER = CLIENT, SERVER
 local AddCSLuaFile = AddCSLuaFile
 local getmetatable = getmetatable
 local setmetatable = setmetatable
+local hook_Run = hook.Run
 local logger = gpm.Logger
 local require = require
 local SysTime = SysTime
 local setfenv = setfenv
+local rawset = rawset
 local ipairs = ipairs
 local error = error
 local pairs = pairs
@@ -120,6 +127,14 @@ do
                 source.send = nil
             end
 
+            -- Isolation features
+            source.concommands = source.concommands ~= false and source.isolation
+            source.properties = source.properties ~= false and source.isolation
+            source.timers = source.timers ~= false and source.isolation
+            source.hooks = source.hooks ~= false and source.isolation
+            source.cvars = source.cvars ~= false and source.isolation
+            source.net = source.net == true and source.isolation
+
             return source
         elseif type( source ) == "function" then
             local metadata = {}
@@ -156,15 +171,23 @@ do
     PACKAGE.__index = PACKAGE
 
     function PACKAGE:GetMetadata()
-        return self.metadata
+        return self.Metadata
+    end
+
+    function PACKAGE:GetImportPath()
+        return table.Lookup( self, "Metadata.import_path" )
+    end
+
+    function PACKAGE:GetFolder()
+        return table.Lookup( self, "Metadata.folder" )
     end
 
     function PACKAGE:GetName()
-        return table.Lookup( self, "metadata.name", "unknown" )
+        return table.Lookup( self, "Metadata.name", self:GetImportPath() or "unknown" )
     end
 
     function PACKAGE:GetVersion()
-        return table.Lookup( self, "metadata.version", "unknown" )
+        return table.Lookup( self, "Metadata.version", "unknown" )
     end
 
     function PACKAGE:GetIdentifier( name )
@@ -174,38 +197,30 @@ do
     end
 
     function PACKAGE:GetSourceName()
-        return table.Lookup( self, "metadata.source", "unknown" )
+        return table.Lookup( self, "Metadata.source", "unknown" )
     end
 
     PACKAGE.__tostring = PACKAGE.GetIdentifier
 
     function PACKAGE:GetEnvironment()
-        return self.environment
+        return self.Environment
     end
 
     function PACKAGE:GetLogger()
-        return self.logger
+        return self.Logger
     end
 
     function PACKAGE:GetResult()
-        return self.result
-    end
-
-    function PACKAGE:GetImportPath()
-        return table.Lookup( self, "metadata.import_path" )
-    end
-
-    function PACKAGE:GetFolder()
-        return table.Lookup( self, "metadata.folder" )
+        return self.Result
     end
 
     function PACKAGE:GetFiles()
-        return self.files
+        return self.Files
     end
 
     function PACKAGE:GetFileList()
         local fileList = {}
-        for filePath in pairs( self.files ) do
+        for filePath in pairs( self.Files ) do
             fileList[ #fileList + 1 ] = filePath
         end
 
@@ -213,23 +228,182 @@ do
     end
 
     function PACKAGE:IsIsolated()
-        return table.Lookup( self, "metadata.isolation" )
+        return table.Lookup( self, "Metadata.isolation" )
+    end
+
+    function PACKAGE:HasEnvironment()
+        return type( self:GetEnvironment() ) == "table"
+    end
+
+    function PACKAGE:GetChildren()
+        return self.Children
+    end
+
+    function PACKAGE:AddChild( child )
+        table.insert( self.Children, 1, child )
+    end
+
+    function PACKAGE:RemoveChild( child )
+        local children = self.Children
+        for index, pkg in ipairs( children ) do
+            if pkg ~= child then continue end
+            return table.remove( children, index )
+        end
     end
 
     function PACKAGE:Link( package2 )
         gpm.ArgAssert( package2, 1, "Package" )
 
-        local env = self:GetEnvironment()
-        if not env then return end
+        local environment1 = self:GetEnvironment()
+        if not environment1 then return false end
 
-        local env2 = package2:GetEnvironment()
-        if not env2 then return end
+        local environment2 = package2:GetEnvironment()
+        if not environment2 then return false end
 
-        logger:Debug( "'%s' -> '%s'", package2:GetIdentifier(), self:GetIdentifier() )
-        environment.LinkMetaTables( env, env2 )
+        environment.Link( environment1, environment2 )
+        self:RemoveChild( child )
+        self:AddChild( child )
+
+        logger:Debug( "'%s' ---> '%s'", package2:GetIdentifier(), self:GetIdentifier() )
+        return true
     end
 
-    local function isPackage( any ) return getmetatable( any ) == PACKAGE end
+    function PACKAGE:UnLink( package2 )
+        gpm.ArgAssert( package2, 1, "Package" )
+
+        local environment1 = self:GetEnvironment()
+        if not environment1 then return false end
+
+        local environment2 = package2:GetEnvironment()
+        if not environment2 then return false end
+
+        environment.UnLink( environment1, environment2 )
+        self:RemoveChild( child )
+
+        logger:Debug( "'%s' -/-> '%s'", package2:GetIdentifier(), self:GetIdentifier() )
+        return true
+    end
+
+    PACKAGE.Install = promise.Async( function( self )
+        local func = self.Main
+        if not func then
+            return promise.Reject( "Missing package '" .. self:GetIdentifier() ..  "' entry point." )
+        end
+
+        local stopwatch = SysTime()
+
+        local env = self:GetEnvironment()
+        if env ~= nil then
+            setfenv( func, env )
+        end
+
+        local ok, result = pcall( func, self )
+        if not ok then
+            return promise.Reject( result )
+        end
+
+        self.Result = result
+
+        local ok, err = pcall( hook_Run, "PackageInstalled", self )
+        if not ok then
+            ErrorNoHaltWithStack( err )
+        end
+
+        gpm.Packages[ self:GetImportPath() ] = self
+        self.Installed = true
+
+        logger:Info( "Package '%s' was successfully installed, took %.4f seconds.", self:GetIdentifier(), SysTime() - stopwatch )
+
+        return result
+    end )
+
+    function PACKAGE:IsInstalled()
+        return self.Installed
+    end
+
+    function PACKAGE:UnInstall( noDependencies )
+        local stopwatch = SysTime()
+
+        local ok, err = pcall( hook_Run, "PackageRemoved", self )
+        if not ok then
+            ErrorNoHaltWithStack( err )
+        end
+
+        local env = self:GetEnvironment()
+        if type( env ) == "table" then
+            for _, pkg in ipairs( self.Children ) do
+                if noDependencies then
+                    logger:Error( "Package '%s' uninstallation failed, dependencies found, try use -f to force uninstallation, took %.4f seconds.", self:GetIdentifier(), SysTime() - stopwatch )
+                    return
+                end
+
+                if pkg:IsInstalled() then
+                    pkg:UnInstall()
+                    pkg:UnLink( self )
+                end
+            end
+
+            local metadata, internal = self.Metadata, self.Internal
+
+            -- Hooks
+            if metadata.hooks then
+                for eventName, data in pairs( internal.Hooks ) do
+                    for identifier in pairs( data ) do
+                        hook.Remove( eventName, identifier )
+                    end
+                end
+            end
+
+            -- Timers
+            if metadata.timers then
+                for identifier in pairs( internal.Timers ) do
+                    timer.Remove( identifier )
+                end
+            end
+
+            -- Cvars
+            if metadata.cvars then
+                for name, cvar in pairs( internal.Cvars ) do
+                    for identifier in pairs( cvar ) do
+                        cvars.RemoveChangeCallback( name, identifier )
+                    end
+                end
+            end
+
+            -- ConCommands
+            if metadata.concommands then
+                for name in pairs( internal.ConCommands ) do
+                    concommand.Remove( name )
+                end
+            end
+
+            -- Properties
+            if metadata.properties then
+                for name in pairs( internal.Properties ) do
+                    properties.List[ string.lower( name ) ] = nil
+                end
+            end
+
+            -- Network strings
+            if metadata.net then
+                for messageName in pairs( internal.NetworkStrings ) do
+                    net.Receivers[ messageName ] = nil
+                end
+            end
+        end
+
+        local importPath = self:GetImportPath()
+        gpm.ImportTasks[ importPath ] = nil
+        gpm.Packages[ importPath ] = nil
+        self.Installed = nil
+
+        logger:Info( "Package '%s' was successfully uninstalled, took %.4f seconds.", self:GetIdentifier(), SysTime() - stopwatch )
+    end
+
+    local function isPackage( any )
+        return getmetatable( any ) == PACKAGE
+    end
+
     gpm.IsPackage = isPackage
     _G.IsPackage = isPackage
 
@@ -278,25 +452,55 @@ end
 
 local addClientLuaFile = SERVER and AddClientLuaFile
 
+local internalMeta = {
+    ["__index"] = function( self, index )
+        local value = {}
+        rawset( self, index, value )
+        return value
+    end
+}
+
+local timerBlacklist = {
+    ["Destroy"] = true,
+    ["Remove"] = true,
+    ["Simple"] = true
+}
+
 Initialize = promise.Async( function( metadata, func, files )
     if type( files ) ~= "table" then
         files = nil
     end
 
-    -- Measuring package startup time
-    local stopwatch = SysTime()
-
     -- Creating package object
     local pkg = setmetatable( {}, PACKAGE )
-    pkg.metadata = metadata
-    pkg.files = files
+    pkg.Metadata = metadata
+    pkg.Installed = false
+    pkg.Files = files
+    pkg.Main = func
 
     if metadata.isolation then
 
+        pkg.Children = {}
+
+        local hookList = setmetatable( {}, internalMeta )
+        local cvarList = setmetatable( {}, internalMeta )
+        local networkStrings = {}
+        local concommandList = {}
+        local propertiesList = {}
+        local timers = {}
+
+        pkg.Internal = {
+            ["NetworkStrings"] = networkStrings,
+            ["ConCommands"] = concommandList,
+            ["Properties"] = propertiesList,
+            ["Cvars"] = cvarList,
+            ["Hooks"] = hookList,
+            ["Timers"] = timers
+        }
+
         -- Creating environment for package
-        local env = environment.Create( func, _G )
-        pkg.environment = env
-        setfenv( func, env )
+        local env = environment.Create( _G )
+        pkg.Environment = env
 
         -- Globals
         environment.SetLinkedTable( env, "gpm", gpm )
@@ -308,17 +512,17 @@ Initialize = promise.Async( function( metadata, func, files )
         env.file = fs
 
         -- Binding package object to gpm.Package & _PKG
-        env.gpm.Package = pkg
+        environment.SetValue( env, "gpm.Package", pkg )
         env._PKG = pkg
 
         -- Logger
         if metadata.logger then
-            pkg.logger = gpm.logger.Create( pkg:GetIdentifier(), metadata.color )
-            table.SetValue( env, "gpm.Logger", pkg.logger )
+            pkg.Logger = gpm.logger.Create( pkg:GetIdentifier(), metadata.color )
+            table.SetValue( env, "gpm.Logger", pkg.Logger )
         end
 
         -- import
-        env["gpm.Import"] = function( importPath, async, pkg2 )
+        env.import = function( importPath, async, pkg2 )
             if gpm.IsPackage( pkg2 ) then
                 return gpm.Import( importPath, async, pkg2 )
             end
@@ -326,20 +530,20 @@ Initialize = promise.Async( function( metadata, func, files )
             return gpm.Import( importPath, async, pkg )
         end
 
-        env.import = env["gpm.Import"]
+        environment.SetValue( env, "gpm.Import", env.import )
 
         -- install
-        env["gpm.Install"] = function( pkg2, async, ... )
+        env.install = function( ... )
+            return gpm.Install( pkg, false, ... )
+        end
+
+        environment.SetValue( env, "gpm.Install", function( pkg2, async, ... )
             if gpm.IsPackage( pkg2 ) then
                 return gpm.Install( pkg2, async, ... )
             end
 
             return gpm.Install( pkg, async, ... )
-        end
-
-        env.install = function( ... )
-            return gpm.Install( pkg, false, ... )
-        end
+        end )
 
         -- require
         env.require = function( ... )
@@ -417,21 +621,145 @@ Initialize = promise.Async( function( metadata, func, files )
             env.AddCSLuaFile = addClientLuaFile
         end
 
+        -- Hooks
+        if metadata.hooks then
+
+            environment.SetLinkedTable( env, "hook", hook )
+
+            environment.SetValue( env, "hook.Add", function( eventName, identifier, ... )
+                if type( identifier ) == "string" then
+                    identifier = pkg:GetIdentifier( identifier )
+                end
+
+                hookList[ eventName ][ identifier ] = true
+                return hook.Add( eventName, identifier, ... )
+            end )
+
+            environment.SetValue( env, "hook.Remove", function( eventName, identifier, ... )
+                if type( identifier ) == "string" then
+                    identifier = pkg:GetIdentifier( identifier )
+                end
+
+                hookList[ eventName ][ identifier ] = nil
+                return hook.Remove( eventName, identifier, ... )
+            end )
+
+        end
+
+        -- Timers
+        if metadata.timers then
+
+            environment.SetLinkedTable( env, "timer", timer )
+
+            for key, func in pairs( timer ) do
+                if timerBlacklist[ key ] then continue end
+                env.timer[ key ] = function( identifier, ... )
+                    identifier = pkg:GetIdentifier( identifier )
+                    timers[ identifier ] = true
+
+                    return func( identifier, ... )
+                end
+            end
+
+            local function removeFunction( identifier, ... )
+                identifier = pkg:GetIdentifier( identifier )
+                timers[ identifier ] = nil
+
+                return timer.Remove( identifier, ... )
+            end
+
+            environment.SetValue( env, "timer.Destroy", removeFunction )
+            environment.SetValue( env, "timer.Remove", removeFunction )
+
+        end
+
+        -- Cvars
+        if metadata.cvars then
+
+            environment.SetLinkedTable( env, "cvars", cvars )
+
+            environment.SetValue( env, "cvars.AddChangeCallback", function( name, func, identifier, ... )
+                identifier = pkg:GetIdentifier( type( identifier ) == "string" and identifier or "Default" )
+                cvarList[ name ][ identifier ] = true
+
+                return cvars.AddChangeCallback( name, func, identifier, ... )
+            end )
+
+            environment.SetValue( env, "cvars.RemoveChangeCallback", function( name, identifier, ... )
+                identifier = pkg:GetIdentifier( type( identifier ) == "string" and identifier or "Default" )
+                cvarList[ name ][ identifier ] = nil
+
+                return cvars.RemoveChangeCallback( name, identifier, ... )
+            end )
+
+        end
+
+        -- ConCommands
+        if metadata.concommands then
+
+            environment.SetLinkedTable( env, "concommand", concommand )
+
+            environment.SetValue( env, "concommand.Add", function( name, ... )
+                concommandList[ name ] = true
+                return concommand.Add( name, ... )
+            end )
+
+            environment.SetValue( env, "concommand.Remove", function( name, ... )
+                concommandList[ name ] = nil
+                return concommand.Remove( name, ... )
+            end )
+
+        end
+
+        -- Net
+        if metadata.net then
+
+            environment.SetLinkedTable( env, "net", net )
+
+            environment.SetValue( env, "net.Receive", function( messageName, ... )
+                messageName = pkg:GetIdentifier( messageName )
+                networkStrings[ messageName ] = true
+
+                return net.Receive( messageName, ... )
+            end )
+
+            environment.SetValue( env, "net.Start", function( messageName, ... )
+                return net.Start( pkg:GetIdentifier( messageName ), ... )
+            end )
+
+            if SERVER then
+
+                environment.SetLinkedTable( env, "util", util )
+
+                environment.SetValue( env, "util.AddNetworkString", function( messageName, ... )
+                    messageName = pkg:GetIdentifier( messageName )
+                    networkStrings[ messageName ] = true
+
+                    return util.AddNetworkString( messageName, ... )
+                end )
+
+            end
+
+        end
+
+        -- Properties
+        if metadata.properties then
+
+            environment.SetLinkedTable( env, "properties", properties )
+
+            environment.SetValue( env, "properties.Add", function( name, ... )
+                name = pkg:GetIdentifier( name )
+                propertiesList[ name ] = true
+
+                return properties.Add( name, ... )
+            end )
+
+        end
+
     end
 
-    -- Run
-    local ok, result = pcall( func, pkg )
-    if not ok then
-        return promise.Reject( result )
-    end
-
-    -- Saving result to package
-    pkg.result = result
-
-    -- Saving in global table & final log
-    local importPath = metadata.import_path
-    logger:Info( "[%s] Package '%s' was successfully imported, it took %.4f seconds.", pkg:GetSourceName(), pkg:GetIdentifier(), SysTime() - stopwatch )
-    gpm.Packages[ importPath ] = pkg
+    -- Installing
+    pkg:Install():Await()
 
     return pkg
 end )
