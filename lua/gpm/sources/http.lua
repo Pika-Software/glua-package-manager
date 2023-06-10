@@ -126,18 +126,18 @@ Import = promise.Async( function( metadata )
             compiledFiles[ data[ 1 ] ] = result
         end
 
-        local main = metadata.main
-        if type( main ) ~= "string" then
-            main = "init.lua"
+        if type( metadata.main ) ~= "string" then
+            metadata.main = "init.lua"
         end
 
-        local func = package.GetCompiledFile( main, compiledFiles )
+        local func = compiledFiles[ metadata.main ]
         if not func then
-            func = package.GetCompiledFile( "main.lua", compiledFiles )
+            metadata.main = "main.lua"
+            func = compiledFiles[ metadata.main ]
         end
 
         if not func then
-            return promise.Reject( "main file '" .. main .. "' is missing or compilation was failed" )
+            return promise.Reject( "main file '" .. metadata.main .. "' is missing or compilation was failed" )
         end
 
         return package.Initialize( metadata, func, compiledFiles )

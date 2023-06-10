@@ -249,14 +249,14 @@ end
 _G.install = gpm.Install
 
 function gpm.ImportFolder( folderPath, pkg2, autorun )
-    if not fs.IsDir( "lua/" .. folderPath, "GAME" ) then
+    if not fs.IsDir( folderPath, "LUA" ) then
         logger:Warn( "Import impossible, folder '%s' does not exist, skipping...", folderPath )
         return
     end
 
     logger:Info( "Starting to import packages from '%s'", folderPath )
 
-    local files, folders = fs.Find( "lua/" .. folderPath .. "/*", "GAME" )
+    local files, folders = fs.Find( folderPath .. "/*", "LUA" )
     for _, folderName in ipairs( folders ) do
         local importPath = folderPath .. "/" .. folderName
         gpm.AsyncImport( importPath, pkg2, autorun ):Catch( function( message )

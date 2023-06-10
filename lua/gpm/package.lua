@@ -11,6 +11,7 @@ local string = string
 local table = table
 local cvars = cvars
 local timer = timer
+local debug = debug
 local fs = gpm.fs
 local util = util
 local hook = hook
@@ -26,7 +27,6 @@ local hook_Run = hook.Run
 local logger = gpm.Logger
 local require = require
 local SysTime = SysTime
-local setfenv = setfenv
 local rawset = rawset
 local ipairs = ipairs
 local error = error
@@ -111,7 +111,7 @@ do
             source.server = source.server ~= false
 
             -- Isolation & autorun
-            source.isolation = source.isolation ~= false
+            source.environment = source.environment ~= false
             source.autorun = source.autorun == true
 
             -- Color
@@ -128,19 +128,19 @@ do
             end
 
             -- Isolation features
-            source.concommands = source.concommands ~= false and source.isolation
-            source.properties = source.properties ~= false and source.isolation
-            source.timers = source.timers ~= false and source.isolation
-            source.hooks = source.hooks ~= false and source.isolation
-            source.cvars = source.cvars ~= false and source.isolation
-            source.net = source.net == true and source.isolation
+            source.concommands = source.concommands ~= false and source.environment
+            source.properties = source.properties ~= false and source.environment
+            source.timers = source.timers ~= false and source.environment
+            source.hooks = source.hooks ~= false and source.environment
+            source.cvars = source.cvars ~= false and source.environment
+            source.net = source.net == true and source.environment
 
             return source
         elseif type( source ) == "function" then
             local metadata = {}
 
             setmetatable( metadata, environment )
-                setfenv( source, metadata )
+                debug.setfenv( source, metadata )
                 local ok, result = pcall( source )
             setmetatable( metadata, nil )
 
@@ -220,15 +220,11 @@ do
 
     function PACKAGE:GetFileList()
         local fileList = {}
-        for filePath in pairs( self.Files ) do
+        for filePath in pairs( self:GetFiles() ) do
             fileList[ #fileList + 1 ] = filePath
         end
 
         return fileList
-    end
-
-    function PACKAGE:IsIsolated()
-        return table.Lookup( self, "Metadata.isolation" )
     end
 
     function PACKAGE:HasEnvironment()
@@ -240,11 +236,11 @@ do
     end
 
     function PACKAGE:AddChild( child )
-        table.insert( self.Children, 1, child )
+        table.insert( self:GetChildren(), 1, child )
     end
 
     function PACKAGE:RemoveChild( child )
-        local children = self.Children
+        local children = self:GetChildren()
         for index, pkg in ipairs( children ) do
             if pkg ~= child then continue end
             return table.remove( children, index )
@@ -294,7 +290,7 @@ do
 
         local env = self:GetEnvironment()
         if env ~= nil then
-            setfenv( func, env )
+            debug.setfenv( func, env )
         end
 
         local ok, result = pcall( func, self )
@@ -343,11 +339,12 @@ do
                 end
             end
 
-            local metadata, internal = self.Metadata, self.Internal
+            local internal = self.Internal
 
             -- Hooks
-            if metadata.hooks then
-                for eventName, data in pairs( internal.Hooks ) do
+            local hooks = internal.Hooks
+            if type( hooks ) == "table" then
+                for eventName, data in pairs( hooks ) do
                     for identifier in pairs( data ) do
                         hook.Remove( eventName, identifier )
                     end
@@ -355,15 +352,17 @@ do
             end
 
             -- Timers
-            if metadata.timers then
-                for identifier in pairs( internal.Timers ) do
+            local timers = internal.Timers
+            if type( timers ) == "table" then
+                for identifier in pairs( timers ) do
                     timer.Remove( identifier )
                 end
             end
 
-            -- Cvars
-            if metadata.cvars then
-                for name, cvar in pairs( internal.Cvars ) do
+            -- ConVars
+            local conVars = internal.ConVars
+            if type( conVars ) == "table" then
+                for name, cvar in pairs( conVars ) do
                     for identifier in pairs( cvar ) do
                         cvars.RemoveChangeCallback( name, identifier )
                     end
@@ -371,22 +370,25 @@ do
             end
 
             -- ConCommands
-            if metadata.concommands then
-                for name in pairs( internal.ConCommands ) do
+            local conCommands = internal.ConCommands
+            if type( conCommands ) == "table" then
+                for name in pairs( conCommands ) do
                     concommand.Remove( name )
                 end
             end
 
             -- Properties
-            if metadata.properties then
-                for name in pairs( internal.Properties ) do
+            local propertiesTbl = internal.Properties
+            if type( propertiesTbl ) == "table" then
+                for name in pairs( propertiesTbl ) do
                     properties.List[ string.lower( name ) ] = nil
                 end
             end
 
             -- Network strings
-            if metadata.net then
-                for messageName in pairs( internal.NetworkStrings ) do
+            local networkStrings = internal.NetworkStrings
+            if type( networkStrings ) == "table" then
+                for messageName in pairs( networkStrings ) do
                     net.Receivers[ messageName ] = nil
                 end
             end
@@ -437,11 +439,11 @@ if SERVER then
             gpm.ArgAssert( fileName, 1, "string" )
         end
 
-        if fileName and fs.IsFile( "lua/" .. fileName, "GAME" ) then
+        if fileName and fs.IsFile( fileName, "LUA" ) then
             filePath = paths.Fix( fileName )
         end
 
-        if filePath and fs.IsFile( "lua/" .. filePath, "GAME" ) then
+        if filePath and fs.IsFile( filePath, "LUA" ) then
             return AddCSLuaFile( filePath )
         end
 
@@ -450,7 +452,7 @@ if SERVER then
 
 end
 
-local addClientLuaFile = SERVER and AddClientLuaFile
+local addCSLuaFile = SERVER and AddClientLuaFile or debug.fempty
 
 local internalMeta = {
     ["__index"] = function( self, index )
@@ -468,7 +470,7 @@ local timerBlacklist = {
 
 Initialize = promise.Async( function( metadata, func, files )
     if type( files ) ~= "table" then
-        files = nil
+        files = {}
     end
 
     -- Creating package object
@@ -478,25 +480,12 @@ Initialize = promise.Async( function( metadata, func, files )
     pkg.Files = files
     pkg.Main = func
 
-    if metadata.isolation then
+    if metadata.environment then
+        for _, func in ipairs( files ) do
+            debug.setfenv( func, env )
+        end
 
         pkg.Children = {}
-
-        local hookList = setmetatable( {}, internalMeta )
-        local cvarList = setmetatable( {}, internalMeta )
-        local networkStrings = {}
-        local concommandList = {}
-        local propertiesList = {}
-        local timers = {}
-
-        pkg.Internal = {
-            ["NetworkStrings"] = networkStrings,
-            ["ConCommands"] = concommandList,
-            ["Properties"] = propertiesList,
-            ["Cvars"] = cvarList,
-            ["Hooks"] = hookList,
-            ["Timers"] = timers
-        }
 
         -- Creating environment for package
         local env = environment.Create( _G )
@@ -545,6 +534,45 @@ Initialize = promise.Async( function( metadata, func, files )
             return gpm.Install( pkg, async, ... )
         end )
 
+        -- AddCSLuaFile
+        env.AddCSLuaFile = addCSLuaFile
+
+        -- include
+        env.include = function( fileName )
+            gpm.ArgAssert( fileName, 1, "string" )
+
+            local func = files[ paths.Fix( fileName ) ]
+            if type( func ) == "function" then
+                return func( pkg )
+            end
+
+            local luaPath = getCurrentLuaPath()
+            if luaPath then
+                local folder = string.GetPathFromFilename( luaPath )
+                if folder and #folder > 0 then
+                    local filePath = paths.Fix( folder .. fileName )
+                    if fs.IsFile( filePath, "LUA" ) then
+                        func = gpm.CompileLua( filePath ):Await()
+                        if type( func ) == "function" then
+                            files[ fileName ] = debug.setfenv( func, env )
+                            return func( pkg )
+                        end
+                    end
+                end
+            end
+
+            local filePath = paths.Fix( fileName )
+            if fs.IsFile( filePath, "LUA" ) then
+                func = gpm.CompileLua( filePath ):Await()
+                if type( func ) == "function" then
+                    files[ fileName ] = debug.setfenv( func, env )
+                    return func( pkg )
+                end
+            end
+
+            error( "Couldn't include file '" .. fileName .. "' - File not found" )
+        end
+
         -- require
         env.require = function( ... )
             local arguments = {...}
@@ -579,52 +607,14 @@ Initialize = promise.Async( function( metadata, func, files )
             error( "Not one of the listed packages could be required." )
         end
 
-        -- include
-        env.include = function( fileName )
-            gpm.ArgAssert( fileName, 1, "string" )
-
-            local func = nil
-            if files ~= nil then
-                func = files[ paths.Fix( fileName ) ]
-            end
-
-            if type( func ) ~= "function" then
-                local luaPath = getCurrentLuaPath()
-                if luaPath then
-                    local folder = string.GetPathFromFilename( luaPath )
-                    if folder and #folder > 0 then
-                        local filePath = paths.Fix( folder .. fileName )
-                        if fs.IsFile( "lua/" .. filePath, "GAME" ) then
-                            func = gpm.CompileLua( filePath ):Await()
-                        end
-                    end
-                end
-            end
-
-            if type( func ) ~= "function" then
-                local filePath = paths.Fix( fileName )
-                if fs.IsFile( "lua/" .. filePath, "GAME" ) then
-                    func = gpm.CompileLua( filePath ):Await()
-                end
-            end
-
-            if type( func ) == "function" then
-                setfenv( func, env )
-                return func()
-            end
-
-            error( "Couldn't include file '" .. fileName .. "' - File not found" )
-        end
-
-        -- AddCSLuaFile
-        if SERVER then
-            env.AddCSLuaFile = addClientLuaFile
-        end
+        pkg.Internal = {}
 
         -- Hooks
         if metadata.hooks then
-
             environment.SetLinkedTable( env, "hook", hook )
+
+            local hookList = setmetatable( {}, internalMeta )
+            pkg.Internal.Hooks = hookList
 
             environment.SetValue( env, "hook.Add", function( eventName, identifier, ... )
                 if type( identifier ) == "string" then
@@ -643,13 +633,14 @@ Initialize = promise.Async( function( metadata, func, files )
                 hookList[ eventName ][ identifier ] = nil
                 return hook.Remove( eventName, identifier, ... )
             end )
-
         end
 
         -- Timers
         if metadata.timers then
-
             environment.SetLinkedTable( env, "timer", timer )
+
+            local timers = {}
+            pkg.Internal.Timers = timers
 
             for key, func in pairs( timer ) do
                 if timerBlacklist[ key ] then continue end
@@ -670,34 +661,36 @@ Initialize = promise.Async( function( metadata, func, files )
 
             environment.SetValue( env, "timer.Destroy", removeFunction )
             environment.SetValue( env, "timer.Remove", removeFunction )
-
         end
 
-        -- Cvars
+        -- ConVars
         if metadata.cvars then
-
             environment.SetLinkedTable( env, "cvars", cvars )
+
+            local conVars = setmetatable( {}, internalMeta )
+            pkg.Internal.ConVars = conVars
 
             environment.SetValue( env, "cvars.AddChangeCallback", function( name, func, identifier, ... )
                 identifier = pkg:GetIdentifier( type( identifier ) == "string" and identifier or "Default" )
-                cvarList[ name ][ identifier ] = true
+                conVars[ name ][ identifier ] = true
 
                 return cvars.AddChangeCallback( name, func, identifier, ... )
             end )
 
             environment.SetValue( env, "cvars.RemoveChangeCallback", function( name, identifier, ... )
                 identifier = pkg:GetIdentifier( type( identifier ) == "string" and identifier or "Default" )
-                cvarList[ name ][ identifier ] = nil
+                conVars[ name ][ identifier ] = nil
 
                 return cvars.RemoveChangeCallback( name, identifier, ... )
             end )
-
         end
 
         -- ConCommands
         if metadata.concommands then
-
             environment.SetLinkedTable( env, "concommand", concommand )
+
+            local concommandList = {}
+            pkg.Internal.ConCommands = concommandList
 
             environment.SetValue( env, "concommand.Add", function( name, ... )
                 concommandList[ name ] = true
@@ -708,13 +701,14 @@ Initialize = promise.Async( function( metadata, func, files )
                 concommandList[ name ] = nil
                 return concommand.Remove( name, ... )
             end )
-
         end
 
         -- Net
         if metadata.net then
-
             environment.SetLinkedTable( env, "net", net )
+
+            local networkStrings = {}
+            pkg.Internal.NetworkStrings = networkStrings
 
             environment.SetValue( env, "net.Receive", function( messageName, ... )
                 messageName = pkg:GetIdentifier( messageName )
@@ -728,7 +722,6 @@ Initialize = promise.Async( function( metadata, func, files )
             end )
 
             if SERVER then
-
                 environment.SetLinkedTable( env, "util", util )
 
                 environment.SetValue( env, "util.AddNetworkString", function( messageName, ... )
@@ -737,25 +730,23 @@ Initialize = promise.Async( function( metadata, func, files )
 
                     return util.AddNetworkString( messageName, ... )
                 end )
-
             end
-
         end
 
         -- Properties
         if metadata.properties then
-
             environment.SetLinkedTable( env, "properties", properties )
+
+            local propertiesTbl = {}
+            pkg.Internal.Properties = propertiesTbl
 
             environment.SetValue( env, "properties.Add", function( name, ... )
                 name = pkg:GetIdentifier( name )
-                propertiesList[ name ] = true
+                propertiesTbl[ name ] = true
 
                 return properties.Add( name, ... )
             end )
-
         end
-
     end
 
     -- Installing
