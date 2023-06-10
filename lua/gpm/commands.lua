@@ -94,11 +94,21 @@ do
 
 end
 
-        hook_Run( "GPM - Reload" )
-        include( "gpm/init.lua" )
-        hook_Run( "GPM - Reloaded" )
-    end
+function gpm.UnInstall( ... )
+    for _, packageName in ipairs( {...} ) do
+        if #packageName == 0 then continue end
 
+        local pkgs = gpm.package.Find( packageName, false, true )
+        if not pkgs then
+            logger:Error( "Package uninstall failed, packages with name '%s' is not found.", packageName )
+            continue
+        end
+
+        for _, pkg in ipairs( pkgs ) do
+            pkg:UnInstall()
+        end
+    end
+end
 
 local net = net
 
