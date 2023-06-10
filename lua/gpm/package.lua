@@ -231,6 +231,26 @@ do
         return table.Lookup( self, "Metadata.isolation" )
     end
 
+    function PACKAGE:HasEnvironment()
+        return type( self:GetEnvironment() ) == "table"
+    end
+
+    function PACKAGE:GetChildren()
+        return self.Children
+    end
+
+    function PACKAGE:AddChild( child )
+        table.insert( self.Children, 1, child )
+    end
+
+    function PACKAGE:RemoveChild( child )
+        local children = self.Children
+        for index, pkg in ipairs( children ) do
+            if pkg ~= child then continue end
+            return table.remove( children, index )
+        end
+    end
+
     function PACKAGE:Link( package2 )
         gpm.ArgAssert( package2, 1, "Package" )
 
@@ -241,9 +261,26 @@ do
         if not environment2 then return false end
 
         environment.Link( environment1, environment2 )
+        self:RemoveChild( child )
+        self:AddChild( child )
 
-        logger:Debug( "'%s' -> '%s'", package2:GetIdentifier(), self:GetIdentifier() )
+        logger:Debug( "'%s' ---> '%s'", package2:GetIdentifier(), self:GetIdentifier() )
+        return true
+    end
 
+    function PACKAGE:UnLink( package2 )
+        gpm.ArgAssert( package2, 1, "Package" )
+
+        local environment1 = self:GetEnvironment()
+        if not environment1 then return false end
+
+        local environment2 = package2:GetEnvironment()
+        if not environment2 then return false end
+
+        environment.UnLink( environment1, environment2 )
+        self:RemoveChild( child )
+
+        logger:Debug( "'%s' -/-> '%s'", package2:GetIdentifier(), self:GetIdentifier() )
         return true
     end
 
@@ -275,7 +312,7 @@ do
         gpm.Packages[ self:GetImportPath() ] = self
         self.Installed = true
 
-        logger:Info( "Package '%s' was successfully installed, it took %.4f seconds.", self:GetIdentifier(), SysTime() - stopwatch )
+        logger:Info( "Package '%s' was successfully installed, took %.4f seconds.", self:GetIdentifier(), SysTime() - stopwatch )
 
         return result
     end )
@@ -442,6 +479,8 @@ Initialize = promise.Async( function( metadata, func, files )
     pkg.Main = func
 
     if metadata.isolation then
+
+        pkg.Children = {}
 
         local hookList = setmetatable( {}, internalMeta )
         local cvarList = setmetatable( {}, internalMeta )
