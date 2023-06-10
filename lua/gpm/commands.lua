@@ -1,4 +1,5 @@
 local ipairs = ipairs
+local table = table
 local gpm = gpm
 
 do
@@ -72,6 +73,8 @@ do
     function gpm.Reload( ... )
         local packageNames = {...}
         if table.IsEmpty( packageNames ) then
+            table.Empty( gpm.ImportTasks )
+            table.Empty( gpm.Packages )
             hook_Run( "GPM - Reload" )
             include( "gpm/init.lua" )
             return hook_Run( "GPM - Reloaded" )
