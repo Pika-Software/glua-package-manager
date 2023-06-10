@@ -9,7 +9,6 @@ local fs = gpm.fs
 
 -- Variables
 local SERVER = SERVER
-local addClientLuaFile = SERVER and package.AddClientLuaFile
 local moonloader = moonloader
 local ipairs = ipairs
 local type = type
@@ -17,8 +16,8 @@ local type = type
 module( "gpm.sources.lua" )
 
 function CanImport( filePath )
-    if fs.IsDir( "lua/" .. filePath, "GAME" ) then return true end
-    if fs.IsFile( "lua/" .. filePath, "GAME" ) then
+    if fs.IsDir( filePath, "LUA" ) then return true end
+    if fs.IsFile( filePath, "LUA" ) then
         local extension = string.GetExtensionFromFilename( filePath )
         if extension == "moon" then return moonloader ~= nil end
         if extension == "lua" then return true end
@@ -29,7 +28,7 @@ end
 
 GetMetadata = promise.Async( function( importPath )
     local metadata, folder = nil, importPath
-    if fs.IsDir( "lua/" .. folder, "GAME" ) then
+    if fs.IsDir( folder, "LUA" ) then
         if moonloader ~= nil then
             moonloader.PreCacheDir( folder )
         end
@@ -42,7 +41,7 @@ GetMetadata = promise.Async( function( importPath )
         hasPackageFile = false
     else
         packagePath = paths.Fix( folder .. "/package.lua" )
-        hasPackageFile = fs.IsFile( "lua/" .. packagePath, "GAME" )
+        hasPackageFile = fs.IsFile( packagePath, "LUA" )
     end
 
     if hasPackageFile then
@@ -57,11 +56,24 @@ GetMetadata = promise.Async( function( importPath )
             ["autorun"] = true
         }
 
-        if fs.IsFile( "lua/" .. importPath, "GAME" ) then
-            if string.EndsWith( importPath, ".moon" ) and moonloader ~= nil and not moonloader.PreCacheFile( importPath ) then
+        local extension = string.GetExtensionFromFilename( importPath )
+        if extension == "moon" then
+            if not fs.IsFile( "lua/" .. importPath, "GAME" ) then
+                return promise.Reject( "Unable to compile Moonscript file, file not found." )
+            end
+
+            if not moonloader then
+                return promise.Reject( "Attempting to compile a Moonscript file fails, install gm_moonloader and try again.\nhttps://github.com/Pika-Software/gm_moonloader" )
+            end
+
+            if not moonloader.PreCacheFile( importPath ) then
                 return promise.Reject( "Compiling Moonscript file '" .. importPath .. "' into Lua is failed!" )
             end
 
+            importPath = string.sub( importPath, 1, #importPath - #extension ) .. "lua"
+        end
+
+        if fs.IsFile( importPath, "LUA" ) then
             metadata.main = importPath
         end
     end
@@ -80,18 +92,18 @@ GetMetadata = promise.Async( function( importPath )
         main = "init.lua"
     end
 
-    if not fs.IsFile( "lua/" .. main, "GAME" ) then
+    if not fs.IsFile( main, "LUA" ) then
         main = paths.Join( importPath, main )
 
-        if not fs.IsFile( "lua/" .. main, "GAME" ) then
+        if not fs.IsFile( main, "LUA" ) then
             main = importPath .. "/init.lua"
-            if not fs.IsFile( "lua/" .. main, "GAME" ) then
+            if not fs.IsFile( main, "LUA" ) then
                 main = importPath .. "/main.lua"
             end
         end
     end
 
-    if fs.IsFile( "lua/" .. main, "GAME" ) then
+    if fs.IsFile( main, "LUA" ) then
         metadata.main = main
     else
         metadata.main = nil
@@ -105,14 +117,14 @@ GetMetadata = promise.Async( function( importPath )
         cl_main = "cl_init.lua"
     end
 
-    if not fs.IsFile( "lua/" .. cl_main, "GAME" ) then
+    if not fs.IsFile( cl_main, "LUA" ) then
         cl_main = paths.Join( importPath, cl_main )
-        if not fs.IsFile( "lua/" .. cl_main, "GAME" ) then
+        if not fs.IsFile( cl_main, "LUA" ) then
             cl_main = importPath .. "/cl_init.lua"
         end
     end
 
-    if fs.IsFile( "lua/" .. cl_main, "GAME" ) then
+    if fs.IsFile( cl_main, "LUA" ) then
         metadata.cl_main = cl_main
     else
         metadata.cl_main = nil
@@ -122,6 +134,8 @@ GetMetadata = promise.Async( function( importPath )
 end )
 
 if SERVER then
+
+    local addClientLuaFile = package.AddClientLuaFile
 
     function SendToClient( metadata )
         local packagePath = metadata.package_path
@@ -145,9 +159,9 @@ if SERVER then
         local folder = metadata.folder
         for _, filePath in ipairs( send ) do
             local localFilePath = folder .. "/" .. filePath
-            if fs.IsFile( "lua/" .. localFilePath, "GAME" ) then
+            if fs.IsFile( localFilePath, "LUA" ) then
                 addClientLuaFile( localFilePath )
-            elseif fs.IsFile( "lua/" .. filePath, "GAME" ) then
+            elseif fs.IsFile( filePath, "LUA" ) then
                 addClientLuaFile( filePath )
             end
         end
@@ -157,12 +171,9 @@ end
 
 Import = promise.Async( function( metadata )
     local main = metadata.main
-    if not main or not fs.IsFile( "lua/" .. main, "GAME" ) then
+    if not main or not fs.IsFile( main, "LUA" ) then
         return promise.Reject( "main file '" .. ( main or "init.lua" ) .. "' is missing." )
     end
 
-    local ok, result = gpm.CompileLua( main ):SafeAwait()
-    if not ok then return promise.Reject( result ) end
-
-    return package.Initialize( metadata, result )
+    return package.Initialize( metadata, gpm.CompileLua( main ):Await() )
 end )
