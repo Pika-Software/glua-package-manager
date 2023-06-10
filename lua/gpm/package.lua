@@ -157,23 +157,23 @@ do
     PACKAGE.__index = PACKAGE
 
     function PACKAGE:GetMetadata()
-        return self.metadata
+        return self.Metadata
     end
 
     function PACKAGE:GetImportPath()
-        return table.Lookup( self, "metadata.import_path" )
+        return table.Lookup( self, "Metadata.import_path" )
     end
 
     function PACKAGE:GetFolder()
-        return table.Lookup( self, "metadata.folder" )
+        return table.Lookup( self, "Metadata.folder" )
     end
 
     function PACKAGE:GetName()
-        return table.Lookup( self, "metadata.name", self:GetImportPath() or "unknown" )
+        return table.Lookup( self, "Metadata.name", self:GetImportPath() or "unknown" )
     end
 
     function PACKAGE:GetVersion()
-        return table.Lookup( self, "metadata.version", "unknown" )
+        return table.Lookup( self, "Metadata.version", "unknown" )
     end
 
     function PACKAGE:GetIdentifier( name )
@@ -183,31 +183,30 @@ do
     end
 
     function PACKAGE:GetSourceName()
-        return table.Lookup( self, "metadata.source", "unknown" )
+        return table.Lookup( self, "Metadata.source", "unknown" )
     end
 
     PACKAGE.__tostring = PACKAGE.GetIdentifier
 
     function PACKAGE:GetEnvironment()
-        return self.environment
+        return self.Environment
     end
 
     function PACKAGE:GetLogger()
-        return self.logger
+        return self.Logger
     end
 
     function PACKAGE:GetResult()
-        return self.result
+        return self.Result
     end
 
-
     function PACKAGE:GetFiles()
-        return self.files
+        return self.Files
     end
 
     function PACKAGE:GetFileList()
         local fileList = {}
-        for filePath in pairs( self.files ) do
+        for filePath in pairs( self.Files ) do
             fileList[ #fileList + 1 ] = filePath
         end
 
@@ -215,7 +214,7 @@ do
     end
 
     function PACKAGE:IsIsolated()
-        return table.Lookup( self, "metadata.isolation" )
+        return table.Lookup( self, "Metadata.isolation" )
     end
 
     function PACKAGE:Link( package2 )
@@ -227,42 +226,40 @@ do
         local environment2 = package2:GetEnvironment()
         if not environment2 then return false end
 
-        logger:Debug( "'%s' -> '%s'", package2:GetIdentifier(), self:GetIdentifier() )
         environment.Link( environment1, environment2 )
+
+        logger:Debug( "'%s' -> '%s'", package2:GetIdentifier(), self:GetIdentifier() )
+
         return true
     end
 
     PACKAGE.Install = promise.Async( function( self )
-        local func = self.main
+        local func = self.Main
         if not func then
             return promise.Reject( "Missing package '" .. self:GetIdentifier() ..  "' entry point." )
         end
 
         local stopwatch = SysTime()
 
-        -- Enviroment for `main.lua`
         local env = self:GetEnvironment()
         if env ~= nil then
             setfenv( func, env )
         end
 
-        -- Running `main.lua`
         local ok, result = pcall( func, self )
         if not ok then
             return promise.Reject( result )
         end
 
-        -- Saving result to package
-        self.result = result
+        self.Result = result
 
-        -- GM:PackageInstalled( `Package` pkg )
         local ok, err = pcall( hook_Run, "PackageInstalled", self )
         if not ok then
             ErrorNoHaltWithStack( err )
         end
 
         gpm.Packages[ self:GetImportPath() ] = self
-        self.installed = true
+        self.Installed = true
 
         logger:Info( "Package '%s' was successfully installed, it took %.4f seconds.", self:GetIdentifier(), SysTime() - stopwatch )
 
@@ -270,20 +267,21 @@ do
     end )
 
     function PACKAGE:IsInstalled()
-        return self.installed
+        return self.Installed
     end
 
-    function PACKAGE:Remove()
-        -- GM:PackageRemoved( `Package` pkg )
+    function PACKAGE:UnInstall()
+        local stopwatch = SysTime()
+
         local ok, err = pcall( hook_Run, "PackageRemoved", self )
         if not ok then
             ErrorNoHaltWithStack( err )
         end
 
         gpm.Packages[ self:GetImportPath() ] = nil
-        self.installed = nil
+        self.Installed = nil
 
-        -- TODO: Remove hooks, networks and other here
+        logger:Info( "Package '%s' was successfully uninstalled, it took %.4f seconds.", self:GetIdentifier(), SysTime() - stopwatch )
     end
 
     local function isPackage( any )
@@ -345,16 +343,16 @@ Initialize = promise.Async( function( metadata, func, files )
 
     -- Creating package object
     local pkg = setmetatable( {}, PACKAGE )
-    pkg.metadata = metadata
-    pkg.installed = false
-    pkg.files = files
-    pkg.main = func
+    pkg.Metadata = metadata
+    pkg.Installed = false
+    pkg.Files = files
+    pkg.Main = func
 
     if metadata.isolation then
 
         -- Creating environment for package
         local env = environment.Create( _G )
-        pkg.environment = env
+        pkg.Environment = env
 
         -- Globals
         environment.SetLinkedTable( env, "gpm", gpm )
@@ -371,8 +369,8 @@ Initialize = promise.Async( function( metadata, func, files )
 
         -- Logger
         if metadata.logger then
-            pkg.logger = gpm.logger.Create( pkg:GetIdentifier(), metadata.color )
-            table.SetValue( env, "gpm.Logger", pkg.logger )
+            pkg.Logger = gpm.logger.Create( pkg:GetIdentifier(), metadata.color )
+            table.SetValue( env, "gpm.Logger", pkg.Logger )
         end
 
         -- import
