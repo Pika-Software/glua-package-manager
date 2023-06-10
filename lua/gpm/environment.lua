@@ -1,14 +1,11 @@
 -- Libraries
 local table = table
+local debug = debug
 
 -- Variables
 local setmetatable = setmetatable
-local debug_fcopy = debug.fcopy
-local ArgAssert = gpm.ArgAssert
-local setfenv = setfenv
 local rawget = rawget
 local ipairs = ipairs
-local pairs = pairs
 local type = type
 
 module( "gpm.environment" )
@@ -16,10 +13,10 @@ module( "gpm.environment" )
 function SetValue( environment, path, value, makeCopy )
     if type( value ) == "function" then
         if makeCopy then
-            value = debug_fcopy( value )
+            value = debug.fcopy( value )
         end
 
-        setfenv( value, environment )
+        debug.setfenv( value, environment )
     elseif makeCopy then
         value = table.Copy( value )
     end
@@ -80,30 +77,4 @@ end
 
 function SetLinkedTable( environment, path, tbl )
     return table.SetValue( environment, path, Create( tbl ) )
-end
-
-function SetTable( environment, path, tbl, makeCopy )
-    ArgAssert( environment, 1, "table" )
-    ArgAssert( tbl, 3, "table" )
-
-    local object = {}
-    for key, value in pairs( tbl ) do
-        if type( key ) == "table" then
-            key = SetTable( environment, nil, tbl, makeCopy )
-        elseif makeCopy and type( key ) == "function" then
-            key = debug_fcopy( setfenv( key, environment ) )
-        end
-
-        if type( value ) == "table" then
-            value = SetTable( environment, nil, tbl, makeCopy )
-        elseif makeCopy and type( value ) == "function" then
-            value = debug_fcopy( setfenv( value, environment ) )
-        end
-
-        object[ key ] = value
-    end
-
-    if not path then return object end
-
-    return table.SetValue( environment, path, object )
 end
