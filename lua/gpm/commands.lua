@@ -95,7 +95,17 @@ do
 end
 
 function gpm.UnInstall( ... )
-    for _, packageName in ipairs( {...} ) do
+    local packageNames = {...}
+    local force = false
+
+    for _, str in ipairs( packageNames ) do
+        if string.lower( str ) == "-f" then
+            force = true
+            break
+        end
+    end
+
+    for _, packageName in ipairs( packageNames ) do
         if #packageName == 0 then continue end
 
         local pkgs = gpm.package.Find( packageName, false, true )
@@ -105,7 +115,7 @@ function gpm.UnInstall( ... )
         end
 
         for _, pkg in ipairs( pkgs ) do
-            pkg:UnInstall()
+            pkg:UnInstall( not force )
         end
     end
 end

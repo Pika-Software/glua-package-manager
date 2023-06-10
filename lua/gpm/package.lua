@@ -270,7 +270,7 @@ do
         return self.Installed
     end
 
-    function PACKAGE:UnInstall()
+    function PACKAGE:UnInstall( noDependencies )
         local stopwatch = SysTime()
 
         local ok, err = pcall( hook_Run, "PackageRemoved", self )
