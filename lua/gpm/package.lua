@@ -750,7 +750,10 @@ Initialize = promise.Async( function( metadata, func, files )
     end
 
     -- Installing
-    pkg:Install():Await()
+    local ok, result = pkg:Install():SafeAwait()
+    if not ok then
+        return promise.Reject( result )
+    end
 
     return pkg
 end )

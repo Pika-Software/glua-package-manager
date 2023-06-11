@@ -175,5 +175,10 @@ Import = promise.Async( function( metadata )
         return promise.Reject( "main file '" .. ( main or "init.lua" ) .. "' is missing." )
     end
 
-    return package.Initialize( metadata, gpm.CompileLua( main ):Await() )
+    local ok, result = gpm.Compile( main ):SafeAwait()
+    if not ok then
+        return promise.Reject( result )
+    end
+
+    return package.Initialize( metadata, result )
 end )
