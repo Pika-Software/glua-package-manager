@@ -442,6 +442,7 @@ if SERVER then
 
     function AddClientLuaFile( fileName )
         local filePath = nil
+
         local luaPath = getCurrentLuaPath()
         if luaPath then
             if fileName ~= nil then
@@ -462,8 +463,15 @@ if SERVER then
             filePath = paths.Fix( fileName )
         end
 
-        if filePath and fs.IsFile( filePath, "LUA" ) then
-            return AddCSLuaFile( filePath )
+        if filePath ~= nil then
+            local extension = string.GetExtensionFromFilename( filePath )
+            if extension == "moon" then
+                filePath = string.sub( filePath, 1, #filePath - #extension ) .. "lua"
+            end
+
+            if fs.IsFile( filePath, "LUA" ) then
+                return AddCSLuaFile( filePath )
+            end
         end
 
         error( "Couldn't AddCSLuaFile file '" .. fileName .. "' - File not found" )
