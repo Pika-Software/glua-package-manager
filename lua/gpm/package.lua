@@ -128,12 +128,14 @@ do
             end
 
             -- Isolation features
-            source.concommands = source.concommands ~= false and source.environment
-            source.properties = source.properties ~= false and source.environment
-            source.timers = source.timers ~= false and source.environment
-            source.hooks = source.hooks ~= false and source.environment
-            source.cvars = source.cvars ~= false and source.environment
-            source.net = source.net == true and source.environment
+            local autonames = source.autonames
+            if type( autonames ) == "table" then
+                autonames.properties = autonames.properties == true and source.environment
+                autonames.timer = autonames.timer == true and source.environment
+                autonames.cvars = autonames.cvars == true and source.environment
+                autonames.hook = autonames.hook == true and source.environment
+                autonames.net = autonames.net == true and source.environment
+            end
 
             return source
         elseif type( source ) == "function" then
@@ -188,6 +190,15 @@ do
 
     function PACKAGE:GetVersion()
         return table.Lookup( self, "Metadata.version", "unknown" )
+    end
+
+    function PACKAGE:HasAutoNames( libraryName )
+        local autoNames = table.Lookup( self, "Metadata.autonames", false )
+        if not autoNames then
+            return autoNames
+        end
+
+        return autoNames[ libraryName ]
     end
 
     function PACKAGE:GetIdentifier( name )
@@ -339,57 +350,67 @@ do
                 end
             end
 
-            local internal = self.Internal
+            local libraries = self.Libraries
 
             -- Hooks
-            local hooks = internal.Hooks
-            if type( hooks ) == "table" then
-                for eventName, data in pairs( hooks ) do
+            local data = libraries.hook
+            if type( data ) == "table" then
+                for eventName, data in pairs( data ) do
                     for identifier in pairs( data ) do
                         hook.Remove( eventName, identifier )
+                        data[ eventName ][ identifier ] = nil
                     end
+
+                    data[ eventName ] = nil
                 end
             end
 
             -- Timers
-            local timers = internal.Timers
-            if type( timers ) == "table" then
-                for identifier in pairs( timers ) do
+            data = libraries.timer
+            if type( data ) == "table" then
+                for identifier in pairs( data ) do
                     timer.Remove( identifier )
+                    data[ identifier ] = nil
                 end
             end
 
             -- ConVars
-            local conVars = internal.ConVars
-            if type( conVars ) == "table" then
-                for name, cvar in pairs( conVars ) do
+            data = libraries.cvars
+            if type( data ) == "table" then
+                for name, cvar in pairs( data ) do
                     for identifier in pairs( cvar ) do
                         cvars.RemoveChangeCallback( name, identifier )
+                        data[ name ][ identifier ] = nil
                     end
+
+                    data[ name ] = nil
                 end
             end
 
             -- ConCommands
-            local conCommands = internal.ConCommands
-            if type( conCommands ) == "table" then
-                for name in pairs( conCommands ) do
+            data = libraries.concommand
+            if type( data ) == "table" then
+                for name in pairs( data ) do
                     concommand.Remove( name )
+                    data[ name ] = nil
                 end
             end
 
             -- Properties
-            local propertiesTbl = internal.Properties
-            if type( propertiesTbl ) == "table" then
-                for name in pairs( propertiesTbl ) do
-                    properties.List[ string.lower( name ) ] = nil
+            data = libraries.properties
+            if type( data ) == "table" then
+                for name in pairs( data ) do
+                    properties.List[ name ] = nil
+                    data[ name ] = nil
                 end
             end
 
             -- Network strings
-            local networkStrings = internal.NetworkStrings
-            if type( networkStrings ) == "table" then
-                for messageName in pairs( networkStrings ) do
+            data = libraries.net
+            if type( data ) == "table" then
+                for messageName in pairs( data ) do
                     net.Receivers[ messageName ] = nil
+                    data[ messageName ] = nil
                 end
             end
         end
@@ -607,145 +628,206 @@ Initialize = promise.Async( function( metadata, func, files )
             error( "Not one of the listed packages could be required." )
         end
 
-        pkg.Internal = {}
+        pkg.Libraries = {}
 
         -- Hooks
-        if metadata.hooks then
-            environment.SetLinkedTable( env, "hook", hook )
+        do
 
-            local hookList = setmetatable( {}, internalMeta )
-            pkg.Internal.Hooks = hookList
+            local data = setmetatable( {}, internalMeta )
+            local autoNames = pkg:HasAutoNames( "hook" )
+            pkg.Libraries.hook = data
 
-            environment.SetValue( env, "hook.Add", function( eventName, identifier, ... )
-                if type( identifier ) == "string" then
+            local obj, metatable = environment.SetLinkedTable( env, "hook", hook )
+
+            function obj.Add( eventName, identifier, ... )
+                if autoNames and type( identifier ) == "string" then
                     identifier = pkg:GetIdentifier( identifier )
                 end
 
-                hookList[ eventName ][ identifier ] = true
+                data[ eventName ][ identifier ] = true
                 return hook.Add( eventName, identifier, ... )
-            end )
+            end
 
-            environment.SetValue( env, "hook.Remove", function( eventName, identifier, ... )
-                if type( identifier ) == "string" then
+            function obj.Remove( eventName, identifier, ... )
+                if autoNames and type( identifier ) == "string" then
                     identifier = pkg:GetIdentifier( identifier )
                 end
 
-                hookList[ eventName ][ identifier ] = nil
+                data[ eventName ][ identifier ] = nil
                 return hook.Remove( eventName, identifier, ... )
-            end )
+            end
+
+            metatable.__newindex = hook
+
         end
 
         -- Timers
-        if metadata.timers then
-            environment.SetLinkedTable( env, "timer", timer )
+        do
 
-            local timers = {}
-            pkg.Internal.Timers = timers
+            local data = {}
+            pkg.Libraries.timer = data
+            local autoNames = pkg:HasAutoNames( "timer" )
+
+            local obj, metatable = environment.SetLinkedTable( env, "timer", timer )
 
             for key, func in pairs( timer ) do
                 if timerBlacklist[ key ] then continue end
-                env.timer[ key ] = function( identifier, ... )
-                    identifier = pkg:GetIdentifier( identifier )
-                    timers[ identifier ] = true
+                obj[ key ] = function( identifier, ... )
+                    if autoNames then
+                        identifier = pkg:GetIdentifier( identifier )
+                    end
 
+                    data[ identifier ] = true
                     return func( identifier, ... )
                 end
             end
 
             local function removeFunction( identifier, ... )
-                identifier = pkg:GetIdentifier( identifier )
-                timers[ identifier ] = nil
+                if autoNames then
+                    identifier = pkg:GetIdentifier( identifier )
+                end
 
+                data[ identifier ] = nil
                 return timer.Remove( identifier, ... )
             end
 
-            environment.SetValue( env, "timer.Destroy", removeFunction )
-            environment.SetValue( env, "timer.Remove", removeFunction )
+            obj.Destroy = removeFunction
+            obj.Remove = removeFunction
+
+            metatable.__newindex = timer
+
         end
 
         -- ConVars
-        if metadata.cvars then
-            environment.SetLinkedTable( env, "cvars", cvars )
+        do
 
-            local conVars = setmetatable( {}, internalMeta )
-            pkg.Internal.ConVars = conVars
+            local data = setmetatable( {}, internalMeta )
+            local autoNames = pkg:HasAutoNames( "cvars" )
+            pkg.Libraries.cvars = data
 
-            environment.SetValue( env, "cvars.AddChangeCallback", function( name, func, identifier, ... )
-                identifier = pkg:GetIdentifier( type( identifier ) == "string" and identifier or "Default" )
-                conVars[ name ][ identifier ] = true
+            local obj, metatable = environment.SetLinkedTable( env, "cvars", cvars )
 
+            function obj.AddChangeCallback( name, func, identifier, ... )
+                if type( identifier ) ~= "string" then
+                    identifier = "Default"
+                end
+
+                if autoNames then
+                    identifier = pkg:GetIdentifier( identifier )
+                end
+
+                data[ name ][ identifier ] = true
                 return cvars.AddChangeCallback( name, func, identifier, ... )
-            end )
+            end
 
-            environment.SetValue( env, "cvars.RemoveChangeCallback", function( name, identifier, ... )
-                identifier = pkg:GetIdentifier( type( identifier ) == "string" and identifier or "Default" )
-                conVars[ name ][ identifier ] = nil
+            function obj.RemoveChangeCallback( name, identifier, ... )
+                if type( identifier ) ~= "string" then
+                    identifier = "Default"
+                end
 
+                if autoNames then
+                    identifier = pkg:GetIdentifier( identifier )
+                end
+
+                data[ name ][ identifier ] = nil
                 return cvars.RemoveChangeCallback( name, identifier, ... )
-            end )
+            end
+
+            metatable.__newindex = cvars
+
         end
 
         -- ConCommands
-        if metadata.concommands then
-            environment.SetLinkedTable( env, "concommand", concommand )
+        do
 
-            local concommandList = {}
-            pkg.Internal.ConCommands = concommandList
+            local data = {}
+            pkg.Libraries.concommand = data
 
-            environment.SetValue( env, "concommand.Add", function( name, ... )
-                concommandList[ name ] = true
+            local obj, metatable = environment.SetLinkedTable( env, "concommand", concommand )
+
+            function obj.Add( name, ... )
+                data[ name ] = true
                 return concommand.Add( name, ... )
-            end )
+            end
 
-            environment.SetValue( env, "concommand.Remove", function( name, ... )
-                concommandList[ name ] = nil
+            function obj.Remove( name, ... )
+                data[ name ] = nil
                 return concommand.Remove( name, ... )
-            end )
+            end
+
+            metatable.__newindex = concommand
+
         end
 
         -- Net
-        if metadata.net then
-            environment.SetLinkedTable( env, "net", net )
+        do
 
-            local networkStrings = {}
-            pkg.Internal.NetworkStrings = networkStrings
+            local data = {}
+            pkg.Libraries.net = data
+            local autoNames = pkg:HasAutoNames( "net" )
 
-            environment.SetValue( env, "net.Receive", function( messageName, ... )
-                messageName = pkg:GetIdentifier( messageName )
-                networkStrings[ messageName ] = true
+            do
 
-                return net.Receive( messageName, ... )
-            end )
+                local obj, metatable = environment.SetLinkedTable( env, "net", net )
 
-            environment.SetValue( env, "net.Start", function( messageName, ... )
-                return net.Start( pkg:GetIdentifier( messageName ), ... )
-            end )
+                function obj.Receive( messageName, ... )
+                    if autoNames then
+                        messageName = pkg:GetIdentifier( messageName )
+                    end
+
+                    data[ messageName ] = true
+                    return net.Receive( messageName, ... )
+                end
+
+                if autoNames then
+                    function obj.Start( messageName, ... )
+                        return net.Start( pkg:GetIdentifier( messageName ), ... )
+                    end
+                end
+
+                metatable.__newindex = net
+
+            end
 
             if SERVER then
-                environment.SetLinkedTable( env, "util", util )
 
-                environment.SetValue( env, "util.AddNetworkString", function( messageName, ... )
-                    messageName = pkg:GetIdentifier( messageName )
-                    networkStrings[ messageName ] = true
+                local obj, metatable = environment.SetLinkedTable( env, "util", util )
 
+                function obj.AddNetworkString( messageName, ... )
+                    if autoNames then
+                        messageName = pkg:GetIdentifier( messageName )
+                    end
+
+                    data[ messageName ] = true
                     return util.AddNetworkString( messageName, ... )
-                end )
+                end
+
+                metatable.__newindex = util
+
             end
+
         end
 
         -- Properties
-        if metadata.properties then
-            environment.SetLinkedTable( env, "properties", properties )
+        do
 
-            local propertiesTbl = {}
-            pkg.Internal.Properties = propertiesTbl
+            local data = {}
+            pkg.Libraries.properties = data
+            local autoNames = pkg:HasAutoNames( "properties" )
 
-            environment.SetValue( env, "properties.Add", function( name, ... )
-                name = pkg:GetIdentifier( name )
-                propertiesTbl[ name ] = true
+            local obj, metatable = environment.SetLinkedTable( env, "properties", properties )
 
+            function obj.Add( name, ... )
+                if autoNames then
+                    name = pkg:GetIdentifier( name )
+                end
+
+                data[ string.lower( name ) ] = true
                 return properties.Add( name, ... )
-            end )
+            end
+
+            metatable.__newindex = properties
+
         end
     end
 
