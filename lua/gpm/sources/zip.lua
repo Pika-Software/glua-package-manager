@@ -34,7 +34,7 @@ local contentFolders = {
 }
 
 Import = promise.Async( function( metadata )
-    local importPath = metadata.import_path
+    local importPath = metadata.importpath
 
     local cachePath = cacheFolder .. "zip_" .. util.MD5( importPath ) .. ".gma.dat"
     if fs.IsFile( cachePath, "DATA" ) and fs.Time( cachePath, "DATA" ) > ( 60 * 60 * cacheLifetime:GetInt() ) then

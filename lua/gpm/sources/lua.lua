@@ -138,7 +138,7 @@ if SERVER then
     local addClientLuaFile = package.AddClientLuaFile
 
     function SendToClient( metadata )
-        local packagePath = metadata.package_path
+        local packagePath = metadata.packagepath
         if packagePath then
             addClientLuaFile( packagePath )
         end

@@ -35,7 +35,7 @@ local allowedExtensions = {
 }
 
 Import = promise.Async( function( metadata )
-    local url = metadata.import_path
+    local url = metadata.importpath
     local extension = string.GetExtensionFromFilename( url )
     if not allowedExtensions[ extension ] then
         local wsid = string.match( url, "steamcommunity%.com/sharedfiles/filedetails/%?id=(%d+)" )
@@ -98,7 +98,7 @@ Import = promise.Async( function( metadata )
     local json = util.JSONToTable( body )
     if not json then return promise.Reject( "'.json' file is corrupted" ) end
     package.GetMetadata( table_Merge( metadata, json ) )
-    metadata.import_path = url
+    metadata.importpath = url
 
     local urls = metadata.files
     if type( urls ) ~= "table" then return promise.Reject( "files list is nil ( no links to files ), download canceled" ) end

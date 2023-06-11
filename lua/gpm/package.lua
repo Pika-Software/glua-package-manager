@@ -175,7 +175,7 @@ do
     end
 
     function PACKAGE:GetImportPath()
-        return table.Lookup( self, "Metadata.import_path" )
+        return table.Lookup( self, "Metadata.importpath" )
     end
 
     function PACKAGE:GetFolder()

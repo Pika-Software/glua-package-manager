@@ -78,7 +78,7 @@ function Download( wsid )
 end
 
 Import = promise.Async( function( metadata )
-    local wsid = metadata.import_path
+    local wsid = metadata.importpath
     local ok, result = Download( wsid ):SafeAwait()
     if not ok then return promise.Reject( result ) end
 

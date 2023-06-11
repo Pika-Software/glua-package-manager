@@ -22,7 +22,7 @@ function CanImport( filePath )
 end
 
 Import = promise.Async( function( metadata )
-    local importPath = metadata.import_path
+    local importPath = metadata.importpath
 
     local gma = gmad_Open( importPath, "GAME" )
     if not gma then return promise.Reject( "gma file '" .. importPath .. "' cannot be readed" ) end
@@ -42,7 +42,9 @@ Import = promise.Async( function( metadata )
     end
 
     local ok, files = game_MountGMA( importPath )
-    if not ok then return promise.Reject( "gma file '" .. importPath .. "' cannot be mounted" ) end
+    if not ok then
+        return promise.Reject( "gma file '" .. importPath .. "' cannot be mounted" )
+    end
 
     local importPaths = {}
     for _, filePath in ipairs( files ) do
@@ -61,7 +63,6 @@ Import = promise.Async( function( metadata )
             if not ok then
                 ErrorNoHaltWithStack( result )
             end
-
         elseif string.StartsWith( filePath, "lua/packages/" ) then
             local importPath = string.match( string.sub( filePath, 5 ), "packages/[^/]+" )
             if not importPath then continue end

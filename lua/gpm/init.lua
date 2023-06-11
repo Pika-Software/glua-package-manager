@@ -5,8 +5,10 @@ local table = table
 
 -- Variables
 local MENU_DLL = MENU_DLL
+local SysTime = SysTime
 local SERVER = SERVER
 local Color = Color
+local error = error
 local type = type
 
 MsgN( [[
@@ -26,7 +28,7 @@ MsgN( [[
 
 module( "gpm", package.seeall )
 
-_VERSION = 013200
+_VERSION = 013300
 
 if not Colors then
     Realm = "unknown"
@@ -98,10 +100,8 @@ local promise = promise
 
 Logger:Info( "gm_promise v%s is initialized.", utils.Version( promise._VERSION_NUM ) )
 
--- https://github.com/Pika-Software/gm_moonloader
-if util.IsBinaryModuleInstalled( "moonloader" ) then
-    require( "moonloader" )
-    gpm.Logger:Info( "Moonloader is initialized, MoonScript support is active." )
+if util.IsBinaryModuleInstalled( "moonloader" ) and pcall( require, "moonloader" ) then
+    Logger:Info( "Moonloader is initialized, MoonScript support is active." )
 end
 
 IncludeComponent "libs/gmad"
