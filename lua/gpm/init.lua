@@ -164,6 +164,26 @@ do
 
 end
 
+function PreCacheMoon( filePath, noError )
+    if not moonloader then
+        if noError then return end
+        error( "Attempting to compile a Moonscript file fails, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader." )
+    end
+
+    if fs.IsDir( filePath, "LUA" ) then
+        moonloader.PreCacheDir( filePath )
+        Logger:Debug( "All MoonScript files in the '%s' folder was compiled into Lua.", filePath )
+        return
+    end
+
+    if not moonloader.PreCacheFile( filePath ) then
+        if noError then return end
+        error( "Compiling Moonscript file '" .. filePath .. "' into Lua is failed!" )
+    end
+
+    Logger:Debug( "The MoonScript file '%s' was successfully compiled into Lua.", filePath )
+end
+
 IncludeComponent "import"
 IncludeComponent "commands"
 
