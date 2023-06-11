@@ -87,6 +87,32 @@ if util.IsBinaryModuleInstalled( "moonloader" ) and pcall( require, "moonloader"
     Logger:Info( "Moonloader is initialized, MoonScript support is active." )
 end
 
+local moonloader = moonloader
+
+do
+
+    local CompileString = CompileString
+
+    function _G.CompileMoonString( moonCode, identifier, handleError )
+        if not moonloader then
+            return promise.Reject( "Attempting to compile a Moonscript file fails, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader." )
+        end
+
+        local luaCode = moonloader.ToLua( moonCode )
+        if not luaCode then
+            error( "MoonScript code compilation to Lua code failed." )
+        end
+
+        local func = CompileString( luaCode, identifier, handleError )
+        if type( func ) ~= "function" then
+            error( "MoonScript-Lua code compilation failed." )
+        end
+
+        return func
+    end
+
+end
+
 IncludeComponent "libs/gmad"
 Logger:Info( "gmad v%s is initialized.", utils.Version( gmad.GMA.Version ) )
 
