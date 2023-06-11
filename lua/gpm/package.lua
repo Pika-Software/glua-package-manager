@@ -517,9 +517,9 @@ Initialize = promise.Async( function( metadata, func, files )
         -- Creating environment for package
         local env = environment.Create( _G )
         pkg.Environment = env
+        env._PKG = pkg
 
         -- Globals
-        environment.SetLinkedTable( env, "gpm", gpm )
         env._VERSION = metadata.version
         env.ArgAssert = gpm.ArgAssert
         env.TypeID = gpm.TypeID
@@ -527,39 +527,45 @@ Initialize = promise.Async( function( metadata, func, files )
         env.http = gpm.http
         env.file = fs
 
-        -- Binding package object to gpm.Package & _PKG
-        environment.SetValue( env, "gpm.Package", pkg )
-        env._PKG = pkg
+        -- GPM link
+        local gpmLink = environment.SetLinkedTable( env, "gpm", gpm )
+        gpmLink.Package = pkg
 
         -- Logger
         if metadata.logger then
-            pkg.Logger = gpm.logger.Create( pkg:GetIdentifier(), metadata.color )
-            table.SetValue( env, "gpm.Logger", pkg.Logger )
+            local logger = gpm.logger.Create( pkg:GetIdentifier(), metadata.color )
+            gpmLink.Logger = logger
+            pkg.Logger = logger
         end
 
         -- import
-        env.import = function( importPath, async, pkg2 )
-            if gpm.IsPackage( pkg2 ) then
-                return gpm.Import( importPath, async, pkg2 )
+        do
+
+            local function import( importPath, async, pkg2 )
+                if gpm.IsPackage( pkg2 ) then
+                    return gpm.Import( importPath, async, pkg2 )
+                end
+
+                return gpm.Import( importPath, async, pkg )
             end
 
-            return gpm.Import( importPath, async, pkg )
-        end
+            gpmLink.Import = import
+            env.import = import
 
-        environment.SetValue( env, "gpm.Import", env.import )
+        end
 
         -- install
         env.install = function( ... )
             return gpm.Install( pkg, false, ... )
         end
 
-        environment.SetValue( env, "gpm.Install", function( pkg2, async, ... )
+        gpmLink.Install = function( pkg2, async, ... )
             if gpm.IsPackage( pkg2 ) then
                 return gpm.Install( pkg2, async, ... )
             end
 
             return gpm.Install( pkg, async, ... )
-        end )
+        end
 
         -- AddCSLuaFile
         env.AddCSLuaFile = addCSLuaFile
