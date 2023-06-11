@@ -74,23 +74,6 @@ IncludeComponent "logger"
 
 Logger = logger.Create( "GPM@" .. utils.Version( _VERSION ), Color( 180, 180, 255 ) )
 
-do
-
-    local ErrorNoHaltWithStack = ErrorNoHaltWithStack
-    local error = error
-
-    function Error( importPath, message, noHalt, sourceName )
-        Logger:Error( "[%s] Package '%s' import failed, see above to see the error.", sourceName or "unknown", importPath )
-        if noHalt then
-            ErrorNoHaltWithStack( message )
-            return
-        end
-
-        error( message, 2 )
-    end
-
-end
-
 libs = {}
 libs.deflatelua = IncludeComponent "libs/deflatelua"
 Logger:Info( "%s v%s is initialized.", libs.deflatelua._NAME, libs.deflatelua._VERSION )
