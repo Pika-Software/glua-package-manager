@@ -164,7 +164,7 @@ do
                 end
 
                 if autorun and not result.autorun then
-                    logger:Debug( "[%s] Package '%s' autorun restricted.", sourceName, importPath )
+                    logger:Debug( "Package '%s' autorun restricted.", importPath )
                     return
                 end
 
