@@ -268,8 +268,8 @@ do
         if not environment2 then return false end
 
         environment.Link( environment1, environment2 )
-        self:RemoveChild( child )
-        self:AddChild( child )
+        package2:RemoveChild( self )
+        package2:AddChild( self )
 
         logger:Debug( "'%s' ---> '%s'", package2:GetIdentifier(), self:GetIdentifier() )
         return true
@@ -285,7 +285,7 @@ do
         if not environment2 then return false end
 
         environment.UnLink( environment1, environment2 )
-        self:RemoveChild( child )
+        package2:RemoveChild( self )
 
         logger:Debug( "'%s' -/-> '%s'", package2:GetIdentifier(), self:GetIdentifier() )
         return true
@@ -338,9 +338,9 @@ do
 
         local env = self:GetEnvironment()
         if type( env ) == "table" then
-            for _, pkg in ipairs( self.Children ) do
+            for index, pkg in ipairs( self.Children ) do
                 if noDependencies then
-                    logger:Error( "Package '%s' uninstallation failed, dependencies found, try use -f to force uninstallation, took %.4f seconds.", self:GetIdentifier(), SysTime() - stopwatch )
+                    logger:Error( "Package '%s' uninstallation failed, %d dependencies found, try use -f to force uninstallation.", self:GetIdentifier(), #self.Children )
                     return
                 end
 
@@ -348,69 +348,71 @@ do
                     pkg:UnInstall()
                     pkg:UnLink( self )
                 end
+
+                self.Children[ index ] = nil
             end
 
             local libraries = self.Libraries
 
             -- Hooks
-            local data = libraries.hook
-            if type( data ) == "table" then
-                for eventName, data in pairs( data ) do
+            local library = libraries.hook
+            if type( library ) == "table" then
+                for eventName, data in pairs( library ) do
                     for identifier in pairs( data ) do
                         hook.Remove( eventName, identifier )
-                        data[ eventName ][ identifier ] = nil
+                        library[ eventName ][ identifier ] = nil
                     end
 
-                    data[ eventName ] = nil
+                    library[ eventName ] = nil
                 end
             end
 
             -- Timers
-            data = libraries.timer
-            if type( data ) == "table" then
-                for identifier in pairs( data ) do
+            library = libraries.timer
+            if type( library ) == "table" then
+                for identifier in pairs( library ) do
                     timer.Remove( identifier )
-                    data[ identifier ] = nil
+                    library[ identifier ] = nil
                 end
             end
 
             -- ConVars
-            data = libraries.cvars
-            if type( data ) == "table" then
-                for name, cvar in pairs( data ) do
+            library = libraries.cvars
+            if type( library ) == "table" then
+                for name, cvar in pairs( library ) do
                     for identifier in pairs( cvar ) do
                         cvars.RemoveChangeCallback( name, identifier )
-                        data[ name ][ identifier ] = nil
+                        library[ name ][ identifier ] = nil
                     end
 
-                    data[ name ] = nil
+                    library[ name ] = nil
                 end
             end
 
             -- ConCommands
-            data = libraries.concommand
-            if type( data ) == "table" then
-                for name in pairs( data ) do
+            library = libraries.concommand
+            if type( library ) == "table" then
+                for name in pairs( library ) do
                     concommand.Remove( name )
-                    data[ name ] = nil
+                    library[ name ] = nil
                 end
             end
 
             -- Properties
-            data = libraries.properties
-            if type( data ) == "table" then
-                for name in pairs( data ) do
+            library = libraries.properties
+            if type( library ) == "table" then
+                for name in pairs( library ) do
                     properties.List[ name ] = nil
-                    data[ name ] = nil
+                    library[ name ] = nil
                 end
             end
 
             -- Network strings
-            data = libraries.net
-            if type( data ) == "table" then
-                for messageName in pairs( data ) do
+            library = libraries.net
+            if type( library ) == "table" then
+                for messageName in pairs( library ) do
                     net.Receivers[ messageName ] = nil
-                    data[ messageName ] = nil
+                    library[ messageName ] = nil
                 end
             end
         end
