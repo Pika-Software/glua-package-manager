@@ -355,64 +355,64 @@ do
             local libraries = self.Libraries
 
             -- Hooks
-            local data = libraries.hook
-            if type( data ) == "table" then
-                for eventName, data in pairs( data ) do
+            local library = libraries.hook
+            if type( library ) == "table" then
+                for eventName, data in pairs( library ) do
                     for identifier in pairs( data ) do
                         hook.Remove( eventName, identifier )
-                        data[ eventName ][ identifier ] = nil
+                        library[ eventName ][ identifier ] = nil
                     end
 
-                    data[ eventName ] = nil
+                    library[ eventName ] = nil
                 end
             end
 
             -- Timers
-            data = libraries.timer
-            if type( data ) == "table" then
-                for identifier in pairs( data ) do
+            library = libraries.timer
+            if type( library ) == "table" then
+                for identifier in pairs( library ) do
                     timer.Remove( identifier )
-                    data[ identifier ] = nil
+                    library[ identifier ] = nil
                 end
             end
 
             -- ConVars
-            data = libraries.cvars
-            if type( data ) == "table" then
-                for name, cvar in pairs( data ) do
+            library = libraries.cvars
+            if type( library ) == "table" then
+                for name, cvar in pairs( library ) do
                     for identifier in pairs( cvar ) do
                         cvars.RemoveChangeCallback( name, identifier )
-                        data[ name ][ identifier ] = nil
+                        library[ name ][ identifier ] = nil
                     end
 
-                    data[ name ] = nil
+                    library[ name ] = nil
                 end
             end
 
             -- ConCommands
-            data = libraries.concommand
-            if type( data ) == "table" then
-                for name in pairs( data ) do
+            library = libraries.concommand
+            if type( library ) == "table" then
+                for name in pairs( library ) do
                     concommand.Remove( name )
-                    data[ name ] = nil
+                    library[ name ] = nil
                 end
             end
 
             -- Properties
-            data = libraries.properties
-            if type( data ) == "table" then
-                for name in pairs( data ) do
+            library = libraries.properties
+            if type( library ) == "table" then
+                for name in pairs( library ) do
                     properties.List[ name ] = nil
-                    data[ name ] = nil
+                    library[ name ] = nil
                 end
             end
 
             -- Network strings
-            data = libraries.net
-            if type( data ) == "table" then
-                for messageName in pairs( data ) do
+            library = libraries.net
+            if type( library ) == "table" then
+                for messageName in pairs( library ) do
                     net.Receivers[ messageName ] = nil
-                    data[ messageName ] = nil
+                    library[ messageName ] = nil
                 end
             end
         end
