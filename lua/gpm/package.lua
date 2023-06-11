@@ -635,9 +635,13 @@ Initialize = promise.Async( function( metadata, func, files )
                 end
 
                 if util.IsLuaModuleInstalled( name ) then
-                    local pkg2 = gpm.SourceImport( "lua", "includes/modules/" .. name .. ".lua" ):Await()
-                    pkg:Link( pkg2 )
-                    return pkg2:GetResult()
+                    local ok, result = gpm.SourceImport( "lua", "includes/modules/" .. name .. ".lua" ):SafeAwait()
+                    if not ok then
+                        error( result )
+                    end
+
+                    pkg:Link( result )
+                    return result:GetResult()
                 end
             end
 
