@@ -55,7 +55,7 @@ Import = promise.Async( function( metadata )
                 continue
             end
 
-            local ok, result = gpm.CompileLua( string.sub( filePath, 4, #filePath ) ):SafeAwait()
+            local ok, result = gpm.Compile( string.sub( filePath, 4, #filePath ) ):SafeAwait()
             if ok then
                 ok, result = pcall( result )
             end
