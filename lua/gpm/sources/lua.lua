@@ -32,7 +32,7 @@ GetMetadata = promise.Async( function( importPath )
             gpm.PreCacheMoon( folder, true )
         end
     else
-        folder = string.GetPathFromFilename( importPath )
+        folder = paths.Fix( string.GetPathFromFilename( importPath ) )
     end
 
     local packagePath = nil
@@ -88,8 +88,8 @@ GetMetadata = promise.Async( function( importPath )
         end
     end
 
-    if hasPackageFile then
-        metadata.package_path = packagePath
+    if packagePath ~= nil then
+        metadata.packagepath = packagePath
     end
 
     metadata.folder = folder
@@ -169,9 +169,9 @@ if SERVER then
         local folder = metadata.folder
         for _, filePath in ipairs( send ) do
             local localFilePath = folder .. "/" .. filePath
-            if fs.IsFile( localFilePath, "LUA" ) then
+            if fs.IsFile( localFilePath, "lsv" ) then
                 addClientLuaFile( localFilePath )
-            elseif fs.IsFile( filePath, "LUA" ) then
+            elseif fs.IsFile( filePath, "lsv" ) then
                 addClientLuaFile( filePath )
             end
         end
