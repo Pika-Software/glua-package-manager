@@ -428,8 +428,6 @@ do
     end
 
     gpm.IsPackage = isPackage
-    _G.IsPackage = isPackage
-
     _G.TYPE_PACKAGE = gpm.AddType( "Package", isPackage )
 
 end
