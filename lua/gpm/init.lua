@@ -184,6 +184,21 @@ function PreCacheMoon( filePath, noError )
     Logger:Debug( "The MoonScript file '%s' was successfully compiled into Lua.", filePath )
 end
 
+do
+
+    local string_GetExtensionFromFilename = string.GetExtensionFromFilename
+    local CompileLua = CompileLua
+
+    Compile = promise.Async( function( filePath )
+        if string_GetExtensionFromFilename( filePath ) == "moon" then
+            PreCacheMoon( filePath, false )
+        end
+
+        return CompileLua( filePath )
+    end )
+
+end
+
 IncludeComponent "import"
 IncludeComponent "commands"
 
