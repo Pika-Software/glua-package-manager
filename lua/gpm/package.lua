@@ -585,22 +585,26 @@ Initialize = promise.Async( function( metadata, func, files )
                 if folder and #folder > 0 then
                     local filePath = paths.Fix( folder .. fileName )
                     if fs.IsFile( filePath, "LUA" ) then
-                        func = gpm.CompileLua( filePath ):Await()
-                        if type( func ) == "function" then
-                            files[ fileName ] = debug.setfenv( func, env )
-                            return func( pkg )
+                        local ok, result = gpm.Compile( filePath ):SafeAwait()
+                        if not ok then
+                            error( result )
                         end
+
+                        files[ fileName ] = debug.setfenv( result, env )
+                        return result( pkg )
                     end
                 end
             end
 
             local filePath = paths.Fix( fileName )
             if fs.IsFile( filePath, "LUA" ) then
-                func = gpm.CompileLua( filePath ):Await()
-                if type( func ) == "function" then
-                    files[ fileName ] = debug.setfenv( func, env )
-                    return func( pkg )
+                local ok, result = gpm.Compile( filePath ):SafeAwait()
+                if not ok then
+                    error( result )
                 end
+
+                files[ fileName ] = debug.setfenv( result, env )
+                return result( pkg )
             end
 
             error( "Couldn't include file '" .. fileName .. "' - File not found" )
