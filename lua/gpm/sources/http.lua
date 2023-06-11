@@ -60,8 +60,16 @@ Import = promise.Async( function( metadata )
             return gpm.SourceImport( "zip", "data/" .. cachePath )
         end
 
-        local ok, result = fs.Compile( cachePath, "DATA" ):SafeAwait()
-        if not ok then return promise.Reject( result ) end
+        local ok, result
+        if extension == "lua" then
+            ok, result = fs.CompileLua( cachePath, "DATA" ):SafeAwait()
+        elseif extension == "moon" then
+            ok, result = fs.CompileMoon( cachePath, "DATA" ):SafeAwait()
+        end
+
+        if not ok then
+            return promise.Reject( result )
+        end
 
         return package.Initialize( package.GetMetadata( metadata ), result )
     end
@@ -85,6 +93,11 @@ Import = promise.Async( function( metadata )
 
         if extension == "lua" then
             local ok, result = pcall( CompileString, body, url )
+            if not ok then return promise.Reject( result ) end
+
+            return package.Initialize( package.GetMetadata( metadata ), result )
+        elseif extension == "moon" then
+            local ok, result = pcall( CompileMoonString, body, url )
             if not ok then return promise.Reject( result ) end
 
             return package.Initialize( package.GetMetadata( metadata ), result )
