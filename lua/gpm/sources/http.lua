@@ -35,7 +35,7 @@ local allowedExtensions = {
 }
 
 Import = promise.Async( function( metadata )
-    local url = metadata.import_path
+    local url = metadata.importpath
     local extension = string.GetExtensionFromFilename( url )
     if not allowedExtensions[ extension ] then
         local wsid = string.match( url, "steamcommunity%.com/sharedfiles/filedetails/%?id=(%d+)" )
@@ -60,8 +60,16 @@ Import = promise.Async( function( metadata )
             return gpm.SourceImport( "zip", "data/" .. cachePath )
         end
 
-        local ok, result = fs.Compile( cachePath, "DATA" ):SafeAwait()
-        if not ok then return promise.Reject( result ) end
+        local ok, result
+        if extension == "lua" then
+            ok, result = fs.CompileLua( cachePath, "DATA" ):SafeAwait()
+        elseif extension == "moon" then
+            ok, result = fs.CompileMoon( cachePath, "DATA" ):SafeAwait()
+        end
+
+        if not ok then
+            return promise.Reject( result )
+        end
 
         return package.Initialize( package.GetMetadata( metadata ), result )
     end
@@ -88,6 +96,11 @@ Import = promise.Async( function( metadata )
             if not ok then return promise.Reject( result ) end
 
             return package.Initialize( package.GetMetadata( metadata ), result )
+        elseif extension == "moon" then
+            local ok, result = pcall( CompileMoonString, body, url )
+            if not ok then return promise.Reject( result ) end
+
+            return package.Initialize( package.GetMetadata( metadata ), result )
         elseif extension == "gma" or extension == "zip" then
             return gpm.SourceImport( extension, "data/" .. cachePath )
         end
@@ -98,7 +111,7 @@ Import = promise.Async( function( metadata )
     local json = util.JSONToTable( body )
     if not json then return promise.Reject( "'.json' file is corrupted" ) end
     package.GetMetadata( table_Merge( metadata, json ) )
-    metadata.import_path = url
+    metadata.importpath = url
 
     local urls = metadata.files
     if type( urls ) ~= "table" then return promise.Reject( "files list is nil ( no links to files ), download canceled" ) end

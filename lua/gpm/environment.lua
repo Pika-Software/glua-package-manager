@@ -10,18 +10,12 @@ local type = type
 
 module( "gpm.environment" )
 
-function SetValue( environment, path, value, makeCopy )
+function SetValue( environment, keyPath, value )
     if type( value ) == "function" then
-        if makeCopy then
-            value = debug.fcopy( value )
-        end
-
         debug.setfenv( value, environment )
-    elseif makeCopy then
-        value = table.Copy( value )
     end
 
-    return table.SetValue( environment, path, value )
+    return table.SetValue( environment, keyPath, value )
 end
 
 do
@@ -37,7 +31,7 @@ do
     function ENVIRONMENT:__index( key )
         local links = GetLinks( self )
         for index = 1, #links do
-            local value = links[ index ][ key ]
+            local value = rawget( links[ index ], key )
             if value == nil then continue end
             return value
         end
@@ -75,6 +69,12 @@ do
 
 end
 
-function SetLinkedTable( environment, path, tbl )
-    return table.SetValue( environment, path, Create( tbl ) )
+function SetLinkedTable( environment, keyPath, tbl )
+    local meta = {
+        ["__index"] = tbl
+    }
+
+    local obj = setmetatable( {}, meta )
+    table.SetValue( environment, keyPath, obj )
+    return obj, meta
 end

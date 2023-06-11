@@ -47,8 +47,8 @@ local _HTTP = HTTP
 
 module( "promise" )
 
-_VERSION = "1.3.0" -- major.minor.patch
-_VERSION_NUM = 010300 -- _VERSION in number format: 1.2.3 -> 010203 | 99.56.13 -> 995613
+_VERSION = "1.3.1" -- major.minor.patch
+_VERSION_NUM = 010301 -- _VERSION in number format: 1.2.3 -> 010203 | 99.56.13 -> 995613
 
 -- Promise object
 do
@@ -372,5 +372,5 @@ function Sleep( delay )
         error( "sleep should be performed in the coroutine/async function" )
     end
 
-    Delay( delay ):Await()
+    Delay( delay ):SafeAwait()
 end

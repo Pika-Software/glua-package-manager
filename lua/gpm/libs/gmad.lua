@@ -281,14 +281,14 @@ function GMA:AddFile( filePath, content )
     end
 
     if isMoon then
-        local startTime = SysTime()
+        local stopwatch = SysTime()
         content = moonloader.ToLua( content )
         if not content then
-            logger:Error( "Compiling Moonscript file '%s' into Lua file '%s' is failed, took %f seconds.", moonPath, filePath, SysTime() - startTime )
+            logger:Error( "Compiling Moonscript file '%s' into Lua file '%s' is failed, took %f seconds.", moonPath, filePath, SysTime() - stopwatch )
             return
         end
 
-        logger:Debug( "Compiling Moonscript file '%s' into Lua file '%s' is finished, took %f seconds.", moonPath, filePath, SysTime() - startTime )
+        logger:Debug( "Compiling Moonscript file '%s' into Lua file '%s' is finished, took %f seconds.", moonPath, filePath, SysTime() - stopwatch )
     end
 
     files[ #files + 1 ] = {

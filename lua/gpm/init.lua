@@ -5,8 +5,10 @@ local table = table
 
 -- Variables
 local MENU_DLL = MENU_DLL
+local SysTime = SysTime
 local SERVER = SERVER
 local Color = Color
+local error = error
 local type = type
 
 MsgN( [[
@@ -26,7 +28,7 @@ MsgN( [[
 
 module( "gpm", package.seeall )
 
-_VERSION = 013200
+_VERSION = 013300
 
 if not Colors then
     Realm = "unknown"
@@ -72,23 +74,6 @@ IncludeComponent "logger"
 
 Logger = logger.Create( "GPM@" .. utils.Version( _VERSION ), Color( 180, 180, 255 ) )
 
-do
-
-    local ErrorNoHaltWithStack = ErrorNoHaltWithStack
-    local error = error
-
-    function Error( importPath, message, noHalt, sourceName )
-        Logger:Error( "[%s] Package '%s' import failed, see above to see the error.", sourceName or "unknown", importPath )
-        if noHalt then
-            ErrorNoHaltWithStack( message )
-            return
-        end
-
-        error( message, 2 )
-    end
-
-end
-
 libs = {}
 libs.deflatelua = IncludeComponent "libs/deflatelua"
 Logger:Info( "%s v%s is initialized.", libs.deflatelua._NAME, libs.deflatelua._VERSION )
@@ -98,10 +83,34 @@ local promise = promise
 
 Logger:Info( "gm_promise v%s is initialized.", utils.Version( promise._VERSION_NUM ) )
 
--- https://github.com/Pika-Software/gm_moonloader
-if util.IsBinaryModuleInstalled( "moonloader" ) then
-    require( "moonloader" )
-    gpm.Logger:Info( "Moonloader is initialized, MoonScript support is active." )
+if util.IsBinaryModuleInstalled( "moonloader" ) and pcall( require, "moonloader" ) then
+    Logger:Info( "Moonloader is initialized, MoonScript support is active." )
+end
+
+local moonloader = moonloader
+
+do
+
+    local CompileString = CompileString
+
+    function _G.CompileMoonString( moonCode, identifier, handleError )
+        if not moonloader then
+            return promise.Reject( "Attempting to compile a Moonscript file fails, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader." )
+        end
+
+        local luaCode = moonloader.ToLua( moonCode )
+        if not luaCode then
+            error( "MoonScript code compilation to Lua code failed." )
+        end
+
+        local func = CompileString( luaCode, identifier, handleError )
+        if type( func ) ~= "function" then
+            error( "MoonScript-Lua code compilation failed." )
+        end
+
+        return func
+    end
+
 end
 
 IncludeComponent "libs/gmad"
@@ -132,7 +141,7 @@ do
     local pcall = pcall
 
     CompileLua = promise.Async( function( filePath )
-        local ok, result = fs.Compile( "lua/" .. filePath, "GAME" ):SafeAwait()
+        local ok, result = fs.CompileLua( "lua/" .. filePath, "GAME" ):SafeAwait()
         if ok then
             return result
         end
@@ -151,6 +160,41 @@ do
         end
 
         return promise.Reject( result )
+    end )
+
+end
+
+function PreCacheMoon( filePath, noError )
+    if not moonloader then
+        if noError then return end
+        error( "Attempting to compile a Moonscript file fails, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader." )
+    end
+
+    if fs.IsDir( filePath, "LUA" ) then
+        moonloader.PreCacheDir( filePath )
+        Logger:Debug( "All MoonScript files in the '%s' folder was compiled into Lua.", filePath )
+        return
+    end
+
+    if not moonloader.PreCacheFile( filePath ) then
+        if noError then return end
+        error( "Compiling Moonscript file '" .. filePath .. "' into Lua is failed!" )
+    end
+
+    Logger:Debug( "The MoonScript file '%s' was successfully compiled into Lua.", filePath )
+end
+
+do
+
+    local string_GetExtensionFromFilename = string.GetExtensionFromFilename
+    local CompileLua = CompileLua
+
+    Compile = promise.Async( function( filePath )
+        if string_GetExtensionFromFilename( filePath ) == "moon" then
+            PreCacheMoon( filePath, false )
+        end
+
+        return CompileLua( filePath )
     end )
 
 end
