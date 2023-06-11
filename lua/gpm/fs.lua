@@ -16,6 +16,7 @@ local table = table
 local file = file
 
 -- Variables
+local CompileMoonString = CompileMoonString
 local CompileString = CompileString
 local math_max = math.max
 local ipairs = ipairs
@@ -119,6 +120,15 @@ CompileLua = promise.Async( function( filePath, gamePath, handleError )
     local func = CompileString( result.fileContent, result.filePath, handleError )
     assert( type( func ) == "function", "Lua file '" .. filePath .. "' (" .. gamePath .. ") compilation failed." )
     return func
+end )
+
+CompileMoon = promise.Async( function( filePath, gamePath, handleError )
+    local ok, result = AsyncRead( filePath, gamePath ):SafeAwait()
+    if not ok then
+        return promise.Reject( result )
+    end
+
+    return CompileMoonString( result.fileContent, result.filePath, handleError )
 end )
 
 if type( asyncio ) == "table" then
