@@ -268,8 +268,8 @@ do
         if not environment2 then return false end
 
         environment.Link( environment1, environment2 )
-        self:RemoveChild( child )
-        self:AddChild( child )
+        package2:RemoveChild( self )
+        package2:AddChild( self )
 
         logger:Debug( "'%s' ---> '%s'", package2:GetIdentifier(), self:GetIdentifier() )
         return true
@@ -285,7 +285,7 @@ do
         if not environment2 then return false end
 
         environment.UnLink( environment1, environment2 )
-        self:RemoveChild( child )
+        package2:RemoveChild( self )
 
         logger:Debug( "'%s' -/-> '%s'", package2:GetIdentifier(), self:GetIdentifier() )
         return true
@@ -338,9 +338,9 @@ do
 
         local env = self:GetEnvironment()
         if type( env ) == "table" then
-            for _, pkg in ipairs( self.Children ) do
+            for index, pkg in ipairs( self.Children ) do
                 if noDependencies then
-                    logger:Error( "Package '%s' uninstallation failed, dependencies found, try use -f to force uninstallation, took %.4f seconds.", self:GetIdentifier(), SysTime() - stopwatch )
+                    logger:Error( "Package '%s' uninstallation failed, %d dependencies found, try use -f to force uninstallation.", self:GetIdentifier(), #self.Children )
                     return
                 end
 
@@ -348,6 +348,8 @@ do
                     pkg:UnInstall()
                     pkg:UnLink( self )
                 end
+
+                self.Children[ index ] = nil
             end
 
             local libraries = self.Libraries
