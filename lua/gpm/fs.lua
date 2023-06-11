@@ -110,10 +110,14 @@ function CreateDir( folderPath )
     return currentPath
 end
 
-Compile = promise.Async( function( filePath, gamePath, handleError )
-    local data = AsyncRead( filePath, gamePath ):Await()
-    local func = CompileString( data.fileContent, data.filePath, handleError )
-    assert( type( func ) == "function", "file '" .. filePath .. "' (" .. gamePath .. ") compilation failed." )
+CompileLua = promise.Async( function( filePath, gamePath, handleError )
+    local ok, result = AsyncRead( filePath, gamePath ):SafeAwait()
+    if not ok then
+        return promise.Reject( result )
+    end
+
+    local func = CompileString( result.fileContent, result.filePath, handleError )
+    assert( type( func ) == "function", "Lua file '" .. filePath .. "' (" .. gamePath .. ") compilation failed." )
     return func
 end )
 
