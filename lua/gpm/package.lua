@@ -46,10 +46,9 @@ function Find( searchable, ignoreImportNames, noPatterns )
             continue
         end
 
-        local name = pkg.name
+        local name = pkg:GetName()
         if not name then continue end
-
-        if name == searchable or string.find( pkg.name, searchable, 1, noPatterns ) then
+        if string.find( name, searchable, 1, noPatterns ) ~= nil then
             result[ #result + 1 ] = pkg
         end
     end
