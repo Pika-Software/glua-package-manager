@@ -1,6 +1,6 @@
+local logger = gpm.Logger
 local SERVER = SERVER
 local ipairs = ipairs
-local table = table
 local gpm = gpm
 local net = net
 
@@ -8,7 +8,6 @@ do
 
     local workshopPath = gpm.WorkshopPath
     local cachePath = gpm.CachePath
-    local logger = gpm.Logger
     local fs = gpm.fs
 
     function gpm.ClearCache()
@@ -68,41 +67,39 @@ do
 
 end
 
-do
+function gpm.Reload( ... )
+    local arguments = { ... }
+    if #arguments == 0 then
+        logger:Warn( "There is no information for reloading packages, if you are trying to do a full reload then just use *" )
+    end
 
-    local hook_Run = hook.Run
-
-    -- TODO: Make this better
-    function gpm.Reload( ... )
-        local packageNames = {...}
-        if table.IsEmpty( packageNames ) then
-            table.Empty( gpm.ImportTasks )
-            table.Empty( gpm.Packages )
-            hook_Run( "GPM - Reload" )
-            include( "gpm/init.lua" )
-            return hook_Run( "GPM - Reloaded" )
-        end
-
-        for _, packageName in ipairs( packageNames ) do
-            if #packageName == 0 then continue end
-
-            local pkg = gpm.Packages[ packageName ]
-            if pkg then
-                pkg:Reload()
-                continue
-            end
-
-            local pkgs = gpm.package.Find( packageName, false, true )
-            if not pkgs then
-                logger:Error( "Package reload failed, packages with name '%s' is not found.", packageName )
-                continue
-            end
-
-            for _, pkg in ipairs( pkgs ) do
-                pkg:Reload()
-            end
+    local packages, count = {}, 0
+    for _, searchable in ipairs( arguments ) do
+        if #searchable == 0 then continue end
+        for _, pkg in ipairs( gpm.package.Find( searchable, false, false ) ) do
+            packages[ pkg ] = true
+            count = count + 1
         end
     end
+
+    if count == 0 then
+        logger:Info( "No candidates found for reloading, skipping..." )
+    else
+
+        logger:Info( "Found %d candidates to reload, reloading...", count )
+        for pkg in pairs( packages ) do
+            pkg:Reload()
+        end
+
+    end
+
+    if SERVER then
+        net.Start( "GPM.Networking" )
+            net.WriteUInt( 2, 3 )
+            net.WriteTable( arguments )
+        net.Broadcast()
+    end
+end
 
 end
 
@@ -172,11 +169,6 @@ if SERVER then
         end
 
         gpm.Reload( unpack( args ) )
-
-        net.Start( "GPM.Commands" )
-            net.WriteUInt( 2, 3 )
-            net.WriteTable( args )
-        net.Broadcast()
     end )
 
     concommand_Add( "gpm_install", function( ply, _, args )
