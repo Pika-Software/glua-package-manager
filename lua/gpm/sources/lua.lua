@@ -182,7 +182,7 @@ end
 
 CompileMain = promise.Async( function( filePath )
     if not filePath or not fs.IsFile( filePath, "LUA" ) then
-        return promise.Reject( "main file '" .. ( filePath or "init.lua" ) .. "' is missing." )
+        return promise.Reject( "Package main file '" .. ( filePath or "init.lua" ) .. "' is missing." )
     end
 
     return gpm.Compile( filePath )

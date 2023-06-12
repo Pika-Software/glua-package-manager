@@ -80,7 +80,7 @@ Import = promise.Async( function( metadata )
     if not ok then return promise.Reject( result ) end
 
     if result.code ~= 200 then
-        return promise.Reject( "invalid response code: " .. result.code )
+        return promise.Reject( "Invalid http response code: " .. result.code )
     end
 
     -- Processing
@@ -105,16 +105,16 @@ Import = promise.Async( function( metadata )
             return gpm.SourceImport( extension, "data/" .. cachePath )
         end
 
-        return promise.Reject( "how did you do that?!" )
+        return promise.Reject( "How did you do that?!" )
     end
 
     local json = util.JSONToTable( body )
-    if not json then return promise.Reject( "'.json' file is corrupted" ) end
+    if not json then return promise.Reject( "'.json' file is corrupted." ) end
     package.GetMetadata( table_Merge( metadata, json ) )
     metadata.importpath = url
 
     local urls = metadata.files
-    if type( urls ) ~= "table" then return promise.Reject( "files list is nil ( no links to files ), download canceled" ) end
+    if type( urls ) ~= "table" then return promise.Reject( "File list is empty, download canceled." ) end
 
     metadata.files = nil
 
@@ -123,19 +123,19 @@ Import = promise.Async( function( metadata )
         logger:Debug( "[%s] Package '%s', file '%s' (%s) download has started.", metadata.source, url, filePath, fileURL )
 
         local ok, result = http.Fetch( fileURL, nil, 120 ):SafeAwait()
-        if not ok then return promise.Reject( "file '" .. filePath .. "' download failed, " .. result ) end
-        if result.code ~= 200 then return promise.Reject( "file '" .. filePath .. "' download failed, invalid response code: " .. result.code .. "." ) end
+        if not ok then return promise.Reject( "File '" .. filePath .. "' download failed, " .. result ) end
+        if result.code ~= 200 then return promise.Reject( "File '" .. filePath .. "' download failed, invalid response code: " .. result.code .. "." ) end
         files[ #files + 1 ] = { filePath, result.body }
     end
 
-    if #files == 0 then return promise.Reject( "no files to compile, file list is empty" ) end
+    if #files == 0 then return promise.Reject( "No files to compile, file list is empty." ) end
 
     if metadata.mount == false then
         local compiledFiles = {}
         for _, data in ipairs( files ) do
             local ok, result = pcall( CompileString, data[ 2 ], data[ 1 ] )
-            if not ok then return promise.Reject( "file '" .. data[ 1 ] .. "' compile failed, " .. result .. "." ) end
-            if not result then return promise.Reject( "file '" ..  data[ 1 ] .. "' compile failed, no result." ) end
+            if not ok then return promise.Reject( "File '" .. data[ 1 ] .. "' compile failed, " .. result .. "." ) end
+            if not result then return promise.Reject( "File '" ..  data[ 1 ] .. "' compile failed, no result." ) end
             compiledFiles[ data[ 1 ] ] = result
         end
 
@@ -150,7 +150,7 @@ Import = promise.Async( function( metadata )
         end
 
         if not func then
-            return promise.Reject( "main file '" .. metadata.main .. "' is missing or compilation was failed" )
+            return promise.Reject( "Package main file '" .. metadata.main .. "' is missing or compilation was failed." )
         end
 
         return package.Initialize( metadata, func, compiledFiles )
@@ -158,7 +158,7 @@ Import = promise.Async( function( metadata )
 
     local gma = gmad.Write( cachePath )
     if not gma then
-        return promise.Reject( "cache file '" .. cachePath .. "' construction error, mounting failed" )
+        return promise.Reject( "Cache file '" .. cachePath .. "' construction error, mounting failed." )
     end
 
     gma:SetTitle( metadata.name )

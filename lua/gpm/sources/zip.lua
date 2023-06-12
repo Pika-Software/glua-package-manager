@@ -43,7 +43,7 @@ Import = promise.Async( function( metadata )
 
     local fileClass = fs.Open( importPath, "rb", "GAME" )
     if not fileClass then
-        return promise.Reject( "file '" .. importPath .. "' cannot be readed" )
+        return promise.Reject( "File '" .. importPath .. "' cannot be readed." )
     end
 
     local files = {}
@@ -70,12 +70,12 @@ Import = promise.Async( function( metadata )
     fileClass:Close()
 
     if #files == 0 then
-        return promise.Reject( "zip archive is empty ( no files to mount )" )
+        return promise.Reject( "Zip archive is empty, no files to mount." )
     end
 
     local gma = gmad.Write( cachePath )
     if not gma then
-        return promise.Reject( "cache file '" .. cachePath .. "' construction error, mounting failed" )
+        return promise.Reject( "Cache file '" .. cachePath .. "' construction error, mounting failed." )
     end
 
     gma:SetTitle( importPath )
