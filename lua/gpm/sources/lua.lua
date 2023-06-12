@@ -62,8 +62,6 @@ GetMetadata = promise.Async( function( importPath )
                 packagePath = luaPath
             end
         end
-
-        metadata.folder = folder
     end
 
     -- Single file
@@ -89,6 +87,7 @@ GetMetadata = promise.Async( function( importPath )
 
     if packagePath ~= nil then
         metadata.packagepath = packagePath
+        metadata.folder = folder
     end
 
     -- Shared init
