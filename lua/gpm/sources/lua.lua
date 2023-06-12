@@ -180,13 +180,16 @@ if SERVER then
 
 end
 
-Import = promise.Async( function( metadata )
-    local main = metadata.main
-    if not main or not fs.IsFile( main, "LUA" ) then
-        return promise.Reject( "main file '" .. ( main or "init.lua" ) .. "' is missing." )
+CompileMain = promise.Async( function( filePath )
+    if not filePath or not fs.IsFile( filePath, "LUA" ) then
+        return promise.Reject( "main file '" .. ( filePath or "init.lua" ) .. "' is missing." )
     end
 
-    local ok, result = gpm.Compile( main ):SafeAwait()
+    return gpm.Compile( filePath )
+end )
+
+Import = promise.Async( function( metadata )
+    local ok, result = CompileMain( metadata.main ):SafeAwait()
     if not ok then
         return promise.Reject( result )
     end
