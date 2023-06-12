@@ -175,6 +175,10 @@ do
         return table.Lookup( self, "Metadata.importpath" )
     end
 
+    function PACKAGE:GetMainFilePath()
+        return table.Lookup( self, "Metadata.main" )
+    end
+
     function PACKAGE:GetFolder()
         return table.Lookup( self, "Metadata.folder" )
     end
@@ -224,19 +228,15 @@ do
         return self.Files
     end
 
-    function PACKAGE:GetFileList()
-        local fileList = {}
-        for filePath in pairs( self:GetFiles() ) do
-            fileList[ #fileList + 1 ] = filePath
-        end
-
-        return fileList
+    function PACKAGE:IsInstalled()
+        return self.Installed
     end
 
     function PACKAGE:HasEnvironment()
         return type( self:GetEnvironment() ) == "table"
     end
 
+    -- Children
     function PACKAGE:GetChildren()
         return self.Children
     end
@@ -253,6 +253,7 @@ do
         end
     end
 
+    -- Package linking
     function PACKAGE:Link( package2 )
         gpm.ArgAssert( package2, 1, "Package" )
 
