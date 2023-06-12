@@ -1,9 +1,8 @@
 local gpm = gpm
 
 -- https://github.com/WilliamVenner/gmsv_workshop
-if SERVER and not steamworks then
-    if not util.IsBinaryModuleInstalled( "workshop" ) then return end
-    require( "workshop" )
+if SERVER and not steamworks and util.IsBinaryModuleInstalled( "workshop" ) and pcall( require, "workshop" ) then
+    gpm.Logger:Info( "A third-party steamworks API 'workshop' has been initialized." )
 end
 
 -- Libraries

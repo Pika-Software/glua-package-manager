@@ -152,7 +152,6 @@ do
                 if not source then continue end
                 if not source.CanImport( importPath ) then continue end
 
-
                 local ok, result = getMetadata( importPath, sourceName, source ):SafeAwait()
                 if not ok then
                     return promise.Reject( result )

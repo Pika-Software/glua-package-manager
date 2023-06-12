@@ -41,9 +41,9 @@ module( "gpm.package" )
 function Find( searchable, ignoreImportNames, noPatterns )
     local result = {}
     for importPath, pkg in pairs( gpm.Packages ) do
-        if not ignoreImportNames and string.find( importPath, searchable, 1, noPatterns ) then
+        if not ignoreImportNames and ( importPath == searchable or string.find( importPath, searchable, 1, noPatterns ) ) then
             result[ #result + 1 ] = pkg
-        elseif pkg.name and string.find( pkg.name, searchable, 1, noPatterns ) then
+        elseif pkg.name and ( pkg.name == searchable or string.find( pkg.name, searchable, 1, noPatterns ) ) then
             result[ #result + 1 ] = pkg
         end
     end
@@ -70,7 +70,9 @@ do
             source.menu = source.menu ~= false
 
             -- Main file
-            if CLIENT and type( source.cl_main ) == "string" then
+            if type( source.cl_main ) ~= "string" then
+                source.cl_main = nil
+            elseif CLIENT then
                 source.main = source.cl_main
             end
 
