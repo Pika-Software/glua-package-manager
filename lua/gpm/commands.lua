@@ -1,6 +1,8 @@
+local SERVER = SERVER
 local ipairs = ipairs
 local table = table
 local gpm = gpm
+local net = net
 
 do
 
