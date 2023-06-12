@@ -62,6 +62,8 @@ GetMetadata = promise.Async( function( importPath )
                 packagePath = luaPath
             end
         end
+
+        metadata.folder = folder
     end
 
     -- Single file
@@ -88,8 +90,6 @@ GetMetadata = promise.Async( function( importPath )
     if packagePath ~= nil then
         metadata.packagepath = packagePath
     end
-
-    metadata.folder = folder
 
     -- Shared init
     local main = metadata.main
@@ -151,7 +151,7 @@ if SERVER then
         end
 
         local cl_main = metadata.cl_main
-        if type( cl_main ) == "string" then
+        if cl_main then
             addClientLuaFile( cl_main )
         end
 
@@ -161,15 +161,20 @@ if SERVER then
         end
 
         local send = metadata.send
-        if not send then return end
+        if send then
+            local folder = metadata.folder
+            for _, filePath in ipairs( send ) do
+                if folder then
+                    local localFilePath = folder .. "/" .. filePath
+                    if fs.IsFile( localFilePath, "lsv" ) then
+                        addClientLuaFile( localFilePath )
+                        continue
+                    end
+                end
 
-        local folder = metadata.folder
-        for _, filePath in ipairs( send ) do
-            local localFilePath = folder .. "/" .. filePath
-            if fs.IsFile( localFilePath, "lsv" ) then
-                addClientLuaFile( localFilePath )
-            elseif fs.IsFile( filePath, "lsv" ) then
-                addClientLuaFile( filePath )
+                if fs.IsFile( filePath, "lsv" ) then
+                    addClientLuaFile( filePath )
+                end
             end
         end
     end
