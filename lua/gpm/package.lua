@@ -318,7 +318,8 @@ do
         return self.Installed
     end
 
-    function PACKAGE:UnInstall( noDependencies )
+    -- TODO: Make this better
+    function PACKAGE:UnInstall( noDependencies, ignoreDependencies )
         local stopwatch = SysTime()
 
         local ok, err = pcall( hook_Run, "PackageRemoved", self )
@@ -328,18 +329,20 @@ do
 
         local env = self:GetEnvironment()
         if type( env ) == "table" then
-            for index, pkg in ipairs( self.Children ) do
-                if noDependencies then
-                    logger:Error( "Package '%s' uninstallation failed, %d dependencies found, try use -f to force uninstallation.", self:GetIdentifier(), #self.Children )
-                    return
-                end
+            if not ignoreDependencies then
+                for index, pkg in ipairs( self.Children ) do
+                    if noDependencies then
+                        logger:Error( "Package '%s' uninstallation failed, %d dependencies found, try use -f to force uninstallation.", self:GetIdentifier(), #self.Children )
+                        return
+                    end
 
-                if pkg:IsInstalled() then
-                    pkg:UnInstall()
-                    pkg:UnLink( self )
-                end
+                    if pkg:IsInstalled() then
+                        pkg:UnInstall()
+                        pkg:UnLink( self )
+                    end
 
-                self.Children[ index ] = nil
+                    self.Children[ index ] = nil
+                end
             end
 
             local libraries = self.Libraries
@@ -414,6 +417,30 @@ do
 
         logger:Info( "Package '%s' was successfully uninstalled, took %.4f seconds.", self:GetIdentifier(), SysTime() - stopwatch )
     end
+
+    -- TODO: Make this better
+    PACKAGE.Reload = promise.Async( function( self )
+        self:UnInstall( false, true )
+
+        local metadata = self:GetMetadata()
+        if not metadata then return end
+
+        if metadata.source == "lua" then
+            local main = metadata.main
+            if main then
+                local ok, result = gpm.Compile( main ):SafeAwait()
+                if not ok then
+                    error( result )
+                end
+
+                self.Main = result
+            end
+
+            table.Empty( self.Files )
+        end
+
+        return self:Install()
+    end )
 
     local function isPackage( any )
         return getmetatable( any ) == PACKAGE
