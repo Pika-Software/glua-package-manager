@@ -136,7 +136,10 @@ if type( asyncio ) == "table" then
         local p = promise.New()
 
         if asyncio.AsyncRead( filePath, gamePath, function( filePath, gamePath, status, fileContent )
-            if status ~= 0 then return p:Reject( "Error code: " .. status ) end
+            if status ~= 0 then
+                return p:Reject( "Error code: " .. status )
+            end
+
             p:Resolve( {
                 ["fileContent"] = fileContent,
                 ["filePath"] = filePath,
@@ -153,7 +156,10 @@ if type( asyncio ) == "table" then
         local p = promise.New()
 
         if asyncio.AsyncWrite( filePath, fileContent, function( filePath, gamePath, status )
-            if status ~= 0 then return p:Reject( "Error code: " .. status ) end
+            if status ~= 0 then
+                return p:Reject( "Error code: " .. status )
+            end
+
             p:Resolve( {
                 ["filePath"] = filePath,
                 ["gamePath"] = gamePath
@@ -169,7 +175,10 @@ if type( asyncio ) == "table" then
         local p = promise.New()
 
         if asyncio.AsyncAppend( filePath, fileContent, function( filePath, gamePath, status )
-            if status ~= 0 then return p:Reject( "Error code: " .. status ) end
+            if status ~= 0 then
+                return p:Reject( "Error code: " .. status )
+            end
+
             p:Resolve( {
                 ["filePath"] = filePath,
                 ["gamePath"] = gamePath
@@ -188,7 +197,10 @@ function AsyncRead( filePath, gamePath )
     local p = promise.New()
 
     if file.AsyncRead( filePath, gamePath, function( filePath, gamePath, status, fileContent )
-        if status ~= 0 then return p:Reject( "Error code: " .. status ) end
+        if status ~= 0 then
+            return p:Reject( "Error code: " .. status )
+        end
+
         p:Resolve( {
             ["filePath"] = filePath,
             ["gamePath"] = gamePath,
@@ -207,7 +219,10 @@ if type( file.AsyncWrite ) == "function" then
         local p = promise.New()
 
         if file.AsyncWrite( filePath, fileContent, function( filePath, status )
-            if status ~= 0 then return p:Reject( "Error code: " .. status ) end
+            if status ~= 0 then
+                return p:Reject( "Error code: " .. status )
+            end
+
             p:Resolve( {
                 ["filePath"] = filePath
             } )
@@ -244,7 +259,10 @@ if type( file.AsyncAppen ) == "function" then
         local p = promise.New()
 
         if file.AsyncAppend( filePath, fileContent, function( filePath, status )
-            if status ~= 0 then return p:Reject( "Error code: " .. status ) end
+            if status ~= 0 then
+                return p:Reject( "Error code: " .. status )
+            end
+
             p:Resolve( {
                 ["filePath"] = filePath
             } )

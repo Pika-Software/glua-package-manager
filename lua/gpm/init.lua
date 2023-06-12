@@ -1,9 +1,5 @@
 AddCSLuaFile()
 
--- Libraries
-local table = table
-
--- Variables
 local MENU_DLL = MENU_DLL
 local SysTime = SysTime
 local SERVER = SERVER
@@ -28,7 +24,7 @@ MsgN( [[
 
 module( "gpm", package.seeall )
 
-_VERSION = 013301
+_VERSION = 013400
 
 if not Colors then
     Realm = "unknown"
@@ -121,15 +117,12 @@ IncludeComponent "http"
 IncludeComponent "fs"
 IncludeComponent "zip"
 
-local fs = fs
-
-if type( Packages ) == "table" then
-    table.Empty( Packages )
-else
+if type( Packages ) ~= "table" then
     Packages = {}
 end
 
 IncludeComponent "package"
+local fs = fs
 
 CacheLifetime = CreateConVar( "gpm_cache_lifetime", "24", FCVAR_ARCHIVE, "Packages cache lifetime, in hours, sets after how many hours the downloaded gpm packages will not be relevant.", 0, 60480 )
 WorkshopPath = fs.CreateDir( "gpm/" .. ( SERVER and "server" or "client" ) .. "/workshop/" )
