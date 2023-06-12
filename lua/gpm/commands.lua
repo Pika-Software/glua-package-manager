@@ -134,14 +134,14 @@ local net = net
 
 if SERVER then
 
-    util.AddNetworkString( "GPM.Commands" )
+    util.AddNetworkString( "GPM.Networking" )
 
     local concommand_Add = concommand.Add
     local IsValid = IsValid
 
     concommand_Add( "gpm_clear_cache", function( ply )
         if IsValid( ply ) then
-            net.Start( "GPM.Commands" )
+            net.Start( "GPM.Networking" )
                 net.WriteUInt( 0, 3 )
             net.Send( ply )
 
@@ -153,7 +153,7 @@ if SERVER then
 
     concommand_Add( "gpm_list", function( ply )
         if IsValid( ply ) then
-            net.Start( "GPM.Commands" )
+            net.Start( "GPM.Networking" )
                 net.WriteUInt( 1, 3 )
             net.Send( ply )
 
@@ -188,7 +188,7 @@ if SERVER then
             return
         end
 
-        net.Start( "GPM.Commands" )
+        net.Start( "GPM.Networking" )
             net.WriteUInt( 3, 3 )
             net.WriteTable( args )
         net.Send( ply )
@@ -205,7 +205,7 @@ if SERVER then
             return
         end
 
-        net.Start( "GPM.Commands" )
+        net.Start( "GPM.Networking" )
             net.WriteUInt( 4, 3 )
             net.WriteTable( args )
         net.Send( ply )
@@ -229,7 +229,7 @@ if CLIENT then
         end
     }
 
-    net.Receive( "GPM.Commands", function()
+    net.Receive( "GPM.Networking", function()
         local func = events[ net.ReadUInt( 3 ) ]
         if not func then return end
         func()
