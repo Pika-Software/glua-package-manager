@@ -6,44 +6,40 @@ local table = table
 local util = util
 local file = file
 local efsw = efsw
+local gpm = gpm
 
 -- Variables
 local CompileMoonString = CompileMoonString
 local CompileString = CompileString
 local debug_fempty = debug.fempty
 local math_max = math.max
+local logger = gpm.Logger
 local SERVER = SERVER
 local ipairs = ipairs
 local assert = assert
 local type = type
 
 -- https://github.com/Pika-Software/gm_asyncio
-if util.IsBinaryModuleInstalled( "asyncio" ) and pcall( require, "asyncio" ) then
-    gpm.Logger:Info( "A third-party file system API 'asyncio' has been initialized." )
 -- https://github.com/WilliamVenner/gm_async_write
+if util.IsBinaryModuleInstalled( "asyncio" ) and pcall( require, "asyncio" ) then
+    logger:Info( "A third-party file system API 'asyncio' has been initialized." )
 elseif SERVER and util.IsBinaryModuleInstalled( "async_write" ) and pcall( require, "async_write" ) then
-    gpm.Logger:Info( "A third-party file system API 'async_write' has been initialized." )
+    logger:Info( "A third-party file system API 'async_write' has been initialized." )
 end
 
 -- https://github.com/Pika-Software/gm_efsw
-if SERVER and util.IsBinaryModuleInstalled( "efsw" ) and pcall( require, "efsw" ) then
-    gpm.Logger:Info( "gm_efsw is initialized, package auto-refresh are available." )
+if util.IsBinaryModuleInstalled( "efsw" ) and pcall( require, "efsw" ) then
+    logger:Info( "gm_efsw is initialized, package auto-reload are available." )
 end
 
--- TODO: Make this better
 if efsw ~= nil then
-    hook.Add( "FileWatchEvent", "GPM.AutoRefresh", function( actionID, _, filePath )
+    hook.Add( "FileWatchEvent", "GPM.AutoReload", function( actionID, _, filePath )
         local importPath = string.match( filePath, ".*/lua/(packages/.*)/" )
         if not importPath then return end
 
         local pkg = gpm.Packages[ importPath ]
         if pkg and pkg:IsInstalled() then
             gpm.Reload( importPath )
-
-            net.Start( "GPM.Commands" )
-                net.WriteUInt( 2, 3 )
-                net.WriteTable( { importPath } )
-            net.Broadcast()
         end
     end )
 end
@@ -83,10 +79,7 @@ function IsDir( filePath, gamePath )
 end
 
 function IsFile( filePath, gamePath )
-    if SERVER then
-        return file.Exists( filePath, gamePath ) and not file.IsDir( filePath, gamePath )
-    end
-
+    if SERVER then return file.Exists( filePath, gamePath ) and not file.IsDir( filePath, gamePath ) end
     if file.Exists( filePath, gamePath ) and not file.IsDir( filePath, gamePath ) then return true end
 
     local files, _ = file.Find( filePath .. "*", gamePath )
@@ -156,29 +149,26 @@ CompileMoon = promise.Async( function( filePath, gamePath, handleError )
     return CompileMoonString( result.fileContent, result.filePath, handleError )
 end )
 
--- TODO: Make this better
-if SERVER then
-    if efsw ~= nil then
-        local watchList = efsw.WatchList
-        if type( watchList ) ~= "table" then
-            watchList = {}; efsw.WatchList = watchList
-        end
+Watch = debug_fempty
+UnWatch = debug_fempty
 
-        function Watch( filePath, gamePath )
-            if watchList[ filePath .. ";" .. gamePath ] then return end
-            local watchID = efsw.Watch( filePath, gamePath )
-            watchList[ filePath .. ";" .. gamePath ] = watchID
-            return watchID
-        end
+if efsw ~= nil then
+    local watchList = efsw.WatchList
+    if type( watchList ) ~= "table" then
+        watchList = {}; efsw.WatchList = watchList
+    end
 
-        function UnWatch( filePath, gamePath )
-            local watchID = watchList[ filePath .. ";" .. gamePath ]
-            if not watchID then return end
+    function Watch( filePath, gamePath )
+        if watchList[ filePath .. ";" .. gamePath ] then return end
+        watchList[ filePath .. ";" .. gamePath ] = efsw.Watch( filePath, gamePath )
+    end
+
+    function UnWatch( filePath, gamePath )
+        local watchID = watchList[ filePath .. ";" .. gamePath ]
+        if watchID then
             efsw.Unwatch( watchID )
             watchList[ filePath .. ";" .. gamePath ] = nil
         end
-    else
-        Watch, UnWatch = debug_fempty, debug_fempty
     end
 end
 
