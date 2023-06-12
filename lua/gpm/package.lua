@@ -41,9 +41,15 @@ module( "gpm.package" )
 function Find( searchable, ignoreImportNames, noPatterns )
     local result = {}
     for importPath, pkg in pairs( gpm.Packages ) do
-        if not ignoreImportNames and ( importPath == searchable or string.find( importPath, searchable, 1, noPatterns ) ) then
+        if not ignoreImportNames and importPath == searchable then
             result[ #result + 1 ] = pkg
-        elseif pkg.name and ( pkg.name == searchable or string.find( pkg.name, searchable, 1, noPatterns ) ) then
+            continue
+        end
+
+        local name = pkg.name
+        if not name then continue end
+
+        if name == searchable or string.find( pkg.name, searchable, 1, noPatterns ) then
             result[ #result + 1 ] = pkg
         end
     end
