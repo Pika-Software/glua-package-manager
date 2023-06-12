@@ -70,6 +70,7 @@ do
 
     local hook_Run = hook.Run
 
+    -- TODO: Make this better
     function gpm.Reload( ... )
         local packageNames = {...}
         if table.IsEmpty( packageNames ) then
@@ -83,6 +84,12 @@ do
         for _, packageName in ipairs( packageNames ) do
             if #packageName == 0 then continue end
 
+            local pkg = gpm.Packages[ packageName ]
+            if pkg then
+                pkg:Reload()
+                continue
+            end
+
             local pkgs = gpm.package.Find( packageName, false, true )
             if not pkgs then
                 logger:Error( "Package reload failed, packages with name '%s' is not found.", packageName )
@@ -90,7 +97,7 @@ do
             end
 
             for _, pkg in ipairs( pkgs ) do
-                pkg:Install()
+                pkg:Reload()
             end
         end
     end
