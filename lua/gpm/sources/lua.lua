@@ -30,6 +30,7 @@ GetMetadata = promise.Async( function( importPath )
     if fs.IsDir( folder, "LUA" ) then
         if SERVER then
             gpm.PreCacheMoon( folder, true )
+            fs.Watch( folder .. "/", "lsv" )
         end
     else
         folder = paths.Fix( string.GetPathFromFilename( importPath ) )

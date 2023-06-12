@@ -23,6 +23,29 @@ local ipairs = ipairs
 local assert = assert
 local type = type
 
+-- https://github.com/Pika-Software/gm_efsw
+if SERVER and util.IsBinaryModuleInstalled( "efsw" ) and pcall( require, "efsw" ) then
+    gpm.Logger:Info( "gm_efsw is initialized, package auto-refresh are available." )
+end
+
+-- TODO: Make this better
+if efsw ~= nil then
+    hook.Add( "FileWatchEvent", "GPM.AutoRefresh", function( actionID, _, filePath )
+        local importPath = string.match( filePath, ".*/lua/(packages/.*)/" )
+        if not importPath then return end
+
+        local pkg = gpm.Packages[ importPath ]
+        if pkg and pkg:IsInstalled() then
+            gpm.Reload( importPath )
+
+            net.Start( "GPM.Commands" )
+                net.WriteUInt( 2, 3 )
+                net.WriteTable( { importPath } )
+            net.Broadcast()
+        end
+    end )
+end
+
 module( "gpm.fs" )
 
 Delete = file.Delete
@@ -130,6 +153,32 @@ CompileMoon = promise.Async( function( filePath, gamePath, handleError )
 
     return CompileMoonString( result.fileContent, result.filePath, handleError )
 end )
+
+-- TODO: Make this better
+if SERVER then
+    if efsw ~= nil then
+        local watchList = efsw.WatchList
+        if type( watchList ) ~= "table" then
+            watchList = {}; efsw.WatchList = watchList
+        end
+
+        function Watch( filePath, gamePath )
+            if watchList[ filePath .. ";" .. gamePath ] then return end
+            local watchID = efsw.Watch( filePath, gamePath )
+            watchList[ filePath .. ";" .. gamePath ] = watchID
+            return watchID
+        end
+
+        function UnWatch( filePath, gamePath )
+            local watchID = watchList[ filePath .. ";" .. gamePath ]
+            if not watchID then return end
+            efsw.Unwatch( watchID )
+            watchList[ filePath .. ";" .. gamePath ] = nil
+        end
+    else
+        Watch, UnWatch = debug_fempty, debug_fempty
+    end
+end
 
 if type( asyncio ) == "table" then
     function AsyncRead( filePath, gamePath )
