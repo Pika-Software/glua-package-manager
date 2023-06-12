@@ -64,9 +64,9 @@ do
                     return promise.Reject( result )
                 end
 
-                metadata = package.GetMetadata( result )
+                metadata = package.BuildMetadata( result )
             else
-                metadata = package.GetMetadata( {} )
+                metadata = package.BuildMetadata( {} )
             end
 
             metadatas[ sourceName .. ";" .. importPath ] = metadata

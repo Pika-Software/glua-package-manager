@@ -46,7 +46,7 @@ GetMetadata = promise.Async( function( importPath )
                 return promise.Reject( result )
             end
 
-            metadata = package.GetMetadata( result )
+            metadata = package.BuildMetadata( result )
             packagePath = moonPath
         end
 
@@ -58,7 +58,7 @@ GetMetadata = promise.Async( function( importPath )
                     return promise.Reject( result )
                 end
 
-                metadata = package.GetMetadata( result )
+                metadata = package.BuildMetadata( result )
                 packagePath = luaPath
             end
         end

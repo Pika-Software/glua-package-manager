@@ -63,7 +63,7 @@ do
         ["__index"] = _G
     }
 
-    local function getMetadata( source )
+    function BuildMetadata( source )
         if type( source ) == "table" then
             utils.LowerTableKeys( source )
 
@@ -156,11 +156,9 @@ do
                 result = result.package
             end
 
-            return getMetadata( result )
+            return BuildMetadata( result )
         end
     end
-
-    GetMetadata = getMetadata
 
 end
 
