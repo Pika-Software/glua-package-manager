@@ -37,16 +37,6 @@ local _G = _G
 
 module( "gpm.package" )
 
--- Get all registered packages
-function GetAll()
-    return gpm.Packages
-end
-
--- Get one registered package
-function Get( importPath )
-    return gpm.Packages[ importPath ]
-end
-
 -- Get package by name/pattern
 function Find( searchable, ignoreImportNames, noPatterns )
     local result = {}
