@@ -1,27 +1,29 @@
--- https://github.com/Pika-Software/gm_asyncio
-if util.IsBinaryModuleInstalled( "asyncio" ) then
-    gpm.Logger:Info( "A third-party file system API 'asyncio' has been initialized." )
-    require( "asyncio" )
--- https://github.com/WilliamVenner/gm_async_write
-elseif SERVER and util.IsBinaryModuleInstalled( "async_write" ) then
-    gpm.Logger:Info( "A third-party file system API 'async_write' has been initialized." )
-    require( "async_write" )
-end
-
 -- Libraries
 local asyncio = asyncio
 local promise = promise
 local string = string
 local table = table
+local util = util
 local file = file
+local efsw = efsw
 
 -- Variables
 local CompileMoonString = CompileMoonString
 local CompileString = CompileString
+local debug_fempty = debug.fempty
 local math_max = math.max
+local SERVER = SERVER
 local ipairs = ipairs
 local assert = assert
 local type = type
+
+-- https://github.com/Pika-Software/gm_asyncio
+if util.IsBinaryModuleInstalled( "asyncio" ) and pcall( require, "asyncio" ) then
+    gpm.Logger:Info( "A third-party file system API 'asyncio' has been initialized." )
+-- https://github.com/WilliamVenner/gm_async_write
+elseif SERVER and util.IsBinaryModuleInstalled( "async_write" ) and pcall( require, "async_write" ) then
+    gpm.Logger:Info( "A third-party file system API 'async_write' has been initialized." )
+end
 
 -- https://github.com/Pika-Software/gm_efsw
 if SERVER and util.IsBinaryModuleInstalled( "efsw" ) and pcall( require, "efsw" ) then
