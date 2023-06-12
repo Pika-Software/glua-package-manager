@@ -1,23 +1,6 @@
--- Libraries
-local asyncio = asyncio
-local promise = promise
-local string = string
-local table = table
-local util = util
-local file = file
-local efsw = efsw
-local gpm = gpm
-
--- Variables
-local CompileMoonString = CompileMoonString
-local CompileString = CompileString
-local debug_fempty = debug.fempty
-local math_max = math.max
 local logger = gpm.Logger
 local SERVER = SERVER
-local ipairs = ipairs
-local assert = assert
-local type = type
+local util = util
 
 -- https://github.com/Pika-Software/gm_asyncio
 -- https://github.com/WilliamVenner/gm_async_write
@@ -32,15 +15,32 @@ if util.IsBinaryModuleInstalled( "efsw" ) and pcall( require, "efsw" ) then
     logger:Info( "gm_efsw is initialized, package auto-reload are available." )
 end
 
+-- Libraries
+local asyncio = asyncio
+local promise = promise
+local string = string
+local table = table
+local file = file
+local efsw = efsw
+
+-- Variables
+local CompileMoonString = CompileMoonString
+local CompileString = CompileString
+local debug_fempty = debug.fempty
+local math_max = math.max
+local ipairs = ipairs
+local assert = assert
+local type = type
+
 if efsw ~= nil then
     hook.Add( "FileWatchEvent", "GPM.AutoReload", function( actionID, _, filePath )
         local importPath = string.match( filePath, ".*/lua/(packages/.*)/" )
         if not importPath then return end
 
         local pkg = gpm.Packages[ importPath ]
-        if pkg and pkg:IsInstalled() then
-            gpm.Reload( importPath )
-        end
+        if not pkg then return end
+
+        pkg:Reload()
     end )
 end
 
@@ -172,7 +172,7 @@ if efsw ~= nil then
     end
 end
 
-if type( asyncio ) == "table" then
+if asyncio ~= nil then
     function AsyncRead( filePath, gamePath )
         local p = promise.New()
 
