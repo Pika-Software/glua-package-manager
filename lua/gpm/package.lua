@@ -56,6 +56,53 @@ function Find( searchable, ignoreImportNames, noPatterns )
     return result
 end
 
+local function getCurrentLuaPath()
+    local filePath = utils.GetCurrentFile()
+    if not filePath then return end
+    return paths.Localize( paths.Fix( filePath ) )
+end
+
+if SERVER then
+
+    function AddClientLuaFile( fileName )
+        local filePath = nil
+
+        local luaPath = getCurrentLuaPath()
+        if luaPath then
+            if fileName ~= nil then
+                gpm.ArgAssert( fileName, 1, "string" )
+            else
+                fileName = string.GetFileFromFilename( luaPath )
+            end
+
+            local folder = string.GetPathFromFilename( luaPath )
+            if folder and #folder > 0 then
+                filePath = paths.Fix( folder .. fileName )
+            end
+        else
+            gpm.ArgAssert( fileName, 1, "string" )
+        end
+
+        if fileName and fs.IsFile( fileName, "LUA" ) then
+            filePath = paths.Fix( fileName )
+        end
+
+        if filePath ~= nil then
+            local extension = string.GetExtensionFromFilename( filePath )
+            if extension == "moon" then
+                filePath = string.sub( filePath, 1, #filePath - #extension ) .. "lua"
+            end
+
+            if fs.IsFile( filePath, "LUA" ) then
+                return AddCSLuaFile( filePath )
+            end
+        end
+
+        error( "Couldn't AddCSLuaFile file '" .. fileName .. "' - File not found" )
+    end
+
+end
+
 do
 
     local environment = {
@@ -287,20 +334,491 @@ do
         return true
     end
 
+    -- Environment
+    do
+
+        local internalMeta = {
+            ["__index"] = function( self, index )
+                local value = {}
+                rawset( self, index, value )
+                return value
+            end
+        }
+
+        local addCSLuaFile = SERVER and AddClientLuaFile or debug.fempty
+
+        function PACKAGE:EnvironmentInit( metadata )
+            local env = self.Environment
+            if type( env ) ~= "table" then
+                env = environment.Create( _G )
+                self.Environment = env
+
+                env.AddCSLuaFile = addCSLuaFile
+                env.ArgAssert = gpm.ArgAssert
+                env.TypeID = gpm.TypeID
+                env.http = gpm.http
+                env.type = gpm.type
+                env._PKG = self
+                env.file = fs
+            end
+
+            env._VERSION = metadata.version
+
+            local main = self.Main
+            if type( main ) == "function" then
+                debug.setfenv( main, env )
+            end
+
+            local files = self.Files
+            for _, func in pairs( files ) do
+                debug.setfenv( func, env )
+            end
+
+            -- GPM link
+            local _gpm = environment.SetLinkedTable( env, "gpm", gpm )
+            _gpm.Package = self
+
+            -- Logger
+            if metadata.logger then
+                local logger = gpm.logger.Create( self:GetIdentifier(), metadata.color )
+                _gpm.Logger = logger
+                self.Logger = logger
+            end
+
+            -- import
+            do
+
+                local function import( importPath, async, pkg2 )
+                    if gpm.IsPackage( pkg2 ) then
+                        return gpm.Import( importPath, async, pkg2 )
+                    end
+
+                    return gpm.Import( importPath, async, self )
+                end
+
+                _gpm.Import = import
+                env.import = import
+
+            end
+
+            -- install
+            env.install = function( ... )
+                return gpm.Install( self, false, ... )
+            end
+
+            _gpm.Install = function( pkg2, async, ... )
+                if gpm.IsPackage( pkg2 ) then
+                    return gpm.Install( pkg2, async, ... )
+                end
+
+                return gpm.Install( self, async, ... )
+            end
+
+            -- include
+            env.include = function( fileName )
+                gpm.ArgAssert( fileName, 1, "string" )
+
+                local func = files[ paths.Fix( fileName ) ]
+                if type( func ) == "function" then
+                    return func( self )
+                end
+
+                local luaPath = getCurrentLuaPath()
+                if luaPath then
+                    local folder = string.GetPathFromFilename( luaPath )
+                    if folder and #folder > 0 then
+                        local filePath = paths.Fix( folder .. fileName )
+                        if fs.IsFile( filePath, "LUA" ) then
+                            local ok, result = gpm.Compile( filePath ):SafeAwait()
+                            if not ok then
+                                error( result )
+                            end
+
+                            files[ fileName ] = debug.setfenv( result, env )
+                            return result( self )
+                        end
+                    end
+                end
+
+                local filePath = paths.Fix( fileName )
+                if fs.IsFile( filePath, "LUA" ) then
+                    local ok, result = gpm.Compile( filePath ):SafeAwait()
+                    if not ok then
+                        error( result )
+                    end
+
+                    files[ fileName ] = debug.setfenv( result, env )
+                    return result( self )
+                end
+
+                error( "Couldn't include file '" .. fileName .. "' - File not found" )
+            end
+
+            -- require
+            env.require = function( ... )
+                local arguments = {...}
+                local lenght = #arguments
+
+                for number, name in ipairs( arguments ) do
+                    gpm.ArgAssert( name, number, "string" )
+
+                    if string.IsURL( name ) then
+                        if not gpm.CanImport( name ) then continue end
+
+                        local ok, result = gpm.AsyncImport( name, self, false ):SafeAwait()
+                        if not ok then
+                            if number ~= lenght then continue end
+                            error( result )
+                        end
+
+                        return result
+                    end
+
+                    if util.IsBinaryModuleInstalled( name ) then
+                        return require( name )
+                    end
+
+                    if util.IsLuaModuleInstalled( name ) then
+                        local ok, result = gpm.SourceImport( "lua", "includes/modules/" .. name .. ".lua" ):SafeAwait()
+                        if not ok then
+                            error( result )
+                        end
+
+                        self:Link( result )
+                        return result:GetResult()
+                    end
+                end
+
+                error( "Not one of the listed packages could be required." )
+            end
+
+            local callbacks = self.Callbacks
+            if not callbacks then
+                callbacks = {}; self.Callbacks = callbacks
+            end
+
+            -- Hooks
+            do
+
+                local data = setmetatable( {}, internalMeta )
+                local autoNames = self:HasAutoNames( "hook" )
+                callbacks.hook = data
+
+                local obj, metatable = environment.SetLinkedTable( env, "hook", hook )
+
+                function obj.Add( eventName, identifier, ... )
+                    if autoNames and type( identifier ) == "string" then
+                        identifier = self:GetIdentifier( identifier )
+                    end
+
+                    data[ eventName ][ identifier ] = true
+                    return hook.Add( eventName, identifier, ... )
+                end
+
+                function obj.Remove( eventName, identifier, ... )
+                    if autoNames and type( identifier ) == "string" then
+                        identifier = self:GetIdentifier( identifier )
+                    end
+
+                    data[ eventName ][ identifier ] = nil
+                    return hook.Remove( eventName, identifier, ... )
+                end
+
+                metatable.__newindex = hook
+
+            end
+
+            -- Timers
+            do
+
+                local data = {}
+                callbacks.timer = data
+                local autoNames = self:HasAutoNames( "timer" )
+
+                local obj, metatable = environment.SetLinkedTable( env, "timer", timer )
+
+                for key, func in pairs( timer ) do
+                    if key == "Destroy" or key == "Remove" or key == "Simple" then continue end
+                    obj[ key ] = function( identifier, ... )
+                        if autoNames then
+                            identifier = self:GetIdentifier( identifier )
+                        end
+
+                        data[ identifier ] = true
+                        return func( identifier, ... )
+                    end
+                end
+
+                local function removeFunction( identifier, ... )
+                    if autoNames then
+                        identifier = self:GetIdentifier( identifier )
+                    end
+
+                    data[ identifier ] = nil
+                    return timer.Remove( identifier, ... )
+                end
+
+                obj.Destroy = removeFunction
+                obj.Remove = removeFunction
+
+                metatable.__newindex = timer
+
+            end
+
+            -- ConVars
+            do
+
+                local data = setmetatable( {}, internalMeta )
+                local autoNames = self:HasAutoNames( "cvars" )
+                callbacks.cvars = data
+
+                local obj, metatable = environment.SetLinkedTable( env, "cvars", cvars )
+
+                function obj.AddChangeCallback( name, func, identifier, ... )
+                    if type( identifier ) ~= "string" then
+                        identifier = "Default"
+                    end
+
+                    if autoNames then
+                        identifier = self:GetIdentifier( identifier )
+                    end
+
+                    data[ name ][ identifier ] = true
+                    return cvars.AddChangeCallback( name, func, identifier, ... )
+                end
+
+                function obj.RemoveChangeCallback( name, identifier, ... )
+                    if type( identifier ) ~= "string" then
+                        identifier = "Default"
+                    end
+
+                    if autoNames then
+                        identifier = self:GetIdentifier( identifier )
+                    end
+
+                    data[ name ][ identifier ] = nil
+                    return cvars.RemoveChangeCallback( name, identifier, ... )
+                end
+
+                metatable.__newindex = cvars
+
+            end
+
+            -- ConCommands
+            do
+
+                local data = {}
+                callbacks.concommand = data
+
+                local obj, metatable = environment.SetLinkedTable( env, "concommand", concommand )
+
+                function obj.Add( name, ... )
+                    data[ name ] = true
+                    return concommand.Add( name, ... )
+                end
+
+                function obj.Remove( name, ... )
+                    data[ name ] = nil
+                    return concommand.Remove( name, ... )
+                end
+
+                metatable.__newindex = concommand
+
+            end
+
+            -- Net
+            do
+
+                local data = {}
+                callbacks.net = data
+                local autoNames = self:HasAutoNames( "net" )
+
+                do
+
+                    local obj, metatable = environment.SetLinkedTable( env, "net", net )
+
+                    function obj.Receive( messageName, ... )
+                        if autoNames then
+                            messageName = self:GetIdentifier( messageName )
+                        end
+
+                        data[ messageName ] = true
+                        return net.Receive( messageName, ... )
+                    end
+
+                    if autoNames then
+                        function obj.Start( messageName, ... )
+                            return net.Start( self:GetIdentifier( messageName ), ... )
+                        end
+                    end
+
+                    metatable.__newindex = net
+
+                end
+
+                if SERVER then
+
+                    local obj, metatable = environment.SetLinkedTable( env, "util", util )
+
+                    function obj.AddNetworkString( messageName, ... )
+                        if autoNames then
+                            messageName = self:GetIdentifier( messageName )
+                        end
+
+                        data[ messageName ] = true
+                        return util.AddNetworkString( messageName, ... )
+                    end
+
+                    metatable.__newindex = util
+
+                end
+
+            end
+
+            -- Properties
+            do
+
+                local data = {}
+                callbacks.properties = data
+                local autoNames = self:HasAutoNames( "properties" )
+
+                local obj, metatable = environment.SetLinkedTable( env, "properties", properties )
+
+                function obj.Add( name, ... )
+                    if autoNames then
+                        name = self:GetIdentifier( name )
+                    end
+
+                    data[ string.lower( name ) ] = true
+                    return properties.Add( name, ... )
+                end
+
+                metatable.__newindex = properties
+
+            end
+
+            return env
+        end
+
+    end
+
+    function PACKAGE:ClearCallbacks()
+        local callbacks = self.Callbacks
+        if type( callbacks ) ~= "table" then return end
+
+        -- Hooks
+        local library = callbacks.hook
+        if type( library ) == "table" then
+            for eventName, data in pairs( library ) do
+                for identifier in pairs( data ) do
+                    hook.Remove( eventName, identifier )
+                    library[ eventName ][ identifier ] = nil
+                end
+
+                library[ eventName ] = nil
+            end
+        end
+
+        -- Timers
+        library = callbacks.timer
+        if type( library ) == "table" then
+            for identifier in pairs( library ) do
+                timer.Remove( identifier )
+                library[ identifier ] = nil
+            end
+        end
+
+        -- ConVars
+        library = callbacks.cvars
+        if type( library ) == "table" then
+            for name, cvar in pairs( library ) do
+                for identifier in pairs( cvar ) do
+                    cvars.RemoveChangeCallback( name, identifier )
+                    library[ name ][ identifier ] = nil
+                end
+
+                library[ name ] = nil
+            end
+        end
+
+        -- ConCommands
+        library = callbacks.concommand
+        if type( library ) == "table" then
+            for name in pairs( library ) do
+                concommand.Remove( name )
+                library[ name ] = nil
+            end
+        end
+
+        -- Properties
+        library = callbacks.properties
+        if type( library ) == "table" then
+            for name in pairs( library ) do
+                properties.List[ name ] = nil
+                library[ name ] = nil
+            end
+        end
+
+        -- Network strings
+        library = callbacks.net
+        if type( library ) == "table" then
+            for messageName in pairs( library ) do
+                net.Receivers[ messageName ] = nil
+                library[ messageName ] = nil
+            end
+        end
+
+        local main = self.Main
+        if main then
+            debug.setfenv( main, _G )
+        end
+
+        local files = self.Files
+        if files then
+            for _, func in pairs( files ) do
+                debug.setfenv( func, _G )
+            end
+        end
+    end
+
+    -- Initialize
+    PACKAGE.Initialize = promise.Async( function( self, nMetadata, nFiles )
+        local metadata = self.Metadata
+        if type( nMetadata ) == "table" then
+            table.Empty( metadata )
+            for key, value in pairs( nMetadata ) do
+                metadata[ key ] = value
+            end
+        end
+
+        if type( nFiles ) == "table" then
+            local files = self.Files
+            table.Empty( files )
+            for key, value in pairs( nFiles ) do
+                files[ key ] = value
+            end
+        end
+
+        self:ClearCallbacks()
+
+        if metadata.environment then
+            return self:EnvironmentInit( metadata )
+        end
+
+        self.Environment = nil
+        self.Callbacks = nil
+    end )
+
+    -- Install/Uninstall/Reload
     PACKAGE.Install = promise.Async( function( self )
-        local func = self.Main
-        if not func then
+        local stopwatch = SysTime()
+
+        local main = self.Main
+        if not main then
             return promise.Reject( "Missing package '" .. self:GetIdentifier() ..  "' entry point." )
         end
 
-        local stopwatch = SysTime()
-
-        local env = self:GetEnvironment()
-        if env ~= nil then
-            debug.setfenv( func, env )
-        end
-
-        local ok, result = pcall( func, self )
+        local ok, result = pcall( main, self )
         if not ok then
             return promise.Reject( result )
         end
@@ -320,12 +838,7 @@ do
         return result
     end )
 
-    function PACKAGE:IsInstalled()
-        return self.Installed
-    end
-
-    -- TODO: Make this better
-    function PACKAGE:UnInstall( noDependencies, ignoreDependencies )
+    function PACKAGE:Uninstall()
         local stopwatch = SysTime()
 
         local ok, err = pcall( hook_Run, "PackageRemoved", self )
@@ -333,119 +846,104 @@ do
             ErrorNoHaltWithStack( err )
         end
 
-        local env = self:GetEnvironment()
-        if type( env ) == "table" then
-            if not ignoreDependencies then
-                for index, pkg in ipairs( self.Children ) do
-                    if noDependencies then
-                        logger:Error( "Package '%s' uninstallation failed, %d dependencies found, try use -f to force uninstallation.", self:GetIdentifier(), #self.Children )
-                        return
-                    end
-
-                    if pkg:IsInstalled() then
-                        pkg:UnInstall()
-                        pkg:UnLink( self )
-                    end
-
-                    self.Children[ index ] = nil
-                end
-            end
-
-            local libraries = self.Libraries
-
-            -- Hooks
-            local library = libraries.hook
-            if type( library ) == "table" then
-                for eventName, data in pairs( library ) do
-                    for identifier in pairs( data ) do
-                        hook.Remove( eventName, identifier )
-                        library[ eventName ][ identifier ] = nil
-                    end
-
-                    library[ eventName ] = nil
-                end
-            end
-
-            -- Timers
-            library = libraries.timer
-            if type( library ) == "table" then
-                for identifier in pairs( library ) do
-                    timer.Remove( identifier )
-                    library[ identifier ] = nil
-                end
-            end
-
-            -- ConVars
-            library = libraries.cvars
-            if type( library ) == "table" then
-                for name, cvar in pairs( library ) do
-                    for identifier in pairs( cvar ) do
-                        cvars.RemoveChangeCallback( name, identifier )
-                        library[ name ][ identifier ] = nil
-                    end
-
-                    library[ name ] = nil
-                end
-            end
-
-            -- ConCommands
-            library = libraries.concommand
-            if type( library ) == "table" then
-                for name in pairs( library ) do
-                    concommand.Remove( name )
-                    library[ name ] = nil
-                end
-            end
-
-            -- Properties
-            library = libraries.properties
-            if type( library ) == "table" then
-                for name in pairs( library ) do
-                    properties.List[ name ] = nil
-                    library[ name ] = nil
-                end
-            end
-
-            -- Network strings
-            library = libraries.net
-            if type( library ) == "table" then
-                for messageName in pairs( library ) do
-                    net.Receivers[ messageName ] = nil
-                    library[ messageName ] = nil
-                end
-            end
+        for index, pkg in ipairs( self.Children ) do
+            self.Children[ index ] = nil
+            pkg:UnLink( self )
+            pkg:Uninstall()
         end
 
-        local importPath = self:GetImportPath()
-        gpm.ImportTasks[ importPath ] = nil
-        gpm.Packages[ importPath ] = nil
+        if self:HasEnvironment() then
+            self:ClearCallbacks()
+        end
+
+        gpm.Packages[ self:GetImportPath() ] = nil
         self.Installed = nil
 
         logger:Info( "Package '%s' was successfully uninstalled, took %.4f seconds.", self:GetIdentifier(), SysTime() - stopwatch )
     end
 
-    -- TODO: Make this better
-    PACKAGE.Reload = promise.Async( function( self )
-        self:UnInstall( false, true )
+    PACKAGE.Reload = promise.Async( function( self, dontSendToClients )
+        local stopwatch = SysTime()
 
-        local metadata = self:GetMetadata()
-        if not metadata then return end
-
-        if metadata.source == "lua" then
-            local main = metadata.main
-            if main then
-                local ok, result = gpm.Compile( main ):SafeAwait()
-                if not ok then
-                    error( result )
-                end
-
-                self.Main = result
-            end
-
-            table.Empty( self.Files )
+        if self:HasEnvironment() then
+            self:ClearCallbacks()
         end
 
-        return self:Install()
+        local sourceName = self:GetSourceName()
+        local source = gpm.sources[ sourceName ]
+        if not source then
+            return promise.Reject( "Package source '" .. sourceName .. "' not found, package data is probably corrupted." )
+        end
+
+        local importPath = self:GetImportPath()
+        local getMetadata, metadata = source.GetMetadata, nil
+        if getMetadata then
+            local ok, result = getMetadata( importPath ):SafeAwait()
+            if not ok then
+                return promise.Reject( result )
+            end
+
+            metadata = result
+        end
+
+        if metadata ~= nil then
+            if type( metadata.name ) ~= "string" then
+                metadata.name = importPath
+            end
+
+            metadata.importpath = importPath
+            metadata.source = sourceName
+            BuildMetadata( metadata )
+        end
+
+        if SERVER then
+            local sendToClient = source.SendToClient
+            if sendToClient ~= nil then
+                source.SendToClient( metadata )
+            end
+        end
+
+        local compileMain = source.CompileMain
+        if compileMain then
+            local ok, result = compileMain( self:GetMainFilePath() ):SafeAwait()
+            if not ok then
+                return promise.Reject( result )
+            end
+
+            self.Main = result
+        end
+
+        local ok, result = self:Initialize( metadata ):SafeAwait()
+        if not ok then
+            return promise.Reject( result )
+        end
+
+        local main = self.Main
+        if not main then
+            return promise.Reject( "Missing package '" .. self:GetIdentifier() ..  "' entry point." )
+        end
+
+        local ok, result = pcall( main, self )
+        if not ok then
+            return promise.Reject( result )
+        end
+
+        self.Result = result
+
+        local ok, err = pcall( hook_Run, "PackageReloaded", self )
+        if not ok then
+            ErrorNoHaltWithStack( err )
+        end
+
+        if SERVER and not dontSendToClients then
+            net.Start( "GPM.Networking" )
+                net.WriteUInt( 5, 3 )
+                net.WriteString( importPath )
+            net.Broadcast()
+        end
+
+        logger:Info( "Package '%s' was successfully reloaded, took %.4f seconds.", self:GetIdentifier(), SysTime() - stopwatch )
+        return result
     end )
 
     local function isPackage( any )
@@ -457,426 +955,20 @@ do
 
 end
 
-local function getCurrentLuaPath()
-    local filePath = utils.GetCurrentFile()
-    if not filePath then return end
-    return paths.Localize( paths.Fix( filePath ) )
-end
-
-if SERVER then
-
-    function AddClientLuaFile( fileName )
-        local filePath = nil
-
-        local luaPath = getCurrentLuaPath()
-        if luaPath then
-            if fileName ~= nil then
-                gpm.ArgAssert( fileName, 1, "string" )
-            else
-                fileName = string.GetFileFromFilename( luaPath )
-            end
-
-            local folder = string.GetPathFromFilename( luaPath )
-            if folder and #folder > 0 then
-                filePath = paths.Fix( folder .. fileName )
-            end
-        else
-            gpm.ArgAssert( fileName, 1, "string" )
-        end
-
-        if fileName and fs.IsFile( fileName, "LUA" ) then
-            filePath = paths.Fix( fileName )
-        end
-
-        if filePath ~= nil then
-            local extension = string.GetExtensionFromFilename( filePath )
-            if extension == "moon" then
-                filePath = string.sub( filePath, 1, #filePath - #extension ) .. "lua"
-            end
-
-            if fs.IsFile( filePath, "LUA" ) then
-                return AddCSLuaFile( filePath )
-            end
-        end
-
-        error( "Couldn't AddCSLuaFile file '" .. fileName .. "' - File not found" )
-    end
-
-end
-
-local addCSLuaFile = SERVER and AddClientLuaFile or debug.fempty
-
-local internalMeta = {
-    ["__index"] = function( self, index )
-        local value = {}
-        rawset( self, index, value )
-        return value
-    end
-}
-
-local timerBlacklist = {
-    ["Destroy"] = true,
-    ["Remove"] = true,
-    ["Simple"] = true
-}
-
 Initialize = promise.Async( function( metadata, func, files )
-    if type( files ) ~= "table" then
-        files = {}
+    local pkg = setmetatable( {
+        ["Installed"] = false,
+        ["Metadata"] = {},
+        ["Children"] = {},
+        ["Files"] = {},
+        ["Main"] = func
+    }, PACKAGE )
+
+    local ok, result = pkg:Initialize( metadata, files ):SafeAwait()
+    if not ok then
+        return promise.Reject( result )
     end
 
-    -- Creating package object
-    local pkg = setmetatable( {}, PACKAGE )
-    pkg.Metadata = metadata
-    pkg.Installed = false
-    pkg.Files = files
-    pkg.Main = func
-
-    if metadata.environment then
-        for _, func in ipairs( files ) do
-            debug.setfenv( func, env )
-        end
-
-        pkg.Children = {}
-
-        -- Creating environment for package
-        local env = environment.Create( _G )
-        pkg.Environment = env
-        env._PKG = pkg
-
-        -- Globals
-        env._VERSION = metadata.version
-        env.ArgAssert = gpm.ArgAssert
-        env.TypeID = gpm.TypeID
-        env.type = gpm.type
-        env.http = gpm.http
-        env.file = fs
-
-        -- GPM link
-        local gpmLink = environment.SetLinkedTable( env, "gpm", gpm )
-        gpmLink.Package = pkg
-
-        -- Logger
-        if metadata.logger then
-            local logger = gpm.logger.Create( pkg:GetIdentifier(), metadata.color )
-            gpmLink.Logger = logger
-            pkg.Logger = logger
-        end
-
-        -- import
-        do
-
-            local function import( importPath, async, pkg2 )
-                if gpm.IsPackage( pkg2 ) then
-                    return gpm.Import( importPath, async, pkg2 )
-                end
-
-                return gpm.Import( importPath, async, pkg )
-            end
-
-            gpmLink.Import = import
-            env.import = import
-
-        end
-
-        -- install
-        env.install = function( ... )
-            return gpm.Install( pkg, false, ... )
-        end
-
-        gpmLink.Install = function( pkg2, async, ... )
-            if gpm.IsPackage( pkg2 ) then
-                return gpm.Install( pkg2, async, ... )
-            end
-
-            return gpm.Install( pkg, async, ... )
-        end
-
-        -- AddCSLuaFile
-        env.AddCSLuaFile = addCSLuaFile
-
-        -- include
-        env.include = function( fileName )
-            gpm.ArgAssert( fileName, 1, "string" )
-
-            local func = files[ paths.Fix( fileName ) ]
-            if type( func ) == "function" then
-                return func( pkg )
-            end
-
-            local luaPath = getCurrentLuaPath()
-            if luaPath then
-                local folder = string.GetPathFromFilename( luaPath )
-                if folder and #folder > 0 then
-                    local filePath = paths.Fix( folder .. fileName )
-                    if fs.IsFile( filePath, "LUA" ) then
-                        local ok, result = gpm.Compile( filePath ):SafeAwait()
-                        if not ok then
-                            error( result )
-                        end
-
-                        files[ fileName ] = debug.setfenv( result, env )
-                        return result( pkg )
-                    end
-                end
-            end
-
-            local filePath = paths.Fix( fileName )
-            if fs.IsFile( filePath, "LUA" ) then
-                local ok, result = gpm.Compile( filePath ):SafeAwait()
-                if not ok then
-                    error( result )
-                end
-
-                files[ fileName ] = debug.setfenv( result, env )
-                return result( pkg )
-            end
-
-            error( "Couldn't include file '" .. fileName .. "' - File not found" )
-        end
-
-        -- require
-        env.require = function( ... )
-            local arguments = {...}
-            local lenght = #arguments
-
-            for number, name in ipairs( arguments ) do
-                gpm.ArgAssert( name, number, "string" )
-
-                if string.IsURL( name ) then
-                    if not gpm.CanImport( name ) then continue end
-
-                    local ok, result = gpm.AsyncImport( name, pkg, false ):SafeAwait()
-                    if not ok then
-                        if number ~= lenght then continue end
-                        error( result )
-                    end
-
-                    return result
-                end
-
-                if util.IsBinaryModuleInstalled( name ) then
-                    return require( name )
-                end
-
-                if util.IsLuaModuleInstalled( name ) then
-                    local ok, result = gpm.SourceImport( "lua", "includes/modules/" .. name .. ".lua" ):SafeAwait()
-                    if not ok then
-                        error( result )
-                    end
-
-                    pkg:Link( result )
-                    return result:GetResult()
-                end
-            end
-
-            error( "Not one of the listed packages could be required." )
-        end
-
-        pkg.Libraries = {}
-
-        -- Hooks
-        do
-
-            local data = setmetatable( {}, internalMeta )
-            local autoNames = pkg:HasAutoNames( "hook" )
-            pkg.Libraries.hook = data
-
-            local obj, metatable = environment.SetLinkedTable( env, "hook", hook )
-
-            function obj.Add( eventName, identifier, ... )
-                if autoNames and type( identifier ) == "string" then
-                    identifier = pkg:GetIdentifier( identifier )
-                end
-
-                data[ eventName ][ identifier ] = true
-                return hook.Add( eventName, identifier, ... )
-            end
-
-            function obj.Remove( eventName, identifier, ... )
-                if autoNames and type( identifier ) == "string" then
-                    identifier = pkg:GetIdentifier( identifier )
-                end
-
-                data[ eventName ][ identifier ] = nil
-                return hook.Remove( eventName, identifier, ... )
-            end
-
-            metatable.__newindex = hook
-
-        end
-
-        -- Timers
-        do
-
-            local data = {}
-            pkg.Libraries.timer = data
-            local autoNames = pkg:HasAutoNames( "timer" )
-
-            local obj, metatable = environment.SetLinkedTable( env, "timer", timer )
-
-            for key, func in pairs( timer ) do
-                if timerBlacklist[ key ] then continue end
-                obj[ key ] = function( identifier, ... )
-                    if autoNames then
-                        identifier = pkg:GetIdentifier( identifier )
-                    end
-
-                    data[ identifier ] = true
-                    return func( identifier, ... )
-                end
-            end
-
-            local function removeFunction( identifier, ... )
-                if autoNames then
-                    identifier = pkg:GetIdentifier( identifier )
-                end
-
-                data[ identifier ] = nil
-                return timer.Remove( identifier, ... )
-            end
-
-            obj.Destroy = removeFunction
-            obj.Remove = removeFunction
-
-            metatable.__newindex = timer
-
-        end
-
-        -- ConVars
-        do
-
-            local data = setmetatable( {}, internalMeta )
-            local autoNames = pkg:HasAutoNames( "cvars" )
-            pkg.Libraries.cvars = data
-
-            local obj, metatable = environment.SetLinkedTable( env, "cvars", cvars )
-
-            function obj.AddChangeCallback( name, func, identifier, ... )
-                if type( identifier ) ~= "string" then
-                    identifier = "Default"
-                end
-
-                if autoNames then
-                    identifier = pkg:GetIdentifier( identifier )
-                end
-
-                data[ name ][ identifier ] = true
-                return cvars.AddChangeCallback( name, func, identifier, ... )
-            end
-
-            function obj.RemoveChangeCallback( name, identifier, ... )
-                if type( identifier ) ~= "string" then
-                    identifier = "Default"
-                end
-
-                if autoNames then
-                    identifier = pkg:GetIdentifier( identifier )
-                end
-
-                data[ name ][ identifier ] = nil
-                return cvars.RemoveChangeCallback( name, identifier, ... )
-            end
-
-            metatable.__newindex = cvars
-
-        end
-
-        -- ConCommands
-        do
-
-            local data = {}
-            pkg.Libraries.concommand = data
-
-            local obj, metatable = environment.SetLinkedTable( env, "concommand", concommand )
-
-            function obj.Add( name, ... )
-                data[ name ] = true
-                return concommand.Add( name, ... )
-            end
-
-            function obj.Remove( name, ... )
-                data[ name ] = nil
-                return concommand.Remove( name, ... )
-            end
-
-            metatable.__newindex = concommand
-
-        end
-
-        -- Net
-        do
-
-            local data = {}
-            pkg.Libraries.net = data
-            local autoNames = pkg:HasAutoNames( "net" )
-
-            do
-
-                local obj, metatable = environment.SetLinkedTable( env, "net", net )
-
-                function obj.Receive( messageName, ... )
-                    if autoNames then
-                        messageName = pkg:GetIdentifier( messageName )
-                    end
-
-                    data[ messageName ] = true
-                    return net.Receive( messageName, ... )
-                end
-
-                if autoNames then
-                    function obj.Start( messageName, ... )
-                        return net.Start( pkg:GetIdentifier( messageName ), ... )
-                    end
-                end
-
-                metatable.__newindex = net
-
-            end
-
-            if SERVER then
-
-                local obj, metatable = environment.SetLinkedTable( env, "util", util )
-
-                function obj.AddNetworkString( messageName, ... )
-                    if autoNames then
-                        messageName = pkg:GetIdentifier( messageName )
-                    end
-
-                    data[ messageName ] = true
-                    return util.AddNetworkString( messageName, ... )
-                end
-
-                metatable.__newindex = util
-
-            end
-
-        end
-
-        -- Properties
-        do
-
-            local data = {}
-            pkg.Libraries.properties = data
-            local autoNames = pkg:HasAutoNames( "properties" )
-
-            local obj, metatable = environment.SetLinkedTable( env, "properties", properties )
-
-            function obj.Add( name, ... )
-                if autoNames then
-                    name = pkg:GetIdentifier( name )
-                end
-
-                data[ string.lower( name ) ] = true
-                return properties.Add( name, ... )
-            end
-
-            metatable.__newindex = properties
-
-        end
-    end
-
-    -- Installing
     local ok, result = pkg:Install():SafeAwait()
     if not ok then
         return promise.Reject( result )
