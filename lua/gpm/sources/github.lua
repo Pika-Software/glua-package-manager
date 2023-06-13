@@ -30,7 +30,7 @@ IsAvailable = promise.Async( function( user, repository, tree )
     end
 
     if result.code ~= 200 then
-        return promise.Reject( "invalid response http code - " .. result.code )
+        return promise.Reject( "Invalid response http code - " .. result.code )
     end
 
     return url
@@ -38,10 +38,10 @@ end )
 
 Import = promise.Async( function( metadata )
     local user = metadata.user
-    if not user then return promise.Reject( "attempt to download failed - repository not recognized" ) end
+    if not user then return promise.Reject( "Attempt to download failed - repository not recognized." ) end
 
     local repository = metadata.repository
-    if not repository then return promise.Reject( "attempt to download failed - user not recognized" ) end
+    if not repository then return promise.Reject( "Attempt to download failed - user not recognized." ) end
 
     local tree = metadata.tree
     if tree ~= nil then

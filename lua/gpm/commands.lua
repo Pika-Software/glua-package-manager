@@ -1,12 +1,13 @@
+local logger = gpm.Logger
+local SERVER = SERVER
 local ipairs = ipairs
-local table = table
 local gpm = gpm
+local net = net
 
 do
 
     local workshopPath = gpm.WorkshopPath
     local cachePath = gpm.CachePath
-    local logger = gpm.Logger
     local fs = gpm.fs
 
     function gpm.ClearCache()
@@ -47,17 +48,16 @@ end
 
 do
 
-    local string_format = string.format
     local colors = gpm.Colors
     local pairs = pairs
     local MsgC = MsgC
 
-    function gpm.PrintPackageList()
+    function gpm.PrintPackageList( packages )
         MsgC( colors.Realm, gpm.Realm, colors.PrimaryText, " packages:\n" )
 
         local total = 0
-        for name, pkg in pairs( gpm.Packages ) do
-            MsgC( colors.Realm, "\t* ", colors.PrimaryText, string_format( "%s@%s\n", name, pkg:GetVersion() ) )
+        for _, pkg in pairs( packages or gpm.Packages ) do
+            MsgC( colors.Realm, "\t* ", colors.PrimaryText, pkg:GetIdentifier() .. "\n" )
             total = total + 1
         end
 
@@ -66,60 +66,67 @@ do
 
 end
 
-do
+function gpm.Reload( ... )
+    local arguments = { ... }
+    if #arguments == 0 then
+        logger:Warn( "There is no information for package reloading, if you are trying to do a full reload then just use .*" )
+        return
+    end
 
-    local hook_Run = hook.Run
-
-    function gpm.Reload( ... )
-        local packageNames = {...}
-        if table.IsEmpty( packageNames ) then
-            table.Empty( gpm.ImportTasks )
-            table.Empty( gpm.Packages )
-            hook_Run( "GPM - Reload" )
-            include( "gpm/init.lua" )
-            return hook_Run( "GPM - Reloaded" )
-        end
-
-        for _, packageName in ipairs( packageNames ) do
-            if #packageName == 0 then continue end
-
-            local pkgs = gpm.package.Find( packageName, false, true )
-            if not pkgs then
-                logger:Error( "Package reload failed, packages with name '%s' is not found.", packageName )
-                continue
-            end
-
-            for _, pkg in ipairs( pkgs ) do
-                pkg:Install()
-            end
+    local packages, count = {}, 0
+    for _, searchable in ipairs( arguments ) do
+        if #searchable == 0 then continue end
+        for _, pkg in ipairs( gpm.package.Find( searchable, false, false ) ) do
+            packages[ pkg ] = true
+            count = count + 1
         end
     end
 
+    if count == 0 then
+        logger:Info( "No candidates found for reloading, skipping..." )
+        return
+    end
+
+    logger:Info( "Found %d candidates to reload, reloading...", count )
+
+    for pkg in pairs( packages ) do
+        pkg:Reload()
+    end
 end
 
-function gpm.UnInstall( ... )
-    local packageNames = {...}
-    local force = false
+function gpm.Uninstall( force, ... )
+    local arguments = {...}
+    if #arguments == 0 then
+        logger:Warn( "There is no information for package uninstalling." )
+        return
+    end
 
-    for _, str in ipairs( packageNames ) do
-        if string.lower( str ) == "-f" then
-            force = true
-            break
+    local packages, count = {}, 0
+    for _, searchable in ipairs( arguments ) do
+        if #searchable == 0 then continue end
+        for _, pkg in ipairs( gpm.package.Find( searchable, false, false ) ) do
+            packages[ pkg ] = true
+            count = count + 1
         end
     end
 
-    for _, packageName in ipairs( packageNames ) do
-        if #packageName == 0 then continue end
+    if count == 0 then
+        logger:Info( "No candidates found for uninstalling, skipping..." )
+        return
+    end
 
-        local pkgs = gpm.package.Find( packageName, false, true )
-        if not pkgs then
-            logger:Error( "Package uninstall failed, packages with name '%s' is not found.", packageName )
+    logger:Info( "Found %d candidates to uninstall, uninstalling...", count )
+
+    for pkg in pairs( packages ) do
+        local children = pkg:GetChildren()
+        local childCount = #children
+        if childCount ~= 0 and not force then
+            logger:Error( "Package '%s' uninstallation cancelled, %d dependencies found, try use -f to force uninstallation, skipping...", pkg:GetIdentifier(), childCount )
+            gpm.PrintPackageList( children )
             continue
         end
 
-        for _, pkg in ipairs( pkgs ) do
-            pkg:UnInstall( not force )
-        end
+        pkg:Uninstall()
     end
 end
 
@@ -127,14 +134,14 @@ local net = net
 
 if SERVER then
 
-    util.AddNetworkString( "GPM.Commands" )
+    util.AddNetworkString( "GPM.Networking" )
 
     local concommand_Add = concommand.Add
     local IsValid = IsValid
 
     concommand_Add( "gpm_clear_cache", function( ply )
         if IsValid( ply ) then
-            net.Start( "GPM.Commands" )
+            net.Start( "GPM.Networking" )
                 net.WriteUInt( 0, 3 )
             net.Send( ply )
 
@@ -146,7 +153,7 @@ if SERVER then
 
     concommand_Add( "gpm_list", function( ply )
         if IsValid( ply ) then
-            net.Start( "GPM.Commands" )
+            net.Start( "GPM.Networking" )
                 net.WriteUInt( 1, 3 )
             net.Send( ply )
 
@@ -156,23 +163,18 @@ if SERVER then
         gpm.PrintPackageList()
     end )
 
-    concommand_Add( "gpm_reload", function( ply, _, args )
+    concommand_Add( "gpm_reload", function( ply, _, arguments )
         if IsValid( ply ) and not ply:IsSuperAdmin() and not ply:IsListenServerHost() then
             ply:ChatPrint( "[GPM] You do not have enough permissions to execute this command." )
             return
         end
 
-        gpm.Reload( unpack( args ) )
-
-        net.Start( "GPM.Commands" )
-            net.WriteUInt( 2, 3 )
-            net.WriteTable( args )
-        net.Broadcast()
+        gpm.Reload( unpack( arguments ) )
     end )
 
-    concommand_Add( "gpm_install", function( ply, _, args )
+    concommand_Add( "gpm_install", function( ply, _, arguments )
         if not IsValid( ply ) then
-            gpm.Install( nil, true, unpack( args ) )
+            gpm.Install( nil, true, unpack( arguments ) )
             return
         end
 
@@ -181,15 +183,24 @@ if SERVER then
             return
         end
 
-        net.Start( "GPM.Commands" )
+        net.Start( "GPM.Networking" )
             net.WriteUInt( 3, 3 )
-            net.WriteTable( args )
+            net.WriteTable( arguments )
         net.Send( ply )
     end )
 
-    concommand_Add( "gpm_uninstall", function( ply, _, args )
+    concommand_Add( "gpm_uninstall", function( ply, _, arguments )
+        local force = false
+        for index, str in ipairs( arguments ) do
+            if string.lower( str ) == "-f" then
+                table.remove( arguments, index )
+                force = true
+                break
+            end
+        end
+
         if not IsValid( ply ) then
-            gpm.UnInstall( unpack( args ) )
+            gpm.Uninstall( force, unpack( arguments ) )
             return
         end
 
@@ -198,9 +209,10 @@ if SERVER then
             return
         end
 
-        net.Start( "GPM.Commands" )
+        net.Start( "GPM.Networking" )
             net.WriteUInt( 4, 3 )
-            net.WriteTable( args )
+            net.WriteBool( force )
+            net.WriteTable( arguments )
         net.Send( ply )
     end )
 
@@ -218,11 +230,19 @@ if CLIENT then
             gpm.Install( nil, true, unpack( net.ReadTable() ) )
         end,
         [4] = function()
-            gpm.UnInstall( unpack( net.ReadTable() ) )
+            gpm.Uninstall( net.ReadBool(), unpack( net.ReadTable() ) )
+        end,
+        [5] = function()
+            local importPath = net.ReadString()
+            logger:Debug( "Received a request to reload package '%s' from the server.", importPath )
+
+            local pkg = gpm.Packages[ importPath ]
+            if not pkg then return end
+            pkg:Reload()
         end
     }
 
-    net.Receive( "GPM.Commands", function()
+    net.Receive( "GPM.Networking", function()
         local func = events[ net.ReadUInt( 3 ) ]
         if not func then return end
         func()

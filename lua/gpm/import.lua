@@ -64,9 +64,9 @@ do
                     return promise.Reject( result )
                 end
 
-                metadata = package.GetMetadata( result )
+                metadata = package.BuildMetadata( result )
             else
-                metadata = package.GetMetadata( {} )
+                metadata = package.BuildMetadata( {} )
             end
 
             metadatas[ sourceName .. ";" .. importPath ] = metadata
@@ -152,7 +152,6 @@ do
                 if not source then continue end
                 if not source.CanImport( importPath ) then continue end
 
-
                 local ok, result = getMetadata( importPath, sourceName, source ):SafeAwait()
                 if not ok then
                     return promise.Reject( result )
@@ -170,6 +169,25 @@ do
 
                 if CLIENT and not result.client then return end
                 if MENU_DLL and not result.menu then return end
+
+                if result.singleplayer and not singlePlayer then
+                    logger:Error( "Package '%s' import failed, package cannot be executed in a singleplayer game.", importPath )
+                    return
+                end
+
+                local gamemodes = result.gamemodes
+                local gamemodesType = type( gamemodes )
+                if ( gamemodesType == "string" and gamemodes ~= activeGamemode ) or ( gamemodesType == "table" and not table_HasIValue( gamemodes, activeGamemode ) ) then
+                    logger:Error( "Package '%s' import failed, package does not support active gamemode.", importPath )
+                    return
+                end
+
+                local maps = result.maps
+                local mapsType = type( maps )
+                if ( mapsType == "string" and maps ~= map ) or ( mapsType == "table" and not table_HasIValue( maps, map ) ) then
+                    logger:Error( "Package '%s' import failed, package does not support current map.", importPath )
+                    return
+                end
 
                 task = gpm.SourceImport( sourceName, importPath )
                 break

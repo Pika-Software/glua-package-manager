@@ -1,11 +1,18 @@
+local logger = gpm.Logger
+local SERVER = SERVER
+local util = util
+
 -- https://github.com/Pika-Software/gm_asyncio
-if util.IsBinaryModuleInstalled( "asyncio" ) then
-    gpm.Logger:Info( "A third-party file system API 'asyncio' has been initialized." )
-    require( "asyncio" )
 -- https://github.com/WilliamVenner/gm_async_write
-elseif SERVER and util.IsBinaryModuleInstalled( "async_write" ) then
-    gpm.Logger:Info( "A third-party file system API 'async_write' has been initialized." )
-    require( "async_write" )
+if util.IsBinaryModuleInstalled( "asyncio" ) and pcall( require, "asyncio" ) then
+    logger:Info( "A third-party file system API 'asyncio' has been initialized." )
+elseif SERVER and util.IsBinaryModuleInstalled( "async_write" ) and pcall( require, "async_write" ) then
+    logger:Info( "A third-party file system API 'async_write' has been initialized." )
+end
+
+-- https://github.com/Pika-Software/gm_efsw
+if util.IsBinaryModuleInstalled( "efsw" ) and pcall( require, "efsw" ) then
+    logger:Info( "gm_efsw is initialized, package auto-reload are available." )
 end
 
 -- Libraries
@@ -14,14 +21,29 @@ local promise = promise
 local string = string
 local table = table
 local file = file
+local efsw = efsw
+local gpm = gpm
 
 -- Variables
 local CompileMoonString = CompileMoonString
 local CompileString = CompileString
+local debug_fempty = debug.fempty
 local math_max = math.max
 local ipairs = ipairs
 local assert = assert
 local type = type
+
+if efsw ~= nil then
+    hook.Add( "FileWatchEvent", "GPM.AutoReload", function( actionID, _, filePath )
+        local importPath = string.match( filePath, ".*/lua/(packages/.*)/" )
+        if not importPath then return end
+
+        local pkg = gpm.Packages[ importPath ]
+        if not pkg then return end
+
+        pkg:Reload()
+    end )
+end
 
 module( "gpm.fs" )
 
@@ -58,10 +80,7 @@ function IsDir( filePath, gamePath )
 end
 
 function IsFile( filePath, gamePath )
-    if SERVER then
-        return file.Exists( filePath, gamePath ) and not file.IsDir( filePath, gamePath )
-    end
-
+    if SERVER then return file.Exists( filePath, gamePath ) and not file.IsDir( filePath, gamePath ) end
     if file.Exists( filePath, gamePath ) and not file.IsDir( filePath, gamePath ) then return true end
 
     local files, _ = file.Find( filePath .. "*", gamePath )
@@ -131,12 +150,38 @@ CompileMoon = promise.Async( function( filePath, gamePath, handleError )
     return CompileMoonString( result.fileContent, result.filePath, handleError )
 end )
 
-if type( asyncio ) == "table" then
+Watch = debug_fempty
+UnWatch = debug_fempty
+
+if efsw ~= nil then
+    local watchList = efsw.WatchList
+    if type( watchList ) ~= "table" then
+        watchList = {}; efsw.WatchList = watchList
+    end
+
+    function Watch( filePath, gamePath )
+        if watchList[ filePath .. ";" .. gamePath ] then return end
+        watchList[ filePath .. ";" .. gamePath ] = efsw.Watch( filePath, gamePath )
+    end
+
+    function UnWatch( filePath, gamePath )
+        local watchID = watchList[ filePath .. ";" .. gamePath ]
+        if watchID then
+            efsw.Unwatch( watchID )
+            watchList[ filePath .. ";" .. gamePath ] = nil
+        end
+    end
+end
+
+if asyncio ~= nil then
     function AsyncRead( filePath, gamePath )
         local p = promise.New()
 
         if asyncio.AsyncRead( filePath, gamePath, function( filePath, gamePath, status, fileContent )
-            if status ~= 0 then return p:Reject( "Error code: " .. status ) end
+            if status ~= 0 then
+                return p:Reject( "Error code: " .. status )
+            end
+
             p:Resolve( {
                 ["fileContent"] = fileContent,
                 ["filePath"] = filePath,
@@ -153,7 +198,10 @@ if type( asyncio ) == "table" then
         local p = promise.New()
 
         if asyncio.AsyncWrite( filePath, fileContent, function( filePath, gamePath, status )
-            if status ~= 0 then return p:Reject( "Error code: " .. status ) end
+            if status ~= 0 then
+                return p:Reject( "Error code: " .. status )
+            end
+
             p:Resolve( {
                 ["filePath"] = filePath,
                 ["gamePath"] = gamePath
@@ -169,7 +217,10 @@ if type( asyncio ) == "table" then
         local p = promise.New()
 
         if asyncio.AsyncAppend( filePath, fileContent, function( filePath, gamePath, status )
-            if status ~= 0 then return p:Reject( "Error code: " .. status ) end
+            if status ~= 0 then
+                return p:Reject( "Error code: " .. status )
+            end
+
             p:Resolve( {
                 ["filePath"] = filePath,
                 ["gamePath"] = gamePath
@@ -188,7 +239,10 @@ function AsyncRead( filePath, gamePath )
     local p = promise.New()
 
     if file.AsyncRead( filePath, gamePath, function( filePath, gamePath, status, fileContent )
-        if status ~= 0 then return p:Reject( "Error code: " .. status ) end
+        if status ~= 0 then
+            return p:Reject( "Error code: " .. status )
+        end
+
         p:Resolve( {
             ["filePath"] = filePath,
             ["gamePath"] = gamePath,
@@ -207,7 +261,10 @@ if type( file.AsyncWrite ) == "function" then
         local p = promise.New()
 
         if file.AsyncWrite( filePath, fileContent, function( filePath, status )
-            if status ~= 0 then return p:Reject( "Error code: " .. status ) end
+            if status ~= 0 then
+                return p:Reject( "Error code: " .. status )
+            end
+
             p:Resolve( {
                 ["filePath"] = filePath
             } )
@@ -244,7 +301,10 @@ if type( file.AsyncAppen ) == "function" then
         local p = promise.New()
 
         if file.AsyncAppend( filePath, fileContent, function( filePath, status )
-            if status ~= 0 then return p:Reject( "Error code: " .. status ) end
+            if status ~= 0 then
+                return p:Reject( "Error code: " .. status )
+            end
+
             p:Resolve( {
                 ["filePath"] = filePath
             } )

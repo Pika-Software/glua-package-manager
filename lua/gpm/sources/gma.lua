@@ -25,7 +25,7 @@ Import = promise.Async( function( metadata )
     local importPath = metadata.importpath
 
     local gma = gmad_Open( importPath, "GAME" )
-    if not gma then return promise.Reject( "gma file '" .. importPath .. "' cannot be readed" ) end
+    if not gma then return promise.Reject( "GMA file '" .. importPath .. "' cannot be readed." ) end
 
     metadata.name = gma:GetTitle()
     metadata.description = gma:GetDescription()
@@ -43,7 +43,7 @@ Import = promise.Async( function( metadata )
 
     local ok, files = game_MountGMA( importPath )
     if not ok then
-        return promise.Reject( "gma file '" .. importPath .. "' cannot be mounted" )
+        return promise.Reject( "GMA file '" .. importPath .. "' cannot be mounted." )
     end
 
     local importPaths = {}

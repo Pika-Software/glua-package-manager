@@ -28,8 +28,10 @@ end
 GetMetadata = promise.Async( function( importPath )
     local metadata, folder = nil, importPath
     if fs.IsDir( folder, "LUA" ) then
+        gpm.PreCacheMoon( folder, true )
+
         if SERVER then
-            gpm.PreCacheMoon( folder, true )
+            fs.Watch( folder .. "/", "lsv" )
         end
     else
         folder = paths.Fix( string.GetPathFromFilename( importPath ) )
@@ -37,20 +39,18 @@ GetMetadata = promise.Async( function( importPath )
 
     local packagePath = nil
     if folder ~= "includes/modules" then
-        if SERVER then
-            local moonPath = folder .. "/package.moon"
-            if fs.IsFile( moonPath, "lsv" ) then
-                local ok, result = fs.CompileMoon( moonPath, "lsv" ):SafeAwait()
-                if not ok then
-                    return promise.Reject( result )
-                end
-
-                metadata = package.GetMetadata( result )
-                packagePath = moonPath
+        local moonPath = folder .. "/package.moon"
+        if fs.IsFile( moonPath, "LUA" ) then
+            local ok, result = fs.CompileMoon( moonPath, "lsv" ):SafeAwait()
+            if not ok then
+                return promise.Reject( result )
             end
+
+            metadata = package.BuildMetadata( result )
+            packagePath = moonPath
         end
 
-        if packagePath == nil then
+        if not packagePath then
             local luaPath = folder .. "/package.lua"
             if fs.IsFile( luaPath, "LUA" ) then
                 local ok, result = gpm.CompileLua( luaPath ):SafeAwait()
@@ -58,7 +58,7 @@ GetMetadata = promise.Async( function( importPath )
                     return promise.Reject( result )
                 end
 
-                metadata = package.GetMetadata( result )
+                metadata = package.BuildMetadata( result )
                 packagePath = luaPath
             end
         end
@@ -72,14 +72,11 @@ GetMetadata = promise.Async( function( importPath )
 
         local extension = string.GetExtensionFromFilename( importPath )
         if extension == "moon" then
-            if SERVER then
-                if not fs.IsFile( importPath, "lsv" ) then
-                    return promise.Reject( "Unable to compile Moonscript '" .. importPath .. "' file, file not found." )
-                end
-
-                gpm.PreCacheMoon( importPath, false )
+            if not fs.IsFile( importPath, "LUA" ) then
+                return promise.Reject( "Unable to compile Moonscript '" .. importPath .. "' file, file not found." )
             end
 
+            gpm.PreCacheMoon( importPath, false )
             importPath = string.sub( importPath, 1, #importPath - #extension ) .. "lua"
         end
 
@@ -90,9 +87,8 @@ GetMetadata = promise.Async( function( importPath )
 
     if packagePath ~= nil then
         metadata.packagepath = packagePath
+        metadata.folder = folder
     end
-
-    metadata.folder = folder
 
     -- Shared init
     local main = metadata.main
@@ -154,7 +150,7 @@ if SERVER then
         end
 
         local cl_main = metadata.cl_main
-        if type( cl_main ) == "string" then
+        if cl_main then
             addClientLuaFile( cl_main )
         end
 
@@ -164,28 +160,36 @@ if SERVER then
         end
 
         local send = metadata.send
-        if not send then return end
+        if send then
+            local folder = metadata.folder
+            for _, filePath in ipairs( send ) do
+                if folder then
+                    local localFilePath = folder .. "/" .. filePath
+                    if fs.IsFile( localFilePath, "lsv" ) then
+                        addClientLuaFile( localFilePath )
+                        continue
+                    end
+                end
 
-        local folder = metadata.folder
-        for _, filePath in ipairs( send ) do
-            local localFilePath = folder .. "/" .. filePath
-            if fs.IsFile( localFilePath, "lsv" ) then
-                addClientLuaFile( localFilePath )
-            elseif fs.IsFile( filePath, "lsv" ) then
-                addClientLuaFile( filePath )
+                if fs.IsFile( filePath, "lsv" ) then
+                    addClientLuaFile( filePath )
+                end
             end
         end
     end
 
 end
 
-Import = promise.Async( function( metadata )
-    local main = metadata.main
-    if not main or not fs.IsFile( main, "LUA" ) then
-        return promise.Reject( "main file '" .. ( main or "init.lua" ) .. "' is missing." )
+CompileMain = promise.Async( function( filePath )
+    if not filePath or not fs.IsFile( filePath, "LUA" ) then
+        return promise.Reject( "Package main file '" .. ( filePath or "init.lua" ) .. "' is missing." )
     end
 
-    local ok, result = gpm.Compile( main ):SafeAwait()
+    return gpm.Compile( filePath )
+end )
+
+Import = promise.Async( function( metadata )
+    local ok, result = CompileMain( metadata.main ):SafeAwait()
     if not ok then
         return promise.Reject( result )
     end
