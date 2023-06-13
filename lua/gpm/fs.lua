@@ -34,6 +34,7 @@ local assert = assert
 local type = type
 
 -- TODO: Add drag-n-drop packages feature
+-- TODO: Add support for single file packages (rewrite pattern)
 if efsw ~= nil then
     hook.Add( "FileWatchEvent", "GPM.AutoReload", function( actionID, _, filePath )
         local importPath = string.match( filePath, ".*/lua/(packages/.*)/" )
