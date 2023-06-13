@@ -180,7 +180,13 @@ do
                 autonames.hook = autonames.hook ~= false and source.environment
                 autonames.net = autonames.net == true and source.environment
             else
-                source.autonames = nil
+                source.autonames = {
+                    ["properties"] = source.environment,
+                    ["timer"] = source.environment,
+                    ["cvars"] = source.environment,
+                    ["hook"] = source.environment,
+                    ["net"] = false
+                }
             end
 
             return source
