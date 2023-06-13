@@ -174,10 +174,10 @@ do
             -- Isolation features
             local autonames = source.autonames
             if type( autonames ) == "table" then
-                autonames.properties = autonames.properties == true and source.environment
-                autonames.timer = autonames.timer == true and source.environment
-                autonames.cvars = autonames.cvars == true and source.environment
-                autonames.hook = autonames.hook == true and source.environment
+                autonames.properties = autonames.properties ~= false and source.environment
+                autonames.timer = autonames.timer ~= false and source.environment
+                autonames.cvars = autonames.cvars ~= false and source.environment
+                autonames.hook = autonames.hook ~= false and source.environment
                 autonames.net = autonames.net == true and source.environment
             else
                 source.autonames = nil
