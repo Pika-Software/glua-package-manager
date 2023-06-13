@@ -6,7 +6,7 @@ local type = type
 
 -- https://github.com/WilliamVenner/gmsv_reqwest
 -- https://github.com/timschumi/gmod-chttp
-if SERVER and game.IsDedicated() then
+if SERVER then
     if util.IsBinaryModuleInstalled( "reqwest" ) then
         logger:Info( "A third-party http client 'reqwest' has been initialized." )
         require( "reqwest" )
@@ -21,11 +21,6 @@ local userAgent = string.format( "%s/%s %s", "GLua Package Manager", gpm.utils.V
 local client = reqwest or CHTTP or HTTP
 
 module( "gpm.http" )
-
-local function request( p, parameters )
-    if client( parameters ) then return end
-    p:Reject( "failed to make http request" )
-end
 
 local queue = {}
 
@@ -52,10 +47,10 @@ function HTTP( parameters )
 
     if queue ~= nil then
         queue[ #queue + 1 ] = function()
-            request( p, parameters )
+            client( parameters )
         end
     else
-        request( p, parameters )
+        client( parameters )
     end
 
     return p
