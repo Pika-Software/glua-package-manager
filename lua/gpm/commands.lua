@@ -48,17 +48,16 @@ end
 
 do
 
-    local string_format = string.format
     local colors = gpm.Colors
     local pairs = pairs
     local MsgC = MsgC
 
-    function gpm.PrintPackageList()
+    function gpm.PrintPackageList( packages )
         MsgC( colors.Realm, gpm.Realm, colors.PrimaryText, " packages:\n" )
 
         local total = 0
-        for name, pkg in pairs( gpm.Packages ) do
-            MsgC( colors.Realm, "\t* ", colors.PrimaryText, string_format( "%s@%s\n", name, pkg:GetVersion() ) )
+        for _, pkg in pairs( packages or gpm.Packages ) do
+            MsgC( colors.Realm, "\t* ", colors.PrimaryText, pkg:GetIdentifier() .. "\n" )
             total = total + 1
         end
 
@@ -70,7 +69,8 @@ end
 function gpm.Reload( ... )
     local arguments = { ... }
     if #arguments == 0 then
-        logger:Warn( "There is no information for reloading packages, if you are trying to do a full reload then just use *" )
+        logger:Warn( "There is no information for package reloading, if you are trying to do a full reload then just use .*" )
+        return
     end
 
     local packages, count = {}, 0
@@ -84,48 +84,49 @@ function gpm.Reload( ... )
 
     if count == 0 then
         logger:Info( "No candidates found for reloading, skipping..." )
-    else
-
-        logger:Info( "Found %d candidates to reload, reloading...", count )
-        for pkg in pairs( packages ) do
-            pkg:Reload()
-        end
-
+        return
     end
 
-    if SERVER then
-        net.Start( "GPM.Networking" )
-            net.WriteUInt( 2, 3 )
-            net.WriteTable( arguments )
-        net.Broadcast()
+    logger:Info( "Found %d candidates to reload, reloading...", count )
+
+    for pkg in pairs( packages ) do
+        pkg:Reload()
     end
 end
 
-end
+function gpm.Uninstall( force, ... )
+    local arguments = {...}
+    if #arguments == 0 then
+        logger:Warn( "There is no information for package uninstalling." )
+        return
+    end
 
-function gpm.UnInstall( ... )
-    local packageNames = {...}
-    local force = false
-
-    for _, str in ipairs( packageNames ) do
-        if string.lower( str ) == "-f" then
-            force = true
-            break
+    local packages, count = {}, 0
+    for _, searchable in ipairs( arguments ) do
+        if #searchable == 0 then continue end
+        for _, pkg in ipairs( gpm.package.Find( searchable, false, false ) ) do
+            packages[ pkg ] = true
+            count = count + 1
         end
     end
 
-    for _, packageName in ipairs( packageNames ) do
-        if #packageName == 0 then continue end
+    if count == 0 then
+        logger:Info( "No candidates found for uninstalling, skipping..." )
+        return
+    end
 
-        local pkgs = gpm.package.Find( packageName, false, true )
-        if not pkgs then
-            logger:Error( "Package uninstall failed, packages with name '%s' is not found.", packageName )
+    logger:Info( "Found %d candidates to uninstall, uninstalling...", count )
+
+    for pkg in pairs( packages ) do
+        local children = pkg:GetChildren()
+        local childCount = #children
+        if childCount ~= 0 and not force then
+            logger:Error( "Package '%s' uninstallation cancelled, %d dependencies found, try use -f to force uninstallation, skipping...", pkg:GetIdentifier(), childCount )
+            gpm.PrintPackageList( children )
             continue
         end
 
-        for _, pkg in ipairs( pkgs ) do
-            pkg:UnInstall( not force )
-        end
+        pkg:Uninstall()
     end
 end
 
@@ -162,18 +163,18 @@ if SERVER then
         gpm.PrintPackageList()
     end )
 
-    concommand_Add( "gpm_reload", function( ply, _, args )
+    concommand_Add( "gpm_reload", function( ply, _, arguments )
         if IsValid( ply ) and not ply:IsSuperAdmin() and not ply:IsListenServerHost() then
             ply:ChatPrint( "[GPM] You do not have enough permissions to execute this command." )
             return
         end
 
-        gpm.Reload( unpack( args ) )
+        gpm.Reload( unpack( arguments ) )
     end )
 
-    concommand_Add( "gpm_install", function( ply, _, args )
+    concommand_Add( "gpm_install", function( ply, _, arguments )
         if not IsValid( ply ) then
-            gpm.Install( nil, true, unpack( args ) )
+            gpm.Install( nil, true, unpack( arguments ) )
             return
         end
 
@@ -184,13 +185,22 @@ if SERVER then
 
         net.Start( "GPM.Networking" )
             net.WriteUInt( 3, 3 )
-            net.WriteTable( args )
+            net.WriteTable( arguments )
         net.Send( ply )
     end )
 
-    concommand_Add( "gpm_uninstall", function( ply, _, args )
+    concommand_Add( "gpm_uninstall", function( ply, _, arguments )
+        local force = false
+        for index, str in ipairs( arguments ) do
+            if string.lower( str ) == "-f" then
+                table.remove( arguments, index )
+                force = true
+                break
+            end
+        end
+
         if not IsValid( ply ) then
-            gpm.UnInstall( unpack( args ) )
+            gpm.Uninstall( force, unpack( arguments ) )
             return
         end
 
@@ -201,7 +211,8 @@ if SERVER then
 
         net.Start( "GPM.Networking" )
             net.WriteUInt( 4, 3 )
-            net.WriteTable( args )
+            net.WriteBool( force )
+            net.WriteTable( arguments )
         net.Send( ply )
     end )
 
@@ -219,7 +230,15 @@ if CLIENT then
             gpm.Install( nil, true, unpack( net.ReadTable() ) )
         end,
         [4] = function()
-            gpm.UnInstall( unpack( net.ReadTable() ) )
+            gpm.Uninstall( net.ReadBool(), unpack( net.ReadTable() ) )
+        end,
+        [5] = function()
+            local importPath = net.ReadString()
+            logger:Debug( "Received a request to reload package '%s' from the server.", importPath )
+
+            local pkg = gpm.Packages[ importPath ]
+            if not pkg then return end
+            pkg:Reload()
         end
     }
 
