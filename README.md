@@ -38,7 +38,7 @@ server = true
 autorun = true
 
 -- don't touch it if you don't know what you're doing
-isolation = true
+environment = true
 
 -- client files
 send = {
@@ -48,6 +48,7 @@ send = {
 
 -- if false, the logger will not be created by default
 logger = false
+color = Color( 255, 255, 0 )
 
 -- if nil, all gamemodes are allowed
 gamemodes = {
@@ -62,6 +63,15 @@ maps = {
 
 -- if true, then the package is allowed to run only in a singleplayer game
 singleplayer = false
+
+autonames = {
+    ["properties"] = true,
+    ["timer"] = true,
+    ["cvars"] = true,
+    ["hook"] = true,
+    ["net"] = false
+}
+
 ```
 
 ## Available package file parameters
