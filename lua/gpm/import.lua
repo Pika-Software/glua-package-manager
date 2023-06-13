@@ -170,6 +170,25 @@ do
                 if CLIENT and not result.client then return end
                 if MENU_DLL and not result.menu then return end
 
+                if result.singleplayer and not singlePlayer then
+                    logger:Error( "Package '%s' import failed, package cannot be executed in a singleplayer game.", importPath )
+                    return
+                end
+
+                local gamemodes = result.gamemodes
+                local gamemodesType = type( gamemodes )
+                if ( gamemodesType == "string" and gamemodes ~= activeGamemode ) or ( gamemodesType == "table" and not table_HasIValue( gamemodes, activeGamemode ) ) then
+                    logger:Error( "Package '%s' import failed, package does not support active gamemode.", importPath )
+                    return
+                end
+
+                local maps = result.maps
+                local mapsType = type( maps )
+                if ( mapsType == "string" and maps ~= map ) or ( mapsType == "table" and not table_HasIValue( maps, map ) ) then
+                    logger:Error( "Package '%s' import failed, package does not support current map.", importPath )
+                    return
+                end
+
                 task = gpm.SourceImport( sourceName, importPath )
                 break
             end

@@ -22,6 +22,7 @@ local string = string
 local table = table
 local file = file
 local efsw = efsw
+local gpm = gpm
 
 -- Variables
 local CompileMoonString = CompileMoonString
