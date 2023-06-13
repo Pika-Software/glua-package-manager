@@ -83,8 +83,8 @@ singleplayer = false
 - ### Package autorun (`autorun`) (def. `false`)
     The default setting is `false`, if this parameter is set to `true` and the package is in a valid `lua/` directory, the package will automatically start and will not wait to be run externally.
 
-- ### Package isolation (`isolation`) (def. `true`)
-    This is the parameter responsible for isolation, by default it is `true`, if it is set to `false` then the package will run in `_G` and all global values created in it will go to `_G`, as well as you will no longer have access to gpm environment features. I recommend to use this only if you really need it.
+- ### Package environment (`environment`) (def. `true`)
+    This is the parameter responsible for environment, by default it is `true`, if it is set to `false` then the package will run in `_G` and all global values created in it will go to `_G`, as well as you will no longer have access to gpm environment features. I recommend to use this only if you really need it.
 
 - ### Package send list (`send`) (def. `nil`)
     The list of files to send to the client, can be useful if the package runs exclusively on the client and has more than one file. (must be a table with indexes from 1 to infinity)
