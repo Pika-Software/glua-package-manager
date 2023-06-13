@@ -179,6 +179,8 @@ do
                 autonames.cvars = autonames.cvars == true and source.environment
                 autonames.hook = autonames.hook == true and source.environment
                 autonames.net = autonames.net == true and source.environment
+            else
+                source.autonames = nil
             end
 
             return source
