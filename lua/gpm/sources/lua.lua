@@ -34,12 +34,12 @@ GetMetadata = promise.Async( function( importPath )
             fs.Watch( folder .. "/", "lsv" )
         end
     else
-        folder = paths.Fix( string.GetPathFromFilename( importPath ) )
+        folder = string.GetPathFromFilename( importPath )
     end
 
     local packagePath = nil
-    if folder ~= "includes/modules" then
-        local moonPath = folder .. "/package.moon"
+    if not string.match( folder, "^includes/modules/?$" ) then
+        local moonPath = paths.Fix( folder .. "/package.moon" )
         if fs.IsFile( moonPath, "LUA" ) then
             local ok, result = fs.CompileMoon( moonPath, "lsv" ):SafeAwait()
             if not ok then
@@ -51,7 +51,7 @@ GetMetadata = promise.Async( function( importPath )
         end
 
         if not packagePath then
-            local luaPath = folder .. "/package.lua"
+            local luaPath = paths.Fix( folder .. "/package.lua" )
             if fs.IsFile( luaPath, "LUA" ) then
                 local ok, result = gpm.CompileLua( luaPath ):SafeAwait()
                 if not ok then
@@ -181,7 +181,7 @@ if SERVER then
 end
 
 CompileMain = promise.Async( function( filePath )
-    if not filePath or not fs.IsFile( filePath, "LUA" ) then
+    if not filePath then
         return promise.Reject( "Package main file '" .. ( filePath or "init.lua" ) .. "' is missing." )
     end
 
