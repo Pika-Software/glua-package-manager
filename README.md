@@ -135,6 +135,7 @@ Look for more examples in our code ;)
 
 ## How to improve?
 For better speed and reliability, the following binary modules can be installed in the game:
+- [gm_efsw](https://github.com/Pika-Software/gm_efsw) ⭐
 - [gm_asyncio](https://github.com/Pika-Software/gm_asyncio) ⭐
 - [gm_moonloader](https://github.com/Pika-Software/gm_moonloader) ⭐
 - [gm_chttp](https://github.com/timschumi/gmod-chttp)
