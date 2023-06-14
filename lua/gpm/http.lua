@@ -1,4 +1,3 @@
-local logger = gpm.Logger
 local promise = promise
 local ipairs = ipairs
 local util = util
@@ -7,12 +6,10 @@ local type = type
 -- https://github.com/WilliamVenner/gmsv_reqwest
 -- https://github.com/timschumi/gmod-chttp
 if SERVER then
-    if util.IsBinaryModuleInstalled( "reqwest" ) then
-        logger:Info( "A third-party http client 'reqwest' has been initialized." )
-        require( "reqwest" )
-    elseif util.IsBinaryModuleInstalled( "chttp" ) then
-        logger:Info( "A third-party http client 'chttp' has been initialized." )
-        require( "chttp" )
+    if util.IsBinaryModuleInstalled( "reqwest" ) and pcall( require, "reqwest" ) then
+        gpm.Logger:Info( "A third-party http client 'reqwest' has been initialized." )
+    elseif util.IsBinaryModuleInstalled( "chttp" ) and pcall( require, "chttp" ) then
+        gpm.Logger:Info( "A third-party http client 'chttp' has been initialized." )
     end
 end
 
