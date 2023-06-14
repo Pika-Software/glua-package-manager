@@ -171,7 +171,7 @@ do
                 source.send = nil
             end
 
-            -- Isolation features
+            -- Libs autonames feature
             local autonames = source.autonames
             if type( autonames ) == "table" then
                 autonames.properties = autonames.properties ~= false and source.environment
@@ -186,6 +186,21 @@ do
                     ["cvars"] = source.environment,
                     ["hook"] = source.environment,
                     ["net"] = false
+                }
+            end
+
+            local defaults = source.defaults
+            if type( defaults ) == "table" then
+                defaults.typeid = autonames.typeid ~= false and source.environment
+                defaults.http = autonames.http ~= false and source.environment
+                defaults.type = autonames.type ~= false and source.environment
+                defaults.file = autonames.file ~= false and source.environment
+            else
+                source.defaults = {
+                    ["typeid"] = source.environment,
+                    ["http"] = source.environment,
+                    ["type"] = source.environment,
+                    ["file"] = source.environment
                 }
             end
 
@@ -360,14 +375,23 @@ do
             if type( env ) ~= "table" then
                 env = environment.Create( _G )
                 self.Environment = env
+                env._PKG = self
 
                 env.AddCSLuaFile = addCSLuaFile
                 env.ArgAssert = gpm.ArgAssert
-                env.TypeID = gpm.TypeID
-                env.http = gpm.http
-                env.type = gpm.type
-                env._PKG = self
-                env.file = fs
+            end
+
+            env.TypeID = nil
+            env.http = nil
+            env.type = nil
+            env.file = nil
+
+            local defaults = metadata.defaults
+            if defaults then
+                if defaults.typeid then env.TypeID = gpm.TypeID end
+                if defaults.http then env.http = gpm.http end
+                if defaults.type then env.type = gpm.type end
+                if defaults.file then env.file = fs end
             end
 
             env._VERSION = metadata.version
@@ -864,7 +888,9 @@ do
             self:ClearCallbacks()
         end
 
-        gpm.Packages[ self:GetImportPath() ] = nil
+        local importPath = self:GetImportPath()
+        gpm.ImportTasks[ importPath ] = nil
+        gpm.Packages[ importPath ] = nil
         self.Installed = nil
 
         logger:Info( "Package '%s' was successfully uninstalled, took %.4f seconds.", self:GetIdentifier(), SysTime() - stopwatch )
