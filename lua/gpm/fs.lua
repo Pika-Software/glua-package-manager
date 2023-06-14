@@ -1,18 +1,17 @@
-local logger = gpm.Logger
 local SERVER = SERVER
 local util = util
 
 -- https://github.com/Pika-Software/gm_asyncio
 -- https://github.com/WilliamVenner/gm_async_write
 if util.IsBinaryModuleInstalled( "asyncio" ) and pcall( require, "asyncio" ) then
-    logger:Info( "A third-party file system API 'asyncio' has been initialized." )
+    gpm.Logger:Info( "A third-party file system API 'asyncio' has been initialized." )
 elseif SERVER and util.IsBinaryModuleInstalled( "async_write" ) and pcall( require, "async_write" ) then
-    logger:Info( "A third-party file system API 'async_write' has been initialized." )
+    gpm.Logger:Info( "A third-party file system API 'async_write' has been initialized." )
 end
 
 -- https://github.com/Pika-Software/gm_efsw
 if util.IsBinaryModuleInstalled( "efsw" ) and pcall( require, "efsw" ) then
-    logger:Info( "gm_efsw is initialized, package auto-reload are available." )
+    gpm.Logger:Info( "gm_efsw is initialized, package auto-reload are available." )
 end
 
 -- Libraries
@@ -33,11 +32,11 @@ local ipairs = ipairs
 local assert = assert
 local type = type
 
--- TODO: Add drag-n-drop packages feature
--- TODO: Add support for single file packages (rewrite pattern)
 if efsw ~= nil then
-    hook.Add( "FileWatchEvent", "GPM.AutoReload", function( actionID, _, filePath )
-        local importPath = string.match( filePath, ".*/lua/(packages/.*)/" )
+    hook.Add( "FileWatchEvent", "GPM.EFSW", function( action, _, filePath )
+        if action <= 0 then return end
+
+        local importPath = string.match( string.sub( filePath, 5 ), "packages/[^/]+" )
         if not importPath then return end
 
         local pkg = gpm.Packages[ importPath ]
