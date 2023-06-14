@@ -42,7 +42,13 @@ if efsw ~= nil then
         local pkg = gpm.Packages[ importPath ]
         if not pkg then return end
 
-        pkg:Reload()
+        local timerName = "GPM.EFSW." .. importPath
+        timer.Create( timerName, 0.5, 1, function()
+            timer.Remove( timerName )
+            if pkg:IsInstalled() then
+                pkg:Reload()
+            end
+        end )
     end )
 end
 

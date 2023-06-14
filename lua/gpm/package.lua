@@ -888,7 +888,9 @@ do
             self:ClearCallbacks()
         end
 
-        gpm.Packages[ self:GetImportPath() ] = nil
+        local importPath = self:GetImportPath()
+        gpm.ImportTasks[ importPath ] = nil
+        gpm.Packages[ importPath ] = nil
         self.Installed = nil
 
         logger:Info( "Package '%s' was successfully uninstalled, took %.4f seconds.", self:GetIdentifier(), SysTime() - stopwatch )

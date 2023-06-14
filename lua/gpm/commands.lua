@@ -73,6 +73,13 @@ function gpm.Reload( ... )
         return
     end
 
+    if SERVER then
+        net.Start( "GPM.Networking" )
+            net.WriteUInt( 2, 3 )
+            net.WriteTable( arguments )
+        net.Broadcast()
+    end
+
     local packages, count = {}, 0
     for _, searchable in ipairs( arguments ) do
         if #searchable == 0 then continue end
@@ -90,7 +97,7 @@ function gpm.Reload( ... )
     logger:Info( "Found %d candidates to reload, reloading...", count )
 
     for pkg in pairs( packages ) do
-        pkg:Reload()
+        pkg:Reload( true )
     end
 end
 
