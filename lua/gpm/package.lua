@@ -911,6 +911,14 @@ do
         if self:IsReloading() then return end
         local stopwatch = SysTime()
 
+        local importPath = self:GetImportPath()
+        if SERVER and not dontSendToClients then
+            net.Start( "GPM.Networking" )
+                net.WriteUInt( 5, 3 )
+                net.WriteString( importPath )
+            net.Broadcast()
+        end
+
         if self:HasEnvironment() then
             self:ClearCallbacks()
         end
@@ -921,9 +929,15 @@ do
             return promise.Reject( "Package source '" .. sourceName .. "' not found, package data is probably corrupted." )
         end
 
+        if not source.Reload then
+            return promise.Reject( "Package '" .. self:GetIdentifier() .. "' reload failed, source '" .. sourceName .. "' does not support package reloading." )
+        end
 
         self.Reloading = true
 
+        local metadata = nil
+        if source.GetMetadata then
+            local ok, result = source.GetMetadata( importPath ):SafeAwait()
             if not ok then
                 return promise.Reject( result )
             end
@@ -931,49 +945,22 @@ do
             metadata = result
         end
 
-        if metadata ~= nil then
-            if type( metadata.name ) ~= "string" then
-                metadata.name = importPath
-            end
-
-            metadata.importpath = importPath
-            metadata.source = sourceName
-            BuildMetadata( metadata )
+        if not metadata then
+            metadata = {}
         end
 
-        if SERVER then
-            local sendToClient = source.SendToClient
-            if sendToClient ~= nil then
-                source.SendToClient( metadata )
-            end
+        if type( metadata.name ) ~= "string" then
+            metadata.name = importPath
         end
 
-        local compileMain = source.CompileMain
-        if compileMain then
-            local ok, result = compileMain( self:GetMainFilePath() ):SafeAwait()
-            if not ok then
-                return promise.Reject( result )
-            end
+        metadata.importpath = importPath
+        metadata.source = sourceName
+        BuildMetadata( metadata )
 
-            self.Main = result
-        end
-
-        local ok, result = self:Initialize( metadata ):SafeAwait()
+        local ok, result = source.Reload( self, metadata ):SafeAwait()
         if not ok then
             return promise.Reject( result )
         end
-
-        local main = self.Main
-        if not main then
-            return promise.Reject( "Missing package '" .. self:GetIdentifier() ..  "' entry point." )
-        end
-
-        local ok, result = pcall( main, self )
-        if not ok then
-            return promise.Reject( result )
-        end
-
-        self.Result = result
 
         local ok, err = pcall( hook_Run, "PackageReloaded", self )
         if not ok then
