@@ -64,15 +64,29 @@ end
 
 if SERVER then
 
+    local function fixFileName( fileName )
+        local extension = string.GetExtensionFromFilename( fileName )
+        if extension ~= "lua" then
+            if extension then
+                fileName = string.gsub( fileName, "%..+$", ".lua" )
+            else
+                fileName = fileName .. ".lua"
+            end
+        end
+
+        return fileName
+    end
+
+    -- TODO: Rewrite this bullshit
     function AddClientLuaFile( fileName )
         local filePath = nil
 
         local luaPath = getCurrentLuaPath()
         if luaPath then
-            if fileName ~= nil then
+            if fileName then
                 gpm.ArgAssert( fileName, 1, "string" )
             else
-                fileName = string.GetFileFromFilename( luaPath )
+                fileName = fixFileName( string.GetFileFromFilename( luaPath ) )
             end
 
             local folder = string.GetPathFromFilename( luaPath )
@@ -83,8 +97,11 @@ if SERVER then
             gpm.ArgAssert( fileName, 1, "string" )
         end
 
-        if fileName and fs.IsFile( fileName, "LUA" ) then
-            filePath = paths.Fix( fileName )
+        if fileName then
+            fileName = fixFileName( fileName )
+            if fs.IsFile( fileName, "LUA" ) then
+                filePath = paths.Fix( fileName )
+            end
         end
 
         if filePath ~= nil then
