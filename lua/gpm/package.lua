@@ -903,7 +903,12 @@ do
         logger:Info( "Package '%s' was successfully uninstalled, took %.4f seconds.", self:GetIdentifier(), SysTime() - stopwatch )
     end
 
+    function PACKAGE:IsReloading()
+        return self.Reloading or false
+    end
+
     PACKAGE.Reload = promise.Async( function( self, dontSendToClients )
+        if self:IsReloading() then return end
         local stopwatch = SysTime()
 
         if self:HasEnvironment() then
@@ -916,10 +921,9 @@ do
             return promise.Reject( "Package source '" .. sourceName .. "' not found, package data is probably corrupted." )
         end
 
-        local importPath = self:GetImportPath()
-        local getMetadata, metadata = source.GetMetadata, nil
-        if getMetadata then
-            local ok, result = getMetadata( importPath ):SafeAwait()
+
+        self.Reloading = true
+
             if not ok then
                 return promise.Reject( result )
             end
@@ -976,12 +980,7 @@ do
             ErrorNoHaltWithStack( err )
         end
 
-        if SERVER and not dontSendToClients then
-            net.Start( "GPM.Networking" )
-                net.WriteUInt( 5, 3 )
-                net.WriteString( importPath )
-            net.Broadcast()
-        end
+        self.Reloading = nil
 
         logger:Info( "Package '%s' was successfully reloaded, took %.4f seconds.", self:GetIdentifier(), SysTime() - stopwatch )
         return result
