@@ -936,10 +936,6 @@ do
             net.Broadcast()
         end
 
-        if self:HasEnvironment() then
-            self:ClearCallbacks()
-        end
-
         local sourceName = self:GetSourceName()
         local source = gpm.sources[ sourceName ]
         if not source then
@@ -951,6 +947,7 @@ do
         end
 
         self.Reloading = true
+        self:ClearCallbacks()
 
         local metadata = nil
         if source.GetMetadata then
