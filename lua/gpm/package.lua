@@ -841,10 +841,7 @@ do
         self.Callbacks = nil
     end )
 
-    -- Install/Uninstall/Reload
-    PACKAGE.Install = promise.Async( function( self )
-        local stopwatch = SysTime()
-
+    PACKAGE.Run = promise.Async( function( self )
         local main = self.Main
         if not main then
             return promise.Reject( "Missing package '" .. self:GetIdentifier() ..  "' entry point." )
@@ -856,6 +853,8 @@ do
         end
 
         self.Result = result
+        return result
+    end )
 
         local ok, err = pcall( hook_Run, "PackageInstalled", self )
         if not ok then
