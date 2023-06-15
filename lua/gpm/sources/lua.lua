@@ -8,9 +8,29 @@ local string = string
 local fs = gpm.fs
 
 -- Variables
+local table_Empty = table.Empty
 local SERVER = SERVER
 local ipairs = ipairs
 local type = type
+
+if efsw ~= nil then
+    hook.Add( "FileWatchEvent", "GPM.Sources.Lua.Hot-Reload", function( action, _, filePath )
+        if action <= 0 then return end
+
+        local importPath = string.match( string.sub( filePath, 5 ), "packages/[^/]+" )
+        if not importPath then return end
+
+        local pkg = gpm.Packages[ importPath ]
+        if not pkg then return end
+
+        if not pkg:IsInstalled() then return end
+        if pkg:IsReloading() then return end
+
+        pkg:Reload():Catch( function( message )
+            gpm.Logger:Error( message )
+        end )
+    end )
+end
 
 module( "gpm.sources.lua" )
 
@@ -195,4 +215,31 @@ Import = promise.Async( function( metadata )
     end
 
     return package.Initialize( metadata, result )
+end )
+
+Reload = promise.Async( function( pkg, metadata )
+    table_Empty( pkg.Files )
+
+    if SERVER then
+        SendToClient( metadata )
+    end
+
+    local ok, result = CompileMain( metadata.main ):SafeAwait()
+    if not ok then
+        return promise.Reject( result )
+    end
+
+    pkg.Main = result
+
+    local ok, result = pkg:Initialize( metadata ):SafeAwait()
+    if not ok then
+        return promise.Reject( result )
+    end
+
+    local ok, result = pkg:Run():SafeAwait()
+    if not ok then
+        return promise.Reject( result )
+    end
+
+    return result
 end )
