@@ -303,7 +303,7 @@ do
     end
 
     function PACKAGE:HasEnvironment()
-        return type( self:GetEnvironment() ) == "table"
+        return type( self.Environment ) == "table"
     end
 
     -- Children
@@ -327,10 +327,10 @@ do
     function PACKAGE:Link( package2 )
         gpm.ArgAssert( package2, 1, "Package" )
 
-        local environment1 = self:GetEnvironment()
+        local environment1 = self.Environment
         if not environment1 then return false end
 
-        local environment2 = package2:GetEnvironment()
+        local environment2 = package2.Environment
         if not environment2 then return false end
 
         environment.Link( environment1, environment2 )
@@ -344,10 +344,10 @@ do
     function PACKAGE:UnLink( package2 )
         gpm.ArgAssert( package2, 1, "Package" )
 
-        local environment1 = self:GetEnvironment()
+        local environment1 = self.Environment
         if not environment1 then return false end
 
-        local environment2 = package2:GetEnvironment()
+        local environment2 = package2.Environment
         if not environment2 then return false end
 
         environment.UnLink( environment1, environment2 )
@@ -397,7 +397,7 @@ do
             env._VERSION = metadata.version
 
             local main = self.Main
-            if type( main ) == "function" then
+            if main then
                 debug.setfenv( main, env )
             end
 
@@ -491,19 +491,19 @@ do
                 local arguments = {...}
                 local lenght = #arguments
 
-                for number, name in ipairs( arguments ) do
-                    gpm.ArgAssert( name, number, "string" )
+                for index, name in ipairs( arguments ) do
+                    gpm.ArgAssert( name, index, "string" )
 
                     if string.IsURL( name ) then
                         if not gpm.CanImport( name ) then continue end
 
-                        local ok, result = gpm.AsyncImport( name, self, false ):SafeAwait()
+                        local ok, pkg = gpm.AsyncImport( name, self, false ):SafeAwait()
                         if not ok then
-                            if number ~= lenght then continue end
-                            error( result )
+                            if index ~= lenght then continue end
+                            error( pkg )
                         end
 
-                        return result
+                        return pkg
                     end
 
                     if util.IsBinaryModuleInstalled( name ) then
@@ -511,13 +511,13 @@ do
                     end
 
                     if util.IsLuaModuleInstalled( name ) then
-                        local ok, result = gpm.SourceImport( "lua", "includes/modules/" .. name .. ".lua" ):SafeAwait()
+                        local ok, pkg = gpm.SourceImport( "lua", "includes/modules/" .. name .. ".lua" ):SafeAwait()
                         if not ok then
-                            error( result )
+                            error( pkg )
                         end
 
-                        self:Link( result )
-                        return result:GetResult()
+                        self:Link( pkg )
+                        return pkg.Result
                     end
                 end
 
