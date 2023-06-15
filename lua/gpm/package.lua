@@ -856,16 +856,24 @@ do
         return result
     end )
 
-        local ok, err = pcall( hook_Run, "PackageInstalled", self )
+    -- Install/Uninstall/Reload
+    PACKAGE.Install = promise.Async( function( self )
+        local stopwatch = SysTime()
+
+        local ok, result = self:Run():SafeAwait()
         if not ok then
-            ErrorNoHaltWithStack( err )
+            return promise.Reject( result )
         end
 
         gpm.Packages[ self:GetImportPath() ] = self
         self.Installed = true
 
-        logger:Info( "Package '%s' was successfully installed, took %.4f seconds.", self:GetIdentifier(), SysTime() - stopwatch )
+        local ok, err = pcall( hook_Run, "PackageInstalled", self )
+        if not ok then
+            ErrorNoHaltWithStack( err )
+        end
 
+        logger:Info( "Package '%s' was successfully installed, took %.4f seconds.", self:GetIdentifier(), SysTime() - stopwatch )
         return result
     end )
 
