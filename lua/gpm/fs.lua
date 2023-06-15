@@ -1,17 +1,18 @@
+local logger = gpm.Logger
 local SERVER = SERVER
 local util = util
 
 -- https://github.com/Pika-Software/gm_asyncio
 -- https://github.com/WilliamVenner/gm_async_write
 if util.IsBinaryModuleInstalled( "asyncio" ) and pcall( require, "asyncio" ) then
-    gpm.Logger:Info( "A third-party file system API 'asyncio' has been initialized." )
+    logger:Info( "A third-party file system API 'asyncio' has been initialized." )
 elseif SERVER and util.IsBinaryModuleInstalled( "async_write" ) and pcall( require, "async_write" ) then
-    gpm.Logger:Info( "A third-party file system API 'async_write' has been initialized." )
+    logger:Info( "A third-party file system API 'async_write' has been initialized." )
 end
 
 -- https://github.com/Pika-Software/gm_efsw
 if util.IsBinaryModuleInstalled( "efsw" ) and pcall( require, "efsw" ) then
-    gpm.Logger:Info( "gm_efsw is initialized, package auto-reload are available." )
+    logger:Info( "gm_efsw is initialized, package auto-reload are available." )
 end
 
 -- Libraries
