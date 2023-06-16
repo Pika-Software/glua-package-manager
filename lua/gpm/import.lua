@@ -105,7 +105,7 @@ do
             end
 
             if SERVER then
-                if metadata.client and source.SendToClient then
+                if result.client and source.SendToClient then
                     source.SendToClient( result, source )
                 end
 
@@ -155,7 +155,7 @@ do
                 end
 
                 if SERVER then
-                    if metadata.client and source.SendToClient then
+                    if result.client and source.SendToClient then
                         source.SendToClient( result, source )
                     end
 
