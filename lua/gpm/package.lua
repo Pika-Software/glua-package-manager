@@ -37,25 +37,6 @@ local _G = _G
 
 module( "gpm.package" )
 
--- Get package by name/pattern
-function Find( searchable, ignoreImportNames, noPatterns )
-    local result = {}
-    for importPath, pkg in pairs( gpm.Packages ) do
-        if not ignoreImportNames and importPath == searchable then
-            result[ #result + 1 ] = pkg
-            continue
-        end
-
-        local name = pkg:GetName()
-        if not name then continue end
-        if string.find( name, searchable, 1, noPatterns ) ~= nil then
-            result[ #result + 1 ] = pkg
-        end
-    end
-
-    return result
-end
-
 if SERVER then
 
     function AddCSLuaFile( fileName )

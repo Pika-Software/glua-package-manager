@@ -130,6 +130,31 @@ CachePath = fs.CreateDir( "gpm/" .. ( SERVER and "server" or "client" ) .. "/pac
 
 do
 
+    local string_find = string.find
+    local pairs = pairs
+
+    function Find( searchable, ignoreImportNames, noPatterns )
+        local result = {}
+        for importPath, pkg in pairs( Packages ) do
+            if not ignoreImportNames and importPath == searchable then
+                result[ #result + 1 ] = pkg
+                continue
+            end
+
+            local name = pkg:GetName()
+            if not name then continue end
+            if string_find( name, searchable, 1, noPatterns ) ~= nil then
+                result[ #result + 1 ] = pkg
+            end
+        end
+
+        return result
+    end
+
+end
+
+do
+
     local CompileFile = CompileFile
     local pcall = pcall
 

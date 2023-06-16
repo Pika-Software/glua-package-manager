@@ -83,7 +83,7 @@ function gpm.Reload( ... )
     local packages, count = {}, 0
     for _, searchable in ipairs( arguments ) do
         if #searchable == 0 then continue end
-        for _, pkg in ipairs( gpm.package.Find( searchable, false, false ) ) do
+        for _, pkg in ipairs( gpm.Find( searchable, false, false ) ) do
             packages[ pkg ] = true
             count = count + 1
         end
@@ -113,7 +113,7 @@ function gpm.Uninstall( force, ... )
     local packages, count = {}, 0
     for _, searchable in ipairs( arguments ) do
         if #searchable == 0 then continue end
-        for _, pkg in ipairs( gpm.package.Find( searchable, false, false ) ) do
+        for _, pkg in ipairs( gpm.Find( searchable, false, false ) ) do
             packages[ pkg ] = true
             count = count + 1
         end
