@@ -13,7 +13,6 @@ local game_MountGMA = game.MountGMA
 local gmad_Open = gmad.Open
 local ipairs = ipairs
 local pcall = pcall
-local type = type
 
 module( "gpm.sources.gma" )
 
@@ -21,29 +20,31 @@ function CanImport( filePath )
     return fs.IsFile( filePath, "GAME" ) and string.EndsWith( filePath, ".gma.dat" ) or string.EndsWith( filePath, ".gma" )
 end
 
-Import = promise.Async( function( metadata )
-    local importPath = metadata.importpath
-
+GetMetadata = promise.Async( function( importPath )
     local gma = gmad_Open( importPath, "GAME" )
-    if not gma then return promise.Reject( "GMA file '" .. importPath .. "' cannot be readed." ) end
+    if not gma then
+        return promise.Reject( "GMA file '" .. importPath .. "' cannot be readed." )
+    end
 
-    metadata.name = gma:GetTitle()
-    metadata.description = gma:GetDescription()
+    local metadata = {
+        ["name"] = gma:GetTitle()
+        -- ["dependencies"] = gma:GetRequiredContent()
+    }
 
-    metadata.author = gma:GetAuthor()
-    metadata.timestamp = gma:GetTimestamp()
-    metadata.requiredContent = gma:GetRequiredContent()
-
-    gma:Close()
-
-    local description = util_JSONToTable( metadata.description )
-    if type( description ) == "table" then
+    local description = util_JSONToTable( gma:GetDescription() )
+    if description then
         table.Merge( metadata, description )
     end
 
-    local ok, files = game_MountGMA( importPath )
+    gma:Close()
+
+    return metadata
+end )
+
+Import = promise.Async( function( metadata )
+    local ok, files = game_MountGMA( metadata.importpath )
     if not ok then
-        return promise.Reject( "GMA file '" .. importPath .. "' cannot be mounted." )
+        return promise.Reject( "GMA file '" .. metadata.importpath .. "' cannot be mounted." )
     end
 
     local importPaths = {}
