@@ -258,7 +258,7 @@ function GMA:AddFile( filePath, content )
     assert( self.WriteMode, "To change a gmad file, write mode is required." )
     ArgAssert( filePath, 1, "string" )
 
-    local isMoon, moonPath = string.EndsWith( filePath, ".moon" ) and moonloader ~= nil
+    local isMoon, moonPath = string.GetExtensionFromFilename( filePath ) == "moon" and moonloader ~= nil
     if isMoon then
         moonPath = filePath
         filePath = paths.FormatToLua( filePath )
