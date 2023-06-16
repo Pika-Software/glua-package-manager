@@ -345,3 +345,17 @@ function Localize( filePath )
     filePath = string.gsub( filePath, "^lua/", "" )
     return filePath
 end
+
+-- Change file extension to .lua
+function FormatToLua( filePath )
+    local extension = string.GetExtensionFromFilename( filePath )
+    if extension ~= "lua" then
+        if extension then
+            filePath = string.gsub( filePath, "%..+$", ".lua" )
+        else
+            filePath = filePath .. ".lua"
+        end
+    end
+
+    return filePath
+end

@@ -185,6 +185,7 @@ do
     Compile = promise.Async( function( filePath )
         if string_GetExtensionFromFilename( filePath ) == "moon" then
             PreCacheMoon( filePath, false )
+            filePath = paths.FormatToLua( filePath )
         end
 
         return CompileLua( filePath )

@@ -12,6 +12,7 @@ local tonumber = tonumber
 local logger = gpm.Logger
 local SysTime = SysTime
 local os_time = os.time
+local paths = gpm.paths
 local assert = assert
 local ipairs = ipairs
 
@@ -260,7 +261,7 @@ function GMA:AddFile( filePath, content )
     local isMoon, moonPath = string.EndsWith( filePath, ".moon" ) and moonloader ~= nil
     if isMoon then
         moonPath = filePath
-        filePath = string.Replace( filePath, ".moon", ".lua" )
+        filePath = paths.FormatToLua( filePath )
     end
 
     if not IsAllowedFilePath( filePath ) then
