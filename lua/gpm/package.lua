@@ -20,7 +20,7 @@ local net = net
 -- Variables
 local ErrorNoHaltWithStack = ErrorNoHaltWithStack
 local CLIENT, SERVER = CLIENT, SERVER
-local AddCSLuaFile = AddCSLuaFile
+local addCSLuaFile = AddCSLuaFile
 local getmetatable = getmetatable
 local setmetatable = setmetatable
 local hook_Run = hook.Run
@@ -64,55 +64,27 @@ end
 
 if SERVER then
 
-    local function fixFileName( fileName )
-        local extension = string.GetExtensionFromFilename( fileName )
-        if extension ~= "lua" then
-            if extension then
-                fileName = string.gsub( fileName, "%..+$", ".lua" )
-            else
-                fileName = fileName .. ".lua"
-            end
-        end
-
-        return fileName
-    end
-
-    -- TODO: Rewrite this bullshit
-    function AddClientLuaFile( fileName )
-        local filePath = nil
-
+    function AddCSLuaFile( fileName )
         local luaPath = getCurrentLuaPath()
+        if luaPath and not fileName then
+            return addCSLuaFile( luaPath )
+        end
+
+        gpm.ArgAssert( fileName, 1, "string" )
+        fileName = paths.FormatToLua( paths.Fix( fileName ) )
+
         if luaPath then
-            if fileName then
-                gpm.ArgAssert( fileName, 1, "string" )
-            else
-                fileName = fixFileName( string.GetFileFromFilename( luaPath ) )
-            end
-
             local folder = string.GetPathFromFilename( luaPath )
-            if folder and #folder > 0 then
-                filePath = paths.Fix( folder .. fileName )
-            end
-        else
-            gpm.ArgAssert( fileName, 1, "string" )
-        end
-
-        if fileName then
-            fileName = fixFileName( fileName )
-            if fs.IsFile( fileName, "LUA" ) then
-                filePath = paths.Fix( fileName )
+            if folder then
+                local filePath = folder .. fileName
+                if fs.IsFile( filePath, "LUA" ) then
+                    return addCSLuaFile( filePath )
+                end
             end
         end
 
-        if filePath ~= nil then
-            local extension = string.GetExtensionFromFilename( filePath )
-            if extension == "moon" then
-                filePath = string.sub( filePath, 1, #filePath - #extension ) .. "lua"
-            end
-
-            if fs.IsFile( filePath, "LUA" ) then
-                return AddCSLuaFile( filePath )
-            end
+        if fs.IsFile( fileName, "LUA" ) then
+            return addCSLuaFile( fileName )
         end
 
         error( "Couldn't AddCSLuaFile file '" .. fileName .. "' - File not found" )
@@ -385,7 +357,7 @@ do
             end
         }
 
-        local addCSLuaFile = SERVER and AddClientLuaFile or debug.fempty
+        local addCSLuaFile = SERVER and AddCSLuaFile or debug.fempty
 
         function PACKAGE:EnvironmentInit( metadata )
             local env = self.Environment
