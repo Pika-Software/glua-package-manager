@@ -67,6 +67,53 @@ GetMetadata = promise.Async( function( importPath )
         if SERVER then
             fs.Watch( importPath .. "/", "lsv" )
         end
+
+        -- TODO: Change cl_main and main to table with server, shared, client
+        -- Shared main file
+        local main = metadata.main
+        if type( main ) == "string" then
+            main = paths.Fix( main )
+        else
+            main = "init.lua"
+        end
+
+        if not fs.IsFile( main, "LUA" ) then
+            main = paths.Join( importPath, main )
+
+            if not fs.IsFile( main, "LUA" ) then
+                main = importPath .. "/init.lua"
+                if not fs.IsFile( main, "LUA" ) then
+                    main = importPath .. "/main.lua"
+                end
+            end
+        end
+
+        if fs.IsFile( main, "LUA" ) then
+            metadata.main = main
+        else
+            metadata.main = nil
+        end
+
+        -- Client main file
+        local cl_main = metadata.cl_main
+        if type( cl_main ) == "string" then
+            cl_main = paths.Fix( cl_main )
+        else
+            cl_main = "cl_init.lua"
+        end
+
+        if not fs.IsFile( cl_main, "LUA" ) then
+            cl_main = paths.Join( importPath, cl_main )
+            if not fs.IsFile( cl_main, "LUA" ) then
+                cl_main = importPath .. "/cl_init.lua"
+            end
+        end
+
+        if fs.IsFile( cl_main, "LUA" ) then
+            metadata.cl_main = cl_main
+        else
+            metadata.cl_main = nil
+        end
     elseif fs.IsFile( importPath, "LUA" ) then
         metadata.autorun = true
 
@@ -82,54 +129,6 @@ GetMetadata = promise.Async( function( importPath )
         if SERVER then
             fs.Watch( importPath, "lsv" )
         end
-
-        return metadata
-    end
-
-    -- Shared main file
-    local main = metadata.main
-    if type( main ) == "string" then
-        main = paths.Fix( main )
-    else
-        main = "init.lua"
-    end
-
-    if not fs.IsFile( main, "LUA" ) then
-        main = paths.Join( importPath, main )
-
-        if not fs.IsFile( main, "LUA" ) then
-            main = importPath .. "/init.lua"
-            if not fs.IsFile( main, "LUA" ) then
-                main = importPath .. "/main.lua"
-            end
-        end
-    end
-
-    if fs.IsFile( main, "LUA" ) then
-        metadata.main = main
-    else
-        metadata.main = nil
-    end
-
-    -- Client main file
-    local cl_main = metadata.cl_main
-    if type( cl_main ) == "string" then
-        cl_main = paths.Fix( cl_main )
-    else
-        cl_main = "cl_init.lua"
-    end
-
-    if not fs.IsFile( cl_main, "LUA" ) then
-        cl_main = paths.Join( importPath, cl_main )
-        if not fs.IsFile( cl_main, "LUA" ) then
-            cl_main = importPath .. "/cl_init.lua"
-        end
-    end
-
-    if fs.IsFile( cl_main, "LUA" ) then
-        metadata.cl_main = cl_main
-    else
-        metadata.cl_main = nil
     end
 
     return metadata
