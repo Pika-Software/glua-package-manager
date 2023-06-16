@@ -71,7 +71,7 @@ Import = promise.Async( function( metadata )
             return promise.Reject( result )
         end
 
-        return package.Initialize( package.BuildMetadata( metadata ), result )
+        return package.Initialize( metadata, result )
     end
 
     -- Downloading
@@ -95,12 +95,12 @@ Import = promise.Async( function( metadata )
             local ok, result = pcall( CompileString, body, url )
             if not ok then return promise.Reject( result ) end
 
-            return package.Initialize( package.BuildMetadata( metadata ), result )
+            return package.Initialize( metadata, result )
         elseif extension == "moon" then
             local ok, result = pcall( CompileMoonString, body, url )
             if not ok then return promise.Reject( result ) end
 
-            return package.Initialize( package.BuildMetadata( metadata ), result )
+            return package.Initialize( metadata, result )
         elseif extension == "gma" or extension == "zip" then
             return gpm.SourceImport( extension, "data/" .. cachePath )
         end
