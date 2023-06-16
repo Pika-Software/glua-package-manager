@@ -82,12 +82,6 @@ do
         return metadata
     end )
 
-    local function sendToClient( metadata, source )
-        if not metadata.client then return end
-        if type( source.SendToClient ) ~= "function" then return end
-        source.SendToClient( metadata )
-    end
-
     local tasks = gpm.ImportTasks
     if type( tasks ) ~= "table" then
         tasks = {}; gpm.ImportTasks = tasks
@@ -111,7 +105,10 @@ do
             end
 
             if SERVER then
-                sendToClient( result, source )
+                if metadata.client and source.SendToClient then
+                    source.SendToClient( result, source )
+                end
+
                 if not result.server then
                     return promise.Reject( "Package does not support running on the server." )
                 end
@@ -158,7 +155,10 @@ do
                 end
 
                 if SERVER then
-                    sendToClient( result, source )
+                    if metadata.client and source.SendToClient then
+                        source.SendToClient( result, source )
+                    end
+
                     if not result.server then return end
                 end
 
