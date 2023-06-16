@@ -57,7 +57,7 @@ function Find( searchable, ignoreImportNames, noPatterns )
 end
 
 local function getCurrentLuaPath()
-    local filePath = utils.GetCurrentFile()
+    local filePath = utils.GetCurrentFilePath()
     if not filePath then return end
     return paths.Localize( paths.Fix( filePath ) )
 end

@@ -319,7 +319,7 @@ function Version( number )
     return string.format( "%d.%d.%d", tonumber( string.sub( version, 0, 2 ) ), tonumber( string.sub( version, 3, 4 ) ), tonumber( string.sub( version, 5 ) ) )
 end
 
-function GetCurrentFile()
+function GetCurrentFilePath()
     for i = 2, 6 do
         local info = debug.getinfo( i, "S" )
         if not info then break end
