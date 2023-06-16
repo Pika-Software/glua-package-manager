@@ -67,130 +67,126 @@ if SERVER then
 
 end
 
+function FormatMetadata( metadata )
+    utils.LowerTableKeys( metadata )
+
+    -- Package name & entry point
+    if type( metadata.name ) ~= "string" then
+        metadata.name = nil
+    end
+
+    -- Menu
+    metadata.menu = metadata.menu ~= false
+
+    -- Main file
+    if type( metadata.cl_main ) ~= "string" then
+        metadata.cl_main = nil
+    elseif CLIENT then
+        metadata.main = metadata.cl_main
+    end
+
+    if type( metadata.main ) ~= "string" then
+        metadata.main = nil
+    end
+
+    -- Version
+    metadata.version = utils.Version( metadata.version )
+
+    -- Gamemodes
+    local gamemodesType = type( metadata.gamemodes )
+    if gamemodesType ~= "string" and gamemodesType ~= "table" then
+        metadata.gamemodes = nil
+    end
+
+    -- Single-player
+    metadata.singleplayer = metadata.singleplayer == true
+
+    -- Maps
+    local mapsType = type( metadata.maps )
+    if mapsType ~= "string" and mapsType ~= "table" then
+        metadata.maps = nil
+    end
+
+    -- Realms
+    metadata.client = metadata.client ~= false
+    metadata.server = metadata.server ~= false
+
+    -- Isolation & autorun
+    metadata.environment = metadata.environment ~= false
+    metadata.autorun = metadata.autorun == true
+
+    -- Color
+    if gpm.type( metadata.color ) ~= "Color" then
+        metadata.color = nil
+    end
+
+    -- Logger
+    metadata.logger = metadata.logger == true
+
+    -- Files to send to the client ( package and main will already be added and there is no need to specify them here )
+    if type( metadata.send ) ~= "table" then
+        metadata.send = nil
+    end
+
+    -- Libs autonames feature
+    local autonames = metadata.autonames
+    if type( autonames ) == "table" then
+        autonames.properties = autonames.properties ~= false and metadata.environment
+        autonames.timer = autonames.timer ~= false and metadata.environment
+        autonames.cvars = autonames.cvars ~= false and metadata.environment
+        autonames.hook = autonames.hook ~= false and metadata.environment
+        autonames.net = autonames.net == true and metadata.environment
+    else
+        metadata.autonames = {
+            ["properties"] = metadata.environment,
+            ["timer"] = metadata.environment,
+            ["cvars"] = metadata.environment,
+            ["hook"] = metadata.environment,
+            ["net"] = false
+        }
+    end
+
+    local defaults = metadata.defaults
+    if type( defaults ) == "table" then
+        defaults.typeid = autonames.typeid ~= false and metadata.environment
+        defaults.http = autonames.http ~= false and metadata.environment
+        defaults.type = autonames.type ~= false and metadata.environment
+        defaults.file = autonames.file ~= false and metadata.environment
+    else
+        metadata.defaults = {
+            ["typeid"] = metadata.environment,
+            ["http"] = metadata.environment,
+            ["type"] = metadata.environment,
+            ["file"] = metadata.environment
+        }
+    end
+
+    return metadata
+end
+
 do
 
-    local environment = {
+    local metatable = {
         ["__index"] = _G
     }
 
-    function BuildMetadata( source )
-        if type( source ) == "table" then
-            utils.LowerTableKeys( source )
+    function ExtractMetadata( func )
+        local environment = {}
+        debug.setfenv( func, environment )
+        setmetatable( environment, metatable )
 
-            -- Package name & entry point
-            if type( source.name ) ~= "string" then
-                source.name = nil
-            end
-
-            -- Menu
-            source.menu = source.menu ~= false
-
-            -- Main file
-            if type( source.cl_main ) ~= "string" then
-                source.cl_main = nil
-            elseif CLIENT then
-                source.main = source.cl_main
-            end
-
-            if type( source.main ) ~= "string" then
-                source.main = nil
-            end
-
-            -- Version
-            source.version = utils.Version( source.version )
-
-            -- Gamemodes
-            local gamemodesType = type( source.gamemodes )
-            if gamemodesType ~= "string" and gamemodesType ~= "table" then
-                source.gamemodes = nil
-            end
-
-            -- Single-player
-            source.singleplayer = source.singleplayer == true
-
-            -- Maps
-            local mapsType = type( source.maps )
-            if mapsType ~= "string" and mapsType ~= "table" then
-                source.maps = nil
-            end
-
-            -- Realms
-            source.client = source.client ~= false
-            source.server = source.server ~= false
-
-            -- Isolation & autorun
-            source.environment = source.environment ~= false
-            source.autorun = source.autorun == true
-
-            -- Color
-            if gpm.type( source.color ) ~= "Color" then
-                source.color = nil
-            end
-
-            -- Logger
-            source.logger = source.logger == true
-
-            -- Files to send to the client ( package and main will already be added and there is no need to specify them here )
-            if type( source.send ) ~= "table" then
-                source.send = nil
-            end
-
-            -- Libs autonames feature
-            local autonames = source.autonames
-            if type( autonames ) == "table" then
-                autonames.properties = autonames.properties ~= false and source.environment
-                autonames.timer = autonames.timer ~= false and source.environment
-                autonames.cvars = autonames.cvars ~= false and source.environment
-                autonames.hook = autonames.hook ~= false and source.environment
-                autonames.net = autonames.net == true and source.environment
-            else
-                source.autonames = {
-                    ["properties"] = source.environment,
-                    ["timer"] = source.environment,
-                    ["cvars"] = source.environment,
-                    ["hook"] = source.environment,
-                    ["net"] = false
-                }
-            end
-
-            local defaults = source.defaults
-            if type( defaults ) == "table" then
-                defaults.typeid = autonames.typeid ~= false and source.environment
-                defaults.http = autonames.http ~= false and source.environment
-                defaults.type = autonames.type ~= false and source.environment
-                defaults.file = autonames.file ~= false and source.environment
-            else
-                source.defaults = {
-                    ["typeid"] = source.environment,
-                    ["http"] = source.environment,
-                    ["type"] = source.environment,
-                    ["file"] = source.environment
-                }
-            end
-
-            return source
-        elseif type( source ) == "function" then
-            local metadata = {}
-
-            setmetatable( metadata, environment )
-                debug.setfenv( source, metadata )
-                local ok, result = pcall( source )
-            setmetatable( metadata, nil )
-
-            if not ok then
-                ErrorNoHaltWithStack( result )
-                return
-            end
-
-            result = result or metadata
-
-            if type( result ) ~= "table" then return end
-            if type( result.package ) == "table" then
-                result = result.package
-            end
-
-            return BuildMetadata( result )
+        local metadata = func()
+        if type( metadata ) ~= "table" then
+            setmetatable( environment, nil )
+            metadata = environment
         end
+
+        local PACKAGE = metadata.package
+        if type( PACKAGE ) == "table" then
+            metadata = PACKAGE
+        end
+
+        return metadata
     end
 
 end
@@ -912,7 +908,7 @@ do
 
         metadata.importpath = importPath
         metadata.source = sourceName
-        BuildMetadata( metadata )
+        FormatMetadata( metadata )
 
         local ok, result = source.Reload( self, metadata ):SafeAwait()
         if not ok then

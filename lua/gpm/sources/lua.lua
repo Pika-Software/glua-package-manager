@@ -58,7 +58,7 @@ GetMetadata = promise.Async( function( importPath )
                 return promise.Reject( result )
             end
 
-            table.Merge( metadata, package.BuildMetadata( result ) )
+            table.Merge( metadata, package.ExtractMetadata( result ) )
             metadata.packagepath = packagePath
         else
             metadata.autorun = true
@@ -79,7 +79,6 @@ GetMetadata = promise.Async( function( importPath )
 
         if not fs.IsFile( main, "LUA" ) then
             main = paths.Join( importPath, main )
-
             if not fs.IsFile( main, "LUA" ) then
                 main = importPath .. "/init.lua"
                 if not fs.IsFile( main, "LUA" ) then

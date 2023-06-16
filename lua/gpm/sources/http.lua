@@ -110,7 +110,7 @@ Import = promise.Async( function( metadata )
 
     local json = util.JSONToTable( body )
     if not json then return promise.Reject( "'.json' file is corrupted." ) end
-    package.BuildMetadata( table_Merge( metadata, json ) )
+    package.FormatMetadata( table_Merge( metadata, json ) )
     metadata.importpath = url
 
     local urls = metadata.files

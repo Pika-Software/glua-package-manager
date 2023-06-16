@@ -64,11 +64,12 @@ do
                     return promise.Reject( result )
                 end
 
-                metadata = package.BuildMetadata( result )
+                metadata = result
             else
-                metadata = package.BuildMetadata( {} )
+                metadata = {}
             end
 
+            metadata = package.FormatMetadata( metadata )
             metadatas[ sourceName .. ";" .. importPath ] = metadata
         end
 
