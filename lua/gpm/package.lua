@@ -438,8 +438,9 @@ do
             -- include
             env.include = function( fileName )
                 gpm.ArgAssert( fileName, 1, "string" )
+                fileName = paths.Fix( fileName )
 
-                local func = files[ paths.Fix( fileName ) ]
+                local func = files[ fileName ]
                 if type( func ) == "function" then
                     return func( self )
                 end
@@ -447,8 +448,8 @@ do
                 local luaPath = getCurrentLuaPath()
                 if luaPath then
                     local folder = string.GetPathFromFilename( luaPath )
-                    if folder and #folder > 0 then
-                        local filePath = paths.Fix( folder .. fileName )
+                    if folder then
+                        local filePath = folder .. fileName
                         if fs.IsFile( filePath, "LUA" ) then
                             local ok, result = gpm.Compile( filePath ):SafeAwait()
                             if not ok then
@@ -461,9 +462,8 @@ do
                     end
                 end
 
-                local filePath = paths.Fix( fileName )
-                if fs.IsFile( filePath, "LUA" ) then
-                    local ok, result = gpm.Compile( filePath ):SafeAwait()
+                if fs.IsFile( fileName, "LUA" ) then
+                    local ok, result = gpm.Compile( fileName ):SafeAwait()
                     if not ok then
                         error( result )
                     end
