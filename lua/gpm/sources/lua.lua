@@ -38,8 +38,7 @@ function CanImport( filePath )
     if fs.IsDir( filePath, "LUA" ) then return true end
     if fs.IsFile( filePath, "LUA" ) then
         local extension = string.GetExtensionFromFilename( filePath )
-        if extension == "moon" then return SERVER end
-        if extension == "lua" then return true end
+        return extension == "moon" or extension == "lua"
     end
 
     return false
