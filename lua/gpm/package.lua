@@ -232,10 +232,6 @@ do
         return table.Lookup( self, "Metadata.main" )
     end
 
-    function PACKAGE:GetFolder()
-        return table.Lookup( self, "Metadata.folder" )
-    end
-
     function PACKAGE:GetName()
         return table.Lookup( self, "Metadata.name", self:GetImportPath() or "unknown" )
     end
