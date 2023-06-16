@@ -5,10 +5,10 @@ local package = gpm.package
 local promise = promise
 local paths = gpm.paths
 local string = string
+local table = table
 local fs = gpm.fs
 
 -- Variables
-local table_Empty = table.Empty
 local SERVER = SERVER
 local ipairs = ipairs
 local type = type
@@ -109,7 +109,8 @@ GetMetadata = promise.Async( function( importPath )
         metadata.folder = folder
     end
 
-    -- Shared init
+
+    -- Shared main file
     local main = metadata.main
     if type( main ) == "string" then
         main = paths.Fix( main )
@@ -134,7 +135,7 @@ GetMetadata = promise.Async( function( importPath )
         metadata.main = nil
     end
 
-    -- Client init
+    -- Client main file
     local cl_main = metadata.cl_main
     if type( cl_main ) == "string" then
         cl_main = paths.Fix( cl_main )
@@ -217,7 +218,7 @@ Import = promise.Async( function( metadata )
 end )
 
 Reload = promise.Async( function( pkg, metadata )
-    table_Empty( pkg.Files )
+    table.Empty( pkg.Files )
 
     if SERVER then
         SendToClient( metadata )

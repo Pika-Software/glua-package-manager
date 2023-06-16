@@ -56,16 +56,10 @@ function Find( searchable, ignoreImportNames, noPatterns )
     return result
 end
 
-local function getCurrentLuaPath()
-    local filePath = utils.GetCurrentFilePath()
-    if not filePath then return end
-    return paths.Localize( paths.Fix( filePath ) )
-end
-
 if SERVER then
 
     function AddCSLuaFile( fileName )
-        local luaPath = getCurrentLuaPath()
+        local luaPath = utils.GetCurrentFilePath()
         if luaPath and not fileName then
             return addCSLuaFile( luaPath )
         end
@@ -445,7 +439,7 @@ do
                     return func( self )
                 end
 
-                local luaPath = getCurrentLuaPath()
+                local luaPath = utils.GetCurrentFilePath()
                 if luaPath then
                     local folder = string.GetPathFromFilename( luaPath )
                     if folder then

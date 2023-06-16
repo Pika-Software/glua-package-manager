@@ -72,6 +72,13 @@ do
             metadatas[ sourceName .. ";" .. importPath ] = metadata
         end
 
+        if type( metadata.name ) ~= "string" then
+            metadata.name = importPath
+        end
+
+        metadata.importpath = importPath
+        metadata.source = sourceName
+
         return metadata
     end )
 
@@ -129,13 +136,6 @@ do
             if ( mapsType == "string" and maps ~= map ) or ( mapsType == "table" and not table_HasIValue( maps, map ) ) then
                 return promise.Reject( "Package does not support current map." )
             end
-
-            if type( result.name ) ~= "string" then
-                result.name = importPath
-            end
-
-            result.importpath = importPath
-            result.source = sourceName
 
             task = source.Import( result )
             tasks[ importPath ] = task
