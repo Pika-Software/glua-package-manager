@@ -169,6 +169,11 @@ function PreCacheMoon( filePath, noError )
         return
     end
 
+    if not fs.IsFile( filePath, "LUA" ) then
+        if noError then return end
+        error( "Unable to compile Moonscript '" .. filePath .. "' file, file not found." )
+    end
+
     if not moonloader.PreCacheFile( filePath ) then
         if noError then return end
         error( "Compiling Moonscript file '" .. filePath .. "' into Lua is failed!" )
