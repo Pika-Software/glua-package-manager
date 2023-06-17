@@ -27,6 +27,7 @@ end
 function Download( wsid )
     local p = promise.New()
 
+    -- TODO: Check game path "WORKSHOP"
     steamworks.DownloadUGC( wsid, function( filePath, fileClass )
         if type( filePath ) ~= "string" then
             filePath = "unknown path"
