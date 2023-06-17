@@ -75,7 +75,7 @@ Import = promise.Async( function( metadata )
     end
 
     -- Downloading
-    logger:Info( "[%s] Package '%s' is downloading...", metadata.source, url )
+    logger:Info( "Package '%s' is downloading...", url )
     local ok, result = http.Fetch( url, nil, 120 ):SafeAwait()
     if not ok then return promise.Reject( result ) end
 
@@ -120,7 +120,7 @@ Import = promise.Async( function( metadata )
 
     local files = {}
     for filePath, fileURL in pairs( urls ) do
-        logger:Debug( "[%s] Package '%s', file '%s' (%s) download has started.", metadata.source, url, filePath, fileURL )
+        logger:Debug( "Package '%s', file '%s' (%s) download has started.", url, filePath, fileURL )
 
         local ok, result = http.Fetch( fileURL, nil, 120 ):SafeAwait()
         if not ok then return promise.Reject( "File '" .. filePath .. "' download failed, " .. result ) end
