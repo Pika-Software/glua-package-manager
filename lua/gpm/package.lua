@@ -67,36 +67,51 @@ if SERVER then
 
 end
 
-function FormatMetadata( metadata )
-    utils.LowerTableKeys( metadata )
+function FormatInit( init )
+    local initType = type( init )
+    if initType == "table" then
+        utils.LowerTableKeys( initType )
 
-    -- Package name & entry point
-    if type( metadata.name ) ~= "string" then
-        metadata.name = nil
+        local server = initType.server
+        if type( server ) ~= "string" or #server == 0 then
+            initType.server = nil
+        end
+
+        local client = initType.client
+        if type( client ) ~= "string" or #client == 0 then
+            initType.client = nil
+        end
+
+        local menu = initType.menu
+        if type( menu ) ~= "string" or #menu == 0 then
+            initType.menu = nil
+        end
+
+        return initType
+    elseif initType == "string" then
+        return {
+            ["server"] = initType,
+            ["client"] = initType,
+            ["menu"] = initType
+        }
     end
 
-    -- Menu
-    metadata.menu = metadata.menu ~= false
+    return {
+        ["server"] = "init.lua",
+        ["client"] = "init.lua",
+        ["menu"] = "init.lua"
+    }
+end
 
-    -- Main file
-    if type( metadata.cl_main ) ~= "string" then
-        metadata.cl_main = nil
+function GetCurrentInitByRealm( init )
+    if SERVER then
+        return init.server
     elseif CLIENT then
-        metadata.main = metadata.cl_main
+        return init.client
+    elseif MENU_DLL then
+        return init.menu
     end
-
-    if type( metadata.main ) ~= "string" then
-        metadata.main = nil
-    end
-
-    -- Version
-    metadata.version = utils.Version( metadata.version )
-
-    -- Gamemodes
-    local gamemodesType = type( metadata.gamemodes )
-    if gamemodesType ~= "string" and gamemodesType ~= "table" then
-        metadata.gamemodes = nil
-    end
+end
 
     -- Single-player
     metadata.singleplayer = metadata.singleplayer == true
