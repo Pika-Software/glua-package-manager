@@ -64,10 +64,6 @@ GetMetadata = promise.Async( function( importPath )
             metadata.autorun = true
         end
 
-        if SERVER then
-            fs.Watch( importPath .. "/", "lsv" )
-        end
-
         -- TODO: Change cl_main and main to table with server, shared, client
         -- Shared main file
         local main = metadata.main
@@ -112,6 +108,10 @@ GetMetadata = promise.Async( function( importPath )
             metadata.cl_main = cl_main
         else
             metadata.cl_main = nil
+        end
+
+        if SERVER then
+            fs.Watch( importPath .. "/", "lsv" )
         end
     elseif fs.IsFile( importPath, "LUA" ) then
         metadata.autorun = true
