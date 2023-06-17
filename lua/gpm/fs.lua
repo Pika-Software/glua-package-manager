@@ -29,6 +29,7 @@ local debug_fempty = debug.fempty
 local math_max = math.max
 local ipairs = ipairs
 local assert = assert
+local BRANCH = BRANCH
 local type = type
 
 module( "gpm.fs" )
@@ -40,40 +41,47 @@ Find = file.Find
 Size = file.Size
 Time = file.Time
 
-function Exists( filePath, gamePath )
-    if SERVER then return file.Exists( filePath, gamePath ) end
-    if file.Exists( filePath, gamePath ) then return true end
+if BRANCH == "x86-64-temp" or SERVER then
+    Exists = file.Exists
+    IsDir = file.IsDir
+    function IsFile( ... )
+        return Exists( ... ) and not IsDir( ... )
+    end
+else
 
-    local files, folders = file.Find( filePath .. "*", gamePath )
-    if not files or not folders then return false end
-    if #files == 0 and #folders == 0 then return false end
+    function Exists( filePath, gamePath )
+        if file.Exists( filePath, gamePath ) then return true end
 
-    local splits = string.Split( filePath, "/" )
-    local fileName = splits[ #splits ]
+        local files, folders = file.Find( filePath .. "*", gamePath )
+        if not files or not folders then return false end
+        if #files == 0 and #folders == 0 then return false end
 
-    return table.HasIValue( files, fileName ) or table.HasIValue( folders, fileName )
-end
+        local splits = string.Split( filePath, "/" )
+        local fileName = splits[ #splits ]
 
-function IsDir( filePath, gamePath )
-    if SERVER then return file.IsDir( filePath, gamePath ) end
-    if file.IsDir( filePath, gamePath ) then return true end
+        return table.HasIValue( files, fileName ) or table.HasIValue( folders, fileName )
+    end
 
-    local _, folders = file.Find( filePath .. "*", gamePath )
-    if folders == nil or #folders == 0 then return false end
+    function IsDir( filePath, gamePath )
+        if file.IsDir( filePath, gamePath ) then return true end
 
-    local splits = string.Split( filePath, "/" )
-    return table.HasIValue( folders, splits[ #splits ] )
-end
+        local _, folders = file.Find( filePath .. "*", gamePath )
+        if folders == nil or #folders == 0 then return false end
 
-function IsFile( filePath, gamePath )
-    if SERVER then return file.Exists( filePath, gamePath ) and not file.IsDir( filePath, gamePath ) end
-    if file.Exists( filePath, gamePath ) and not file.IsDir( filePath, gamePath ) then return true end
+        local splits = string.Split( filePath, "/" )
+        return table.HasIValue( folders, splits[ #splits ] )
+    end
 
-    local files, _ = file.Find( filePath .. "*", gamePath )
-    if not files or #files == 0 then return false end
-    local splits = string.Split( filePath, "/" )
+    function IsFile( filePath, gamePath )
+        if file.Exists( filePath, gamePath ) and not file.IsDir( filePath, gamePath ) then return true end
 
-    return table.HasIValue( files, splits[ #splits ] )
+        local files, _ = file.Find( filePath .. "*", gamePath )
+        if not files or #files == 0 then return false end
+        local splits = string.Split( filePath, "/" )
+
+        return table.HasIValue( files, splits[ #splits ] )
+    end
+
 end
 
 function Read( filePath, gamePath, length )
