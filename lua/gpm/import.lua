@@ -69,16 +69,12 @@ do
                 metadata = {}
             end
 
-            metadata = package.FormatMetadata( metadata )
+            metadata.importpath = importPath
+            metadata.source = sourceName
+
+            package.FormatMetadata( metadata )
             metadatas[ sourceName .. ";" .. importPath ] = metadata
         end
-
-        if type( metadata.name ) ~= "string" then
-            metadata.name = importPath
-        end
-
-        metadata.importpath = importPath
-        metadata.source = sourceName
 
         return metadata
     end )
@@ -86,6 +82,45 @@ do
     local tasks = gpm.ImportTasks
     if type( tasks ) ~= "table" then
         tasks = {}; gpm.ImportTasks = tasks
+    end
+
+    function gpm.CanBeInstalled( metadata, source )
+        local init = metadata.init
+        if SERVER then
+            if ( init.client or metadata.send ) and source.SendToClient then
+                source.SendToClient( metadata, source )
+            end
+
+            if not init.server then
+                return false, "package does not support running on the server"
+            end
+        end
+
+        if CLIENT and not init.client then
+            return false, "package does not support running on the client"
+        end
+
+        if MENU_DLL and not init.menu then
+            return false, "package does not support running in menu"
+        end
+
+        if metadata.singleplayer and not singlePlayer then
+            return false, "package cannot be executed in a singleplayer game"
+        end
+
+        local gamemodes = metadata.gamemodes
+        local gamemodesType = type( gamemodes )
+        if ( gamemodesType == "string" and gamemodes ~= activeGamemode ) or ( gamemodesType == "table" and not table_HasIValue( gamemodes, activeGamemode ) ) then
+            return false, "package does not support active gamemode"
+        end
+
+        local maps = metadata.maps
+        local mapsType = type( maps )
+        if ( mapsType == "string" and maps ~= map ) or ( mapsType == "table" and not table_HasIValue( maps, map ) ) then
+            return false, "package does not support current map"
+        end
+
+        return true
     end
 
     gpm.SourceImport = promise.Async( function( sourceName, importPath )
@@ -101,38 +136,9 @@ do
                 return promise.Reject( result )
             end
 
-            if CLIENT and not result.client then
-                return promise.Reject( "Package does not support running on the client." )
-            end
-
-            if SERVER then
-                if result.client and source.SendToClient then
-                    source.SendToClient( result, source )
-                end
-
-                if not result.server then
-                    return promise.Reject( "Package does not support running on the server." )
-                end
-            end
-
-            if MENU_DLL and not result.menu then
-                return promise.Reject( "Package does not support running in menu." )
-            end
-
-            if result.singleplayer and not singlePlayer then
-                return promise.Reject( "Package cannot be executed in a singleplayer game." )
-            end
-
-            local gamemodes = result.gamemodes
-            local gamemodesType = type( gamemodes )
-            if ( gamemodesType == "string" and gamemodes ~= activeGamemode ) or ( gamemodesType == "table" and not table_HasIValue( gamemodes, activeGamemode ) ) then
-                return promise.Reject( "Package does not support active gamemode." )
-            end
-
-            local maps = result.maps
-            local mapsType = type( maps )
-            if ( mapsType == "string" and maps ~= map ) or ( mapsType == "table" and not table_HasIValue( maps, map ) ) then
-                return promise.Reject( "Package does not support current map." )
+            local ok, message = gpm.CanBeInstalled( result, source )
+            if not ok then
+                return promise.Reject( message )
             end
 
             task = source.Import( result )
@@ -155,38 +161,14 @@ do
                     return promise.Reject( result )
                 end
 
-                if SERVER then
-                    if result.client and source.SendToClient then
-                        source.SendToClient( result, source )
-                    end
-
-                    if not result.server then return end
+                local ok, message = gpm.CanBeInstalled( result, source )
+                if not ok then
+                    logger:Error( "Package '%s' import failed, %s.", importPath, message )
+                    return
                 end
 
                 if autorun and not result.autorun then
                     logger:Debug( "Package '%s' autorun restricted.", importPath )
-                    return
-                end
-
-                if CLIENT and not result.client then return end
-                if MENU_DLL and not result.menu then return end
-
-                if result.singleplayer and not singlePlayer then
-                    logger:Error( "Package '%s' import failed, package cannot be executed in a singleplayer game.", importPath )
-                    return
-                end
-
-                local gamemodes = result.gamemodes
-                local gamemodesType = type( gamemodes )
-                if ( gamemodesType == "string" and gamemodes ~= activeGamemode ) or ( gamemodesType == "table" and not table_HasIValue( gamemodes, activeGamemode ) ) then
-                    logger:Error( "Package '%s' import failed, package does not support active gamemode.", importPath )
-                    return
-                end
-
-                local maps = result.maps
-                local mapsType = type( maps )
-                if ( mapsType == "string" and maps ~= map ) or ( mapsType == "table" and not table_HasIValue( maps, map ) ) then
-                    logger:Error( "Package '%s' import failed, package does not support current map.", importPath )
                     return
                 end
 

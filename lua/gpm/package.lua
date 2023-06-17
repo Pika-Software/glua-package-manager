@@ -19,7 +19,7 @@ local net = net
 
 -- Variables
 local ErrorNoHaltWithStack = ErrorNoHaltWithStack
-local CLIENT, SERVER = CLIENT, SERVER
+local CLIENT, SERVER, MENU_DLL = CLIENT, SERVER, MENU_DLL
 local addCSLuaFile = AddCSLuaFile
 local getmetatable = getmetatable
 local setmetatable = setmetatable
@@ -113,34 +113,48 @@ function GetCurrentInitByRealm( init )
     end
 end
 
-    -- Single-player
-    metadata.singleplayer = metadata.singleplayer == true
+function FormatMetadata( metadata )
+    utils.LowerTableKeys( metadata )
 
-    -- Maps
-    local mapsType = type( metadata.maps )
-    if mapsType ~= "string" and mapsType ~= "table" then
-        metadata.maps = nil
+    if type( metadata.name ) ~= "string" then
+        local importPath = metadata.importpath
+        if type( importPath ) then
+            metadata.name = importPath
+        else
+            metadata.name = nil
+        end
     end
 
-    -- Realms
-    metadata.client = metadata.client ~= false
-    metadata.server = metadata.server ~= false
-
-    -- Isolation & autorun
+    metadata.init = FormatInit( metadata.init )
+    metadata.version = utils.Version( metadata.version )
     metadata.environment = metadata.environment ~= false
     metadata.autorun = metadata.autorun == true
 
-    -- Color
+    -- Files to send to the client ( package and init will already be added and there is no need to specify them here )
+    if type( metadata.send ) ~= "table" then
+        metadata.send = nil
+    end
+
+    -- Logger and logs color
+    metadata.logger = metadata.logger == true
+
     if gpm.type( metadata.color ) ~= "Color" then
         metadata.color = nil
     end
 
-    -- Logger
-    metadata.logger = metadata.logger == true
+    -- Single-player restriction
+    metadata.singleplayer = metadata.singleplayer == true
 
-    -- Files to send to the client ( package and main will already be added and there is no need to specify them here )
-    if type( metadata.send ) ~= "table" then
-        metadata.send = nil
+    -- Allowed gamemodes
+    local gamemodesType = type( metadata.gamemodes )
+    if gamemodesType ~= "string" and gamemodesType ~= "table" then
+        metadata.gamemodes = nil
+    end
+
+    -- Allowed maps
+    local mapsType = type( metadata.maps )
+    if mapsType ~= "string" and mapsType ~= "table" then
+        metadata.maps = nil
     end
 
     -- Libs autonames feature
@@ -363,9 +377,9 @@ do
 
             env._VERSION = metadata.version
 
-            local main = self.Main
-            if main then
-                debug.setfenv( main, env )
+            local init = self.Init
+            if init then
+                debug.setfenv( init, env )
             end
 
             local files = self.Files
@@ -767,9 +781,9 @@ do
             end
         end
 
-        local main = self.Main
-        if main then
-            debug.setfenv( main, _G )
+        local init = self.Init
+        if init then
+            debug.setfenv( init, _G )
         end
 
         local files = self.Files
@@ -809,12 +823,12 @@ do
     end )
 
     PACKAGE.Run = promise.Async( function( self )
-        local main = self.Main
-        if not main then
+        local init = self.Init
+        if not init then
             return promise.Reject( "Missing package '" .. self:GetIdentifier() ..  "' entry point." )
         end
 
-        local ok, result = pcall( main, self )
+        local ok, result = pcall( init, self )
         if not ok then
             return promise.Reject( result )
         end
@@ -952,7 +966,7 @@ Initialize = promise.Async( function( metadata, func, files )
         ["Metadata"] = {},
         ["Children"] = {},
         ["Files"] = {},
-        ["Main"] = func
+        ["Init"] = func
     }, PACKAGE )
 
     local ok, result = pkg:Initialize( metadata, files ):SafeAwait()

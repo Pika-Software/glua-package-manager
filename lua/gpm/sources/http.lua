@@ -139,18 +139,13 @@ Import = promise.Async( function( metadata )
             compiledFiles[ data[ 1 ] ] = result
         end
 
-        if type( metadata.main ) ~= "string" then
-            metadata.main = "init.lua"
-        end
+        local init = package.FormatInit( metadata.init )
+        metadata.init = init
 
-        local func = compiledFiles[ metadata.main ]
+        local filePath = package.GetCurrentInitByRealm( init )
+        local func = compiledFiles[ filePath ]
         if not func then
-            metadata.main = "main.lua"
-            func = compiledFiles[ metadata.main ]
-        end
-
-        if not func then
-            return promise.Reject( "Package main file '" .. metadata.main .. "' is missing or compilation was failed." )
+            return promise.Reject( "Package init file '" .. filePath .. "' is missing or compilation was failed." )
         end
 
         return package.Initialize( metadata, func, compiledFiles )

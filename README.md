@@ -27,43 +27,46 @@ Also, you can run an existing addon via gpm, just add the code below to `package
 ```lua
 -- lua/packages/example-package/package.lua
 name = "example-package"
-main = "init.lua"
-version = 1
+version = 000100
 
--- allowed sides to run package, if client is false then the server will not send anything
-client = true
-server = true
-
--- if there is no autorun, the package will wait for import from another package
-autorun = true
-
--- don't touch it if you don't know what you're doing
-environment = true
-
--- client files
-send = {
-    "my/client/file.lua",
-    "my/client/file2.lua"
+-- Files to be used as an entry point into the package, supports relative paths and global relative to "lua/"
+init = {
+    ["client"] = "cl_init.lua",
+    ["server"] = "init.lua",
+    ["menu"] = "init.lua"
 }
 
--- if false, the logger will not be created by default
+-- If there is no autorun, the package will wait for import from another package
+autorun = true
+
+-- Don't touch it if you don't know what you're doing
+environment = true
+
+-- Client files ( supports relative paths and global paths by "lua/" )
+send = {
+    "file.lua",
+    "my_addon/file2.lua"
+}
+
+-- If false, the logger will not be created by default and logs color
 logger = false
 color = Color( 255, 255, 0 )
 
--- if nil, all gamemodes are allowed
+-- Allowed gamemodes list, if nil then all gamemodes are allowed
 gamemodes = {
     "sandbox",
     "darkrp"
 }
 
--- if nil, all maps are allowed
+-- Allowed maps list, if nil then all maps are allowed
 maps = {
     "gm_construct"
 }
 
--- if true, then the package is allowed to run only in a singleplayer game
+-- If true, then the package is allowed to run only in a singleplayer game
 singleplayer = false
 
+-- Enables automatic naming for listed libraries, e.g. all hooks with hook = true will have a package identifier in the hook name, if the hook name is a string of course...
 autonames = {
     ["properties"] = true,
     ["timer"] = true,
@@ -81,14 +84,16 @@ autonames = {
 - ### Package version (`version`) (def. `nil`)
     By default, the version is a number whose format is { 00 } { 00 } { 00 } = 0.0.0, you can also use your own version format, just put your version here as a string.
 
-- ### Package entry point (`main`) (def. `init.lua`)
-    The `main` in this case is the entry point to the package (where the code execution will start from), you can use either the full `lua/` path, for example 'lua/packages/example-package/init.lua' or a local path relative to your package folder.
+- ### Package init (`init`)
+    This is a universal parameter, which can be either a string or a table, in case it is a string, the package will run on both server and client and menu using the same initialization point, but if it is a table, it must contain parameters like ["realm"] = "path/to/init. lua", if any side is not specified then it won't be launched/sent, i.e. if we specify this value to {["server"] = "init.lua"} the package will only run on server and won't be sent to clients and also will not support menu realm.
 
-- ### Package client entry point (`cl_main`) ( def. `nil`)
-    An optional parameter that substitutes `main` with another file for the client, helps to easily separate the client and server sides.
-
-- ### Client and server (`client`, `server`, `menu`) (def. `true`, `true`, `false`)
-    You can change the permissions to run a package, for example if you set `client` to `false` the client will not be able to run it, moreover it will not even know that such a package exists and therefore will not see its files. `menu` is works only in menu realm.
+    #### Example
+    ```lua
+        init = {
+            ["server"] = "init.lua",
+            ["client"] = "cl_init.lua"
+        }
+    ```
 
 - ### Package autorun (`autorun`) (def. `false`)
     The default setting is `false`, if this parameter is set to `true` and the package is in a valid `lua/` directory, the package will automatically start and will not wait to be run externally.

@@ -12,7 +12,6 @@ local fs = gpm.fs
 local MENU_DLL = MENU_DLL
 local SERVER = SERVER
 local ipairs = ipairs
-local type = type
 
 if efsw ~= nil then
     hook.Add( "FileWatchEvent", "GPM.Sources.Lua.Hot-Reload", function( action, _, filePath )
@@ -67,52 +66,6 @@ GetMetadata = promise.Async( function( importPath )
             metadata.autorun = true
         end
 
-        -- TODO: Change cl_main and main to table with server, shared, client
-        -- Shared main file
-        local main = metadata.main
-        if type( main ) == "string" then
-            main = paths.Fix( main )
-        else
-            main = "init.lua"
-        end
-
-        if not fs.IsFile( main, "LUA" ) then
-            main = paths.Join( importPath, main )
-            if not fs.IsFile( main, "LUA" ) then
-                main = importPath .. "/init.lua"
-                if not fs.IsFile( main, "LUA" ) then
-                    main = importPath .. "/main.lua"
-                end
-            end
-        end
-
-        if fs.IsFile( main, "LUA" ) then
-            metadata.main = main
-        else
-            metadata.main = nil
-        end
-
-        -- Client main file
-        local cl_main = metadata.cl_main
-        if type( cl_main ) == "string" then
-            cl_main = paths.Fix( cl_main )
-        else
-            cl_main = "cl_init.lua"
-        end
-
-        if not fs.IsFile( cl_main, "LUA" ) then
-            cl_main = paths.Join( importPath, cl_main )
-            if not fs.IsFile( cl_main, "LUA" ) then
-                cl_main = importPath .. "/cl_init.lua"
-            end
-        end
-
-        if fs.IsFile( cl_main, "LUA" ) then
-            metadata.cl_main = cl_main
-        else
-            metadata.cl_main = nil
-        end
-
         if SERVER or MENU_DLL then
             fs.Watch( importPath .. "/", "lsv" )
         end
@@ -124,9 +77,7 @@ GetMetadata = promise.Async( function( importPath )
         end
 
         importPath = paths.FormatToLua( importPath )
-        if fs.IsFile( importPath, "LUA" ) then
-            metadata.main = importPath
-        end
+        metadata.init = importPath
 
         if SERVER or MENU_DLL then
             fs.Watch( importPath, "lsv" )
@@ -145,21 +96,21 @@ if SERVER then
             addCSLuaFile( packagePath )
         end
 
-        local cl_main = metadata.cl_main
-        if cl_main then
-            addCSLuaFile( cl_main )
-        else
-            local main = metadata.main
-            if main then
-                addCSLuaFile( metadata.main )
+        local importPath = metadata.importpath
+        local isInFolder = fs.IsDir( importPath, "lsv" )
+
+        local client = metadata.init.client
+        if client then
+            local filePath = importPath .. "/" .. client
+            if fs.IsFile( filePath, "lsv" ) then
+                addCSLuaFile( filePath )
+            elseif fs.IsFile( client, "lsv" ) then
+                addCSLuaFile( client )
             end
         end
 
         local send = metadata.send
         if send then
-            local importPath = metadata.importpath
-            local isInFolder = fs.IsDir( importPath, "lsv" )
-
             for _, filePath in ipairs( send ) do
                 if isInFolder then
                     local localFilePath = importPath .. "/" .. filePath
@@ -178,16 +129,21 @@ if SERVER then
 
 end
 
-CompileMain = promise.Async( function( filePath )
-    if not filePath then
-        return promise.Reject( "Package main file '" .. ( filePath or "init.lua" ) .. "' is missing." )
+CompileMain = promise.Async( function( metadata )
+    local filePath = package.GetCurrentInitByRealm( metadata.init )
+    if not fs.IsFile( filePath, "LUA" ) then
+        filePath = metadata.importpath .. "/" .. filePath
+    end
+
+    if not fs.IsFile( filePath, "LUA" ) then
+        return promise.Reject( "Package init file '" .. filePath .. "' is missing." )
     end
 
     return gpm.Compile( filePath )
 end )
 
 Import = promise.Async( function( metadata )
-    local ok, result = CompileMain( metadata.main ):SafeAwait()
+    local ok, result = CompileMain( metadata ):SafeAwait()
     if not ok then
         return promise.Reject( result )
     end
@@ -202,12 +158,12 @@ Reload = promise.Async( function( pkg, metadata )
         SendToClient( metadata )
     end
 
-    local ok, result = CompileMain( metadata.main ):SafeAwait()
+    local ok, result = CompileMain( metadata ):SafeAwait()
     if not ok then
         return promise.Reject( result )
     end
 
-    pkg.Main = result
+    pkg.Init = result
 
     local ok, result = pkg:Initialize( metadata ):SafeAwait()
     if not ok then
