@@ -100,7 +100,7 @@ autonames = {
     The list of files to send to the client, can be useful if the package runs exclusively on the client and has more than one file. (must be a table with indexes from 1 to infinity)
 
 - ### Package logger (`logger`) (def. `false`)
-    If set to `true` then a personal logger object will be created in the package environment, to easily send logs to the console. If necessary, you can create a logger object yourself, just call `gpm.logger.Create( name, color )` (`name` is `string`, `color` is `Color`).
+    If set to `true` then a personal logger object will be created in the package environment, to easily send logs to the console. If necessary, you can create a logger object yourself, just call `gpm.CreateLogger( name, color )` (`name` is `string`, `color` is `Color`).
 
     #### Example usage
     ```lua

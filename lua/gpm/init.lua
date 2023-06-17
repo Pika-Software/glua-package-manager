@@ -68,7 +68,7 @@ local stopwatch = SysTime()
 IncludeComponent "utils"
 IncludeComponent "logger"
 
-Logger = logger.Create( "GPM@" .. utils.Version( _VERSION ), Color( 180, 180, 255 ) )
+Logger = CreateLogger( "GPM@" .. utils.Version( _VERSION ), Color( 180, 180, 255 ) )
 
 libs = {}
 libs.deflatelua = IncludeComponent "libs/deflatelua"

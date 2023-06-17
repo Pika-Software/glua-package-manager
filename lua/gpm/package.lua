@@ -368,7 +368,7 @@ do
 
             -- Logger
             if metadata.logger then
-                local logger = gpm.logger.Create( self:GetIdentifier(), metadata.color )
+                local logger = gpm.CreateLogger( self:GetIdentifier(), metadata.color )
                 _gpm.Logger = logger
                 self.Logger = logger
             end
