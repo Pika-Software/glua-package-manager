@@ -12,7 +12,6 @@ local fs = gpm.fs
 
 -- Variables
 local steamworks = steamworks
-local logger = gpm.Logger
 local tonumber = tonumber
 local type = type
 
@@ -29,57 +28,63 @@ function Download( wsid )
     local p = promise.New()
 
     steamworks.DownloadUGC( wsid, function( filePath, fileClass )
-        if type( filePath ) == "string" and fs.IsFile( filePath, "GAME" ) then
+        if type( filePath ) ~= "string" then
+            filePath = "unknown path"
+        elseif fs.IsFile( filePath, "GAME" ) then
             p:Resolve( filePath )
             return
         end
 
-        if fileClass then
-            local gmaReader = gmad.Read( fileClass )
-            if not gmaReader then
-                p:Reject( "gma reading failed" )
-                return
-            end
-
-            local cachePath = cacheFolder .. wsid .. ".gma.dat"
-            if fs.IsFile( cachePath, "DATA" ) then
-                if fs.Time( cachePath, "DATA" ) <= ( 60 * 60 * cacheLifetime:GetInt() ) then
-                    p:Resolve( "data/" .. cachePath )
-                    return
-                end
-
-                fs.Delete( cachePath )
-            end
-
-            gmaReader:ReadAllFiles()
-            gmaReader:Close()
-
-            local gmaWriter = gmad.Write( cachePath )
-            if gmaWriter then
-                gmaWriter.Metadata = gmaReader.Metadata
-                gmaWriter.Files = gmaReader.Files
-                gmaWriter:Close()
-            elseif fs.IsFile( cachePath, "DATA" ) then
-                logger:Warn( "Cache writing failed, probably file 'data/" .. cachePath .. "' was already mounted, need to restart the game." )
-            else
-                p:Reject( "gma file writing failed" )
-                return
-            end
-
-            p:Resolve( "data/" .. cachePath )
+        if not fileClass then
+            p:Reject( "Unknown error reading downloaded GMA file '" .. filePath .. "' failed." )
             return
         end
 
-        p:Reject( "gma has no data to read" )
+        local gmaReader = gmad.Read( fileClass )
+        if not gmaReader then
+            p:Reject( "Unknown error reading downloaded GMA file '" .. filePath .. "' failed." )
+            return
+        end
+
+        gmaReader:ReadAllFiles()
+        gmaReader:Close()
+
+        local cachePath = cacheFolder .. wsid .. ".gma.dat"
+        if fs.IsFile( cachePath, "DATA" ) then
+            if fs.Time( cachePath, "DATA" ) <= ( 60 * 60 * cacheLifetime:GetInt() ) then
+                p:Resolve( "data/" .. cachePath )
+                return
+            end
+
+            fs.Delete( cachePath )
+        end
+
+        local gmaWriter = gmad.Write( cachePath )
+        if not gmaWriter then
+            if fs.IsFile( cachePath, "DATA" ) then
+                gpm.Logger:Warn( "GMA file '" .. cachePath .. "' cannot be written, it is probably already mounted to the game, try restarting the game." )
+            else
+                p:Reject( "Unknown GMA file '" .. cachePath .. "' writing error." )
+            end
+
+            return
+        end
+
+        gmaWriter.Metadata = gmaReader.Metadata
+        gmaWriter.Files = gmaReader.Files
+        gmaWriter:Close()
+
+        p:Resolve( "data/" .. cachePath )
     end )
 
     return p
 end
 
 Import = promise.Async( function( metadata )
-    local wsid = metadata.importpath
-    local ok, result = Download( wsid ):SafeAwait()
-    if not ok then return promise.Reject( result ) end
+    local ok, result = Download( metadata.importpath ):SafeAwait()
+    if ok then
+        return gpm.SourceImport( "gma", result )
+    end
 
-    return gpm.SourceImport( "gma", result )
+    return promise.Reject( result )
 end )
