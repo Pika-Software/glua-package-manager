@@ -213,12 +213,11 @@ do
     local CompileLua = CompileLua
 
     Compile = promise.Async( function( filePath )
-        if string_GetExtensionFromFilename( filePath ) == "moon" then
+        if SERVER and string_GetExtensionFromFilename( filePath ) == "moon" then
             PreCacheMoon( filePath, false )
-            filePath = paths.FormatToLua( filePath )
         end
 
-        return CompileLua( filePath )
+        return CompileLua( paths.FormatToLua( filePath ) )
     end )
 
 end

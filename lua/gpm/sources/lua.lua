@@ -49,7 +49,9 @@ GetMetadata = promise.Async( function( importPath )
     local metadata = {}
 
     if fs.IsDir( importPath, "LUA" ) then
-        gpm.PreCacheMoon( importPath, true )
+        if SERVER then
+            gpm.PreCacheMoon( importPath, true )
+        end
 
         local packagePath = importPath .. "/package.lua"
         if fs.IsFile( packagePath, "LUA" ) then
@@ -116,7 +118,7 @@ GetMetadata = promise.Async( function( importPath )
     elseif fs.IsFile( importPath, "LUA" ) then
         metadata.autorun = true
 
-        if string.GetExtensionFromFilename( importPath ) == "moon" then
+        if SERVER and string.GetExtensionFromFilename( importPath ) == "moon" then
             gpm.PreCacheMoon( importPath, false )
         end
 
