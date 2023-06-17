@@ -9,6 +9,7 @@ local table = table
 local fs = gpm.fs
 
 -- Variables
+local MENU_DLL = MENU_DLL
 local SERVER = SERVER
 local ipairs = ipairs
 local type = type
@@ -49,7 +50,7 @@ GetMetadata = promise.Async( function( importPath )
     local metadata = {}
 
     if fs.IsDir( importPath, "LUA" ) then
-        if SERVER then
+        if SERVER or MENU_DLL then
             gpm.PreCacheMoon( importPath, true )
         end
 
@@ -112,13 +113,13 @@ GetMetadata = promise.Async( function( importPath )
             metadata.cl_main = nil
         end
 
-        if SERVER then
+        if SERVER or MENU_DLL then
             fs.Watch( importPath .. "/", "lsv" )
         end
     elseif fs.IsFile( importPath, "LUA" ) then
         metadata.autorun = true
 
-        if SERVER and string.GetExtensionFromFilename( importPath ) == "moon" then
+        if ( SERVER or MENU_DLL ) and string.GetExtensionFromFilename( importPath ) == "moon" then
             gpm.PreCacheMoon( importPath, false )
         end
 
@@ -127,7 +128,7 @@ GetMetadata = promise.Async( function( importPath )
             metadata.main = importPath
         end
 
-        if SERVER then
+        if SERVER or MENU_DLL then
             fs.Watch( importPath, "lsv" )
         end
     end
