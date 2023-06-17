@@ -205,10 +205,6 @@ do
         return table.Lookup( self, "Metadata.importpath" )
     end
 
-    function PACKAGE:GetMainFilePath()
-        return table.Lookup( self, "Metadata.main" )
-    end
-
     function PACKAGE:GetName()
         return table.Lookup( self, "Metadata.name", self:GetImportPath() or "unknown" )
     end
