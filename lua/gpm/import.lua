@@ -282,7 +282,7 @@ function gpm.ImportFolder( folderPath, pkg2, autorun )
         return
     end
 
-    logger:Info( "Starting to import packages from '%s'", folderPath )
+    logger:Info( "Started import from folder: %s", folderPath )
 
     local files, folders = fs.Find( folderPath .. "/*", "LUA" )
     for _, folderName in ipairs( folders ) do

@@ -6,7 +6,6 @@ local gpm = gpm
 
 -- Variables
 local tonumber = tonumber
-local module = module
 local ipairs = ipairs
 local pairs = pairs
 local type = type
