@@ -317,6 +317,7 @@ end
 
 -- File path localization
 function paths.Localize( filePath )
+    filePath = string.gsub( filePath, "^cache/moonloader/", "" )
     filePath = string.gsub( filePath, "^addons/[%w%-_]-/", "" )
     filePath = string.gsub( filePath, "^lua/", "" )
     return filePath
