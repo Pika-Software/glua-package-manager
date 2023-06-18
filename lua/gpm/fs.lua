@@ -86,7 +86,7 @@ if not ( SERVER or MENU_DLL ) then
         end
 
         for _, mountedFile in ipairs( MountedFiles ) do
-            if string.find( mountedFile, filePath ) then return true end
+            if string.StartsWith( mountedFile, filePath ) then return true end
         end
 
         return false
