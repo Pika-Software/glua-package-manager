@@ -90,9 +90,9 @@ function FormatInit( init )
         return init
     elseif initType == "string" then
         return {
-            ["server"] = initType,
-            ["client"] = initType,
-            ["menu"] = initType
+            ["server"] = init,
+            ["client"] = init,
+            ["menu"] = init
         }
     end
 
