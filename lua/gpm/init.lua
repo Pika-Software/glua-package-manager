@@ -80,7 +80,7 @@ local promise = promise
 Logger:Info( "gm_promise v%s is initialized.", utils.Version( promise._VERSION_NUM ) )
 
 if util.IsBinaryModuleInstalled( "moonloader" ) and pcall( require, "moonloader" ) then
-    Logger:Info( "Moonloader is initialized, MoonScript support is active." )
+    Logger:Info( "gm_moonloader v%s is initialized, MoonScript support is active.", utils.Version( moonloader._VERSION ) )
 end
 
 local moonloader = moonloader
