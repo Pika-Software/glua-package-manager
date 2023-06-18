@@ -29,6 +29,7 @@
     Documentation can be found at: https://github.com/dankmolot/gm_promise
 ]]
 
+local ErrorNoHaltWithStack = ErrorNoHaltWithStack
 local string_format = string.format
 local getmetatable = getmetatable
 local setmetatable = setmetatable
@@ -45,13 +46,15 @@ local xpcall = xpcall
 local error = error
 local _HTTP = HTTP
 
+local developer = GetConVar( "developer" )
+
 module( "promise" )
 
-_VERSION = "1.4.0" -- major.minor.patch
-_VERSION_NUM = 010400 -- _VERSION in number format: 1.2.3 -> 010203 | 99.56.13 -> 995613
+_VERSION = "1.4.1" -- major.minor.patch
+_VERSION_NUM = 010401 -- _VERSION in number format: 1.2.3 -> 010203 | 99.56.13 -> 995613
 
 local function PromiseErrorHandler(...)
-    if cvars.Bool( "developer" ) then
+    if developer:GetInt() > 0 then
         ErrorNoHaltWithStack(...)
     end
 
