@@ -20,7 +20,7 @@ local net = net
 -- Variables
 local ErrorNoHaltWithStack = ErrorNoHaltWithStack
 local CLIENT, SERVER, MENU_DLL = CLIENT, SERVER, MENU_DLL
-local addCSLuaFile = AddCSLuaFile
+local _AddCSLuaFile = AddCSLuaFile
 local getmetatable = getmetatable
 local setmetatable = setmetatable
 local hook_Run = hook.Run
@@ -39,6 +39,14 @@ module( "gpm.package" )
 
 if SERVER then
 
+    local function addCSLuaFile( filePath )
+        if string.GetExtensionFromFilename( filePath ) == "moon" then
+            gpm.PreCacheMoon( filePath, false )
+        end
+
+        _AddCSLuaFile( paths.FormatToLua( filePath ) )
+    end
+
     function AddCSLuaFile( fileName )
         local luaPath = utils.GetCurrentFilePath()
         if luaPath and not fileName then
@@ -46,7 +54,7 @@ if SERVER then
         end
 
         gpm.ArgAssert( fileName, 1, "string" )
-        fileName = paths.FormatToLua( paths.Fix( fileName ) )
+        fileName = paths.Fix( fileName )
 
         if luaPath then
             local folder = string.GetPathFromFilename( luaPath )

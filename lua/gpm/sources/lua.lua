@@ -53,19 +53,23 @@ GetMetadata = promise.Async( function( importPath )
     local metadata = {}
 
     if fs.IsDir( importPath, "LUA" ) then
-        if SERVER or MENU_DLL then
-            gpm.PreCacheMoon( importPath, true )
+        if SERVER then
+            local moonPackagePath = importPath .. "/package.moon"
+            if fs.IsFile( moonPackagePath, "lsv" ) then
+                gpm.PreCacheMoon( moonPackagePath, false )
+            end
         end
 
         local packagePath = importPath .. "/package.lua"
         if fs.IsFile( packagePath, "LUA" ) then
-            local ok, result = gpm.CompileLua( packagePath ):SafeAwait()
+            metadata.packagepath = packagePath
+
+            local ok, result = gpm.Compile( packagePath ):SafeAwait()
             if not ok then
                 return promise.Reject( result )
             end
 
             table.Merge( metadata, package.ExtractMetadata( result ) )
-            metadata.packagepath = packagePath
         else
             metadata.autorun = true
         end
