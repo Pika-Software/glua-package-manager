@@ -10,7 +10,6 @@ local ArgAssert = gpm.ArgAssert
 local moonloader = moonloader
 local tonumber = tonumber
 local logger = gpm.Logger
-local SysTime = SysTime
 local os_time = os.time
 local paths = gpm.paths
 local assert = assert
@@ -258,14 +257,28 @@ function GMA:AddFile( filePath, content )
     assert( self.WriteMode, "To change a gmad file, write mode is required." )
     ArgAssert( filePath, 1, "string" )
 
-    local isMoon, moonPath = string.GetExtensionFromFilename( filePath ) == "moon" and moonloader ~= nil
-    if isMoon then
-        moonPath = filePath
-        filePath = paths.FormatToLua( filePath )
+    if string.GetExtensionFromFilename( filePath ) == "moon" then
+        if not moonloader then
+            error( "Attempting to compile a Moonscript file fails, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader." )
+        end
+
+        local luaCode = moonloader.ToLua( content )
+        if not luaCode then
+            error( "Compiling the Moonscript '" .. filePath .. "' file into a Lua file failed, GMA file: " .. self.FilePath )
+        end
+
+        files[ #files + 1 ] = {
+            ["Size"] = string.len( luaCode ),
+            ["CRC"] = util.CRC( luaCode ),
+            ["Content"] = luaCode,
+            ["Path"] = paths.FormatToLua( filePath )
+        }
+
+        return
     end
 
     if not IsAllowedFilePath( filePath ) then
-        logger:Warn( "File '%s' was not written to gma because its path is not valid.", filePath )
+        logger:Warn( "File '%s' was not written to GMA because its path is not valid.", filePath )
         return
     end
 
@@ -279,17 +292,6 @@ function GMA:AddFile( filePath, content )
             table.remove( files, number )
             break
         end
-    end
-
-    if isMoon then
-        local stopwatch = SysTime()
-        content = moonloader.ToLua( content )
-        if not content then
-            logger:Error( "Compiling Moonscript file '%s' into Lua file '%s' is failed, took %f seconds.", moonPath, filePath, SysTime() - stopwatch )
-            return
-        end
-
-        logger:Debug( "Compiling Moonscript file '%s' into Lua file '%s' is finished, took %f seconds.", moonPath, filePath, SysTime() - stopwatch )
     end
 
     files[ #files + 1 ] = {
@@ -545,6 +547,7 @@ function Write( filePath )
     if not fileClass then return end
 
     return setmetatable( {
+        ["FilePath"] = filePath,
         ["WriteMode"] = true,
         ["File"] = fileClass,
         ["Files"] = {},
