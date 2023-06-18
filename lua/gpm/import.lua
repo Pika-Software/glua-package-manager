@@ -46,13 +46,6 @@ do
         return false
     end
 
-    function gpm.LocatePackage( ... )
-        for number, importPath in ipairs( {...} ) do
-            gpm.ArgAssert( importPath, number, "string" )
-            if gpm.CanImport( importPath ) then return importPath end
-        end
-    end
-
     local metadatas = {}
 
     local getMetadata = promise.Async( function( importPath, sourceName, source )
