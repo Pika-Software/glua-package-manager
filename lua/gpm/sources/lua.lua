@@ -133,20 +133,21 @@ if SERVER then
 
 end
 
-CompileMain = promise.Async( function( metadata )
-    local filePath = package.GetCurrentInitByRealm( metadata.init )
-    if not fs.IsFile( filePath, "LUA" ) then
-        filePath = metadata.importpath .. "/" .. filePath
-        if not fs.IsFile( filePath, "LUA" ) then
-            return promise.Reject( "Package init file '" .. filePath .. "' is missing." )
-        end
+CompileInit = promise.Async( function( metadata )
+    local absolutePath = package.GetCurrentInitByRealm( metadata.init )
+
+    local relativePath = metadata.importpath .. "/" .. absolutePath
+    if fs.IsFile( relativePath, "LUA" ) then
+        return gpm.Compile( relativePath )
+    elseif fs.IsFile( absolutePath, "LUA" ) then
+        return gpm.Compile( absolutePath )
     end
 
-    return gpm.Compile( filePath )
+    return promise.Reject( "Package init file '" .. absolutePath .. "' is missing." )
 end )
 
 Import = promise.Async( function( metadata )
-    local ok, result = CompileMain( metadata ):SafeAwait()
+    local ok, result = CompileInit( metadata ):SafeAwait()
     if not ok then
         return promise.Reject( result )
     end
@@ -161,7 +162,7 @@ Reload = promise.Async( function( pkg, metadata )
         SendToClient( metadata )
     end
 
-    local ok, result = CompileMain( metadata ):SafeAwait()
+    local ok, result = CompileInit( metadata ):SafeAwait()
     if not ok then
         return promise.Reject( result )
     end
