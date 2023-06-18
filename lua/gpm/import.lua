@@ -128,7 +128,7 @@ do
         if not task then
             local source = sources[ sourceName ]
             if not source then
-                return promise.Reject( "Requested package source not found." )
+                return promise.Reject( "source not found" )
             end
 
             local ok, result = getMetadata( importPath, sourceName, source ):SafeAwait()
@@ -141,11 +141,7 @@ do
                 return promise.Reject( message )
             end
 
-            task = source.Import( result ):Catch( function( message )
-                logger:Error( "Package '%s' import failed, see above to see the error.", importPath )
-                ErrorNoHaltWithStack( message )
-            end )
-
+            task = source.Import( result )
             tasks[ importPath ] = task
         end
 
@@ -200,7 +196,10 @@ do
             end
         end
 
-        return task
+        return task:Catch( function( message )
+            logger:Error( "Package '%s' import failed, see above to see the error.", importPath )
+            ErrorNoHaltWithStack( message )
+        end )
     end )
 
 end
@@ -210,9 +209,13 @@ function gpm.Import( importPath, async, pkg2 )
 
     local task = gpm.AsyncImport( importPath, pkg2 )
     if not async then
-        local pkg = task:Await()
-        if not pkg then return end
-        return pkg:GetResult(), pkg
+        local ok, result = task:SafeAwait()
+        if not ok then
+            error( "Package '%s' import failed, %s", importPath, result )
+        end
+
+        if not result then return end
+        return result:GetResult(), result
     end
 
     return task
