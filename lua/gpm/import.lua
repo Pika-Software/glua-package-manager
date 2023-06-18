@@ -21,9 +21,9 @@ if not sources then
     sources = {}; gpm.sources = sources
 end
 
-for _, filePath in ipairs( fs.Find( "gpm/sources/*", "LUA" ) ) do
-    local extension = string.GetExtensionFromFilename( filePath )
-    gpm.IncludeComponent( "sources/" .. string.sub( filePath, 1, #filePath - ( ( extension ~= nil and #extension or 0 ) + 1 ) ) )
+for _, fileName in ipairs( fs.Find( "gpm/sources/*", "LUA" ) ) do
+    local extension = string.GetExtensionFromFilename( fileName )
+    gpm.IncludeComponent( "sources/" .. string.sub( fileName, 1, #fileName - ( ( extension ~= nil and #extension or 0 ) + 1 ) ) )
 end
 
 local activeGamemode = engine.ActiveGamemode()

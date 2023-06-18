@@ -228,7 +228,9 @@ end
 
 function table.HasIValue( tbl, any )
     for _, value in ipairs( tbl ) do
-        if any == value then return true end
+        if value == any then
+            return true
+        end
     end
 
     return false
