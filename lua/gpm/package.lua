@@ -52,13 +52,13 @@ if SERVER then
             local folder = string.GetPathFromFilename( luaPath )
             if folder then
                 local filePath = folder .. fileName
-                if fs.IsFile( filePath, "LUA" ) then
+                if fs.IsFile( filePath, "lsv" ) then
                     return addCSLuaFile( filePath )
                 end
             end
         end
 
-        if fs.IsFile( fileName, "LUA" ) then
+        if fs.IsFile( fileName, "lsv" ) then
             return addCSLuaFile( fileName )
         end
 

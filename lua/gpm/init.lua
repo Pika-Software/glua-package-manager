@@ -52,7 +52,7 @@ end
 
 do
 
-    local AddCSLuaFile = SERVER and AddCSLuaFile
+    local AddCSLuaFile = AddCSLuaFile
     local include = include
 
     function IncludeComponent( filePath )
@@ -125,8 +125,8 @@ IncludeComponent "package"
 local fs = fs
 
 CacheLifetime = CreateConVar( "gpm_cache_lifetime", "24", FCVAR_ARCHIVE, "Packages cache lifetime, in hours, sets after how many hours the downloaded gpm packages will not be relevant.", 0, 60480 )
-WorkshopPath = fs.CreateDir( "gpm/" .. ( SERVER and "server" or "client" ) .. "/workshop/" )
-CachePath = fs.CreateDir( "gpm/" .. ( SERVER and "server" or "client" ) .. "/packages/" )
+WorkshopPath = fs.CreateDir( "gpm/" .. string.lower( Realm ) .. "/workshop/" )
+CachePath = fs.CreateDir( "gpm/" .. string.lower( Realm ) .. "/packages/" )
 
 do
 
