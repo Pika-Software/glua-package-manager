@@ -159,7 +159,7 @@ do
     local pcall = pcall
 
     CompileLua = promise.Async( function( filePath )
-        local ok, result = fs.CompileLua( "lua/" .. filePath, "GAME" ):SafeAwait()
+        local ok, result = fs.CompileLua( filePath, "LUA" ):SafeAwait()
         if ok then
             return result
         end
