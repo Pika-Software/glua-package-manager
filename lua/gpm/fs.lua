@@ -25,8 +25,11 @@ local efsw = efsw
 -- Variables
 local CompileMoonString = CompileMoonString
 local CompileString = CompileString
+local game_MountGMA = game.MountGMA
 local debug_fempty = debug.fempty
 local math_max = math.max
+local MENU_DLL = MENU_DLL
+local CLIENT = CLIENT
 local ipairs = ipairs
 local assert = assert
 local type = type
@@ -47,9 +50,52 @@ function IsFile( ... )
     return Exists( ... ) and not IsDir( ... )
 end
 
-if not SERVER then
+if MENU_DLL then
+    function MountGMA( gmaPath )
+        error( "Not yet implemented." )
+    end
+else
+    function MountGMA( gmaPath )
+        local ok, files = game_MountGMA( gmaPath )
+        print( "GMA mount", ok, gmaPath )
+
+        if ok and CLIENT then
+            for _, filePath in ipairs( files ) do
+                table.insert( MountedFiles, 1, filePath )
+            end
+        end
+
+        return ok, files
+    end
+end
+
+if not ( SERVER or MENU_DLL ) then
+
+    if type( MountedFiles ) ~= "table" then
+        MountedFiles = {}
+    end
+
+    local gamePaths = {
+        ["LUA"] = "lua",
+        ["lsv"] = "lua",
+        ["lcl"] = "lua"
+    }
+
+    function IsMounted( filePath, gamePath )
+        local additional = gamePaths[ gamePath ]
+        if additional then
+            filePath = additional .. "/" .. filePath
+        end
+
+        for _, mountedFile in ipairs( MountedFiles ) do
+            if string.find( mountedFile, filePath ) then return true end
+        end
+
+        return false
+    end
 
     function Exists( filePath, gamePath )
+        if IsMounted( filePath, gamePath ) then return true end
         if file.Exists( filePath, gamePath ) then return true end
 
         local files, folders = file.Find( filePath .. "*", gamePath )
@@ -63,6 +109,7 @@ if not SERVER then
     end
 
     function IsDir( filePath, gamePath )
+        if IsMounted( filePath, gamePath ) then return true end
         if file.IsDir( filePath, gamePath ) then return true end
 
         local _, folders = file.Find( filePath .. "*", gamePath )
@@ -73,6 +120,7 @@ if not SERVER then
     end
 
     function IsFile( filePath, gamePath )
+        if IsMounted( filePath, gamePath ) then return true end
         if file.Exists( filePath, gamePath ) and not file.IsDir( filePath, gamePath ) then return true end
 
         local files, _ = file.Find( filePath .. "*", gamePath )
