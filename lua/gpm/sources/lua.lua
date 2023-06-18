@@ -133,10 +133,9 @@ CompileMain = promise.Async( function( metadata )
     local filePath = package.GetCurrentInitByRealm( metadata.init )
     if not fs.IsFile( filePath, "LUA" ) then
         filePath = metadata.importpath .. "/" .. filePath
-    end
-
-    if not fs.IsFile( filePath, "LUA" ) then
-        return promise.Reject( "Package init file '" .. filePath .. "' is missing." )
+        if not fs.IsFile( filePath, "LUA" ) then
+            return promise.Reject( "Package init file '" .. filePath .. "' is missing." )
+        end
     end
 
     return gpm.Compile( filePath )

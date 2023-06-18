@@ -72,22 +72,22 @@ function FormatInit( init )
     if initType == "table" then
         utils.LowerTableKeys( init )
 
-        local server = initType.server
+        local server = init.server
         if type( server ) ~= "string" or #server == 0 then
-            initType.server = nil
+            init.server = nil
         end
 
-        local client = initType.client
+        local client = init.client
         if type( client ) ~= "string" or #client == 0 then
-            initType.client = nil
+            init.client = nil
         end
 
-        local menu = initType.menu
+        local menu = init.menu
         if type( menu ) ~= "string" or #menu == 0 then
-            initType.menu = nil
+            init.menu = nil
         end
 
-        return initType
+        return init
     elseif initType == "string" then
         return {
             ["server"] = initType,
