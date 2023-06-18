@@ -9,7 +9,6 @@ local fs = gpm.fs
 -- Variables
 local ErrorNoHaltWithStack = ErrorNoHaltWithStack
 local util_JSONToTable = util.JSONToTable
-local game_MountGMA = game.MountGMA
 local gmad_Open = gmad.Open
 local ipairs = ipairs
 local xpcall = xpcall
@@ -42,7 +41,7 @@ GetMetadata = promise.Async( function( importPath )
 end )
 
 Import = promise.Async( function( metadata )
-    local ok, files = game_MountGMA( metadata.importpath )
+    local ok, files = fs.MountGMA( metadata.importpath )
     if not ok then
         return promise.Reject( "GMA file '" .. metadata.importpath .. "' cannot be mounted." )
     end
