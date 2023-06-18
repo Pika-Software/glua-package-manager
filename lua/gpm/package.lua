@@ -70,7 +70,7 @@ end
 function FormatInit( init )
     local initType = type( init )
     if initType == "table" then
-        utils.LowerTableKeys( initType )
+        utils.LowerTableKeys( init )
 
         local server = initType.server
         if type( server ) ~= "string" or #server == 0 then
