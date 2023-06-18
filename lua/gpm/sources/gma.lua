@@ -10,6 +10,7 @@ local fs = gpm.fs
 local ErrorNoHaltWithStack = ErrorNoHaltWithStack
 local util_JSONToTable = util.JSONToTable
 local gmad_Open = gmad.Open
+local MENU_DLL = MENU_DLL
 local ipairs = ipairs
 local xpcall = xpcall
 
@@ -51,7 +52,7 @@ Import = promise.Async( function( metadata )
         if string.sub( filePath, 1, 4 ) ~= "lua/" then continue end
         local luaPath = string.sub( filePath, 5, #filePath )
 
-        if string.StartsWith( luaPath, "autorun/" ) then
+        if string.StartsWith( luaPath, "autorun/" ) and not MENU_DLL then
             if string.StartsWith( luaPath, "autorun/server/" ) and not SERVER then
                 continue
             elseif string.StartsWith( luaPath, "autorun/client/" ) and not CLIENT then

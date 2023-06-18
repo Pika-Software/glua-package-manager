@@ -217,7 +217,7 @@ do
     local CompileLua = CompileLua
 
     Compile = promise.Async( function( filePath )
-        if SERVER and string_GetExtensionFromFilename( filePath ) == "moon" then
+        if ( SERVER or MENU_DLL ) and string_GetExtensionFromFilename( filePath ) == "moon" then
             PreCacheMoon( filePath, false )
         end
 
@@ -227,7 +227,10 @@ do
 end
 
 IncludeComponent "import"
-IncludeComponent "commands"
+
+if not MENU_DLL then
+    IncludeComponent "commands"
+end
 
 ImportFolder( "packages", nil, true )
 

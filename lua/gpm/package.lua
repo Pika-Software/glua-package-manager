@@ -640,7 +640,7 @@ do
             end
 
             -- Net
-            do
+            if not MENU_DLL then
 
                 local data = {}
                 callbacks.net = data
