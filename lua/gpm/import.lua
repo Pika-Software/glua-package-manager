@@ -141,7 +141,11 @@ do
                 return promise.Reject( message )
             end
 
-            task = source.Import( result )
+            task = source.Import( result ):Catch( function( message )
+                logger:Error( "Package '%s' import failed, see above to see the error.", importPath )
+                ErrorNoHaltWithStack( message )
+            end )
+
             tasks[ importPath ] = task
         end
 
@@ -181,11 +185,6 @@ do
             return promise.Reject( "Requested package doesn't exist." )
         end
 
-        task:Catch( function( message )
-            logger:Error( "Package '%s' import failed, see above to see the error.", importPath )
-            ErrorNoHaltWithStack( message )
-        end )
-
         if IsPackage( pkg ) then
             if task:IsPending() then
                 task:Then( function( pkg2 )
@@ -210,7 +209,6 @@ function gpm.Import( importPath, async, pkg2 )
     assert( async or promise.RunningInAsync(), "import supposed to be running in coroutine/async function (do you running it from package)" )
 
     local task = gpm.AsyncImport( importPath, pkg2 )
-
     if not async then
         local pkg = task:Await()
         if not pkg then return end
@@ -245,8 +243,6 @@ function gpm.Install( pkg2, async, ... )
     assert( async or promise.RunningInAsync(), "import supposed to be running in coroutine/async function (do you running it from package)" )
 
     local task = gpm.AsyncInstall( pkg2, ... )
-    task:Catch( ErrorNoHaltWithStack )
-
     if not async then
         local pkg = task:Await()
         if not pkg then return end

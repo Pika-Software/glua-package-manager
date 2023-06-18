@@ -14,6 +14,12 @@ local SERVER = SERVER
 local ipairs = ipairs
 
 if efsw ~= nil then
+
+    local logger = gpm.Logger
+    local function catch( message )
+        logger:Error( message )
+    end
+
     hook.Add( "FileWatchEvent", "GPM.Sources.Lua.Hot-Reload", function( action, _, filePath )
         if action <= 0 then return end
 
@@ -25,11 +31,9 @@ if efsw ~= nil then
 
         if not pkg:IsInstalled() then return end
         if pkg:IsReloading() then return end
-
-        pkg:Reload():Catch( function( message )
-            gpm.Logger:Error( message )
-        end )
+        pkg:Reload():Catch( catch )
     end )
+
 end
 
 module( "gpm.sources.lua" )
