@@ -29,7 +29,6 @@ local debug_fempty = debug.fempty
 local math_max = math.max
 local ipairs = ipairs
 local assert = assert
-local BRANCH = BRANCH
 local type = type
 
 module( "gpm.fs" )
@@ -41,13 +40,14 @@ Find = file.Find
 Size = file.Size
 Time = file.Time
 
-if BRANCH == "x86-64-temp" or SERVER then
-    Exists = file.Exists
-    IsDir = file.IsDir
-    function IsFile( ... )
-        return Exists( ... ) and not IsDir( ... )
-    end
-else
+Exists = file.Exists
+IsDir = file.IsDir
+
+function IsFile( ... )
+    return Exists( ... ) and not IsDir( ... )
+end
+
+if not SERVER then
 
     function Exists( filePath, gamePath )
         if file.Exists( filePath, gamePath ) then return true end
