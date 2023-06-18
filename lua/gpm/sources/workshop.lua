@@ -41,7 +41,7 @@ function Download( wsid )
             return
         end
 
-        local gmaReader = gmad.Read( fileClass )
+        local gmaReader = gmad.Open( fileClass )
         if not gmaReader then
             p:Reject( "Unknown error reading downloaded GMA file '" .. filePath .. "' failed." )
             return

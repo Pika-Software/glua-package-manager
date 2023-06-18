@@ -500,7 +500,7 @@ function Parse( fileClass )
     return metadata
 end
 
-function Read( fileClass )
+function Open( fileClass )
     if not fileClass then return end
 
     local metadata = Parse( fileClass )
@@ -517,11 +517,11 @@ function Read( fileClass )
     return instance
 end
 
-function Open( filePath, gamePath )
+function Read( filePath, gamePath )
     local fileClass = file.Open( filePath, "rb", gamePath )
     if not fileClass then return end
 
-    local instance = Read( fileClass )
+    local instance = Open( fileClass )
     if not instance then
         fileClass:Close()
         return

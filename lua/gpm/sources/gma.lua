@@ -9,7 +9,7 @@ local fs = gpm.fs
 -- Variables
 local ErrorNoHaltWithStack = ErrorNoHaltWithStack
 local util_JSONToTable = util.JSONToTable
-local gmad_Open = gmad.Open
+local gmad_Open = gmad.Read
 local MENU_DLL = MENU_DLL
 local ipairs = ipairs
 local xpcall = xpcall
