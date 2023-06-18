@@ -74,6 +74,13 @@ GetMetadata = promise.Async( function( importPath )
             metadata.autorun = true
         end
 
+        if not metadata.init and SERVER then
+            local moonInitFile = importPath .. "/init.moon"
+            if fs.IsFile( moonInitFile, "lsv" ) then
+                metadata.init = moonInitFile
+            end
+        end
+
         if SERVER or MENU_DLL then
             fs.Watch( importPath .. "/", "lsv" )
         end
