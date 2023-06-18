@@ -262,19 +262,12 @@ function GMA:AddFile( filePath, content )
             error( "Attempting to compile a Moonscript file fails, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader." )
         end
 
-        local luaCode = moonloader.ToLua( content )
-        if not luaCode then
+        content = moonloader.ToLua( content )
+        if not content then
             error( "Compiling the Moonscript '" .. filePath .. "' file into a Lua file failed, GMA file: " .. self.FilePath )
         end
 
-        files[ #files + 1 ] = {
-            ["Size"] = string.len( luaCode ),
-            ["CRC"] = util.CRC( luaCode ),
-            ["Content"] = luaCode,
-            ["Path"] = paths.FormatToLua( filePath )
-        }
-
-        return
+        filePath = paths.FormatToLua( filePath )
     end
 
     if not IsAllowedFilePath( filePath ) then
