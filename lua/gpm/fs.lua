@@ -57,8 +57,6 @@ if MENU_DLL then
 else
     function MountGMA( gmaPath )
         local ok, files = game_MountGMA( gmaPath )
-        print( "GMA mount", ok, gmaPath )
-
         if ok and CLIENT then
             for _, filePath in ipairs( files ) do
                 table.insert( MountedFiles, 1, filePath )
