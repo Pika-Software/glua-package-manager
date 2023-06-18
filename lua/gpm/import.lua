@@ -13,6 +13,7 @@ local IsPackage = gpm.IsPackage
 local logger = gpm.Logger
 local ipairs = ipairs
 local assert = assert
+local error = error
 local type = type
 
 local sources = gpm.sources
@@ -204,7 +205,7 @@ function gpm.Import( importPath, async, pkg2 )
     if not async then
         local ok, result = task:SafeAwait()
         if not ok then
-            error( "Package '%s' import failed, %s", importPath, result )
+            error( "Package '" .. importPath .. "' import failed, " .. result )
         end
 
         if not result then return end
@@ -242,7 +243,7 @@ function gpm.Install( pkg2, async, ... )
     if not async then
         local ok, result = task:SafeAwait()
         if not ok then
-            error( "Package '%s' import failed, %s", importPath, result )
+            error( "Package '" .. importPath .. "' import failed, " .. result )
         end
 
         if not result then return end
