@@ -45,13 +45,7 @@ do
 
     function UnLink( environment1, environment2 )
         local links = GetLinks( environment1 )
-        for index, environment in ipairs( links ) do
-            if environment == environment2 then
-                table.remove( links, index )
-                break
-            end
-        end
-
+        table.RemoveByIValue( links, environment2 )
         return environment1
     end
 

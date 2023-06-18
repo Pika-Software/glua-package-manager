@@ -234,6 +234,13 @@ function table.HasIValue( tbl, any )
     return false
 end
 
+function table.RemoveByIValue( tbl, any )
+    for index, value in ipairs( tbl ) do
+        if value ~= any then continue end
+        return table.remove( tbl, index )
+    end
+end
+
 function table.Lookup( tbl, str, default )
     for _, key in ipairs( string.Split( str, "." ) ) do
         tbl = tbl[ key ]

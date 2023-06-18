@@ -305,11 +305,7 @@ do
     end
 
     function PACKAGE:RemoveChild( child )
-        local children = self:GetChildren()
-        for index, pkg in ipairs( children ) do
-            if pkg ~= child then continue end
-            return table.remove( children, index )
-        end
+        return table.RemoveByIValue( self:GetChildren(), child )
     end
 
     -- Package linking
