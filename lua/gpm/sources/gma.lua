@@ -12,7 +12,7 @@ local util_JSONToTable = util.JSONToTable
 local game_MountGMA = game.MountGMA
 local gmad_Open = gmad.Open
 local ipairs = ipairs
-local pcall = pcall
+local xpcall = xpcall
 
 module( "gpm.sources.gma" )
 
@@ -49,23 +49,25 @@ Import = promise.Async( function( metadata )
 
     local importPaths = {}
     for _, filePath in ipairs( files ) do
-        if string.StartsWith( filePath, "lua/autorun/" ) then
-            if string.StartsWith( filePath, "lua/autorun/server/" ) and not SERVER then
+        if string.sub( filePath, 1, 4 ) ~= "lua/" then continue end
+        local luaPath = string.sub( filePath, 5, #filePath )
+
+        if string.StartsWith( luaPath, "autorun/" ) then
+            if string.StartsWith( luaPath, "autorun/server/" ) and not SERVER then
                 continue
-            elseif string.StartsWith( filePath, "lua/autorun/client" ) and not CLIENT then
+            elseif string.StartsWith( luaPath, "autorun/client/" ) and not CLIENT then
                 continue
             end
 
-            local ok, result = gpm.Compile( string.sub( filePath, 4, #filePath ) ):SafeAwait()
+            local ok, result = gpm.Compile( luaPath ):SafeAwait()
             if ok then
-                ok, result = pcall( result )
+                xpcall( result, ErrorNoHaltWithStack )
+                continue
             end
 
-            if not ok then
-                ErrorNoHaltWithStack( result )
-            end
-        elseif string.StartsWith( filePath, "lua/packages/" ) then
-            local importPath = string.match( string.sub( filePath, 5 ), "packages/[^/]+" )
+            ErrorNoHaltWithStack( result )
+        elseif string.StartsWith( luaPath, "packages/" ) then
+            local importPath = string.match( luaPath, "packages/[^/]+" )
             if not importPath then continue end
 
             if table.HasIValue( importPaths, importPath ) then continue end
