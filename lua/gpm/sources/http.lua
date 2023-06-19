@@ -5,21 +5,32 @@ local package = gpm.package
 local promise = promise
 local http = gpm.http
 local string = string
+local table = table
 local gmad = gmad
 local fs = gpm.fs
 local util = util
 
 -- Variables
+local CompileMoonString = CompileMoonString
 local CompileString = CompileString
-local table_Merge = table.Merge
 local logger = gpm.Logger
 local ipairs = ipairs
-local pairs = pairs
 local pcall = pcall
 local type = type
 
 local cacheLifetime = gpm.CacheLifetime
 local cacheFolder = gpm.CachePath
+
+local supportedExtensions = {
+    ["lua"] = true,
+    ["zip"] = true,
+    ["gma"] = true,
+    ["json"] = true
+}
+
+local jsonExtensions = {
+    ["php"] = true
+}
 
 module( "gpm.sources.http" )
 
@@ -27,37 +38,78 @@ function CanImport( filePath )
     return string.IsURL( filePath )
 end
 
-local allowedExtensions = {
-    ["lua"] = true,
-    ["zip"] = true,
-    ["gma"] = true,
-    ["json"] = true
-}
+GetMetadata = promise.Async( function( importPath )
+    local metadata = {}
 
-Import = promise.Async( function( metadata )
-    local url = metadata.importpath
-    local extension = string.GetExtensionFromFilename( url )
-    if not allowedExtensions[ extension ] then
-        local wsid = string.match( url, "steamcommunity%.com/sharedfiles/filedetails/%?id=(%d+)" )
-        if wsid ~= nil then
-            return gpm.SourceImport( "workshop", wsid )
+    local wsid = string.match( importPath, "steamcommunity%.com/sharedfiles/filedetails/%?id=(%d+)" )
+    if wsid then
+        metadata.workshopid = wsid
+        return metadata
+    end
+
+    local github = string.match( importPath, "github%.com/[^/]+/[^/]+$" )
+    if github then
+        metadata.github = github
+        return metadata
+    end
+
+    local extension = string.GetExtensionFromFilename( importPath )
+    if extension then
+        if jsonExtensions[ extension ] then
+            extension = "json"
+        elseif not supportedExtensions[ extension ] then
+            return promise.Reject( "Package '" .. importPath .. "' metadata cannot be retrieved, unsupported file extension." )
         end
-
-        local gitHub = string.match( url, "^https?://(github.com/[^/]+/[^/]+)$" )
-        if gitHub ~= nil then
-            return gpm.SourceImport( "github", gitHub )
-        end
-
+    else
         extension = "json"
     end
 
-    -- Local cache
-    local cachePath = cacheFolder .. "http_" .. util.MD5( url ) .. "."  .. ( extension == "json" and "gma" or extension ) .. ".dat"
+    metadata.extension = extension
+
+    if extension == "json" then
+        logger:Info( "Package '%s' JSON is downloading...", importPath )
+
+        local ok, result = http.Fetch( importPath, nil, 120 ):SafeAwait()
+        if not ok then
+            return promise.Reject( result )
+        end
+
+        if result.code ~= 200 then
+            return promise.Reject( "Package '%s' JSON download failed, wrong HTTP response code (" .. result.code .. ")." )
+        end
+
+        local json = util.JSONToTable( body )
+        if not json then
+            return promise.Reject( "Package '" .. importPath .. "' JSON data is corrupted." )
+        end
+
+        table.Merge( metadata, json )
+    end
+
+    return metadata
+end )
+
+Import = promise.Async( function( metadata )
+    local wsid = metadata.workshopid
+    if wsid then
+        return gpm.SourceImport( "workshop", wsid )
+    end
+
+    local github = metadata.github
+    if github then
+        return gpm.SourceImport( "github", gitHub )
+    end
+
+    local extension = metadata.extension
+    local importpath = metadata.importpath
+
+    -- Cache
+    local cachePath = cacheFolder .. "http_" .. util.MD5( importpath ) .. "."  .. ( extension == "json" and "gma" or extension ) .. ".dat"
     if fs.IsFile( cachePath, "DATA" ) and fs.Time( cachePath, "DATA" ) > ( 60 * 60 * cacheLifetime:GetInt() ) then
-        if extension == "gma" or extension == "json" then
+        if extension == "json" then
             return gpm.SourceImport( "gma", "data/" .. cachePath )
-        elseif extension == "zip" then
-            return gpm.SourceImport( "zip", "data/" .. cachePath )
+        elseif extension == "gma" or extension == "zip" then
+            return gpm.SourceImport( extension, "data/" .. cachePath )
         end
 
         local ok, result
@@ -71,104 +123,158 @@ Import = promise.Async( function( metadata )
             return promise.Reject( result )
         end
 
-        return package.Initialize( metadata, result )
+        return package.Initialize( metadata, result, {
+            [ cachePath ] = result
+        } )
     end
 
-    -- Downloading
-    logger:Info( "Package '%s' is downloading...", url )
-    local ok, result = http.Fetch( url, nil, 120 ):SafeAwait()
-    if not ok then return promise.Reject( result ) end
+    -- JSON
+    if extension == "json" then
+        local source = metadata.source
+        if type( source ) ~= "table" then
+            return promise.Reject( "No 'source' parameter, can't determine code source, cancelling..." )
+        end
+
+        local files = {}
+
+        local urls = source.urls
+        if type( urls ) == "table" then
+            for _, data in ipairs( urls ) do
+                utils.LowerTableKeys( data )
+
+                local filePath = data.filepath
+                if type( filePath ) ~= "string" then
+                    return promise.Reject( "" )
+                end
+
+                local url = data.url
+                if type( url ) ~= "string" then
+                    return promise.Reject( "" )
+                end
+
+                local headers = data.headers
+                if type( headers ) ~= "table" then
+                    headers = nil
+                end
+
+                logger:Debug( "Package '%s' file '%s' (%s) is downloading...", importpath, filePath, url )
+
+                local ok, result = http.Fetch( url, headers, 120 ):SafeAwait()
+                if not ok then
+                    return promise.Reject( "Package '" .. importpath .. "' file '" .. filePath .. "' (" .. url .. ") download failed, " .. result .. "." )
+                end
+
+                if result.code ~= 200 then
+                    return promise.Reject( "Package '" .. importpath .. "' file '" .. filePath .. "' (" .. url .. ") download failed, wrong HTTP response code (" .. result.code .. ")." )
+                end
+
+                files[ #files + 1 ] = {
+                    ["FilePath"] = filePath,
+                    ["Content"] = result.body
+                }
+            end
+        end
+
+        if table.IsEmpty( files ) then
+            return promise.Reject( "No files to compile, file list is empty." )
+        end
+
+        if metadata.mount == false then
+            local compiled = {}
+            for _, data in ipairs( files ) do
+                local filePath = data.FilePath
+
+                local ok, result
+                if string.GetExtensionFromFilename( filePath ) == "moon" then
+                    ok, result = pcall( CompileMoonString, data.Content, filePath )
+                else
+                    ok, result = pcall( CompileString, data.Content, filePath )
+                end
+
+                if not ok then
+                    return promise.Reject( "File '" .. filePath .. "' compile failed, " .. result .. "." )
+                end
+
+                if not result then
+                    return promise.Reject( "File '" ..  filePath .. "' compile failed, no result." )
+                end
+
+                compiled[ filePath ] = result
+            end
+
+            local initPath = package.GetCurrentInitByRealm( metadata.init )
+            local func = compiled[ initPath ]
+            if not func then
+                return promise.Reject( "Package init file '" .. initPath .. "' is missing or compilation was failed." )
+            end
+
+            return package.Initialize( metadata, func, compiled )
+        end
+
+        local gma = gmad.Write( cachePath )
+        if not gma then
+            return promise.Reject( "Package '" .. importpath .. "' cache file '" .. cachePath .. "' writing failed." )
+        end
+
+        local name = metadata.name
+        if name then
+            gma:SetTitle( name )
+        end
+
+        gma:SetDescription( util.TableToJSON( metadata ) )
+
+        local author = metadata.author
+        if author then
+            gma:SetAuthor( author )
+        end
+
+        for _, data in ipairs( files ) do
+            gma:AddFile( data[ 1 ], data[ 2 ] )
+        end
+
+        gma:Close()
+
+        return gpm.SourceImport( "gma", "data/" .. cachePath )
+    end
+
+    logger:Info( "Package '%s' is downloading...", importpath )
+
+    local headers = meatada.headers
+    if type( headers ) ~= "table" then
+        headers = nil
+    end
+
+    local ok, result = http.Fetch( importpath, headers, 120 ):SafeAwait()
+    if not ok then
+        return promise.Reject( result )
+    end
 
     if result.code ~= 200 then
-        return promise.Reject( "Invalid http response code: " .. result.code )
+        return promise.Reject( "Package '%s' download failed, wrong HTTP response code (" .. result.code .. ")." )
     end
 
-    -- Processing
-    local body = result.body
-    if extension ~= "json" then
-        local ok, result = fs.AsyncWrite( cachePath, body ):SafeAwait()
+    local ok, err = fs.AsyncWrite( cachePath, result.body ):SafeAwait()
+    if not ok then
+        return promise.Reject( "Package '" .. importpath .. "' cache writing failed, " .. err )
+    end
+
+    if extension == "lua" then
+        local ok, result = pcall( CompileString, result.body, cachePath )
         if not ok then
-            logger:Warn( "[%s] Cache creation for package '%s' failed, error: %s", metadata.source, url, result )
+            return promise.Reject( result )
         end
 
-        if extension == "lua" then
-            local ok, result = pcall( CompileString, body, url )
-            if not ok then return promise.Reject( result ) end
-
-            return package.Initialize( metadata, result )
-        elseif extension == "moon" then
-            local ok, result = pcall( CompileMoonString, body, url )
-            if not ok then return promise.Reject( result ) end
-
-            return package.Initialize( metadata, result )
-        elseif extension == "gma" or extension == "zip" then
-            return gpm.SourceImport( extension, "data/" .. cachePath )
+        return package.Initialize( metadata, result )
+    elseif extension == "moon" then
+        local ok, result = pcall( CompileMoonString, result.body, cachePath )
+        if not ok then
+            return promise.Reject( result )
         end
 
-        return promise.Reject( "How did you do that?!" )
+        return package.Initialize( metadata, result )
+    elseif extension == "gma" or extension == "zip" then
+        return gpm.SourceImport( extension, "data/" .. cachePath )
     end
 
-    local json = util.JSONToTable( body )
-    if not json then return promise.Reject( "'.json' file is corrupted." ) end
-    package.FormatMetadata( table_Merge( metadata, json ) )
-    metadata.importpath = url
-
-    local urls = metadata.files
-    if type( urls ) ~= "table" then return promise.Reject( "File list is empty, download canceled." ) end
-
-    metadata.files = nil
-
-    local files = {}
-    for filePath, fileURL in pairs( urls ) do
-        logger:Debug( "Package '%s', file '%s' (%s) download has started.", url, filePath, fileURL )
-
-        local ok, result = http.Fetch( fileURL, nil, 120 ):SafeAwait()
-        if not ok then return promise.Reject( "File '" .. filePath .. "' download failed, " .. result ) end
-        if result.code ~= 200 then return promise.Reject( "File '" .. filePath .. "' download failed, invalid response code: " .. result.code .. "." ) end
-        files[ #files + 1 ] = { filePath, result.body }
-    end
-
-    if #files == 0 then return promise.Reject( "No files to compile, file list is empty." ) end
-
-    if metadata.mount == false then
-        local compiledFiles = {}
-        for _, data in ipairs( files ) do
-            local ok, result = pcall( CompileString, data[ 2 ], data[ 1 ] )
-            if not ok then return promise.Reject( "File '" .. data[ 1 ] .. "' compile failed, " .. result .. "." ) end
-            if not result then return promise.Reject( "File '" ..  data[ 1 ] .. "' compile failed, no result." ) end
-            compiledFiles[ data[ 1 ] ] = result
-        end
-
-        local init = package.FormatInit( metadata.init )
-        metadata.init = init
-
-        local filePath = package.GetCurrentInitByRealm( init )
-        local func = compiledFiles[ filePath ]
-        if not func then
-            return promise.Reject( "Package init file '" .. filePath .. "' is missing or compilation was failed." )
-        end
-
-        return package.Initialize( metadata, func, compiledFiles )
-    end
-
-    local gma = gmad.Write( cachePath )
-    if not gma then
-        return promise.Reject( "Cache file '" .. cachePath .. "' construction error, mounting failed." )
-    end
-
-    gma:SetTitle( metadata.name )
-    gma:SetDescription( util.TableToJSON( metadata ) )
-
-    local author = metadata.author
-    if author ~= nil then
-        gma:SetAuthor( author )
-    end
-
-    for _, data in ipairs( files ) do
-        gma:AddFile( data[ 1 ], data[ 2 ] )
-    end
-
-    gma:Close()
-
-    return gpm.SourceImport( "gma", "data/" .. cachePath )
+    return promise.Reject( "How did you do that?!" )
 end )
