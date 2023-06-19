@@ -1,6 +1,7 @@
 local logger = gpm.Logger
 local SERVER = SERVER
 local ipairs = ipairs
+local table = table
 local gpm = gpm
 local net = net
 
@@ -51,12 +52,25 @@ do
     local colors = gpm.Colors
     local pairs = pairs
     local MsgC = MsgC
+    local type = type
 
     function gpm.PrintPackageList( packages )
         MsgC( colors.Realm, gpm.Realm, colors.PrimaryText, " packages:\n" )
 
+        if type( packages ) ~= "table" then
+            packages = {}
+
+            for _, pkg in pairs( gpm.Packages ) do
+                packages[ #packages + 1 ] = pkg
+            end
+        end
+
+        table.sort( packages, function( a, b )
+            return a:GetIdentifier() < b:GetIdentifier()
+        end )
+
         local total = 0
-        for _, pkg in pairs( packages or gpm.Packages ) do
+        for _, pkg in pairs( packages ) do
             MsgC( colors.Realm, "\t* ", colors.PrimaryText, pkg:GetIdentifier() .. "\n" )
             total = total + 1
         end
