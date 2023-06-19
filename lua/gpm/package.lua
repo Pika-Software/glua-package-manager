@@ -266,7 +266,7 @@ do
     end
 
     function PACKAGE:GetSourceName()
-        return table.Lookup( self, "Metadata.source", "unknown" )
+        return table.Lookup( self, "Metadata.sourcename", "unknown" )
     end
 
     PACKAGE.__tostring = PACKAGE.GetIdentifier
@@ -940,7 +940,7 @@ do
         end
 
         metadata.importpath = importPath
-        metadata.source = sourceName
+        metadata.sourcename = sourceName
         FormatMetadata( metadata )
 
         local ok, result = source.Reload( self, metadata ):SafeAwait()

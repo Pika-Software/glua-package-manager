@@ -59,12 +59,11 @@ do
                 end
 
                 metadata = result
-            else
-                metadata = {}
             end
 
+            metadata = metadata or {}
             metadata.importpath = importPath
-            metadata.source = sourceName
+            metadata.sourcename = sourceName
 
             package.FormatMetadata( metadata )
             metadatas[ sourceName .. ";" .. importPath ] = metadata
