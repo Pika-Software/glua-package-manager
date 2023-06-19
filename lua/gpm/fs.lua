@@ -80,7 +80,9 @@ if not ( SERVER or MENU_DLL ) then
         ["lcl"] = "lua"
     }
 
-    function IsMounted( filePath, gamePath )
+    function IsMounted( filePath, gamePath, onlyDir )
+        if onlyDir and string.GetExtensionFromFilename( filePath ) then return end
+
         local additional = gamePaths[ gamePath ]
         if additional then
             filePath = additional .. "/" .. filePath
@@ -108,7 +110,7 @@ if not ( SERVER or MENU_DLL ) then
     end
 
     function IsDir( filePath, gamePath )
-        if IsMounted( filePath, gamePath ) then return true end
+        if IsMounted( filePath, gamePath, true ) then return true end
         if file.IsDir( filePath, gamePath ) then return true end
 
         local _, folders = file.Find( filePath .. "*", gamePath )
