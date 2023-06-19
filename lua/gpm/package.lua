@@ -144,7 +144,7 @@ function FormatMetadata( metadata )
     end
 
     -- Logger and logs color
-    metadata.logger = metadata.logger == true
+    metadata.logger = metadata.logger ~= false
 
     if gpm.type( metadata.color ) ~= "Color" then
         metadata.color = nil
