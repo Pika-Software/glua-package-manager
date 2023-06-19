@@ -47,31 +47,6 @@ do
         return false
     end
 
-    local metadatas = {}
-
-    local getMetadata = promise.Async( function( importPath, sourceName, source )
-        local metadata = metadatas[ sourceName .. ";" .. importPath ]
-        if not metadata then
-            if type( source.GetMetadata ) == "function" then
-                local ok, result = source.GetMetadata( importPath ):SafeAwait()
-                if not ok then
-                    return promise.Reject( result )
-                end
-
-                metadata = result
-            end
-
-            metadata = metadata or {}
-            metadata.importpath = importPath
-            metadata.sourcename = sourceName
-
-            package.FormatMetadata( metadata )
-            metadatas[ sourceName .. ";" .. importPath ] = metadata
-        end
-
-        return metadata
-    end )
-
     local tasks = gpm.ImportTasks
     if type( tasks ) ~= "table" then
         tasks = {}; gpm.ImportTasks = tasks
@@ -124,17 +99,28 @@ do
                 return promise.Reject( "source not found" )
             end
 
-            local ok, result = getMetadata( importPath, sourceName, source ):SafeAwait()
-            if not ok then
-                return promise.Reject( result )
+            local metadata = {}
+
+            if type( source.GetMetadata ) == "function" then
+                local ok, result = source.GetMetadata( importPath ):SafeAwait()
+                if not ok then
+                    return promise.Reject( result )
+                end
+
+                metadata = result
             end
 
-            local ok, message = gpm.CanBeInstalled( result, source )
+            metadata.importpath = importPath
+            metadata.sourcename = sourceName
+
+            package.FormatMetadata( metadata )
+
+            local ok, message = gpm.CanBeInstalled( metadata, source )
             if not ok then
                 return promise.Reject( message )
             end
 
-            task = source.Import( result )
+            task = source.Import( metadata )
             tasks[ importPath ] = task
         end
 
@@ -149,18 +135,29 @@ do
                 if not source then continue end
                 if not source.CanImport( importPath ) then continue end
 
-                local ok, result = getMetadata( importPath, sourceName, source ):SafeAwait()
-                if not ok then
-                    return promise.Reject( result )
+                local metadata = {}
+
+                if type( source.GetMetadata ) == "function" then
+                    local ok, result = source.GetMetadata( importPath ):SafeAwait()
+                    if not ok then
+                        return promise.Reject( result )
+                    end
+
+                    metadata = result
                 end
 
-                local ok, message = gpm.CanBeInstalled( result, source )
+                metadata.importpath = importPath
+                metadata.sourcename = sourceName
+
+                package.FormatMetadata( metadata )
+
+                local ok, message = gpm.CanBeInstalled( metadata, source )
                 if not ok then
                     logger:Error( "Package '%s' import failed, %s.", importPath, message )
                     return
                 end
 
-                if autorun and not result.autorun then
+                if autorun and not metadata.autorun then
                     logger:Debug( "Package '%s' autorun restricted.", importPath )
                     return
                 end
