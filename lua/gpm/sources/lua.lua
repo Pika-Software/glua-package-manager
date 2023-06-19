@@ -9,8 +9,7 @@ local table = table
 local fs = gpm.fs
 
 -- Variables
-local MENU_DLL = MENU_DLL
-local SERVER = SERVER
+local SERVER, MENU_DLL = SERVER, MENU_DLL
 local ipairs = ipairs
 
 if efsw ~= nil then
@@ -53,15 +52,9 @@ GetMetadata = promise.Async( function( importPath )
     local metadata = {}
 
     if fs.IsDir( importPath, "LUA" ) then
-        if SERVER then
-            local moonPackagePath = importPath .. "/package.moon"
-            if fs.IsFile( moonPackagePath, "lsv" ) then
-                gpm.PreCacheMoon( moonPackagePath, false )
-            end
-        end
 
         local packagePath = importPath .. "/package.lua"
-        if fs.IsFile( packagePath, "LUA" ) then
+        if fs.IsLuaFile( packagePath, "LUA", true ) then
             metadata.packagepath = packagePath
 
             local ok, result = gpm.Compile( packagePath ):SafeAwait()
@@ -74,25 +67,12 @@ GetMetadata = promise.Async( function( importPath )
             metadata.autorun = true
         end
 
-        if not metadata.init and SERVER then
-            local moonInitFile = importPath .. "/init.moon"
-            if fs.IsFile( moonInitFile, "lsv" ) then
-                metadata.init = moonInitFile
-            end
-        end
-
         if SERVER or MENU_DLL then
             fs.Watch( importPath .. "/", "lsv" )
         end
-    elseif fs.IsFile( importPath, "LUA" ) then
+    elseif fs.IsLuaFile( importPath, "LUA", true ) then
+        metadata.init = paths.FormatToLua( importPath )
         metadata.autorun = true
-
-        if ( SERVER or MENU_DLL ) and string.GetExtensionFromFilename( importPath ) == "moon" then
-            gpm.PreCacheMoon( importPath, false )
-        end
-
-        importPath = paths.FormatToLua( importPath )
-        metadata.init = importPath
 
         if SERVER or MENU_DLL then
             fs.Watch( importPath, "lsv" )
@@ -148,9 +128,9 @@ CompileInit = promise.Async( function( metadata )
     local absolutePath = package.GetCurrentInitByRealm( metadata.init )
 
     local relativePath = metadata.importpath .. "/" .. absolutePath
-    if fs.IsFile( relativePath, "LUA" ) then
+    if fs.IsLuaFile( relativePath, "LUA" ) then
         return gpm.Compile( relativePath )
-    elseif fs.IsFile( absolutePath, "LUA" ) then
+    elseif fs.IsLuaFile( absolutePath, "LUA" ) then
         return gpm.Compile( absolutePath )
     end
 

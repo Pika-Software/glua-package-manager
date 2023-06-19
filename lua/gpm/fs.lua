@@ -1,5 +1,6 @@
 local SERVER = SERVER
 local util = util
+local gpm = gpm
 
 -- https://github.com/Pika-Software/gm_asyncio
 -- https://github.com/WilliamVenner/gm_async_write
@@ -128,6 +129,24 @@ if not ( SERVER or MENU_DLL ) then
         return table.HasIValue( files, splits[ #splits ] )
     end
 
+end
+
+function IsLuaFile( filePath, gamePath, compileMoon )
+    local extension = string.GetExtensionFromFilename( filePath )
+    filePath = string.sub( filePath, 1, #filePath - ( extension ~= nil and ( #extension + 1 ) or 0 ) )
+
+    if ( SERVER or MENU_DLL ) then
+        local moonPath = filePath  .. ".moon"
+        if IsFile( moonPath, gamePath ) then
+            if compileMoon then
+                gpm.PreCacheMoon( moonPath, false )
+            end
+
+            return true
+        end
+    end
+
+    return IsFile( filePath .. ".lua", gamePath )
 end
 
 function Read( filePath, gamePath, length )
