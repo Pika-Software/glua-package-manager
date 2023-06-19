@@ -115,7 +115,7 @@ function GetCurrentInitByRealm( init )
     if SERVER then
         return init.server
     elseif CLIENT then
-        return init.client
+        return paths.FormatToLua( init.client )
     elseif MENU_DLL then
         return init.menu
     end
@@ -435,6 +435,10 @@ do
             env.include = function( fileName )
                 gpm.ArgAssert( fileName, 1, "string" )
                 fileName = paths.Fix( fileName )
+
+                if CLIENT then
+                    fileName = paths.FormatToLua( fileName )
+                end
 
                 local func = files[ fileName ]
                 if type( func ) == "function" then
