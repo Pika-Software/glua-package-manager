@@ -191,25 +191,33 @@ function CreateDir( folderPath )
     return currentPath
 end
 
-CompileLua = promise.Async( function( filePath, gamePath, handleError )
-    local ok, result = AsyncRead( filePath, gamePath ):SafeAwait()
-    if not ok then
-        return promise.Reject( result )
+function CompileLua( filePath, gamePath, handleError )
+    if CLIENT and IsMounted( filePath, gamePath ) then
+        filePath = "lua/" .. filePath
+        gamePath = "GAME"
     end
 
-    local func = CompileString( result.fileContent, result.filePath, handleError )
-    assert( type( func ) == "function", "Lua file '" .. filePath .. "' (" .. gamePath .. ") compilation failed." )
+    local content = Read( filePath, gamePath )
+    if not content then
+        error( "File compilation '" .. filePath .. "' failed, file cannot be read." )
+    end
+
+    local func = CompileString( content, filePath, handleError )
+    if not func then
+        error( "File compilation '" .. filePath .. "' failed, unknown error." )
+    end
+
     return func
-end )
+end
 
-CompileMoon = promise.Async( function( filePath, gamePath, handleError )
-    local ok, result = AsyncRead( filePath, gamePath ):SafeAwait()
-    if not ok then
-        return promise.Reject( result )
+function CompileMoon( filePath, gamePath, handleError )
+    local content = Read( filePath, gamePath )
+    if not content then
+        error( "File compilation '" .. filePath .. "' failed, file cannot be read." )
     end
 
-    return CompileMoonString( result.fileContent, result.filePath, handleError )
-end )
+    return CompileMoonString( content, filePath, handleError )
+end
 
 Watch = debug_fempty
 UnWatch = debug_fempty

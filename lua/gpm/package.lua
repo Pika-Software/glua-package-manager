@@ -450,26 +450,18 @@ do
                     local folder = string.GetPathFromFilename( luaPath )
                     if folder then
                         local filePath = folder .. fileName
-                        if fs.IsFile( filePath, "LUA" ) then
-                            local ok, result = gpm.Compile( filePath ):SafeAwait()
-                            if not ok then
-                                error( result )
-                            end
-
-                            files[ fileName ] = debug.setfenv( result, env )
-                            return result( self )
+                        if fs.IsLuaFile( filePath, "LUA", true ) then
+                            local func = debug.setfenv( gpm.CompileLua( filePath ), env )
+                            files[ fileName ] = func
+                            return func( self )
                         end
                     end
                 end
 
-                if fs.IsFile( fileName, "LUA" ) then
-                    local ok, result = gpm.Compile( fileName ):SafeAwait()
-                    if not ok then
-                        error( result )
-                    end
-
-                    files[ fileName ] = debug.setfenv( result, env )
-                    return result( self )
+                if fs.IsLuaFile( fileName, "LUA", true ) then
+                    local func = debug.setfenv( gpm.CompileLua( fileName ), env )
+                    files[ fileName ] = func
+                    return func( self )
                 end
 
                 error( "Couldn't include file '" .. fileName .. "' - File not found" )

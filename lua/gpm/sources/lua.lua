@@ -11,6 +11,8 @@ local fs = gpm.fs
 -- Variables
 local SERVER, MENU_DLL = SERVER, MENU_DLL
 local ipairs = ipairs
+local pcall = pcall
+local error = error
 
 if efsw ~= nil then
 
@@ -56,7 +58,7 @@ GetMetadata = promise.Async( function( importPath )
         if fs.IsLuaFile( packagePath, "LUA", true ) then
             metadata.packagepath = packagePath
 
-            local ok, result = gpm.Compile( packagePath ):SafeAwait()
+            local ok, result = pcall( gpm.CompileLua, packagePath )
             if not ok then
                 return promise.Reject( result )
             end
@@ -123,21 +125,20 @@ if SERVER then
 
 end
 
-CompileInit = promise.Async( function( metadata )
-    local absolutePath = package.GetCurrentInitByRealm( metadata.init )
-
+function CompileInit( metadata )
+    local absolutePath = paths.FormatToLua( package.GetCurrentInitByRealm( metadata.init ) )
     local relativePath = metadata.importpath .. "/" .. absolutePath
-    if fs.IsLuaFile( relativePath, "LUA" ) then
-        return gpm.Compile( relativePath )
-    elseif fs.IsLuaFile( absolutePath, "LUA" ) then
-        return gpm.Compile( absolutePath )
+    if fs.IsLuaFile( relativePath, "LUA", true ) then
+        return gpm.CompileLua( relativePath )
+    elseif fs.IsLuaFile( absolutePath, "LUA", true ) then
+        return gpm.CompileLua( absolutePath )
     end
 
-    return promise.Reject( "Package init file '" .. absolutePath .. "' is missing." )
-end )
+    error( "Package init file '" .. absolutePath .. "' is missing." )
+end
 
 Import = promise.Async( function( metadata )
-    local ok, result = CompileInit( metadata ):SafeAwait()
+    local ok, result = pcall( CompileInit, metadata )
     if not ok then
         return promise.Reject( result )
     end
@@ -152,7 +153,7 @@ Reload = promise.Async( function( pkg, metadata )
         SendToClient( metadata )
     end
 
-    local ok, result = CompileInit( metadata ):SafeAwait()
+    local ok, result = pcall( CompileInit, metadata )
     if not ok then
         return promise.Reject( result )
     end

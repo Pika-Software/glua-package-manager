@@ -159,31 +159,23 @@ do
     local CompileFile = CompileFile
     local pcall = pcall
 
-    CompileLua = promise.Async( function( filePath )
-        if not fs.IsFile( filePath, "LUA" ) then
-            return promise.Reject( "File '" .. filePath .. "' code compilation failed, file does not exist." )
-        end
-
-        local ok, result = fs.CompileLua( "lua/" .. filePath, "GAME" ):SafeAwait()
+    function CompileLua( filePath )
+        local ok, result = pcall( fs.CompileLua, filePath, "LUA" )
         if ok then
             return result
         end
 
         if MENU_DLL then
-            return promise.Reject( result )
+            error( result )
         end
 
-        local ok, result = pcall( CompileFile, filePath )
-        if ok then
-            if type( result ) == "function" then
-                return result
-            end
-
-            return promise.Reject( "File '" .. filePath .. "' code compilation failed due to an unknown error." )
+        local func = CompileFile( filePath )
+        if not func then
+            error( "File compilation '" .. filePath .. "' failed, unknown error." )
         end
 
-        return promise.Reject( result )
-    end )
+        return func
+    end
 
 end
 
@@ -210,21 +202,6 @@ function PreCacheMoon( filePath, noError )
     end
 
     Logger:Debug( "The MoonScript file '%s' was successfully compiled into Lua.", filePath )
-end
-
-do
-
-    local string_GetExtensionFromFilename = string.GetExtensionFromFilename
-    local CompileLua = CompileLua
-
-    Compile = promise.Async( function( filePath )
-        if ( SERVER or MENU_DLL ) and string_GetExtensionFromFilename( filePath ) == "moon" then
-            PreCacheMoon( filePath, false )
-        end
-
-        return CompileLua( paths.FormatToLua( filePath ) )
-    end )
-
 end
 
 IncludeComponent "import"

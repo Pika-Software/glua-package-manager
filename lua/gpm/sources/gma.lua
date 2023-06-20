@@ -59,13 +59,10 @@ Import = promise.Async( function( metadata )
                 continue
             end
 
-            local ok, result = gpm.Compile( luaPath ):SafeAwait()
+            local ok, result = xpcall( gpm.CompileLua, ErrorNoHaltWithStack, luaPath )
             if ok then
                 xpcall( result, ErrorNoHaltWithStack )
-                continue
             end
-
-            ErrorNoHaltWithStack( result )
         elseif string.StartsWith( luaPath, "packages/" ) then
             local importPath = string.match( luaPath, "packages/[^/]+" )
             if not importPath then continue end

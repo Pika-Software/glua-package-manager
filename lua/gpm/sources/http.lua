@@ -114,9 +114,9 @@ Import = promise.Async( function( metadata )
 
         local ok, result
         if extension == "lua" then
-            ok, result = fs.CompileLua( cachePath, "DATA" ):SafeAwait()
+            ok, result = pcall( fs.CompileLua, cachePath, "DATA" )
         elseif extension == "moon" then
-            ok, result = fs.CompileMoon( cachePath, "DATA" ):SafeAwait()
+            ok, result = pcall( fs.CompileMoon, cachePath, "DATA" )
         end
 
         if not ok then
