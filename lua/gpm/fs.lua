@@ -32,7 +32,7 @@ local math_max = math.max
 local MENU_DLL = MENU_DLL
 local CLIENT = CLIENT
 local ipairs = ipairs
-local assert = assert
+local error = error
 local type = type
 
 module( "gpm.fs" )
@@ -317,7 +317,6 @@ function AsyncRead( filePath, gamePath )
 end
 
 if type( file.AsyncWrite ) == "function" then
-
     function AsyncWrite( filePath, fileContent )
         local p = promise.New()
 
@@ -335,9 +334,7 @@ if type( file.AsyncWrite ) == "function" then
 
         return p
     end
-
 else
-
     function AsyncWrite( filePath, fileContent )
         local p = promise.New()
 
@@ -353,11 +350,9 @@ else
 
         return p
     end
-
 end
 
 if type( file.AsyncAppen ) == "function" then
-
     function AsyncAppend( filePath, fileContent )
         local p = promise.New()
 
@@ -375,9 +370,7 @@ if type( file.AsyncAppen ) == "function" then
 
         return p
     end
-
 else
-
     function AsyncAppend( filePath, fileContent )
         local p = promise.New()
 
@@ -388,5 +381,4 @@ else
 
         return p
     end
-
 end

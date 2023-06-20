@@ -7,7 +7,7 @@ local Color = Color
 local error = error
 local type = type
 
-MsgN( [[
+Msg( [[
     ____    _____    ___ ___
    /'_ `\ /\ '__`\ /' __` __`\
   /\ \L\ \\ \ \L\ \/\ \/\ \/\ \
@@ -20,6 +20,7 @@ MsgN( [[
   Discord: https://discord.gg/3UVxhZ
   Developers: Pika Software
   License: MIT
+
 ]] )
 
 module( "gpm", package.seeall )
@@ -91,7 +92,7 @@ do
 
     function _G.CompileMoonString( moonCode, identifier, handleError )
         if not moonloader then
-            return promise.Reject( "Attempting to compile a Moonscript file fails, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader." )
+            error( "Attempting to compile a Moonscript file fails, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader." )
         end
 
         local luaCode = moonloader.ToLua( moonCode )

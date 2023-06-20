@@ -239,7 +239,7 @@ Import = promise.Async( function( metadata )
 
     logger:Info( "Package '%s' is downloading...", importpath )
 
-    local headers = meatada.headers
+    local headers = metadata.headers
     if type( headers ) ~= "table" then
         headers = nil
     end
