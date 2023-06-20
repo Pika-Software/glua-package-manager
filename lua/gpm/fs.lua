@@ -80,6 +80,7 @@ if not ( SERVER or MENU_DLL ) then
         ["lcl"] = "lua"
     }
 
+    -- https://github.com/Facepunch/garrysmod-issues/issues/5481
     function IsMounted( filePath, gamePath, onlyDir )
         if onlyDir and string.GetExtensionFromFilename( filePath ) then return end
 

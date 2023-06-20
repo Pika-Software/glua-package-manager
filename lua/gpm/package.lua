@@ -434,11 +434,7 @@ do
             -- include
             env.include = function( fileName )
                 gpm.ArgAssert( fileName, 1, "string" )
-                fileName = paths.Fix( fileName )
-
-                if CLIENT then
-                    fileName = paths.FormatToLua( fileName )
-                end
+                fileName = paths.FormatToLua( paths.Fix( fileName ) )
 
                 local func = files[ fileName ]
                 if type( func ) == "function" then
