@@ -47,11 +47,6 @@ do
         return false
     end
 
-    local tasks = gpm.ImportTasks
-    if type( tasks ) ~= "table" then
-        tasks = {}; gpm.ImportTasks = tasks
-    end
-
     function gpm.CanBeInstalled( metadata, source )
         local init = metadata.init
         if SERVER then
@@ -91,40 +86,50 @@ do
         return true
     end
 
+    local tasks = gpm.ImportTasks
+    if type( tasks ) ~= "table" then
+        tasks = {}; gpm.ImportTasks = tasks
+    end
+
     gpm.SourceImport = promise.Async( function( sourceName, importPath )
         local task = tasks[ importPath ]
-        if not task then
-            local source = sources[ sourceName ]
-            if not source then
-                return promise.Reject( "source not found" )
-            end
-
-            local metadata = {}
-
-            if type( source.GetMetadata ) == "function" then
-                local ok, result = source.GetMetadata( importPath ):SafeAwait()
-                if not ok then
-                    return promise.Reject( result )
-                end
-
-                metadata = result
-            end
-
-            metadata.importpath = importPath
-            metadata.sourcename = sourceName
-
-            package.FormatMetadata( metadata )
-
-            local ok, message = gpm.CanBeInstalled( metadata, source )
-            if not ok then
-                return promise.Reject( message )
-            end
-
-            task = source.Import( metadata )
-            tasks[ importPath ] = task
+        if task then
+            return task
         end
 
-        return task
+        local source = sources[ sourceName ]
+        if not source then
+            return promise.Reject( "source not found" )
+        end
+
+        local metadata = {}
+
+        if type( source.GetMetadata ) == "function" then
+            local ok, result = source.GetMetadata( importPath ):SafeAwait()
+            if not ok then
+                return promise.Reject( result )
+            end
+
+            metadata = result
+        end
+
+        metadata.importpath = importPath
+        metadata.sourcename = sourceName
+
+        package.FormatMetadata( metadata )
+
+        local ok, message = gpm.CanBeInstalled( metadata, source )
+        if not ok then
+            return promise.Reject( message )
+        end
+
+        task = source.Import( metadata )
+        tasks[ importPath ] = task
+
+        return task:Catch( function( message )
+            logger:Error( "Package '%s' import failed, see above to see the error.", importPath )
+            ErrorNoHaltWithStack( message )
+        end )
     end )
 
     gpm.AsyncImport = promise.Async( function( importPath, pkg, autorun )
@@ -165,10 +170,10 @@ do
                 task = gpm.SourceImport( sourceName, importPath )
                 break
             end
-        end
 
-        if not task then
-            return promise.Reject( "Requested package doesn't exist." )
+            if not task then
+                return promise.Reject( "Requested package doesn't exist." )
+            end
         end
 
         if IsPackage( pkg ) then
@@ -186,10 +191,7 @@ do
             end
         end
 
-        return task:Catch( function( message )
-            logger:Error( "Package '%s' import failed, see above to see the error.", importPath )
-            ErrorNoHaltWithStack( message )
-        end )
+        return task
     end )
 
 end
