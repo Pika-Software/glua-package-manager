@@ -14,6 +14,7 @@ local os_time = os.time
 local paths = gpm.paths
 local assert = assert
 local ipairs = ipairs
+local error = error
 
 module( "gmad" )
 
