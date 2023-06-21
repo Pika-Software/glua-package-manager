@@ -1,3 +1,4 @@
+local SERVER = SERVER
 local gpm = gpm
 
 -- https://github.com/WilliamVenner/gmsv_workshop
@@ -25,9 +26,11 @@ function CanImport( filePath )
 end
 
 function Download( wsid )
-    local p = promise.New()
+    if not steamworks and SERVER then
+        return promise.Reject( "There is no steamworks library on the server, it is required to work with the Steam Workshop, a supported binary: https://github.com/WilliamVenner/gmsv_workshop" )
+    end
 
-    -- TODO: Check game path "WORKSHOP"
+    local p = promise.New()
     steamworks.DownloadUGC( wsid, function( filePath, fileClass )
         if type( filePath ) ~= "string" then
             filePath = "unknown path"
