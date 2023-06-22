@@ -29,6 +29,7 @@
     Documentation can be found at: https://github.com/dankmolot/gm_promise
 ]]
 
+local ErrorNoHaltWithStack = ErrorNoHaltWithStack
 local string_format = string.format
 local getmetatable = getmetatable
 local setmetatable = setmetatable
@@ -41,14 +42,24 @@ local tostring = tostring
 local istable = istable
 local ipairs = ipairs
 local Either = Either
-local pcall = pcall
+local xpcall = xpcall
 local error = error
 local _HTTP = HTTP
 
+local developer = GetConVar( "developer" )
+
 module( "promise" )
 
-_VERSION = "1.3.1" -- major.minor.patch
-_VERSION_NUM = 010301 -- _VERSION in number format: 1.2.3 -> 010203 | 99.56.13 -> 995613
+_VERSION = "1.4.1" -- major.minor.patch
+_VERSION_NUM = 010401 -- _VERSION in number format: 1.2.3 -> 010203 | 99.56.13 -> 995613
+
+local function PromiseErrorHandler(...)
+    if developer:GetInt() > 0 then
+        ErrorNoHaltWithStack(...)
+    end
+
+    return ...
+end
 
 -- Promise object
 do
@@ -92,7 +103,7 @@ do
 
             local ok, result
             if handler then
-                ok, result = pcall(handler, self:GetResult())
+                ok, result = xpcall(handler, PromiseErrorHandler, self:GetResult())
             else
                 ok, result = self:IsFulfilled(), self:GetResult()
             end
@@ -144,9 +155,9 @@ do
                 return self:Reject(err)
             end
 
-            local ok, err = pcall(function()
+            local ok, err = xpcall(function()
                 value:Then(onFulfill, onReject)
-            end)
+            end, PromiseErrorHandler)
 
             if not ok then OnReject(err) end
         return end
@@ -246,7 +257,7 @@ function Async(func)
     if not isfunction(func) then return end
 
     local function run(p, ...)
-        local ok, result = pcall(func, ...)
+        local ok, result = xpcall(func, PromiseErrorHandler, ...)
         if ok then
             p:Resolve(result)
         else

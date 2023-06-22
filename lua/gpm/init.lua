@@ -7,7 +7,7 @@ local Color = Color
 local error = error
 local type = type
 
-MsgN( [[
+Msg( [[
     ____    _____    ___ ___
    /'_ `\ /\ '__`\ /' __` __`\
   /\ \L\ \\ \ \L\ \/\ \/\ \/\ \
@@ -20,11 +20,12 @@ MsgN( [[
   Discord: https://discord.gg/3UVxhZ
   Developers: Pika Software
   License: MIT
+
 ]] )
 
 module( "gpm", package.seeall )
 
-_VERSION = 013500
+_VERSION = 013600
 
 if not Colors then
     Realm = "unknown"
@@ -52,7 +53,7 @@ end
 
 do
 
-    local AddCSLuaFile = SERVER and AddCSLuaFile
+    local AddCSLuaFile = AddCSLuaFile
     local include = include
 
     function IncludeComponent( filePath )
@@ -68,7 +69,7 @@ local stopwatch = SysTime()
 IncludeComponent "utils"
 IncludeComponent "logger"
 
-Logger = logger.Create( "GPM@" .. utils.Version( _VERSION ), Color( 180, 180, 255 ) )
+Logger = CreateLogger( "GPM@" .. utils.Version( _VERSION ), Color( 180, 180, 255 ) )
 
 libs = {}
 libs.deflatelua = IncludeComponent "libs/deflatelua"
@@ -80,7 +81,7 @@ local promise = promise
 Logger:Info( "gm_promise v%s is initialized.", utils.Version( promise._VERSION_NUM ) )
 
 if util.IsBinaryModuleInstalled( "moonloader" ) and pcall( require, "moonloader" ) then
-    Logger:Info( "Moonloader is initialized, MoonScript support is active." )
+    Logger:Info( "gm_moonloader v%s is initialized, MoonScript support is active.", utils.Version( moonloader._VERSION ) )
 end
 
 local moonloader = moonloader
@@ -91,7 +92,7 @@ do
 
     function _G.CompileMoonString( moonCode, identifier, handleError )
         if not moonloader then
-            return promise.Reject( "Attempting to compile a Moonscript file fails, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader." )
+            error( "Attempting to compile a Moonscript file fails, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader." )
         end
 
         local luaCode = moonloader.ToLua( moonCode )
@@ -125,35 +126,56 @@ IncludeComponent "package"
 local fs = fs
 
 CacheLifetime = CreateConVar( "gpm_cache_lifetime", "24", FCVAR_ARCHIVE, "Packages cache lifetime, in hours, sets after how many hours the downloaded gpm packages will not be relevant.", 0, 60480 )
-WorkshopPath = fs.CreateDir( "gpm/" .. ( SERVER and "server" or "client" ) .. "/workshop/" )
-CachePath = fs.CreateDir( "gpm/" .. ( SERVER and "server" or "client" ) .. "/packages/" )
+WorkshopPath = fs.CreateDir( "gpm/" .. string.lower( Realm ) .. "/workshop/" )
+CachePath = fs.CreateDir( "gpm/" .. string.lower( Realm ) .. "/packages/" )
+
+do
+
+    local string_find = string.find
+    local pairs = pairs
+
+    function Find( searchable, ignoreImportNames, noPatterns )
+        local result = {}
+        for importPath, pkg in pairs( Packages ) do
+            if not ignoreImportNames and importPath == searchable then
+                result[ #result + 1 ] = pkg
+                continue
+            end
+
+            local name = pkg:GetName()
+            if not name then continue end
+            if string_find( name, searchable, 1, noPatterns ) ~= nil then
+                result[ #result + 1 ] = pkg
+            end
+        end
+
+        return result
+    end
+
+end
 
 do
 
     local CompileFile = CompileFile
     local pcall = pcall
 
-    CompileLua = promise.Async( function( filePath )
-        local ok, result = fs.CompileLua( "lua/" .. filePath, "GAME" ):SafeAwait()
+    function CompileLua( filePath )
+        local ok, result = pcall( fs.CompileLua, filePath, "LUA" )
         if ok then
             return result
         end
 
         if MENU_DLL then
-            return promise.Reject( result )
+            error( result )
         end
 
-        local ok, result = pcall( CompileFile, filePath )
-        if ok then
-            if type( result ) == "function" then
-                return result
-            end
-
-            return promise.Reject( "File '" .. filePath .. "' code compilation failed due to an unknown error." )
+        local func = CompileFile( filePath )
+        if not func then
+            error( "File compilation '" .. filePath .. "' failed, unknown error." )
         end
 
-        return promise.Reject( result )
-    end )
+        return func
+    end
 
 end
 
@@ -169,6 +191,11 @@ function PreCacheMoon( filePath, noError )
         return
     end
 
+    if not fs.IsFile( filePath, "LUA" ) then
+        if noError then return end
+        error( "Unable to compile Moonscript '" .. filePath .. "' file, file not found." )
+    end
+
     if not moonloader.PreCacheFile( filePath ) then
         if noError then return end
         error( "Compiling Moonscript file '" .. filePath .. "' into Lua is failed!" )
@@ -177,23 +204,11 @@ function PreCacheMoon( filePath, noError )
     Logger:Debug( "The MoonScript file '%s' was successfully compiled into Lua.", filePath )
 end
 
-do
-
-    local string_GetExtensionFromFilename = string.GetExtensionFromFilename
-    local CompileLua = CompileLua
-
-    Compile = promise.Async( function( filePath )
-        if string_GetExtensionFromFilename( filePath ) == "moon" then
-            PreCacheMoon( filePath, false )
-        end
-
-        return CompileLua( filePath )
-    end )
-
-end
-
 IncludeComponent "import"
-IncludeComponent "commands"
+
+if not MENU_DLL then
+    IncludeComponent "commands"
+end
 
 ImportFolder( "packages", nil, true )
 

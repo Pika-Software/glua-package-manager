@@ -9,11 +9,10 @@ local fs = gpm.fs
 -- Variables
 local ErrorNoHaltWithStack = ErrorNoHaltWithStack
 local util_JSONToTable = util.JSONToTable
-local game_MountGMA = game.MountGMA
-local gmad_Open = gmad.Open
+local gmad_Open = gmad.Read
+local MENU_DLL = MENU_DLL
 local ipairs = ipairs
-local pcall = pcall
-local type = type
+local xpcall = xpcall
 
 module( "gpm.sources.gma" )
 
@@ -21,50 +20,51 @@ function CanImport( filePath )
     return fs.IsFile( filePath, "GAME" ) and string.EndsWith( filePath, ".gma.dat" ) or string.EndsWith( filePath, ".gma" )
 end
 
-Import = promise.Async( function( metadata )
-    local importPath = metadata.importpath
-
+GetMetadata = promise.Async( function( importPath )
     local gma = gmad_Open( importPath, "GAME" )
-    if not gma then return promise.Reject( "GMA file '" .. importPath .. "' cannot be readed." ) end
+    if not gma then
+        return promise.Reject( "GMA file '" .. importPath .. "' cannot be readed." )
+    end
 
-    metadata.name = gma:GetTitle()
-    metadata.description = gma:GetDescription()
+    local metadata = {
+        ["name"] = gma:GetTitle()
+        -- ["dependencies"] = gma:GetRequiredContent()
+    }
 
-    metadata.author = gma:GetAuthor()
-    metadata.timestamp = gma:GetTimestamp()
-    metadata.requiredContent = gma:GetRequiredContent()
-
-    gma:Close()
-
-    local description = util_JSONToTable( metadata.description )
-    if type( description ) == "table" then
+    local description = util_JSONToTable( gma:GetDescription() )
+    if description then
         table.Merge( metadata, description )
     end
 
-    local ok, files = game_MountGMA( importPath )
+    gma:Close()
+
+    return metadata
+end )
+
+Import = promise.Async( function( metadata )
+    local ok, files = fs.MountGMA( metadata.importpath )
     if not ok then
-        return promise.Reject( "GMA file '" .. importPath .. "' cannot be mounted." )
+        return promise.Reject( "GMA file '" .. metadata.importpath .. "' cannot be mounted." )
     end
 
     local importPaths = {}
     for _, filePath in ipairs( files ) do
-        if string.StartsWith( filePath, "lua/autorun/" ) then
-            if string.StartsWith( filePath, "lua/autorun/server/" ) and not SERVER then
+        if string.sub( filePath, 1, 4 ) ~= "lua/" then continue end
+        local luaPath = string.sub( filePath, 5, #filePath )
+
+        if string.StartsWith( luaPath, "autorun/" ) and not MENU_DLL then
+            if string.StartsWith( luaPath, "autorun/server/" ) and not SERVER then
                 continue
-            elseif string.StartsWith( filePath, "lua/autorun/client" ) and not CLIENT then
+            elseif string.StartsWith( luaPath, "autorun/client/" ) and not CLIENT then
                 continue
             end
 
-            local ok, result = gpm.Compile( string.sub( filePath, 4, #filePath ) ):SafeAwait()
+            local ok, result = xpcall( gpm.CompileLua, ErrorNoHaltWithStack, luaPath )
             if ok then
-                ok, result = pcall( result )
+                xpcall( result, ErrorNoHaltWithStack )
             end
-
-            if not ok then
-                ErrorNoHaltWithStack( result )
-            end
-        elseif string.StartsWith( filePath, "lua/packages/" ) then
-            local importPath = string.match( string.sub( filePath, 5 ), "packages/[^/]+" )
+        elseif string.StartsWith( luaPath, "packages/" ) then
+            local importPath = string.match( luaPath, "packages/[^/]+" )
             if not importPath then continue end
 
             if table.HasIValue( importPaths, importPath ) then continue end

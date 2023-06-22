@@ -19,8 +19,8 @@ local net = net
 
 -- Variables
 local ErrorNoHaltWithStack = ErrorNoHaltWithStack
-local CLIENT, SERVER = CLIENT, SERVER
-local AddCSLuaFile = AddCSLuaFile
+local CLIENT, SERVER, MENU_DLL = CLIENT, SERVER, MENU_DLL
+local addCSLuaFile = AddCSLuaFile
 local getmetatable = getmetatable
 local setmetatable = setmetatable
 local hook_Run = hook.Run
@@ -37,65 +37,29 @@ local _G = _G
 
 module( "gpm.package" )
 
--- Get package by name/pattern
-function Find( searchable, ignoreImportNames, noPatterns )
-    local result = {}
-    for importPath, pkg in pairs( gpm.Packages ) do
-        if not ignoreImportNames and importPath == searchable then
-            result[ #result + 1 ] = pkg
-            continue
-        end
-
-        local name = pkg:GetName()
-        if not name then continue end
-        if string.find( name, searchable, 1, noPatterns ) ~= nil then
-            result[ #result + 1 ] = pkg
-        end
-    end
-
-    return result
-end
-
-local function getCurrentLuaPath()
-    local filePath = utils.GetCurrentFile()
-    if not filePath then return end
-    return paths.Localize( paths.Fix( filePath ) )
-end
-
 if SERVER then
 
-    function AddClientLuaFile( fileName )
-        local filePath = nil
+    function AddCSLuaFile( fileName )
+        local luaPath = utils.GetCurrentFilePath()
+        if not fileName and luaPath and fs.IsFile( luaPath, "LUA" ) then
+            return addCSLuaFile( luaPath )
+        end
 
-        local luaPath = getCurrentLuaPath()
+        gpm.ArgAssert( fileName, 1, "string" )
+        fileName = paths.FormatToLua( paths.Fix( fileName ) )
+
         if luaPath then
-            if fileName ~= nil then
-                gpm.ArgAssert( fileName, 1, "string" )
-            else
-                fileName = string.GetFileFromFilename( luaPath )
-            end
-
             local folder = string.GetPathFromFilename( luaPath )
-            if folder and #folder > 0 then
-                filePath = paths.Fix( folder .. fileName )
+            if folder then
+                local filePath = folder .. fileName
+                if fs.IsLuaFile( filePath, "LUA", true ) then
+                    return addCSLuaFile( filePath )
+                end
             end
-        else
-            gpm.ArgAssert( fileName, 1, "string" )
         end
 
-        if fileName and fs.IsFile( fileName, "LUA" ) then
-            filePath = paths.Fix( fileName )
-        end
-
-        if filePath ~= nil then
-            local extension = string.GetExtensionFromFilename( filePath )
-            if extension == "moon" then
-                filePath = string.sub( filePath, 1, #filePath - #extension ) .. "lua"
-            end
-
-            if fs.IsFile( filePath, "LUA" ) then
-                return AddCSLuaFile( filePath )
-            end
+        if fs.IsLuaFile( fileName, "LUA", true ) then
+            return addCSLuaFile( fileName )
         end
 
         error( "Couldn't AddCSLuaFile file '" .. fileName .. "' - File not found" )
@@ -103,130 +67,155 @@ if SERVER then
 
 end
 
+function FormatInit( init )
+    local initType = type( init )
+    if initType == "table" then
+        utils.LowerTableKeys( init )
+
+        local server = init.server
+        if type( server ) ~= "string" or #server == 0 then
+            init.server = nil
+        end
+
+        local client = init.client
+        if type( client ) ~= "string" or #client == 0 then
+            init.client = nil
+        end
+
+        local menu = init.menu
+        if type( menu ) ~= "string" or #menu == 0 then
+            init.menu = nil
+        end
+
+        return init
+    elseif initType == "string" then
+        return {
+            ["server"] = init,
+            ["client"] = init,
+            ["menu"] = init
+        }
+    end
+
+    return {
+        ["server"] = "init.lua",
+        ["client"] = "init.lua",
+        ["menu"] = "init.lua"
+    }
+end
+
+function GetCurrentInitByRealm( init )
+    if SERVER then
+        return init.server
+    elseif CLIENT then
+        return paths.FormatToLua( init.client )
+    elseif MENU_DLL then
+        return init.menu
+    end
+end
+
+function FormatMetadata( metadata )
+    utils.LowerTableKeys( metadata )
+
+    if type( metadata.name ) ~= "string" then
+        local importPath = metadata.importpath
+        if type( importPath ) then
+            metadata.name = importPath
+        else
+            metadata.name = nil
+        end
+    end
+
+    metadata.init = FormatInit( metadata.init )
+    metadata.version = utils.Version( metadata.version )
+    metadata.environment = metadata.environment ~= false
+    metadata.autorun = metadata.autorun == true
+
+    -- Files to send to the client ( package and init will already be added and there is no need to specify them here )
+    if type( metadata.send ) ~= "table" then
+        metadata.send = nil
+    end
+
+    -- Logger and logs color
+    metadata.logger = metadata.logger ~= false
+
+    if gpm.type( metadata.color ) ~= "Color" then
+        metadata.color = nil
+    end
+
+    -- Single-player restriction
+    metadata.singleplayer = metadata.singleplayer == true
+
+    -- Allowed gamemodes
+    local gamemodesType = type( metadata.gamemodes )
+    if gamemodesType ~= "string" and gamemodesType ~= "table" then
+        metadata.gamemodes = nil
+    end
+
+    -- Allowed maps
+    local mapsType = type( metadata.maps )
+    if mapsType ~= "string" and mapsType ~= "table" then
+        metadata.maps = nil
+    end
+
+    -- Libs autonames feature
+    local autonames = metadata.autonames
+    if type( autonames ) == "table" then
+        autonames.properties = autonames.properties ~= false and metadata.environment
+        autonames.timer = autonames.timer ~= false and metadata.environment
+        autonames.cvars = autonames.cvars ~= false and metadata.environment
+        autonames.hook = autonames.hook ~= false and metadata.environment
+        autonames.net = autonames.net == true and metadata.environment
+    else
+        metadata.autonames = {
+            ["properties"] = metadata.environment,
+            ["timer"] = metadata.environment,
+            ["cvars"] = metadata.environment,
+            ["hook"] = metadata.environment,
+            ["net"] = false
+        }
+    end
+
+    local defaults = metadata.defaults
+    if type( defaults ) == "table" then
+        defaults.typeid = autonames.typeid ~= false and metadata.environment
+        defaults.http = autonames.http ~= false and metadata.environment
+        defaults.type = autonames.type ~= false and metadata.environment
+        defaults.file = autonames.file ~= false and metadata.environment
+    else
+        metadata.defaults = {
+            ["typeid"] = metadata.environment,
+            ["http"] = metadata.environment,
+            ["type"] = metadata.environment,
+            ["file"] = metadata.environment
+        }
+    end
+
+    return metadata
+end
+
 do
 
-    local environment = {
+    local metatable = {
         ["__index"] = _G
     }
 
-    function BuildMetadata( source )
-        if type( source ) == "table" then
-            utils.LowerTableKeys( source )
+    function ExtractMetadata( func )
+        local environment = {}
+        debug.setfenv( func, environment )
+        setmetatable( environment, metatable )
 
-            -- Package name & entry point
-            if type( source.name ) ~= "string" then
-                source.name = nil
-            end
-
-            -- Menu
-            source.menu = source.menu ~= false
-
-            -- Main file
-            if type( source.cl_main ) ~= "string" then
-                source.cl_main = nil
-            elseif CLIENT then
-                source.main = source.cl_main
-            end
-
-            if type( source.main ) ~= "string" then
-                source.main = nil
-            end
-
-            -- Version
-            source.version = utils.Version( source.version )
-
-            -- Gamemodes
-            local gamemodesType = type( source.gamemodes )
-            if gamemodesType ~= "string" and gamemodesType ~= "table" then
-                source.gamemodes = nil
-            end
-
-            -- Single-player
-            source.singleplayer = source.singleplayer == true
-
-            -- Maps
-            local mapsType = type( source.maps )
-            if mapsType ~= "string" and mapsType ~= "table" then
-                source.maps = nil
-            end
-
-            -- Realms
-            source.client = source.client ~= false
-            source.server = source.server ~= false
-
-            -- Isolation & autorun
-            source.environment = source.environment ~= false
-            source.autorun = source.autorun == true
-
-            -- Color
-            if gpm.type( source.color ) ~= "Color" then
-                source.color = nil
-            end
-
-            -- Logger
-            source.logger = source.logger == true
-
-            -- Files to send to the client ( package and main will already be added and there is no need to specify them here )
-            if type( source.send ) ~= "table" then
-                source.send = nil
-            end
-
-            -- Libs autonames feature
-            local autonames = source.autonames
-            if type( autonames ) == "table" then
-                autonames.properties = autonames.properties ~= false and source.environment
-                autonames.timer = autonames.timer ~= false and source.environment
-                autonames.cvars = autonames.cvars ~= false and source.environment
-                autonames.hook = autonames.hook ~= false and source.environment
-                autonames.net = autonames.net == true and source.environment
-            else
-                source.autonames = {
-                    ["properties"] = source.environment,
-                    ["timer"] = source.environment,
-                    ["cvars"] = source.environment,
-                    ["hook"] = source.environment,
-                    ["net"] = false
-                }
-            end
-
-            local defaults = source.defaults
-            if type( defaults ) == "table" then
-                defaults.typeid = autonames.typeid ~= false and source.environment
-                defaults.http = autonames.http ~= false and source.environment
-                defaults.type = autonames.type ~= false and source.environment
-                defaults.file = autonames.file ~= false and source.environment
-            else
-                source.defaults = {
-                    ["typeid"] = source.environment,
-                    ["http"] = source.environment,
-                    ["type"] = source.environment,
-                    ["file"] = source.environment
-                }
-            end
-
-            return source
-        elseif type( source ) == "function" then
-            local metadata = {}
-
-            setmetatable( metadata, environment )
-                debug.setfenv( source, metadata )
-                local ok, result = pcall( source )
-            setmetatable( metadata, nil )
-
-            if not ok then
-                ErrorNoHaltWithStack( result )
-                return
-            end
-
-            result = result or metadata
-
-            if type( result ) ~= "table" then return end
-            if type( result.package ) == "table" then
-                result = result.package
-            end
-
-            return BuildMetadata( result )
+        local metadata = func()
+        if type( metadata ) ~= "table" then
+            setmetatable( environment, nil )
+            metadata = environment
         end
+
+        local PACKAGE = metadata.package
+        if type( PACKAGE ) == "table" then
+            metadata = PACKAGE
+        end
+
+        return metadata
     end
 
 end
@@ -243,14 +232,6 @@ do
 
     function PACKAGE:GetImportPath()
         return table.Lookup( self, "Metadata.importpath" )
-    end
-
-    function PACKAGE:GetMainFilePath()
-        return table.Lookup( self, "Metadata.main" )
-    end
-
-    function PACKAGE:GetFolder()
-        return table.Lookup( self, "Metadata.folder" )
     end
 
     function PACKAGE:GetName()
@@ -277,7 +258,7 @@ do
     end
 
     function PACKAGE:GetSourceName()
-        return table.Lookup( self, "Metadata.source", "unknown" )
+        return table.Lookup( self, "Metadata.sourcename", "unknown" )
     end
 
     PACKAGE.__tostring = PACKAGE.GetIdentifier
@@ -303,7 +284,7 @@ do
     end
 
     function PACKAGE:HasEnvironment()
-        return type( self:GetEnvironment() ) == "table"
+        return type( self.Environment ) == "table"
     end
 
     -- Children
@@ -316,21 +297,17 @@ do
     end
 
     function PACKAGE:RemoveChild( child )
-        local children = self:GetChildren()
-        for index, pkg in ipairs( children ) do
-            if pkg ~= child then continue end
-            return table.remove( children, index )
-        end
+        return table.RemoveByIValue( self:GetChildren(), child )
     end
 
     -- Package linking
     function PACKAGE:Link( package2 )
         gpm.ArgAssert( package2, 1, "Package" )
 
-        local environment1 = self:GetEnvironment()
+        local environment1 = self.Environment
         if not environment1 then return false end
 
-        local environment2 = package2:GetEnvironment()
+        local environment2 = package2.Environment
         if not environment2 then return false end
 
         environment.Link( environment1, environment2 )
@@ -344,10 +321,10 @@ do
     function PACKAGE:UnLink( package2 )
         gpm.ArgAssert( package2, 1, "Package" )
 
-        local environment1 = self:GetEnvironment()
+        local environment1 = self.Environment
         if not environment1 then return false end
 
-        local environment2 = package2:GetEnvironment()
+        local environment2 = package2.Environment
         if not environment2 then return false end
 
         environment.UnLink( environment1, environment2 )
@@ -368,7 +345,7 @@ do
             end
         }
 
-        local addCSLuaFile = SERVER and AddClientLuaFile or debug.fempty
+        local addCSLuaFile = SERVER and AddCSLuaFile or debug.fempty
 
         function PACKAGE:EnvironmentInit( metadata )
             local env = self.Environment
@@ -396,9 +373,9 @@ do
 
             env._VERSION = metadata.version
 
-            local main = self.Main
-            if type( main ) == "function" then
-                debug.setfenv( main, env )
+            local init = self.Init
+            if init then
+                debug.setfenv( init, env )
             end
 
             local files = self.Files
@@ -412,7 +389,7 @@ do
 
             -- Logger
             if metadata.logger then
-                local logger = gpm.logger.Create( self:GetIdentifier(), metadata.color )
+                local logger = gpm.CreateLogger( self:GetIdentifier(), metadata.color )
                 _gpm.Logger = logger
                 self.Logger = logger
             end
@@ -449,38 +426,30 @@ do
             -- include
             env.include = function( fileName )
                 gpm.ArgAssert( fileName, 1, "string" )
+                fileName = paths.FormatToLua( paths.Fix( fileName ) )
 
-                local func = files[ paths.Fix( fileName ) ]
+                local func = files[ fileName ]
                 if type( func ) == "function" then
                     return func( self )
                 end
 
-                local luaPath = getCurrentLuaPath()
+                local luaPath = utils.GetCurrentFilePath()
                 if luaPath then
                     local folder = string.GetPathFromFilename( luaPath )
-                    if folder and #folder > 0 then
-                        local filePath = paths.Fix( folder .. fileName )
-                        if fs.IsFile( filePath, "LUA" ) then
-                            local ok, result = gpm.Compile( filePath ):SafeAwait()
-                            if not ok then
-                                error( result )
-                            end
-
-                            files[ fileName ] = debug.setfenv( result, env )
-                            return result( self )
+                    if folder then
+                        local filePath = folder .. fileName
+                        if fs.IsLuaFile( filePath, "LUA", true ) then
+                            local func = debug.setfenv( gpm.CompileLua( filePath ), env )
+                            files[ fileName ] = func
+                            return func( self )
                         end
                     end
                 end
 
-                local filePath = paths.Fix( fileName )
-                if fs.IsFile( filePath, "LUA" ) then
-                    local ok, result = gpm.Compile( filePath ):SafeAwait()
-                    if not ok then
-                        error( result )
-                    end
-
-                    files[ fileName ] = debug.setfenv( result, env )
-                    return result( self )
+                if fs.IsLuaFile( fileName, "LUA", true ) then
+                    local func = debug.setfenv( gpm.CompileLua( fileName ), env )
+                    files[ fileName ] = func
+                    return func( self )
                 end
 
                 error( "Couldn't include file '" .. fileName .. "' - File not found" )
@@ -491,19 +460,19 @@ do
                 local arguments = {...}
                 local lenght = #arguments
 
-                for number, name in ipairs( arguments ) do
-                    gpm.ArgAssert( name, number, "string" )
+                for index, name in ipairs( arguments ) do
+                    gpm.ArgAssert( name, index, "string" )
 
                     if string.IsURL( name ) then
                         if not gpm.CanImport( name ) then continue end
 
-                        local ok, result = gpm.AsyncImport( name, self, false ):SafeAwait()
+                        local ok, pkg = gpm.AsyncImport( name, self, false ):SafeAwait()
                         if not ok then
-                            if number ~= lenght then continue end
-                            error( result )
+                            if index ~= lenght then continue end
+                            error( pkg )
                         end
 
-                        return result
+                        return pkg
                     end
 
                     if util.IsBinaryModuleInstalled( name ) then
@@ -511,13 +480,13 @@ do
                     end
 
                     if util.IsLuaModuleInstalled( name ) then
-                        local ok, result = gpm.SourceImport( "lua", "includes/modules/" .. name .. ".lua" ):SafeAwait()
+                        local ok, pkg = gpm.SourceImport( "lua", "includes/modules/" .. name .. ".lua" ):SafeAwait()
                         if not ok then
-                            error( result )
+                            error( pkg )
                         end
 
-                        self:Link( result )
-                        return result:GetResult()
+                        self:Link( pkg )
+                        return pkg.Result
                     end
                 end
 
@@ -659,7 +628,7 @@ do
             end
 
             -- Net
-            do
+            if not MENU_DLL then
 
                 local data = {}
                 callbacks.net = data
@@ -800,9 +769,9 @@ do
             end
         end
 
-        local main = self.Main
-        if main then
-            debug.setfenv( main, _G )
+        local init = self.Init
+        if init then
+            debug.setfenv( init, _G )
         end
 
         local files = self.Files
@@ -841,32 +810,39 @@ do
         self.Callbacks = nil
     end )
 
-    -- Install/Uninstall/Reload
-    PACKAGE.Install = promise.Async( function( self )
-        local stopwatch = SysTime()
-
-        local main = self.Main
-        if not main then
+    PACKAGE.Run = promise.Async( function( self )
+        local init = self.Init
+        if not init then
             return promise.Reject( "Missing package '" .. self:GetIdentifier() ..  "' entry point." )
         end
 
-        local ok, result = pcall( main, self )
+        local ok, result = pcall( init, self )
         if not ok then
             return promise.Reject( result )
         end
 
         self.Result = result
+        return result
+    end )
+
+    -- Install/Uninstall/Reload
+    PACKAGE.Install = promise.Async( function( self )
+        local stopwatch = SysTime()
+
+        local ok, result = self:Run():SafeAwait()
+        if not ok then
+            return promise.Reject( result )
+        end
+
+        gpm.Packages[ self:GetImportPath() ] = self
+        self.Installed = true
 
         local ok, err = pcall( hook_Run, "PackageInstalled", self )
         if not ok then
             ErrorNoHaltWithStack( err )
         end
 
-        gpm.Packages[ self:GetImportPath() ] = self
-        self.Installed = true
-
         logger:Info( "Package '%s' was successfully installed, took %.4f seconds.", self:GetIdentifier(), SysTime() - stopwatch )
-
         return result
     end )
 
@@ -896,11 +872,20 @@ do
         logger:Info( "Package '%s' was successfully uninstalled, took %.4f seconds.", self:GetIdentifier(), SysTime() - stopwatch )
     end
 
+    function PACKAGE:IsReloading()
+        return self.Reloading or false
+    end
+
     PACKAGE.Reload = promise.Async( function( self, dontSendToClients )
+        if self:IsReloading() then return end
         local stopwatch = SysTime()
 
-        if self:HasEnvironment() then
-            self:ClearCallbacks()
+        local importPath = self:GetImportPath()
+        if SERVER and not dontSendToClients then
+            net.Start( "GPM.Networking" )
+                net.WriteUInt( 5, 3 )
+                net.WriteString( importPath )
+            net.Broadcast()
         end
 
         local sourceName = self:GetSourceName()
@@ -909,10 +894,16 @@ do
             return promise.Reject( "Package source '" .. sourceName .. "' not found, package data is probably corrupted." )
         end
 
-        local importPath = self:GetImportPath()
-        local getMetadata, metadata = source.GetMetadata, nil
-        if getMetadata then
-            local ok, result = getMetadata( importPath ):SafeAwait()
+        if not source.Reload then
+            return promise.Reject( "Package '" .. self:GetIdentifier() .. "' reload failed, source '" .. sourceName .. "' does not support package reloading." )
+        end
+
+        self.Reloading = true
+        self:ClearCallbacks()
+
+        local metadata = nil
+        if source.GetMetadata then
+            local ok, result = source.GetMetadata( importPath ):SafeAwait()
             if not ok then
                 return promise.Reject( result )
             end
@@ -920,61 +911,29 @@ do
             metadata = result
         end
 
-        if metadata ~= nil then
-            if type( metadata.name ) ~= "string" then
-                metadata.name = importPath
-            end
-
-            metadata.importpath = importPath
-            metadata.source = sourceName
-            BuildMetadata( metadata )
+        if not metadata then
+            metadata = {}
         end
 
-        if SERVER then
-            local sendToClient = source.SendToClient
-            if sendToClient ~= nil then
-                source.SendToClient( metadata )
-            end
+        if type( metadata.name ) ~= "string" then
+            metadata.name = importPath
         end
 
-        local compileMain = source.CompileMain
-        if compileMain then
-            local ok, result = compileMain( self:GetMainFilePath() ):SafeAwait()
-            if not ok then
-                return promise.Reject( result )
-            end
+        metadata.importpath = importPath
+        metadata.sourcename = sourceName
+        FormatMetadata( metadata )
 
-            self.Main = result
-        end
-
-        local ok, result = self:Initialize( metadata ):SafeAwait()
+        local ok, result = source.Reload( self, metadata ):SafeAwait()
         if not ok then
             return promise.Reject( result )
         end
-
-        local main = self.Main
-        if not main then
-            return promise.Reject( "Missing package '" .. self:GetIdentifier() ..  "' entry point." )
-        end
-
-        local ok, result = pcall( main, self )
-        if not ok then
-            return promise.Reject( result )
-        end
-
-        self.Result = result
 
         local ok, err = pcall( hook_Run, "PackageReloaded", self )
         if not ok then
             ErrorNoHaltWithStack( err )
         end
 
-        if SERVER and not dontSendToClients then
-            net.Start( "GPM.Networking" )
-                net.WriteUInt( 5, 3 )
-                net.WriteString( importPath )
-            net.Broadcast()
-        end
+        self.Reloading = nil
 
         logger:Info( "Package '%s' was successfully reloaded, took %.4f seconds.", self:GetIdentifier(), SysTime() - stopwatch )
         return result
@@ -995,7 +954,7 @@ Initialize = promise.Async( function( metadata, func, files )
         ["Metadata"] = {},
         ["Children"] = {},
         ["Files"] = {},
-        ["Main"] = func
+        ["Init"] = func
     }, PACKAGE )
 
     local ok, result = pkg:Initialize( metadata, files ):SafeAwait()

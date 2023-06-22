@@ -6,7 +6,6 @@ local gpm = gpm
 
 -- Variables
 local tonumber = tonumber
-local module = module
 local ipairs = ipairs
 local pairs = pairs
 local type = type
@@ -229,10 +228,19 @@ end
 
 function table.HasIValue( tbl, any )
     for _, value in ipairs( tbl ) do
-        if any == value then return true end
+        if value == any then
+            return true
+        end
     end
 
     return false
+end
+
+function table.RemoveByIValue( tbl, any )
+    for index, value in ipairs( tbl ) do
+        if value ~= any then continue end
+        return table.remove( tbl, index )
+    end
 end
 
 function table.Lookup( tbl, str, default )
@@ -300,11 +308,53 @@ function util.IsLuaModuleInstalled( name )
     return gpm.fs.IsFile( "includes/modules/" .. name .. ".lua", "LUA" )
 end
 
-module( "gpm.utils" )
+-- paths
+local paths = gpm.paths
+if type( paths ) ~= "table" then
+    paths = {}; gpm.paths = paths
+end
 
-function LowerTableKeys( tbl )
+-- File path fix
+function paths.Fix( filePath )
+    return string.lower( string.gsub( filePath, "[/\\]+", "/" ) )
+end
+
+-- File path join
+function paths.Join( filePath, ... )
+    return paths.Fix( table.concat( { filePath, ... }, "/" ) )
+end
+
+-- File path localization
+function paths.Localize( filePath )
+    filePath = string.gsub( filePath, "^cache/moonloader/", "" )
+    filePath = string.gsub( filePath, "^addons/[%w%-_]-/", "" )
+    filePath = string.gsub( filePath, "^lua/", "" )
+    return filePath
+end
+
+-- Change file extension to .lua
+function paths.FormatToLua( filePath )
+    local extension = string.GetExtensionFromFilename( filePath )
+    if extension ~= "lua" then
+        if extension then
+            filePath = string.gsub( filePath, "%..+$", ".lua" )
+        else
+            filePath = filePath .. ".lua"
+        end
+    end
+
+    return filePath
+end
+
+-- utils
+local utils = gpm.utils
+if type( utils ) ~= "table" then
+    utils = {}; gpm.utils = utils
+end
+
+function utils.LowerTableKeys( tbl )
     for key, value in pairs( tbl ) do
-        if type( value ) == "table" then value = LowerTableKeys( value ) end
+        if type( value ) == "table" then value = utils.LowerTableKeys( value ) end
         if type( key ) ~= "string" then continue end
         tbl[ key ] = nil; tbl[ string.lower( key ) ] = value
     end
@@ -312,36 +362,18 @@ function LowerTableKeys( tbl )
     return tbl
 end
 
-function Version( number )
+function utils.Version( number )
     if not number then return "unknown" end
     if type( number ) == "string" then return number end
     local version = string.format( "%06d", number )
     return string.format( "%d.%d.%d", tonumber( string.sub( version, 0, 2 ) ), tonumber( string.sub( version, 3, 4 ) ), tonumber( string.sub( version, 5 ) ) )
 end
 
-function GetCurrentFile()
+function utils.GetCurrentFilePath()
     for i = 2, 6 do
         local info = debug.getinfo( i, "S" )
         if not info then break end
-        if info.what == "main" then return info.short_src end
+        if info.what ~= "main" then continue end
+        return paths.Localize( paths.Fix( info.short_src ) )
     end
-end
-
-module( "gpm.paths" )
-
--- File path fix
-function Fix( filePath )
-    return string.lower( string.gsub( filePath, "[/\\]+", "/" ) )
-end
-
--- File path join
-function Join( filePath, ... )
-    return Fix( table.concat( { filePath, ... }, "/" ) )
-end
-
--- File path localization
-function Localize( filePath )
-    filePath = string.gsub( filePath, "^addons/[%w%-_]-/", "" )
-    filePath = string.gsub( filePath, "^lua/", "" )
-    return filePath
 end

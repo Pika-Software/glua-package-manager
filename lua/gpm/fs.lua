@@ -1,5 +1,6 @@
 local SERVER = SERVER
 local util = util
+local gpm = gpm
 
 -- https://github.com/Pika-Software/gm_asyncio
 -- https://github.com/WilliamVenner/gm_async_write
@@ -21,36 +22,18 @@ local string = string
 local table = table
 local file = file
 local efsw = efsw
-local gpm = gpm
 
 -- Variables
 local CompileMoonString = CompileMoonString
 local CompileString = CompileString
+local game_MountGMA = game.MountGMA
 local debug_fempty = debug.fempty
 local math_max = math.max
+local MENU_DLL = MENU_DLL
+local CLIENT = CLIENT
 local ipairs = ipairs
-local assert = assert
+local error = error
 local type = type
-
-if efsw ~= nil then
-    hook.Add( "FileWatchEvent", "GPM.EFSW", function( action, _, filePath )
-        if action <= 0 then return end
-
-        local importPath = string.match( string.sub( filePath, 5 ), "packages/[^/]+" )
-        if not importPath then return end
-
-        local pkg = gpm.Packages[ importPath ]
-        if not pkg then return end
-
-        local timerName = "GPM.EFSW." .. importPath
-        timer.Create( timerName, 0.5, 1, function()
-            timer.Remove( timerName )
-            if pkg:IsInstalled() then
-                pkg:Reload()
-            end
-        end )
-    end )
-end
 
 module( "gpm.fs" )
 
@@ -61,40 +44,112 @@ Find = file.Find
 Size = file.Size
 Time = file.Time
 
-function Exists( filePath, gamePath )
-    if SERVER then return file.Exists( filePath, gamePath ) end
-    if file.Exists( filePath, gamePath ) then return true end
+Exists = file.Exists
+IsDir = file.IsDir
 
-    local files, folders = file.Find( filePath .. "*", gamePath )
-    if not files or not folders then return false end
-    if #files == 0 and #folders == 0 then return false end
-
-    local splits = string.Split( filePath, "/" )
-    local fileName = splits[ #splits ]
-
-    return table.HasIValue( files, fileName ) or table.HasIValue( folders, fileName )
+function IsFile( ... )
+    return Exists( ... ) and not IsDir( ... )
 end
 
-function IsDir( filePath, gamePath )
-    if SERVER then return file.IsDir( filePath, gamePath ) end
-    if file.IsDir( filePath, gamePath ) then return true end
+if MENU_DLL then
+    function MountGMA( gmaPath )
+        error( "Not yet implemented." )
+    end
+else
+    function MountGMA( gmaPath )
+        local ok, files = game_MountGMA( gmaPath )
+        if ok and CLIENT then
+            for _, filePath in ipairs( files ) do
+                table.insert( MountedFiles, 1, filePath )
+            end
+        end
 
-    local _, folders = file.Find( filePath .. "*", gamePath )
-    if folders == nil or #folders == 0 then return false end
-
-    local splits = string.Split( filePath, "/" )
-    return table.HasIValue( folders, splits[ #splits ] )
+        return ok, files
+    end
 end
 
-function IsFile( filePath, gamePath )
-    if SERVER then return file.Exists( filePath, gamePath ) and not file.IsDir( filePath, gamePath ) end
-    if file.Exists( filePath, gamePath ) and not file.IsDir( filePath, gamePath ) then return true end
+if not ( SERVER or MENU_DLL ) then
 
-    local files, _ = file.Find( filePath .. "*", gamePath )
-    if not files or #files == 0 then return false end
-    local splits = string.Split( filePath, "/" )
+    if type( MountedFiles ) ~= "table" then
+        MountedFiles = {}
+    end
 
-    return table.HasIValue( files, splits[ #splits ] )
+    local gamePaths = {
+        ["LUA"] = "lua",
+        ["lsv"] = "lua",
+        ["lcl"] = "lua"
+    }
+
+    -- https://github.com/Facepunch/garrysmod-issues/issues/5481
+    function IsMounted( filePath, gamePath, onlyDir )
+        if onlyDir and string.GetExtensionFromFilename( filePath ) then return end
+
+        local additional = gamePaths[ gamePath ]
+        if additional then
+            filePath = additional .. "/" .. filePath
+        end
+
+        for _, mountedFile in ipairs( MountedFiles ) do
+            if string.StartsWith( mountedFile, filePath ) then return true end
+        end
+
+        return false
+    end
+
+    function Exists( filePath, gamePath )
+        if IsMounted( filePath, gamePath ) then return true end
+        if file.Exists( filePath, gamePath ) then return true end
+
+        local files, folders = file.Find( filePath .. "*", gamePath )
+        if not files or not folders then return false end
+        if #files == 0 and #folders == 0 then return false end
+
+        local splits = string.Split( filePath, "/" )
+        local fileName = splits[ #splits ]
+
+        return table.HasIValue( files, fileName ) or table.HasIValue( folders, fileName )
+    end
+
+    function IsDir( filePath, gamePath )
+        if IsMounted( filePath, gamePath, true ) then return true end
+        if file.IsDir( filePath, gamePath ) then return true end
+
+        local _, folders = file.Find( filePath .. "*", gamePath )
+        if folders == nil or #folders == 0 then return false end
+
+        local splits = string.Split( filePath, "/" )
+        return table.HasIValue( folders, splits[ #splits ] )
+    end
+
+    function IsFile( filePath, gamePath )
+        if IsMounted( filePath, gamePath ) then return true end
+        if file.Exists( filePath, gamePath ) and not file.IsDir( filePath, gamePath ) then return true end
+
+        local files, _ = file.Find( filePath .. "*", gamePath )
+        if not files or #files == 0 then return false end
+        local splits = string.Split( filePath, "/" )
+
+        return table.HasIValue( files, splits[ #splits ] )
+    end
+
+end
+
+function IsLuaFile( filePath, gamePath, compileMoon )
+    local extension = string.GetExtensionFromFilename( filePath )
+    filePath = string.sub( filePath, 1, #filePath - ( extension ~= nil and ( #extension + 1 ) or 0 ) )
+
+    if ( SERVER or MENU_DLL ) then
+        local moonPath = filePath  .. ".moon"
+        if IsFile( moonPath, gamePath ) then
+            if compileMoon then
+                gpm.PreCacheMoon( moonPath, false )
+            end
+
+            return true
+        end
+    end
+
+    return IsFile( filePath .. ".lua", gamePath )
 end
 
 function Read( filePath, gamePath, length )
@@ -137,25 +192,33 @@ function CreateDir( folderPath )
     return currentPath
 end
 
-CompileLua = promise.Async( function( filePath, gamePath, handleError )
-    local ok, result = AsyncRead( filePath, gamePath ):SafeAwait()
-    if not ok then
-        return promise.Reject( result )
+function CompileLua( filePath, gamePath, handleError )
+    if CLIENT and IsMounted( filePath, gamePath ) then
+        filePath = "lua/" .. filePath
+        gamePath = "GAME"
     end
 
-    local func = CompileString( result.fileContent, result.filePath, handleError )
-    assert( type( func ) == "function", "Lua file '" .. filePath .. "' (" .. gamePath .. ") compilation failed." )
+    local content = Read( filePath, gamePath )
+    if not content then
+        error( "File compilation '" .. filePath .. "' failed, file cannot be read." )
+    end
+
+    local func = CompileString( content, filePath, handleError )
+    if not func then
+        error( "File compilation '" .. filePath .. "' failed, unknown error." )
+    end
+
     return func
-end )
+end
 
-CompileMoon = promise.Async( function( filePath, gamePath, handleError )
-    local ok, result = AsyncRead( filePath, gamePath ):SafeAwait()
-    if not ok then
-        return promise.Reject( result )
+function CompileMoon( filePath, gamePath, handleError )
+    local content = Read( filePath, gamePath )
+    if not content then
+        error( "File compilation '" .. filePath .. "' failed, file cannot be read." )
     end
 
-    return CompileMoonString( result.fileContent, result.filePath, handleError )
-end )
+    return CompileMoonString( content, filePath, handleError )
+end
 
 Watch = debug_fempty
 UnWatch = debug_fempty
@@ -263,7 +326,6 @@ function AsyncRead( filePath, gamePath )
 end
 
 if type( file.AsyncWrite ) == "function" then
-
     function AsyncWrite( filePath, fileContent )
         local p = promise.New()
 
@@ -281,9 +343,7 @@ if type( file.AsyncWrite ) == "function" then
 
         return p
     end
-
 else
-
     function AsyncWrite( filePath, fileContent )
         local p = promise.New()
 
@@ -299,11 +359,9 @@ else
 
         return p
     end
-
 end
 
 if type( file.AsyncAppen ) == "function" then
-
     function AsyncAppend( filePath, fileContent )
         local p = promise.New()
 
@@ -321,9 +379,7 @@ if type( file.AsyncAppen ) == "function" then
 
         return p
     end
-
 else
-
     function AsyncAppend( filePath, fileContent )
         local p = promise.New()
 
@@ -334,5 +390,4 @@ else
 
         return p
     end
-
 end

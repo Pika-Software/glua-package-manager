@@ -11,16 +11,6 @@ function CanImport( filePath )
     return string.match( filePath, "github.com/(.+)" ) ~= nil
 end
 
-GetMetadata = promise.Async( function( url )
-    local user, repository = string.match( url, "github.com/([%w_%-%.]+)/([%w_%-%.]+)" )
-    return {
-        ["tree"] = string.match( url, "/tree/([%w_%-%.%/]+)"),
-        ["repository"] = repository,
-        ["user"] = user,
-        ["url"] = url
-    }
-end )
-
 IsAvailable = promise.Async( function( user, repository, tree )
     local url = string.format( "https://github.com/%s/%s/archive/refs/heads/%s.zip", user, repository, tree )
 
@@ -36,24 +26,37 @@ IsAvailable = promise.Async( function( user, repository, tree )
     return url
 end )
 
-Import = promise.Async( function( metadata )
-    local user = metadata.user
+GetMetadata = promise.Async( function( importPath )
+    local user, repository = string.match( importPath, "github.com/([%w_%-%.]+)/([%w_%-%.]+)" )
     if not user then return promise.Reject( "Attempt to download failed - repository not recognized." ) end
-
-    local repository = metadata.repository
     if not repository then return promise.Reject( "Attempt to download failed - user not recognized." ) end
 
-    local tree = metadata.tree
+    local metadata = {}
+
+    local tree = string.match( importPath, "/tree/([%w_%-%.%/]+)")
     if tree ~= nil then
         local ok, result = IsAvailable( user, repository, tree ):SafeAwait()
-        if ok then return gpm.SourceImport( "http", result ) end
+        if ok then
+            metadata.url = result
+            return metadata
+        end
     end
 
     local ok, result = IsAvailable( user, repository, "main" ):SafeAwait()
-    if ok then return gpm.SourceImport( "http", result ) end
+    if ok then
+        metadata.url = result
+        return metadata
+    end
 
     ok, result = IsAvailable( user, repository, "master" ):SafeAwait()
-    if ok then return gpm.SourceImport( "http", result ) end
+    if ok then
+        metadata.url = result
+        return metadata
+    end
 
     return promise.Reject( result )
+end )
+
+Import = promise.Async( function( metadata )
+    return gpm.SourceImport( "http", metadata.url )
 end )

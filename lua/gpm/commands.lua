@@ -1,6 +1,7 @@
 local logger = gpm.Logger
 local SERVER = SERVER
 local ipairs = ipairs
+local table = table
 local gpm = gpm
 local net = net
 
@@ -51,12 +52,25 @@ do
     local colors = gpm.Colors
     local pairs = pairs
     local MsgC = MsgC
+    local type = type
 
     function gpm.PrintPackageList( packages )
         MsgC( colors.Realm, gpm.Realm, colors.PrimaryText, " packages:\n" )
 
+        if type( packages ) ~= "table" then
+            packages = {}
+
+            for _, pkg in pairs( gpm.Packages ) do
+                packages[ #packages + 1 ] = pkg
+            end
+        end
+
+        table.sort( packages, function( a, b )
+            return a:GetIdentifier() < b:GetIdentifier()
+        end )
+
         local total = 0
-        for _, pkg in pairs( packages or gpm.Packages ) do
+        for _, pkg in pairs( packages ) do
             MsgC( colors.Realm, "\t* ", colors.PrimaryText, pkg:GetIdentifier() .. "\n" )
             total = total + 1
         end
@@ -64,6 +78,10 @@ do
         MsgC( colors.Realm, "\tTotal: ", colors.PrimaryText, total, "\n" )
     end
 
+end
+
+local function catch( message )
+    logger:Error( message )
 end
 
 function gpm.Reload( ... )
@@ -83,7 +101,7 @@ function gpm.Reload( ... )
     local packages, count = {}, 0
     for _, searchable in ipairs( arguments ) do
         if #searchable == 0 then continue end
-        for _, pkg in ipairs( gpm.package.Find( searchable, false, false ) ) do
+        for _, pkg in ipairs( gpm.Find( searchable, false, false ) ) do
             packages[ pkg ] = true
             count = count + 1
         end
@@ -97,7 +115,7 @@ function gpm.Reload( ... )
     logger:Info( "Found %d candidates to reload, reloading...", count )
 
     for pkg in pairs( packages ) do
-        pkg:Reload( true )
+        pkg:Reload( true ):Catch( catch )
     end
 end
 
@@ -111,7 +129,7 @@ function gpm.Uninstall( force, ... )
     local packages, count = {}, 0
     for _, searchable in ipairs( arguments ) do
         if #searchable == 0 then continue end
-        for _, pkg in ipairs( gpm.package.Find( searchable, false, false ) ) do
+        for _, pkg in ipairs( gpm.Find( searchable, false, false ) ) do
             packages[ pkg ] = true
             count = count + 1
         end
@@ -245,7 +263,8 @@ if CLIENT then
 
             local pkg = gpm.Packages[ importPath ]
             if not pkg then return end
-            pkg:Reload()
+
+            pkg:Reload():Catch( catch )
         end
     }
 

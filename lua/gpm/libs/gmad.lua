@@ -10,10 +10,11 @@ local ArgAssert = gpm.ArgAssert
 local moonloader = moonloader
 local tonumber = tonumber
 local logger = gpm.Logger
-local SysTime = SysTime
 local os_time = os.time
+local paths = gpm.paths
 local assert = assert
 local ipairs = ipairs
+local error = error
 
 module( "gmad" )
 
@@ -257,14 +258,21 @@ function GMA:AddFile( filePath, content )
     assert( self.WriteMode, "To change a gmad file, write mode is required." )
     ArgAssert( filePath, 1, "string" )
 
-    local isMoon, moonPath = string.EndsWith( filePath, ".moon" ) and moonloader ~= nil
-    if isMoon then
-        moonPath = filePath
-        filePath = string.Replace( filePath, ".moon", ".lua" )
+    if string.GetExtensionFromFilename( filePath ) == "moon" then
+        if not moonloader then
+            error( "Attempting to compile a Moonscript file fails, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader." )
+        end
+
+        content = moonloader.ToLua( content )
+        if not content then
+            error( "Compiling the Moonscript '" .. filePath .. "' file into a Lua file failed, GMA file: " .. self.FilePath )
+        end
+
+        filePath = paths.FormatToLua( filePath )
     end
 
     if not IsAllowedFilePath( filePath ) then
-        logger:Warn( "File '%s' was not written to gma because its path is not valid.", filePath )
+        logger:Warn( "File '%s' was not written to GMA because its path is not valid.", filePath )
         return
     end
 
@@ -278,17 +286,6 @@ function GMA:AddFile( filePath, content )
             table.remove( files, number )
             break
         end
-    end
-
-    if isMoon then
-        local stopwatch = SysTime()
-        content = moonloader.ToLua( content )
-        if not content then
-            logger:Error( "Compiling Moonscript file '%s' into Lua file '%s' is failed, took %f seconds.", moonPath, filePath, SysTime() - stopwatch )
-            return
-        end
-
-        logger:Debug( "Compiling Moonscript file '%s' into Lua file '%s' is finished, took %f seconds.", moonPath, filePath, SysTime() - stopwatch )
     end
 
     files[ #files + 1 ] = {
@@ -504,7 +501,7 @@ function Parse( fileClass )
     return metadata
 end
 
-function Read( fileClass )
+function Open( fileClass )
     if not fileClass then return end
 
     local metadata = Parse( fileClass )
@@ -521,11 +518,11 @@ function Read( fileClass )
     return instance
 end
 
-function Open( filePath, gamePath )
+function Read( filePath, gamePath )
     local fileClass = file.Open( filePath, "rb", gamePath )
     if not fileClass then return end
 
-    local instance = Read( fileClass )
+    local instance = Open( fileClass )
     if not instance then
         fileClass:Close()
         return
@@ -544,6 +541,7 @@ function Write( filePath )
     if not fileClass then return end
 
     return setmetatable( {
+        ["FilePath"] = filePath,
         ["WriteMode"] = true,
         ["File"] = fileClass,
         ["Files"] = {},

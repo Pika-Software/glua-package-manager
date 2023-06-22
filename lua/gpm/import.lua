@@ -13,6 +13,7 @@ local IsPackage = gpm.IsPackage
 local logger = gpm.Logger
 local ipairs = ipairs
 local assert = assert
+local error = error
 local type = type
 
 local sources = gpm.sources
@@ -20,9 +21,9 @@ if not sources then
     sources = {}; gpm.sources = sources
 end
 
-for _, filePath in ipairs( fs.Find( "gpm/sources/*", "LUA" ) ) do
-    local extension = string.GetExtensionFromFilename( filePath )
-    gpm.IncludeComponent( "sources/" .. string.sub( filePath, 1, #filePath - ( ( extension ~= nil and #extension or 0 ) + 1 ) ) )
+for _, fileName in ipairs( fs.Find( "gpm/sources/*", "LUA" ) ) do
+    local extension = string.GetExtensionFromFilename( fileName )
+    gpm.IncludeComponent( "sources/" .. string.sub( fileName, 1, #fileName - ( ( extension ~= nil and #extension or 0 ) + 1 ) ) )
 end
 
 local activeGamemode = engine.ActiveGamemode()
@@ -46,39 +47,43 @@ do
         return false
     end
 
-    function gpm.LocatePackage( ... )
-        for number, importPath in ipairs( {...} ) do
-            gpm.ArgAssert( importPath, number, "string" )
-            if gpm.CanImport( importPath ) then return importPath end
-        end
-    end
-
-    local metadatas = {}
-
-    local getMetadata = promise.Async( function( importPath, sourceName, source )
-        local metadata = metadatas[ sourceName .. ";" .. importPath ]
-        if not metadata then
-            if type( source.GetMetadata ) == "function" then
-                local ok, result = source.GetMetadata( importPath ):SafeAwait()
-                if not ok then
-                    return promise.Reject( result )
-                end
-
-                metadata = package.BuildMetadata( result )
-            else
-                metadata = package.BuildMetadata( {} )
+    function gpm.CanBeInstalled( metadata, source )
+        local init = metadata.init
+        if SERVER then
+            if ( init.client or metadata.send ) and source.SendToClient then
+                source.SendToClient( metadata, source )
             end
 
-            metadatas[ sourceName .. ";" .. importPath ] = metadata
+            if not init.server then
+                return false, "package does not support running on the server"
+            end
         end
 
-        return metadata
-    end )
+        if CLIENT and not init.client then
+            return false, "package does not support running on the client"
+        end
 
-    local function sendToClient( metadata, source )
-        if not metadata.client then return end
-        if type( source.SendToClient ) ~= "function" then return end
-        source.SendToClient( metadata )
+        if MENU_DLL and not init.menu then
+            return false, "package does not support running in menu"
+        end
+
+        if metadata.singleplayer and not singlePlayer then
+            return false, "package cannot be executed in a singleplayer game"
+        end
+
+        local gamemodes = metadata.gamemodes
+        local gamemodesType = type( gamemodes )
+        if ( gamemodesType == "string" and gamemodes ~= activeGamemode ) or ( gamemodesType == "table" and not table_HasIValue( gamemodes, activeGamemode ) ) then
+            return false, "package does not support active gamemode"
+        end
+
+        local maps = metadata.maps
+        local mapsType = type( maps )
+        if ( mapsType == "string" and maps ~= map ) or ( mapsType == "table" and not table_HasIValue( maps, map ) ) then
+            return false, "package does not support current map"
+        end
+
+        return true
     end
 
     local tasks = gpm.ImportTasks
@@ -88,60 +93,43 @@ do
 
     gpm.SourceImport = promise.Async( function( sourceName, importPath )
         local task = tasks[ importPath ]
-        if not task then
-            local source = sources[ sourceName ]
-            if not source then
-                return promise.Reject( "Requested package source not found." )
-            end
+        if task then
+            return task
+        end
 
-            local ok, result = getMetadata( importPath, sourceName, source ):SafeAwait()
+        local source = sources[ sourceName ]
+        if not source then
+            return promise.Reject( "source not found" )
+        end
+
+        local metadata = {}
+
+        if type( source.GetMetadata ) == "function" then
+            local ok, result = source.GetMetadata( importPath ):SafeAwait()
             if not ok then
                 return promise.Reject( result )
             end
 
-            if CLIENT and not result.client then
-                return promise.Reject( "Package does not support running on the client." )
-            end
-
-            if SERVER then
-                sendToClient( result, source )
-                if not result.server then
-                    return promise.Reject( "Package does not support running on the server." )
-                end
-            end
-
-            if MENU_DLL and not result.menu then
-                return promise.Reject( "Package does not support running in menu." )
-            end
-
-            if result.singleplayer and not singlePlayer then
-                return promise.Reject( "Package cannot be executed in a singleplayer game." )
-            end
-
-            local gamemodes = result.gamemodes
-            local gamemodesType = type( gamemodes )
-            if ( gamemodesType == "string" and gamemodes ~= activeGamemode ) or ( gamemodesType == "table" and not table_HasIValue( gamemodes, activeGamemode ) ) then
-                return promise.Reject( "Package does not support active gamemode." )
-            end
-
-            local maps = result.maps
-            local mapsType = type( maps )
-            if ( mapsType == "string" and maps ~= map ) or ( mapsType == "table" and not table_HasIValue( maps, map ) ) then
-                return promise.Reject( "Package does not support current map." )
-            end
-
-            if type( result.name ) ~= "string" then
-                result.name = importPath
-            end
-
-            result.importpath = importPath
-            result.source = sourceName
-
-            task = source.Import( result )
-            tasks[ importPath ] = task
+            metadata = result
         end
 
-        return task
+        metadata.importpath = importPath
+        metadata.sourcename = sourceName
+
+        package.FormatMetadata( metadata )
+
+        local ok, message = gpm.CanBeInstalled( metadata, source )
+        if not ok then
+            return promise.Reject( message )
+        end
+
+        task = source.Import( metadata )
+        tasks[ importPath ] = task
+
+        return task:Catch( function( message )
+            logger:Error( "Package '%s' import failed, see above to see the error.", importPath )
+            ErrorNoHaltWithStack( message )
+        end )
     end )
 
     gpm.AsyncImport = promise.Async( function( importPath, pkg, autorun )
@@ -152,56 +140,41 @@ do
                 if not source then continue end
                 if not source.CanImport( importPath ) then continue end
 
-                local ok, result = getMetadata( importPath, sourceName, source ):SafeAwait()
+                local metadata = {}
+
+                if type( source.GetMetadata ) == "function" then
+                    local ok, result = source.GetMetadata( importPath ):SafeAwait()
+                    if not ok then
+                        return promise.Reject( result )
+                    end
+
+                    metadata = result
+                end
+
+                metadata.importpath = importPath
+                metadata.sourcename = sourceName
+
+                package.FormatMetadata( metadata )
+
+                local ok, message = gpm.CanBeInstalled( metadata, source )
                 if not ok then
-                    return promise.Reject( result )
+                    logger:Error( "Package '%s' import failed, %s.", importPath, message )
+                    return
                 end
 
-                if SERVER then
-                    sendToClient( result, source )
-                    if not result.server then return end
-                end
-
-                if autorun and not result.autorun then
+                if autorun and not metadata.autorun then
                     logger:Debug( "Package '%s' autorun restricted.", importPath )
-                    return
-                end
-
-                if CLIENT and not result.client then return end
-                if MENU_DLL and not result.menu then return end
-
-                if result.singleplayer and not singlePlayer then
-                    logger:Error( "Package '%s' import failed, package cannot be executed in a singleplayer game.", importPath )
-                    return
-                end
-
-                local gamemodes = result.gamemodes
-                local gamemodesType = type( gamemodes )
-                if ( gamemodesType == "string" and gamemodes ~= activeGamemode ) or ( gamemodesType == "table" and not table_HasIValue( gamemodes, activeGamemode ) ) then
-                    logger:Error( "Package '%s' import failed, package does not support active gamemode.", importPath )
-                    return
-                end
-
-                local maps = result.maps
-                local mapsType = type( maps )
-                if ( mapsType == "string" and maps ~= map ) or ( mapsType == "table" and not table_HasIValue( maps, map ) ) then
-                    logger:Error( "Package '%s' import failed, package does not support current map.", importPath )
                     return
                 end
 
                 task = gpm.SourceImport( sourceName, importPath )
                 break
             end
-        end
 
-        if not task then
-            return promise.Reject( "Requested package doesn't exist." )
+            if not task then
+                return promise.Reject( "Requested package doesn't exist." )
+            end
         end
-
-        task:Catch( function( message )
-            logger:Error( "Package '%s' import failed, see above to see the error.", importPath )
-            ErrorNoHaltWithStack( message )
-        end )
 
         if IsPackage( pkg ) then
             if task:IsPending() then
@@ -227,11 +200,14 @@ function gpm.Import( importPath, async, pkg2 )
     assert( async or promise.RunningInAsync(), "import supposed to be running in coroutine/async function (do you running it from package)" )
 
     local task = gpm.AsyncImport( importPath, pkg2 )
-
     if not async then
-        local pkg = task:Await()
-        if not pkg then return end
-        return pkg:GetResult(), pkg
+        local ok, result = task:SafeAwait()
+        if not ok then
+            error( "Package '" .. importPath .. "' import failed, " .. result )
+        end
+
+        if not result then return end
+        return result:GetResult(), result
     end
 
     return task
@@ -243,12 +219,12 @@ gpm.AsyncInstall = promise.Async( function( pkg2, ... )
     local arguments = {...}
     local length = #arguments
 
-    for number, importPath in ipairs( arguments ) do
+    for index, importPath in ipairs( arguments ) do
         if not gpm.CanImport( importPath ) then continue end
 
         local ok, result = gpm.AsyncImport( importPath, pkg2, false ):SafeAwait()
         if not ok then
-            if number ~= length then continue end
+            if index ~= length then continue end
             return promise.Reject( result )
         end
 
@@ -262,12 +238,14 @@ function gpm.Install( pkg2, async, ... )
     assert( async or promise.RunningInAsync(), "import supposed to be running in coroutine/async function (do you running it from package)" )
 
     local task = gpm.AsyncInstall( pkg2, ... )
-    task:Catch( ErrorNoHaltWithStack )
-
     if not async then
-        local pkg = task:Await()
-        if not pkg then return end
-        return pkg:GetResult(), pkg
+        local ok, result = task:SafeAwait()
+        if not ok then
+            error( "Package '" .. importPath .. "' import failed, " .. result )
+        end
+
+        if not result then return end
+        return result:GetResult(), result
     end
 
     return task
@@ -281,7 +259,7 @@ function gpm.ImportFolder( folderPath, pkg2, autorun )
         return
     end
 
-    logger:Info( "Starting to import packages from '%s'", folderPath )
+    logger:Info( "Started import from folder: %s", folderPath )
 
     local files, folders = fs.Find( folderPath .. "/*", "LUA" )
     for _, folderName in ipairs( folders ) do
