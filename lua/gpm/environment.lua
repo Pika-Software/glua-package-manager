@@ -5,7 +5,6 @@ local debug = debug
 -- Variables
 local setmetatable = setmetatable
 local rawget = rawget
-local ipairs = ipairs
 local type = type
 
 module( "gpm.environment" )
