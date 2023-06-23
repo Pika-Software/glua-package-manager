@@ -225,7 +225,7 @@ gpm.AsyncInstall = promise.Async( function( pkg2, ... )
         local ok, result = gpm.AsyncImport( importPath, pkg2, false ):SafeAwait()
         if not ok then
             if index ~= length then continue end
-            return promise.Reject( result )
+            return promise.Reject( "Package '" .. importPath .. "' import failed, " .. result )
         end
 
         return result
@@ -241,7 +241,7 @@ function gpm.Install( pkg2, async, ... )
     if not async then
         local ok, result = task:SafeAwait()
         if not ok then
-            error( "Package '" .. importPath .. "' import failed, " .. result )
+            error( result )
         end
 
         if not result then return end
