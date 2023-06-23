@@ -17,11 +17,13 @@ local error = error
 if efsw ~= nil then
 
     local logger = gpm.Logger
+    local timer = timer
+
     local function catch( message )
         logger:Error( message )
     end
 
-    hook.Add( "FileWatchEvent", "GPM.Sources.Lua.Hot-Reload", function( action, _, filePath )
+    hook.Add( "FileWatchEvent", "gpm.efsw.sources.lua", function( action, _, filePath )
         if action <= 0 then return end
 
         local importPath = string.match( string.sub( filePath, 5 ), "packages/[^/]+" )
@@ -30,9 +32,13 @@ if efsw ~= nil then
         local pkg = gpm.Packages[ importPath ]
         if not pkg then return end
 
-        if not pkg:IsInstalled() then return end
-        if pkg:IsReloading() then return end
-        pkg:Reload():Catch( catch )
+        local timerName = "gpm.efsw.sources.lua." .. importPath
+        timer.Create( timerName, 0.25, 1, function()
+            timer.Remove( timerName )
+            if not pkg:IsInstalled() then return end
+            if pkg:IsReloading() then return end
+            pkg:Reload():Catch( catch )
+        end )
     end )
 
 end
@@ -67,17 +73,9 @@ GetMetadata = promise.Async( function( importPath )
         else
             metadata.autorun = true
         end
-
-        if SERVER or MENU_DLL then
-            fs.Watch( importPath .. "/", "lsv" )
-        end
     elseif fs.IsFile( importPath, "LUA" ) then
         metadata.init = importPath
         metadata.autorun = true
-
-        if SERVER or MENU_DLL then
-            fs.Watch( importPath, "lsv" )
-        end
     end
 
     return metadata
@@ -141,6 +139,15 @@ Import = promise.Async( function( metadata )
     local ok, result = pcall( CompileInit, metadata )
     if not ok then
         return promise.Reject( result )
+    end
+
+    if SERVER or MENU_DLL then
+        local importPath = metadata.importpath
+        if fs.IsDir( importPath, "lsv" ) then
+            fs.Watch( importPath .. "/", "lsv" )
+        else
+            fs.Watch( importPath, "lsv" )
+        end
     end
 
     return package.Initialize( metadata, result )
