@@ -924,6 +924,8 @@ do
         FormatMetadata( metadata )
 
         local ok, result = source.Reload( self, metadata ):SafeAwait()
+        self.Reloading = nil
+
         if not ok then
             return promise.Reject( result )
         end
@@ -932,8 +934,6 @@ do
         if not ok then
             ErrorNoHaltWithStack( err )
         end
-
-        self.Reloading = nil
 
         logger:Info( "Package '%s' was successfully reloaded, took %.4f seconds.", self:GetIdentifier(), SysTime() - stopwatch )
         return result
