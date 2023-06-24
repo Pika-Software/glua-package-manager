@@ -10,6 +10,7 @@ local fs = gpm.fs
 
 -- Variables
 local SERVER, MENU_DLL = SERVER, MENU_DLL
+local AddCSLuaFile = AddCSLuaFile
 local ipairs = ipairs
 local pcall = pcall
 local error = error
@@ -89,11 +90,10 @@ end )
 
 if SERVER then
 
-    local addCSLuaFile = package.AddCSLuaFile
     function SendToClient( metadata )
         local packagePath = metadata.packagepath
         if packagePath then
-            addCSLuaFile( packagePath )
+            AddCSLuaFile( paths.FormatToLua( packagePath ) )
         end
 
         local importPath = metadata.importpath
@@ -102,10 +102,10 @@ if SERVER then
         local client = metadata.init.client
         if client then
             local filePath = importPath .. "/" .. client
-            if fs.IsFile( filePath, "lsv" ) then
-                addCSLuaFile( filePath )
-            elseif fs.IsFile( client, "lsv" ) then
-                addCSLuaFile( client )
+            if fs.IsLuaFile( filePath, "lsv", true ) then
+                AddCSLuaFile( paths.FormatToLua( filePath ) )
+            elseif fs.IsLuaFile( client, "lsv", true ) then
+                AddCSLuaFile( paths.FormatToLua( client ) )
             end
         end
 
@@ -114,14 +114,14 @@ if SERVER then
             for _, filePath in ipairs( send ) do
                 if isInFolder then
                     local localFilePath = importPath .. "/" .. filePath
-                    if fs.IsFile( localFilePath, "lsv" ) then
-                        addCSLuaFile( localFilePath )
+                    if fs.IsLuaFile( localFilePath, "lsv", true ) then
+                        AddCSLuaFile( paths.FormatToLua( localFilePath ) )
                         continue
                     end
                 end
 
-                if fs.IsFile( filePath, "lsv" ) then
-                    addCSLuaFile( filePath )
+                if fs.IsLuaFile( filePath, "lsv", true ) then
+                    AddCSLuaFile( paths.FormatToLua( filePath ) )
                 end
             end
         end

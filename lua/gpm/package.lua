@@ -107,7 +107,7 @@ function GetCurrentInitByRealm( init )
     if SERVER then
         return init.server
     elseif CLIENT then
-        return paths.FormatToLua( init.client )
+        return init.client
     elseif MENU_DLL then
         return init.menu
     end
