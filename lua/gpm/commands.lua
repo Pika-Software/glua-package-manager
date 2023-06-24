@@ -80,10 +80,6 @@ do
 
 end
 
-local function catch( message )
-    logger:Error( message )
-end
-
 function gpm.Reload( ... )
     local arguments = { ... }
     if #arguments == 0 then
@@ -115,7 +111,9 @@ function gpm.Reload( ... )
     logger:Info( "Found %d candidates to reload, reloading...", count )
 
     for pkg in pairs( packages ) do
-        pkg:Reload( true ):Catch( catch )
+        pkg:Reload( true ):Catch( function( message )
+            logger:Error( "Package '%s' reload failed, error:\n%s", pkg:GetIdentifier(), message )
+        end )
     end
 end
 
@@ -264,7 +262,9 @@ if CLIENT then
             local pkg = gpm.Packages[ importPath ]
             if not pkg then return end
 
-            pkg:Reload():Catch( catch )
+            pkg:Reload( true ):Catch( function( message )
+                logger:Error( "Package '%s' reload failed, error:\n%s", pkg:GetIdentifier(), message )
+            end )
         end
     }
 

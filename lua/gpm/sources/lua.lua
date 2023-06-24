@@ -19,10 +19,6 @@ if efsw ~= nil then
     local logger = gpm.Logger
     local timer = timer
 
-    local function catch( message )
-        logger:Error( message )
-    end
-
     hook.Add( "FileWatchEvent", "gpm.efsw.sources.lua", function( action, _, filePath )
         if action <= 0 then return end
 
@@ -37,7 +33,9 @@ if efsw ~= nil then
             timer.Remove( timerName )
             if not pkg:IsInstalled() then return end
             if pkg:IsReloading() then return end
-            pkg:Reload():Catch( catch )
+            pkg:Reload():Catch( function( message )
+                logger:Error( "Package '%s' reload failed, error:\n%s", pkg:GetIdentifier(), message )
+            end )
         end )
     end )
 
