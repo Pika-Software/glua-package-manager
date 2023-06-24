@@ -15,19 +15,28 @@ local ipairs = ipairs
 local pcall = pcall
 local error = error
 
-if efsw ~= nil then
+if ( SERVER or MENU_DLL ) and efsw ~= nil then
 
     local logger = gpm.Logger
     local timer = timer
 
     hook.Add( "FileWatchEvent", "gpm.efsw.sources.lua", function( action, _, filePath )
         if action <= 0 then return end
+        filePath = paths.Localize( filePath )
 
-        local importPath = string.match( string.sub( filePath, 5 ), "packages/[^/]+" )
+        local importPath = string.match( filePath, "packages/[^/]+" )
         if not importPath then return end
 
         local pkg = gpm.Packages[ importPath ]
         if not pkg then return end
+
+        if action ~= 3 and fs.IsDir( filePath, "lsv" ) then
+            if action == 1 then
+                fs.Watch( filePath .. "/", "lsv" )
+            elseif action == 2 then
+                fs.UnWatch( filePath .. "/", "lsv" )
+            end
+        end
 
         local timerName = "gpm.efsw.sources.lua." .. importPath
         timer.Create( timerName, 0.25, 1, function()
