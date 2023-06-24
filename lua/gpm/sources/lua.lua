@@ -71,9 +71,17 @@ GetMetadata = promise.Async( function( importPath )
         else
             metadata.autorun = true
         end
+
+        if SERVER or MENU_DLL then
+            fs.Watch( importPath .. "/", "lsv" )
+        end
     elseif fs.IsFile( importPath, "LUA" ) then
         metadata.init = importPath
         metadata.autorun = true
+
+        if SERVER or MENU_DLL then
+            fs.Watch( importPath, "lsv" )
+        end
     end
 
     return metadata
@@ -137,15 +145,6 @@ Import = promise.Async( function( metadata )
     local ok, result = pcall( CompileInit, metadata )
     if not ok then
         return promise.Reject( result )
-    end
-
-    if SERVER or MENU_DLL then
-        local importPath = metadata.importpath
-        if fs.IsDir( importPath, "lsv" ) then
-            fs.Watch( importPath .. "/", "lsv" )
-        else
-            fs.Watch( importPath, "lsv" )
-        end
     end
 
     return package.Initialize( metadata, result )
