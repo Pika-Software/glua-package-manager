@@ -32,9 +32,9 @@ if ( SERVER or MENU_DLL ) and efsw ~= nil then
 
         if action ~= 3 and fs.IsDir( filePath, "lsv" ) then
             if action == 1 then
-                fs.Watch( filePath .. "/", "lsv" )
+                fs.Watch( filePath, "lsv", true )
             elseif action == 2 then
-                fs.UnWatch( filePath .. "/", "lsv" )
+                fs.UnWatch( filePath, "lsv", true )
             end
         end
 
@@ -81,17 +81,13 @@ GetMetadata = promise.Async( function( importPath )
         else
             metadata.autorun = true
         end
-
-        if SERVER or MENU_DLL then
-            fs.Watch( importPath .. "/", "lsv" )
-        end
     elseif fs.IsFile( importPath, "LUA" ) then
         metadata.init = importPath
         metadata.autorun = true
+    end
 
-        if SERVER or MENU_DLL then
-            fs.Watch( importPath, "lsv" )
-        end
+    if SERVER or MENU_DLL then
+        fs.Watch( importPath, "lsv", true )
     end
 
     return metadata

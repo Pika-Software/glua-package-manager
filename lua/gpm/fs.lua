@@ -18,6 +18,7 @@ end
 -- Libraries
 local asyncio = asyncio
 local promise = promise
+local paths = gpm.paths
 local string = string
 local table = table
 local file = file
@@ -31,6 +32,7 @@ local debug_fempty = debug.fempty
 local math_max = math.max
 local MENU_DLL = MENU_DLL
 local CLIENT = CLIENT
+local select = select
 local ipairs = ipairs
 local error = error
 local type = type
@@ -229,17 +231,40 @@ if efsw ~= nil then
         watchList = {}; efsw.WatchList = watchList
     end
 
-    function Watch( filePath, gamePath )
+    function Watch( filePath, gamePath, recursively )
+        filePath = paths.Fix( filePath )
+
+        if CLIENT and IsMounted( filePath, gamePath ) then return end
         if watchList[ filePath .. ";" .. gamePath ] then return end
+        if IsDir( filePath, gamePath ) then
+            filePath = filePath .. "/"
+            if recursively then
+                for _, folder in ipairs( select( -1, Find( filePath .. "*", gamePath ) ) ) do
+                    Watch( filePath .. folder, gamePath, recursively )
+                end
+            end
+        end
+
         watchList[ filePath .. ";" .. gamePath ] = efsw.Watch( filePath, gamePath )
     end
 
-    function UnWatch( filePath, gamePath )
+    function UnWatch( filePath, gamePath, recursively )
+        filePath = paths.Fix( filePath )
+
         local watchID = watchList[ filePath .. ";" .. gamePath ]
-        if watchID then
-            efsw.Unwatch( watchID )
-            watchList[ filePath .. ";" .. gamePath ] = nil
+        if not watchID then return end
+
+        if IsDir( filePath, gamePath ) then
+            filePath = filePath .. "/"
+            if recursively then
+                for _, folder in ipairs( select( -1, Find( filePath .. "*", gamePath ) ) ) do
+                    UnWatch( filePath .. folder, gamePath, recursively )
+                end
+            end
         end
+
+        efsw.Unwatch( watchID )
+        watchList[ filePath .. ";" .. gamePath ] = nil
     end
 end
 
