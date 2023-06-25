@@ -29,7 +29,6 @@ local CompileMoonString = CompileMoonString
 local CompileString = CompileString
 local game_MountGMA = game.MountGMA
 local debug_fempty = debug.fempty
-local math_max = math.max
 local MENU_DLL = MENU_DLL
 local CLIENT = CLIENT
 local select = select
