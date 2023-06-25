@@ -5,7 +5,9 @@ local SysTime = SysTime
 local SERVER = SERVER
 local Color = Color
 local error = error
+local pcall = pcall
 local type = type
+local _G = _G
 
 Msg( [[
     ____    _____    ___ ___
@@ -25,7 +27,7 @@ Msg( [[
 
 module( "gpm", package.seeall )
 
-_VERSION = 013606
+_VERSION = 013607
 
 if not Colors then
     Realm = "unknown"
@@ -80,11 +82,16 @@ local promise = promise
 
 Logger:Info( "gm_promise v%s is initialized.", utils.Version( promise._VERSION_NUM ) )
 
-if util.IsBinaryModuleInstalled( "moonloader" ) and pcall( require, "moonloader" ) then
-    Logger:Info( "gm_moonloader v%s is initialized, MoonScript support is active.", utils.Version( moonloader._VERSION ) )
+local moonloader
+if util.IsBinaryModuleInstalled( "moonloader" ) then
+    local ok, message = pcall( require, "moonloader" )
+    if ok then
+        moonloader = _G.moonloader
+        Logger:Info( "gm_moonloader v%s is initialized, MoonScript support is active.", utils.Version( moonloader._VERSION ) )
+    else
+        Logger:Error( "gm_moonloader startup error: %s", message )
+    end
 end
-
-local moonloader = moonloader
 
 do
 
@@ -157,7 +164,6 @@ end
 do
 
     local CompileFile = CompileFile
-    local pcall = pcall
 
     function CompileLua( filePath )
         local ok, result = pcall( fs.CompileLua, filePath, "LUA" )
