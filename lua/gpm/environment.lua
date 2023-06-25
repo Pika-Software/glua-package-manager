@@ -30,7 +30,7 @@ do
     function ENVIRONMENT:__index( key )
         local links = GetLinks( self )
         for index = 1, #links do
-            local value = links[ index ][ key ]
+            local value = rawget( links[ index ], key )
             if value == nil then continue end
             return value
         end
