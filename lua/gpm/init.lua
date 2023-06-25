@@ -27,7 +27,7 @@ Msg( [[
 
 module( "gpm", package.seeall )
 
-_VERSION = 013700
+_VERSION = 013701
 
 if not Colors then
     Realm = "unknown"
@@ -102,9 +102,9 @@ do
             error( "Attempting to compile a Moonscript file fails, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader." )
         end
 
-        local luaCode = moonloader.ToLua( moonCode )
+        local luaCode, err = moonloader.ToLua( moonCode )
         if not luaCode then
-            error( "MoonScript code compilation to Lua code failed." )
+            error( err or "MoonScript code compilation to Lua code failed." )
         end
 
         local func = CompileString( luaCode, identifier, handleError )

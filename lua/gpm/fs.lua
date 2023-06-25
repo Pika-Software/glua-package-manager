@@ -158,7 +158,7 @@ function Read( filePath, gamePath, length )
     local fileClass = file.Open( filePath, "rb", gamePath )
     if not fileClass then return end
 
-    local fileContent = fileClass:Read( type( length ) == "number" and math_max( 0, length ) or fileClass:Size() )
+    local fileContent = fileClass:Read( length )
     fileClass:Close()
 
     return fileContent
