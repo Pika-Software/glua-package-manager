@@ -1,21 +1,23 @@
 local SERVER = SERVER
 local util = util
 local gpm = gpm
+local logger = gpm.Logger
 
 -- https://github.com/Pika-Software/gm_asyncio
 -- https://github.com/WilliamVenner/gm_async_write
 if util.IsBinaryModuleInstalled( "asyncio" ) and pcall( require, "asyncio" ) then
-    gpm.Logger:Info( "A third-party file system API 'asyncio' has been initialized." )
+    logger:Info( "A third-party file system API 'asyncio' has been initialized." )
 elseif SERVER and util.IsBinaryModuleInstalled( "async_write" ) and pcall( require, "async_write" ) then
-    gpm.Logger:Info( "A third-party file system API 'async_write' has been initialized." )
+    logger:Info( "A third-party file system API 'async_write' has been initialized." )
 end
 
 -- https://github.com/Pika-Software/gm_efsw
 if util.IsBinaryModuleInstalled( "efsw" ) and pcall( require, "efsw" ) then
-    gpm.Logger:Info( "gm_efsw is initialized, package auto-reload are available." )
+    logger:Info( "gm_efsw is initialized, package auto-reload are available." )
 end
 
 -- Libraries
+local moonloader = moonloader
 local asyncio = asyncio
 local promise = promise
 local paths = gpm.paths
@@ -59,10 +61,16 @@ if MENU_DLL then
 else
     function MountGMA( gmaPath )
         local ok, files = game_MountGMA( gmaPath )
-        if ok and CLIENT then
-            for _, filePath in ipairs( files ) do
-                table.insert( MountedFiles, 1, filePath )
+        if ok then
+            if CLIENT then
+                for _, filePath in ipairs( files ) do
+                    table.insert( MountedFiles, 1, filePath )
+                end
             end
+
+            logger:Debug( "GMA file '%s' was mounted to GAME with %d files.", gmaPath, #files  )
+        else
+            logger:Error( "GMA file '%s' mounting failed.", gmaPath )
         end
 
         return ok, files
@@ -139,11 +147,15 @@ function IsLuaFile( filePath, gamePath, compileMoon )
     local extension = string.GetExtensionFromFilename( filePath )
     filePath = string.sub( filePath, 1, #filePath - ( extension ~= nil and ( #extension + 1 ) or 0 ) )
 
-    if ( SERVER or MENU_DLL ) then
+    if ( SERVER or MENU_DLL ) and moonloader ~= nil then
         local moonPath = filePath  .. ".moon"
         if IsFile( moonPath, gamePath ) then
             if compileMoon then
-                gpm.PreCacheMoon( moonPath, false )
+                if not moonloader.PreCacheFile( moonPath ) then
+                    error( "Compiling Moonscript file '" .. moonPath .. "' into Lua is failed!" )
+                end
+
+                logger:Debug( "The MoonScript file '%s' was successfully compiled into Lua.", moonPath )
             end
 
             return true
