@@ -241,7 +241,7 @@ function gpm.Install( pkg2, async, ... )
     if not async then
         local ok, result = task:SafeAwait()
         if not ok then
-            promise.Reject( result )
+            return promise.Reject( result )
         end
 
         if not result then return end
