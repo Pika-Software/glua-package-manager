@@ -978,12 +978,12 @@ do
         return result
     end )
 
-    local function isPackage( any )
+    function IsPackage( any )
         return getmetatable( any ) == PACKAGE
     end
 
-    gpm.IsPackage = isPackage
-    _G.TYPE_PACKAGE = gpm.AddType( "Package", isPackage )
+    gpm.IsPackage = IsPackage
+    _G.TYPE_PACKAGE = gpm.AddType( "Package", IsPackage )
 
 end
 
