@@ -129,14 +129,16 @@ end
 
 function CompileInit( metadata )
     local absolutePath = paths.FormatToLua( package.GetCurrentInitByRealm( metadata.init ) )
-    local relativePath = metadata.importpath .. "/" .. absolutePath
+    local importPath = metadata.importpath
+
+    local relativePath = importPath .. "/" .. absolutePath
     if fs.IsLuaFile( relativePath, "LUA", true ) then
         return gpm.CompileLua( relativePath )
     elseif fs.IsLuaFile( absolutePath, "LUA", true ) then
         return gpm.CompileLua( absolutePath )
     end
 
-    error( "Package init file '" .. absolutePath .. "' is missing." )
+    error( "Package '" .. importPath .. "' init file '" .. absolutePath .. "' is missing.", 2 )
 end
 
 Import = promise.Async( function( metadata )
