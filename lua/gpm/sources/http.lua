@@ -15,7 +15,6 @@ local CompileMoonString = CompileMoonString
 local CompileString = CompileString
 local logger = gpm.Logger
 local ipairs = ipairs
-local pcall = pcall
 local type = type
 
 local cacheLifetime = gpm.CacheLifetime
@@ -112,19 +111,15 @@ Import = promise.Async( function( metadata )
             return gpm.SourceImport( extension, "data/" .. cachePath )
         end
 
-        local ok, result
+        local func
         if extension == "lua" then
-            ok, result = pcall( fs.CompileLua, cachePath, "DATA" )
+            func = fs.CompileLua( cachePath, "DATA" )
         elseif extension == "moon" then
-            ok, result = pcall( fs.CompileMoon, cachePath, "DATA" )
+            func = fs.CompileMoon( cachePath, "DATA" )
         end
 
-        if not ok then
-            return promise.Reject( result )
-        end
-
-        return package.Initialize( metadata, result, {
-            [ cachePath ] = result
+        return package.Initialize( metadata, func, {
+            [ cachePath ] = func
         } )
     end
 
@@ -184,22 +179,14 @@ Import = promise.Async( function( metadata )
             for _, data in ipairs( files ) do
                 local filePath = data.FilePath
 
-                local ok, result
+                local func
                 if string.GetExtensionFromFilename( filePath ) == "moon" then
-                    ok, result = pcall( CompileMoonString, data.Content, filePath )
+                    func = CompileMoonString( data.Content, filePath )
                 else
-                    ok, result = pcall( CompileString, data.Content, filePath )
+                    func = CompileString( data.Content, filePath )
                 end
 
-                if not ok then
-                    return promise.Reject( "File '" .. filePath .. "' compile failed, " .. result .. "." )
-                end
-
-                if not result then
-                    return promise.Reject( "File '" ..  filePath .. "' compile failed, no result." )
-                end
-
-                compiled[ filePath ] = result
+                compiled[ filePath ] = func
             end
 
             local initPath = package.GetCurrentInitByRealm( metadata.init )
@@ -259,19 +246,9 @@ Import = promise.Async( function( metadata )
     end
 
     if extension == "lua" then
-        local ok, result = pcall( CompileString, result.body, cachePath )
-        if not ok then
-            return promise.Reject( result )
-        end
-
-        return package.Initialize( metadata, result )
+        return package.Initialize( metadata, CompileString( result.body, cachePath ) )
     elseif extension == "moon" then
-        local ok, result = pcall( CompileMoonString, result.body, cachePath )
-        if not ok then
-            return promise.Reject( result )
-        end
-
-        return package.Initialize( metadata, result )
+        return package.Initialize( metadata, CompileMoonString( result.body, cachePath ) )
     elseif extension == "gma" or extension == "zip" then
         return gpm.SourceImport( extension, "data/" .. cachePath )
     end

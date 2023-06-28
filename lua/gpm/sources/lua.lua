@@ -12,7 +12,6 @@ local fs = gpm.fs
 local SERVER, MENU_DLL = SERVER, MENU_DLL
 local AddCSLuaFile = AddCSLuaFile
 local ipairs = ipairs
-local pcall = pcall
 local error = error
 
 if ( SERVER or MENU_DLL ) and efsw ~= nil then
@@ -71,13 +70,7 @@ GetMetadata = promise.Async( function( importPath )
         local packagePath = importPath .. "/package.lua"
         if fs.IsLuaFile( packagePath, "LUA", true ) then
             metadata.packagepath = packagePath
-
-            local ok, result = pcall( gpm.CompileLua, packagePath )
-            if not ok then
-                return promise.Reject( result )
-            end
-
-            table.Merge( metadata, package.ExtractMetadata( result ) )
+            table.Merge( metadata, package.ExtractMetadata( gpm.CompileLua( packagePath ) ) )
         else
             metadata.autorun = true
         end
@@ -147,12 +140,7 @@ function CompileInit( metadata )
 end
 
 Import = promise.Async( function( metadata )
-    local ok, result = pcall( CompileInit, metadata )
-    if not ok then
-        return promise.Reject( result )
-    end
-
-    return package.Initialize( metadata, result )
+    return package.Initialize( metadata, CompileInit( metadata ) )
 end )
 
 Reload = promise.Async( function( pkg, metadata )
@@ -162,12 +150,7 @@ Reload = promise.Async( function( pkg, metadata )
         SendToClient( metadata )
     end
 
-    local ok, result = pcall( CompileInit, metadata )
-    if not ok then
-        return promise.Reject( result )
-    end
-
-    pkg.Init = result
+    pkg.Init = CompileInit( metadata )
 
     local ok, result = pkg:Initialize( metadata ):SafeAwait()
     if not ok then

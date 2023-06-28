@@ -125,11 +125,7 @@ do
 
         task = source.Import( metadata )
         tasks[ importPath ] = task
-
-        return task:Catch( function( message )
-            logger:Error( "Package '%s' import failed, see above to see the error.", importPath )
-            ErrorNoHaltWithStack( message )
-        end )
+        return task
     end )
 
     gpm.AsyncImport = promise.Async( function( importPath, pkg, autorun )
@@ -203,7 +199,7 @@ function gpm.Import( importPath, async, pkg2 )
     if not async then
         local ok, result = task:SafeAwait()
         if not ok then
-            error( "Package '" .. importPath .. "' import failed, " .. result )
+            error( result, 2 )
         end
 
         if not result then return end
@@ -225,13 +221,13 @@ gpm.AsyncInstall = promise.Async( function( pkg2, ... )
         local ok, result = gpm.AsyncImport( importPath, pkg2, false ):SafeAwait()
         if not ok then
             if index ~= length then continue end
-            return promise.Reject( "Package '" .. importPath .. "' import failed, " .. result )
+            return promise.Reject( result )
         end
 
         return result
     end
 
-    error( "Not one of the listed packages could be imported." )
+    return promise.Reject( "Not one of the listed packages '" .. table.concat( arguments, ", " ) .. "' could be imported." )
 end )
 
 function gpm.Install( pkg2, async, ... )
@@ -241,11 +237,14 @@ function gpm.Install( pkg2, async, ... )
     if not async then
         local ok, result = task:SafeAwait()
         if not ok then
-            return promise.Reject( result )
+            error( result, 2 )
         end
 
-        if not result then return end
-        return result:GetResult(), result
+        if gpm_IsPackage( result ) then
+            return result:GetResult(), result
+        end
+
+        return result
     end
 
     return task
@@ -264,11 +263,15 @@ function gpm.ImportFolder( folderPath, pkg2, autorun )
     local files, folders = fs.Find( folderPath .. "/*", "LUA" )
     for _, folderName in ipairs( folders ) do
         local importPath = folderPath .. "/" .. folderName
-        gpm.AsyncImport( importPath, pkg2, autorun )
+        gpm.AsyncImport( importPath, pkg2, autorun ):Catch( function( message )
+            logger:Error( "Package '%s' import failed, %s", importPath, message )
+        end )
     end
 
     for _, fileName in ipairs( files ) do
         local importPath = folderPath .. "/" .. fileName
-        gpm.AsyncImport( importPath, pkg2, autorun )
+        gpm.AsyncImport( importPath, pkg2, autorun ):Catch( function( message )
+            logger:Error( "Package '%s' import failed, %s", importPath, message )
+        end )
     end
 end

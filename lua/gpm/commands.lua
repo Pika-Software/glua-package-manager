@@ -197,7 +197,10 @@ if SERVER then
 
     concommand_Add( "gpm_install", function( ply, _, arguments )
         if not IsValid( ply ) then
-            gpm.Install( nil, true, unpack( arguments ) )
+            gpm.Install( nil, true, unpack( arguments ) ):Catch( function( message )
+                logger:Error( message )
+            end )
+
             return
         end
 
@@ -250,7 +253,9 @@ if CLIENT then
             gpm.Reload( unpack( net.ReadTable() ) )
         end,
         [3] = function()
-            gpm.Install( nil, true, unpack( net.ReadTable() ) )
+            gpm.Install( nil, true, unpack( net.ReadTable() ) ):Catch( function( message )
+                logger:Error( message )
+            end )
         end,
         [4] = function()
             gpm.Uninstall( net.ReadBool(), unpack( net.ReadTable() ) )
