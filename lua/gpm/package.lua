@@ -408,11 +408,23 @@ do
             do
 
                 local function import( importPath, async, pkg2 )
-                    if gpm.IsPackage( pkg2 ) then
-                        return gpm.Import( importPath, async, pkg2 )
+                    local task
+                    if IsPackage( pkg2 ) then
+                        task = gpm.Import( importPath, true, pkg2 )
+                    else
+                        task = gpm.Import( importPath, true, self )
                     end
 
-                    return gpm.Import( importPath, async, self )
+                    if not async then
+                        local result = task:Await()
+                        if IsPackage( result ) then
+                            return result:GetResult(), result
+                        end
+
+                        return result
+                    end
+
+                    return task
                 end
 
                 _gpm.Import = import
@@ -422,15 +434,32 @@ do
 
             -- install
             env.install = function( ... )
-                return gpm.Install( self, false, ... )
+                local result = gpm.Install( self, true, ... ):Await()
+                if IsPackage( result ) then
+                    return result:GetResult(), result
+                end
+
+                return result
             end
 
             _gpm.Install = function( pkg2, async, ... )
-                if gpm.IsPackage( pkg2 ) then
-                    return gpm.Install( pkg2, async, ... )
+                local task
+                if IsPackage( pkg2 ) then
+                    task = gpm.Install( pkg2, true, ... )
+                else
+                    task = gpm.Install( self, true, ... )
                 end
 
-                return gpm.Install( self, async, ... )
+                if not async then
+                    local result = task:Await()
+                    if IsPackage( result ) then
+                        return result:GetResult(), result
+                    end
+
+                    return result
+                end
+
+                return task
             end
 
             -- include

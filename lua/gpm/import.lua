@@ -197,8 +197,11 @@ function gpm.Import( importPath, async, pkg2 )
             error( result, 2 )
         end
 
-        if not result then return end
-        return result:GetResult(), result
+        if gpm_IsPackage( result ) then
+            return result:GetResult(), result
+        end
+
+        return result
     end
 
     return task
