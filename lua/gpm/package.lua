@@ -220,6 +220,16 @@ do
 
 end
 
+function Link( pkg, result )
+    if type( result ) == "table" then
+        for _, pkg2 in ipairs( result ) do
+            Link( pkg, pkg2 )
+        end
+    elseif IsPackage( result ) then
+        pkg:Link( result )
+    end
+end
+
 -- Package Meta
 do
 

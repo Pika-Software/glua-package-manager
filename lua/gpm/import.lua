@@ -9,7 +9,7 @@ local fs = gpm.fs
 -- Variables
 local CLIENT, SERVER, MENU_DLL = CLIENT, SERVER, MENU_DLL
 local table_HasIValue = table.HasIValue
-local IsPackage = gpm.IsPackage
+local gpm_IsPackage = gpm.IsPackage
 local logger = gpm.Logger
 local ipairs = ipairs
 local assert = assert
@@ -172,18 +172,13 @@ do
             end
         end
 
-        if IsPackage( pkg ) then
+        if gpm_IsPackage( pkg ) then
             if task:IsPending() then
-                task:Then( function( pkg2 )
-                    if IsPackage( pkg2 ) then
-                        pkg:Link( pkg2 )
-                    end
+                task:Then( function( result )
+                    package.Link( pkg, result )
                 end )
             elseif task:IsFulfilled() then
-                local pkg2 = task:GetResult()
-                if IsPackage( pkg2 ) then
-                    pkg:Link( pkg2 )
-                end
+                package.Link( pkg, task:GetResult() )
             end
         end
 
