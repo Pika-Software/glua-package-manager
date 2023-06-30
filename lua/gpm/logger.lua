@@ -75,6 +75,7 @@ do
     local realm = string.upper( gpm.Realm )
     local string_format = string.format
     local os_date = os.date
+    local select = select
     local MsgC = MsgC
 
     function meta:Log( color, level, str, ... )
