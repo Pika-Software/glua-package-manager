@@ -26,9 +26,6 @@ if ( SERVER or MENU_DLL ) and efsw ~= nil then
         local importPath = string.match( filePath, "packages/[^/]+" )
         if not importPath then return end
 
-        local pkg = gpm.Packages[ importPath ]
-        if not pkg then return end
-
         if action ~= 3 and fs.IsDir( filePath, "lsv" ) then
             if action == 1 then
                 fs.Watch( filePath, "lsv", true )
@@ -40,11 +37,19 @@ if ( SERVER or MENU_DLL ) and efsw ~= nil then
         local timerName = "gpm.efsw.sources.lua." .. importPath
         timer.Create( timerName, 0.25, 1, function()
             timer.Remove( timerName )
-            if not pkg:IsInstalled() then return end
-            if pkg:IsReloading() then return end
-            pkg:Reload():Catch( function( message )
-                logger:Error( "Package '%s' reload failed, error:\n%s", pkg:GetIdentifier(), message )
-            end )
+
+            net.Start( "GPM.Networking" )
+                net.WriteUInt( 5, 3 )
+                net.WriteString( importPath )
+            net.Broadcast()
+
+            local pkg = gpm.Packages[ importPath ]
+            if pkg and pkg:IsInstalled() then
+                if pkg:IsReloading() then return end
+                pkg:Reload():Catch( function( message )
+                    logger:Error( "Package '%s' reload failed, error:\n%s", pkg:GetIdentifier(), message )
+                end )
+            end
         end )
     end )
 
