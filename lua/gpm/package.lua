@@ -919,14 +919,6 @@ do
         if self:IsReloading() then return end
         local stopwatch = SysTime()
 
-        local importPath = self:GetImportPath()
-        if SERVER and not dontSendToClients then
-            net.Start( "GPM.Networking" )
-                net.WriteUInt( 5, 3 )
-                net.WriteString( importPath )
-            net.Broadcast()
-        end
-
         local sourceName = self:GetSourceName()
         local source = gpm.sources[ sourceName ]
         if not source then
@@ -940,7 +932,7 @@ do
         self.Reloading = true
         self:ClearCallbacks()
 
-        local metadata = nil
+        local importPath, metadata = self:GetImportPath()
         if source.GetMetadata then
             local ok, result = source.GetMetadata( importPath ):SafeAwait()
             if not ok then
