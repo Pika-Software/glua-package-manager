@@ -81,7 +81,11 @@ do
         ArgAssert( color, 1, "Color" )
         ArgAssert( level, 2, "string" )
 
-        MsgC( colors.SecondaryText, os_date( "%d/%m/%Y %H:%M:%S " ), color, level, colors.SecondaryText, " --- ", colors.Realm, "[" .. realm .. "] ", self.Color, self.Name, colors.SecondaryText, " : ", self.TextColor, string_format( str, ... ), "\n"  )
+        if select( "#", ... ) > 0 then
+            str = string_format( str, ... )
+        end
+
+        MsgC( colors.SecondaryText, os_date( "%d/%m/%Y %H:%M:%S " ), color, level, colors.SecondaryText, " --- ", colors.Realm, "[" .. realm .. "] ", self.Color, self.Name, colors.SecondaryText, " : ", self.TextColor, str, "\n"  )
     end
 
 end
