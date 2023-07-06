@@ -54,18 +54,16 @@ function IsFile( ... )
     return Exists( ... ) and not IsDir( ... )
 end
 
-if MENU_DLL then
-    function MountGMA( gmaPath )
-        error( "Not yet implemented." )
-    end
-else
+function MountGMA( gmaPath )
+    error( "Not yet implemented." )
+end
+
+if not MENU_DLL then
     function MountGMA( gmaPath )
         local ok, files = game_MountGMA( gmaPath )
         if ok then
-            if CLIENT then
-                for _, filePath in ipairs( files ) do
-                    table.insert( MountedFiles, 1, filePath )
-                end
+            for _, filePath in ipairs( files ) do
+                table.insert( MountedFiles, 1, filePath )
             end
 
             logger:Debug( "GMA file '%s' was mounted to GAME with %d files.", gmaPath, #files  )
@@ -77,70 +75,69 @@ else
     end
 end
 
-if not ( SERVER or MENU_DLL ) then
+if type( MountedFiles ) ~= "table" then
+    MountedFiles = {}
+end
 
-    if type( MountedFiles ) ~= "table" then
-        MountedFiles = {}
+local gamePaths = {
+    ["LUA"] = "lua",
+    ["lsv"] = "lua",
+    ["lcl"] = "lua"
+}
+
+-- https://github.com/Facepunch/garrysmod-issues/issues/5481
+function IsMounted( filePath, gamePath, onlyDir )
+    if onlyDir and string.GetExtensionFromFilename( filePath ) then return end
+
+    local additional = gamePaths[ gamePath ]
+    if additional then
+        filePath = additional .. "/" .. filePath
     end
 
-    local gamePaths = {
-        ["LUA"] = "lua",
-        ["lsv"] = "lua",
-        ["lcl"] = "lua"
-    }
-
-    -- https://github.com/Facepunch/garrysmod-issues/issues/5481
-    function IsMounted( filePath, gamePath, onlyDir )
-        if onlyDir and string.GetExtensionFromFilename( filePath ) then return end
-
-        local additional = gamePaths[ gamePath ]
-        if additional then
-            filePath = additional .. "/" .. filePath
-        end
-
-        for _, mountedFile in ipairs( MountedFiles ) do
-            if string.StartsWith( mountedFile, filePath ) then return true end
-        end
-
-        return false
+    for _, mountedFile in ipairs( MountedFiles ) do
+        if string.StartsWith( mountedFile, filePath ) then return true end
     end
 
-    function Exists( filePath, gamePath )
-        if IsMounted( filePath, gamePath ) then return true end
-        if file.Exists( filePath, gamePath ) then return true end
+    return false
+end
 
-        local files, folders = file.Find( filePath .. "*", gamePath )
-        if not files or not folders then return false end
-        if #files == 0 and #folders == 0 then return false end
+function Exists( filePath, gamePath )
+    if IsMounted( filePath, gamePath ) then return true end
+    if file.Exists( filePath, gamePath ) then return true end
+    if SERVER then return false end
 
-        local splits = string.Split( filePath, "/" )
-        local fileName = splits[ #splits ]
+    local files, folders = file.Find( filePath .. "*", gamePath )
+    if not files or not folders then return false end
+    if #files == 0 and #folders == 0 then return false end
 
-        return table.HasIValue( files, fileName ) or table.HasIValue( folders, fileName )
-    end
+    local splits = string.Split( filePath, "/" )
+    local fileName = splits[ #splits ]
 
-    function IsDir( filePath, gamePath )
-        if IsMounted( filePath, gamePath, true ) then return true end
-        if file.IsDir( filePath, gamePath ) then return true end
+    return table.HasIValue( files, fileName ) or table.HasIValue( folders, fileName )
+end
 
-        local _, folders = file.Find( filePath .. "*", gamePath )
-        if folders == nil or #folders == 0 then return false end
+function IsDir( filePath, gamePath )
+    if IsMounted( filePath, gamePath, true ) then return true end
+    if file.IsDir( filePath, gamePath ) then return true end
+    if SERVER then return false end
 
-        local splits = string.Split( filePath, "/" )
-        return table.HasIValue( folders, splits[ #splits ] )
-    end
+    local _, folders = file.Find( filePath .. "*", gamePath )
+    if folders == nil or #folders == 0 then return false end
 
-    function IsFile( filePath, gamePath )
-        if IsMounted( filePath, gamePath ) then return true end
-        if file.Exists( filePath, gamePath ) and not file.IsDir( filePath, gamePath ) then return true end
+    local splits = string.Split( filePath, "/" )
+    return table.HasIValue( folders, splits[ #splits ] )
+end
 
-        local files, _ = file.Find( filePath .. "*", gamePath )
-        if not files or #files == 0 then return false end
-        local splits = string.Split( filePath, "/" )
+function IsFile( filePath, gamePath )
+    if IsMounted( filePath, gamePath ) then return true end
+    if file.Exists( filePath, gamePath ) and not file.IsDir( filePath, gamePath ) then return true end
+    if SERVER then return false end
 
-        return table.HasIValue( files, splits[ #splits ] )
-    end
+    local files, _ = file.Find( filePath .. "*", gamePath )
+    if not files or #files == 0 then return false end
+    local splits = string.Split( filePath, "/" )
 
+    return table.HasIValue( files, splits[ #splits ] )
 end
 
 function IsLuaFile( filePath, gamePath, compileMoon )
