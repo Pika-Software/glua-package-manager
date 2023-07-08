@@ -140,10 +140,7 @@ do
 
                 if type( source.GetMetadata ) == "function" then
                     local ok, result = source.GetMetadata( importPath ):SafeAwait()
-                    if not ok then
-                        return promise.Reject( result )
-                    end
-
+                    if not ok then return promise.Reject( result ) end
                     metadata = result
                 end
 

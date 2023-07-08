@@ -23,6 +23,7 @@ local CLIENT, SERVER, MENU_DLL = CLIENT, SERVER, MENU_DLL
 local addCSLuaFile = AddCSLuaFile
 local getmetatable = getmetatable
 local setmetatable = setmetatable
+local ArgAssert = gpm.ArgAssert
 local hook_Run = hook.Run
 local logger = gpm.Logger
 local require = require
@@ -45,7 +46,7 @@ if SERVER then
             return addCSLuaFile( luaPath )
         end
 
-        gpm.ArgAssert( fileName, 1, "string" )
+        ArgAssert( fileName, 1, "string" )
         fileName = paths.FormatToLua( paths.Fix( fileName ) )
 
         if luaPath then
@@ -312,13 +313,11 @@ do
 
     -- Package linking
     function PACKAGE:Link( package2 )
-        gpm.ArgAssert( package2, 1, "Package" )
+        ArgAssert( package2, 1, "Package" )
 
-        local environment1 = self.Environment
-        if not environment1 then return false end
+        local environment1 = self:GetEnvironment()
 
-        local environment2 = package2.Environment
-        if not environment2 then return false end
+        local environment2 = package2:GetEnvironment()
 
         environment.Link( environment1, environment2 )
         package2:RemoveChild( self )
@@ -329,13 +328,12 @@ do
     end
 
     function PACKAGE:UnLink( package2 )
-        gpm.ArgAssert( package2, 1, "Package" )
+        ArgAssert( package2, 1, "Package" )
 
-        local environment1 = self.Environment
+        local environment1 = self:GetEnvironment()
         if not environment1 then return false end
 
-        local environment2 = package2.Environment
-        if not environment2 then return false end
+        local environment2 = package2:GetEnvironment()
 
         environment.UnLink( environment1, environment2 )
         package2:RemoveChild( self )
@@ -365,7 +363,7 @@ do
                 env._PKG = self
 
                 env.AddCSLuaFile = addCSLuaFile
-                env.ArgAssert = gpm.ArgAssert
+                env.ArgAssert = ArgAssert
             end
 
             env.TypeID = nil
@@ -464,7 +462,7 @@ do
 
             -- include
             env.include = function( fileName )
-                gpm.ArgAssert( fileName, 1, "string" )
+                ArgAssert( fileName, 1, "string" )
                 fileName = paths.FormatToLua( paths.Fix( fileName ) )
 
                 local func = files[ fileName ]
@@ -500,7 +498,7 @@ do
                 local lenght = #arguments
 
                 for index, name in ipairs( arguments ) do
-                    gpm.ArgAssert( name, index, "string" )
+                    ArgAssert( name, index, "string" )
 
                     if string.IsURL( name ) then
                         if not gpm.CanImport( name ) then continue end
