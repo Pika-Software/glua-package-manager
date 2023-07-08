@@ -169,16 +169,7 @@ do
             end
         end
 
-        if gpm_IsPackage( pkg ) then
-            if task:IsPending() then
-                task:Then( function( result )
-                    package.Link( pkg, result )
-                end )
-            elseif task:IsFulfilled() then
-                package.Link( pkg, task:GetResult() )
-            end
-        end
-
+        package.Link( pkg, task )
         return task
     end )
 

@@ -221,14 +221,41 @@ do
 
 end
 
-function Link( pkg, result )
-    if type( result ) == "table" then
-        for _, pkg2 in ipairs( result ) do
-            Link( pkg, pkg2 )
+function Link( pkg, target )
+    if not pkg then return end
+    ArgAssert( pkg, 1, "Package" )
+
+    if IsPackage( target ) then
+        local ok, message = pcall( pkg.Link, pkg, target )
+        if not ok then
+            logger:Error( "Linking package '%s' to package '%s' failed, %s.", pkg:GetIdentifier(), target:GetIdentifier(), message )
         end
-    elseif IsPackage( result ) then
-        pkg:Link( result )
+
+        return true
     end
+
+    if promise.IsPromise( target ) then
+        if target:IsPending() then
+            target:Then( function( result )
+                Link( pkg, result )
+            end )
+        elseif target:IsFulfilled() then
+            Link( pkg, target:GetResult() )
+        end
+
+        return true
+    end
+
+    if type( target ) == "table" then
+        for _, subTarget in ipairs( target ) do
+            Link( pkg, subTarget )
+        end
+
+        return true
+    end
+
+    logger:Error( "It's not possible to link '%s' and '%s' as packages.", pkg:GetIdentifier(), _G.tostring( target ) )
+    return false
 end
 
 -- Package Meta
@@ -522,7 +549,7 @@ do
                             error( pkg )
                         end
 
-                        self:Link( pkg )
+                        Link( self, pkg )
                         return pkg.Result
                     end
                 end
