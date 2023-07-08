@@ -343,8 +343,14 @@ do
         ArgAssert( package2, 1, "Package" )
 
         local environment1 = self:GetEnvironment()
+        if not environment1 then
+            error( "primary package environment is missing" )
+        end
 
         local environment2 = package2:GetEnvironment()
+        if not environment2 then
+            error( "second package environment is missing" )
+        end
 
         environment.Link( environment1, environment2 )
         package2:RemoveChild( self )
@@ -358,9 +364,14 @@ do
         ArgAssert( package2, 1, "Package" )
 
         local environment1 = self:GetEnvironment()
-        if not environment1 then return false end
+        if not environment1 then
+            error( "primary package environment is missing" )
+        end
 
         local environment2 = package2:GetEnvironment()
+        if not environment2 then
+            error( "second package environment is missing" )
+        end
 
         environment.UnLink( environment1, environment2 )
         package2:RemoveChild( self )
