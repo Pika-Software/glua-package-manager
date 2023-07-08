@@ -337,13 +337,13 @@ function GMA:ReadFile( number )
     local metadata = self.Metadata
     if not metadata then return end
 
-    local filesPos = metadata.FilesPos
+    local filesPos = metadata.DataPosition
     if not filesPos then return end
 
     local fileClass = self.File
     if not fileClass then return end
 
-    fileClass:Seek( filesPos + entry.Offset )
+    fileClass:Seek( filesPos + entry.Position )
     content = fileClass:Read( entry.Size )
     entry.Content = content
     return content
@@ -356,7 +356,7 @@ function GMA:ReadAllFiles()
     local metadata = self.Metadata
     if not metadata then return end
 
-    local filesPos = metadata.FilesPos
+    local filesPos = metadata.DataPosition
     if not filesPos then return end
 
     local files = self.Files
@@ -366,7 +366,7 @@ function GMA:ReadAllFiles()
         if entry.Content then continue end
         if not fileClass then continue end
 
-        fileClass:Seek( filesPos + entry.Offset )
+        fileClass:Seek( filesPos + entry.Position )
         entry.Content = fileClass:Read( entry.Size )
     end
 
@@ -442,8 +442,8 @@ function GMA:Close()
     fileClass:Close()
 end
 
--- Metadata parsing
-function Parse( fileClass )
+-- Metadata reading
+function ReadMetadata( fileClass )
     if fileClass:Read( 4 ) ~= GMA.Identity then return end
 
     local version = fileClass:ReadByte()
@@ -483,28 +483,35 @@ function Parse( fileClass )
     metadata.Files = {}
 
     while fileClass:ReadULong() ~= 0 do
-        local entry = {}
-        entry.Path = fileClass:ReadString()
-        entry.Size = fileClass:ReadULong()
+        local filePath = fileClass:ReadString()
+        if not filePath then continue end
+
+        local size = fileClass:ReadULong()
+        if not size then continue end
+
+        local entry = {
+            ["Path"] = filePath,
+            ["Size"] = size
+        }
+
         fileClass:Skip( 4 )
 
         entry.CRC = fileClass:ReadULong()
-        entry.Offset = offset
+        entry.Position = offset
 
         metadata.Files[ fileNum ] = entry
-        offset = offset + entry.Size
+        offset = offset + size
         fileNum = fileNum + 1
     end
 
-    metadata.FilesPos = fileClass:Tell()
-
+    metadata.DataPosition = fileClass:Tell()
     return metadata
 end
 
 function Open( fileClass )
     if not fileClass then return end
 
-    local metadata = Parse( fileClass )
+    local metadata = ReadMetadata( fileClass )
     if not metadata then return end
 
     local instance = setmetatable( {
