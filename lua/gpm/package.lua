@@ -128,7 +128,9 @@ function FormatMetadata( metadata )
 
     metadata.init = FormatInit( metadata.init )
     metadata.version = utils.Version( metadata.version )
-    metadata.environment = metadata.environment ~= false
+
+    local hasEnvironment = metadata.environment ~= false
+    metadata.environment = hasEnvironment
     metadata.autorun = metadata.autorun == true
 
     -- Files to send to the client ( package and init will already be added and there is no need to specify them here )
@@ -161,33 +163,33 @@ function FormatMetadata( metadata )
     -- Libs autonames feature
     local autonames = metadata.autonames
     if type( autonames ) == "table" then
-        autonames.properties = autonames.properties ~= false and metadata.environment
-        autonames.timer = autonames.timer ~= false and metadata.environment
-        autonames.cvars = autonames.cvars ~= false and metadata.environment
-        autonames.hook = autonames.hook ~= false and metadata.environment
-        autonames.net = autonames.net == true and metadata.environment
+        autonames.properties = autonames.properties ~= false and hasEnvironment
+        autonames.timer = autonames.timer ~= false and hasEnvironment
+        autonames.cvars = autonames.cvars ~= false and hasEnvironment
+        autonames.hook = autonames.hook ~= false and hasEnvironment
+        autonames.net = autonames.net == true and hasEnvironment
     else
         metadata.autonames = {
-            ["properties"] = metadata.environment,
-            ["timer"] = metadata.environment,
-            ["cvars"] = metadata.environment,
-            ["hook"] = metadata.environment,
+            ["properties"] = hasEnvironment,
+            ["timer"] = hasEnvironment,
+            ["cvars"] = hasEnvironment,
+            ["hook"] = hasEnvironment,
             ["net"] = false
         }
     end
 
     local defaults = metadata.defaults
     if type( defaults ) == "table" then
-        defaults.typeid = autonames.typeid ~= false and metadata.environment
-        defaults.http = autonames.http ~= false and metadata.environment
-        defaults.type = autonames.type ~= false and metadata.environment
-        defaults.file = autonames.file ~= false and metadata.environment
+        defaults.typeid = autonames.typeid ~= false and hasEnvironment
+        defaults.http = autonames.http ~= false and hasEnvironment
+        defaults.type = autonames.type ~= false and hasEnvironment
+        defaults.file = autonames.file ~= false and hasEnvironment
     else
         metadata.defaults = {
-            ["typeid"] = metadata.environment,
-            ["http"] = metadata.environment,
-            ["type"] = metadata.environment,
-            ["file"] = metadata.environment
+            ["typeid"] = hasEnvironment,
+            ["http"] = hasEnvironment,
+            ["type"] = hasEnvironment,
+            ["file"] = hasEnvironment
         }
     end
 
@@ -200,12 +202,12 @@ do
 
     function ExtractMetadata( func )
         local environment = {}
+        debug.setmetatable( environment, link )
         debug.setfenv( func, environment )
-        setmetatable( environment, metatable )
 
         local metadata = func()
         if type( metadata ) ~= "table" then
-            setmetatable( environment, nil )
+            debug.setmetatable( environment, nil )
             metadata = environment
         end
 
@@ -220,7 +222,7 @@ do
 end
 
 function Link( pkg, target )
-    if not pkg then return end
+    if not pkg or not target then return end
     ArgAssert( pkg, 1, "Package" )
 
     if IsPackage( target ) then
@@ -252,7 +254,6 @@ function Link( pkg, target )
         return true
     end
 
-    logger:Error( "It's not possible to link '%s' and '%s' as packages.", pkg:GetIdentifier(), _G.tostring( target ) )
     return false
 end
 

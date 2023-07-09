@@ -27,7 +27,7 @@ Msg( [[
 
 module( "gpm", package.seeall )
 
-_VERSION = 014000
+_VERSION = 014100
 
 if not Colors then
     Realm = "unknown"
@@ -80,7 +80,7 @@ Logger:Info( "%s v%s is initialized.", libs.deflatelua._NAME, libs.deflatelua._V
 IncludeComponent "libs/promise"
 local promise = promise
 
-Logger:Info( "gm_promise v%s is initialized.", utils.Version( promise._VERSION_NUM ) )
+Logger:Info( "gm_promise v%s is initialized.", promise._VERSION )
 
 local moonloader
 if util.IsBinaryModuleInstalled( "moonloader" ) then
