@@ -27,7 +27,7 @@ Msg( [[
 
 module( "gpm", package.seeall )
 
-_VERSION = 014101
+_VERSION = 014102
 
 if not Colors then
     Realm = "unknown"
@@ -193,9 +193,9 @@ if not MENU_DLL then
     IncludeComponent "commands"
 end
 
-if SERVER or MENU_DLL then
+if SERVER or MENU_DLL or game.IsDedicated() then
     ImportFolder( "packages", nil, true )
-elseif not game.IsDedicated() then
+else
     util.NextTick( ImportFolder, "packages", nil, true )
 end
 
