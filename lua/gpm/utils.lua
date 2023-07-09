@@ -372,9 +372,16 @@ end
 
 function utils.LowerTableKeys( tbl )
     for key, value in pairs( tbl ) do
-        if type( value ) == "table" then value = utils.LowerTableKeys( value ) end
-        if type( key ) ~= "string" then continue end
-        tbl[ key ] = nil; tbl[ string.lower( key ) ] = value
+        if type( value ) == "table" then
+            value = utils.LowerTableKeys( value )
+        end
+
+        local keyType = type( key )
+        if keyType == "string" then
+            tbl[ key ] = nil; tbl[ string.lower( key ) ] = value
+        elseif keyType == "table" then
+            tbl[ key ] = nil; tbl[ utils.LowerTableKeys( key ) ] = value
+        end
     end
 
     return tbl
