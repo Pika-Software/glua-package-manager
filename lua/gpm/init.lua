@@ -120,7 +120,9 @@ end
 IncludeComponent "libs/gmad"
 Logger:Info( "gmad v%s is initialized.", utils.Version( gmad.GMA.Version ) )
 
-IncludeComponent "environment"
+IncludeComponent "libs/metaworks"
+Logger:Info( "metaworks v%s is initialized.", metaworks._VERSION )
+
 IncludeComponent "http"
 IncludeComponent "fs"
 IncludeComponent "zip"

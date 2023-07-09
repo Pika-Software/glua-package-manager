@@ -1,7 +1,7 @@
 local gpm = gpm
 
 -- Libraries
-local environment = gpm.environment
+local metaworks = gpm.metaworks
 local concommand = concommand
 local properties = properties
 local promise = promise
@@ -196,9 +196,7 @@ end
 
 do
 
-    local metatable = {
-        ["__index"] = _G
-    }
+    local link = metaworks.CreateLink( _G, true, false )
 
     function ExtractMetadata( func )
         local environment = {}
@@ -352,7 +350,7 @@ do
             error( "second package environment is missing" )
         end
 
-        environment.Link( environment1, environment2 )
+        metaworks.Link( environment1, environment2 )
         package2:RemoveChild( self )
         package2:AddChild( self )
 
@@ -373,7 +371,7 @@ do
             error( "second package environment is missing" )
         end
 
-        environment.UnLink( environment1, environment2 )
+        metaworks.UnLink( environment1, environment2 )
         package2:RemoveChild( self )
 
         logger:Debug( "'%s' -/-> '%s'", package2:GetIdentifier(), self:GetIdentifier() )
@@ -394,49 +392,51 @@ do
         local addCSLuaFile = SERVER and AddCSLuaFile or debug.fempty
 
         function PACKAGE:EnvironmentInit( metadata )
-            local env = self.Environment
-            if type( env ) ~= "table" then
-                env = environment.Create( _G )
-                self.Environment = env
-                env._PKG = self
+            local environment = self.Environment
+            if type( environment ) ~= "table" then
+                environment = metaworks.Create( _G )
+                self.Environment = environment
+                environment._PKG = self
 
-                env.AddCSLuaFile = addCSLuaFile
-                env.ArgAssert = ArgAssert
+                environment.AddCSLuaFile = addCSLuaFile
+                environment.ArgAssert = ArgAssert
             end
 
-            env.TypeID = nil
-            env.http = nil
-            env.type = nil
-            env.file = nil
+            environment.TypeID = nil
+            environment.http = nil
+            environment.type = nil
+            environment.file = nil
 
             local defaults = metadata.defaults
             if defaults then
-                if defaults.typeid then env.TypeID = gpm.TypeID end
-                if defaults.http then env.http = gpm.http end
-                if defaults.type then env.type = gpm.type end
-                if defaults.file then env.file = fs end
+                if defaults.typeid then environment.TypeID = gpm.TypeID end
+                if defaults.http then environment.http = gpm.http end
+                if defaults.type then environment.type = gpm.type end
+                if defaults.file then environment.file = fs end
             end
 
-            env._VERSION = metadata.version
+            environment._VERSION = metadata.version
 
             local init = self.Init
             if init then
-                debug.setfenv( init, env )
+                debug.setfenv( init, environment )
             end
 
             local files = self.Files
             for _, func in pairs( files ) do
-                debug.setfenv( func, env )
+                debug.setfenv( func, environment )
             end
 
             -- GPM link
-            local _gpm = environment.SetLinkedTable( env, "gpm", gpm )
-            _gpm.Package = self
+
+            local gpml = metaworks.CreateLink( gpm, true, false )
+            environment.gpm = gpml
+            gpml.Package = self
 
             -- Logger
             if metadata.logger then
                 local logger = gpm.CreateLogger( self:GetIdentifier(), metadata.color )
-                _gpm.Logger = logger
+                gpml.Logger = logger
                 self.Logger = logger
             end
 
@@ -463,13 +463,13 @@ do
                     return task
                 end
 
-                _gpm.Import = import
-                env.import = import
+                gpml.Import = import
+                environment.import = import
 
             end
 
             -- install
-            env.install = function( ... )
+            environment.install = function( ... )
                 local result = gpm.Install( self, true, ... ):Await()
                 if IsPackage( result ) then
                     return result:GetResult(), result
@@ -478,7 +478,7 @@ do
                 return result
             end
 
-            _gpm.Install = function( pkg2, async, ... )
+            gpml.Install = function( pkg2, async, ... )
                 local task
                 if IsPackage( pkg2 ) then
                     task = gpm.Install( pkg2, true, ... )
@@ -499,7 +499,7 @@ do
             end
 
             -- include
-            env.include = function( fileName )
+            environment.include = function( fileName )
                 ArgAssert( fileName, 1, "string" )
                 fileName = paths.FormatToLua( paths.Fix( fileName ) )
 
@@ -514,7 +514,7 @@ do
                     if folder then
                         local filePath = folder .. fileName
                         if fs.IsLuaFile( filePath, "LUA", true ) then
-                            local func = debug.setfenv( gpm.CompileLua( filePath ), env )
+                            local func = debug.setfenv( gpm.CompileLua( filePath ), environment )
                             files[ fileName ] = func
                             return func( self )
                         end
@@ -522,7 +522,7 @@ do
                 end
 
                 if fs.IsLuaFile( fileName, "LUA", true ) then
-                    local func = debug.setfenv( gpm.CompileLua( fileName ), env )
+                    local func = debug.setfenv( gpm.CompileLua( fileName ), environment )
                     files[ fileName ] = func
                     return func( self )
                 end
@@ -531,7 +531,7 @@ do
             end
 
             -- require
-            env.require = function( ... )
+            environment.require = function( ... )
                 local arguments = {...}
                 local lenght = #arguments
 
@@ -580,9 +580,10 @@ do
                 local autoNames = self:HasAutoNames( "hook" )
                 callbacks.hook = data
 
-                local obj, metatable = environment.SetLinkedTable( env, "hook", hook )
+                local link, meta = metaworks.CreateLink( hook, true, false )
+                environment.hook = link
 
-                function obj.Add( eventName, identifier, ... )
+                function link.Add( eventName, identifier, ... )
                     if autoNames and type( identifier ) == "string" then
                         identifier = self:GetIdentifier( identifier )
                     end
@@ -591,7 +592,7 @@ do
                     return hook.Add( eventName, identifier, ... )
                 end
 
-                function obj.Remove( eventName, identifier, ... )
+                function link.Remove( eventName, identifier, ... )
                     if autoNames and type( identifier ) == "string" then
                         identifier = self:GetIdentifier( identifier )
                     end
@@ -600,7 +601,7 @@ do
                     return hook.Remove( eventName, identifier, ... )
                 end
 
-                metatable.__newindex = hook
+                meta.__newindex = hook
 
             end
 
@@ -611,11 +612,12 @@ do
                 callbacks.timer = data
                 local autoNames = self:HasAutoNames( "timer" )
 
-                local obj, metatable = environment.SetLinkedTable( env, "timer", timer )
+                local link, meta = metaworks.CreateLink( timer, true, false )
+                environment.timer = link
 
                 for key, func in pairs( timer ) do
                     if key == "Destroy" or key == "Remove" or key == "Simple" then continue end
-                    obj[ key ] = function( identifier, ... )
+                    link[ key ] = function( identifier, ... )
                         if autoNames then
                             identifier = self:GetIdentifier( identifier )
                         end
@@ -634,10 +636,10 @@ do
                     return timer.Remove( identifier, ... )
                 end
 
-                obj.Destroy = removeFunction
-                obj.Remove = removeFunction
+                link.Destroy = removeFunction
+                link.Remove = removeFunction
 
-                metatable.__newindex = timer
+                meta.__newindex = timer
 
             end
 
@@ -648,9 +650,10 @@ do
                 local autoNames = self:HasAutoNames( "cvars" )
                 callbacks.cvars = data
 
-                local obj, metatable = environment.SetLinkedTable( env, "cvars", cvars )
+                local link, meta = metaworks.CreateLink( cvars, true, false )
+                environment.cvars = link
 
-                function obj.AddChangeCallback( name, func, identifier, ... )
+                function link.AddChangeCallback( name, func, identifier, ... )
                     if type( identifier ) ~= "string" then
                         identifier = "Default"
                     end
@@ -663,7 +666,7 @@ do
                     return cvars.AddChangeCallback( name, func, identifier, ... )
                 end
 
-                function obj.RemoveChangeCallback( name, identifier, ... )
+                function link.RemoveChangeCallback( name, identifier, ... )
                     if type( identifier ) ~= "string" then
                         identifier = "Default"
                     end
@@ -676,7 +679,7 @@ do
                     return cvars.RemoveChangeCallback( name, identifier, ... )
                 end
 
-                metatable.__newindex = cvars
+                meta.__newindex = cvars
 
             end
 
@@ -686,19 +689,20 @@ do
                 local data = {}
                 callbacks.concommand = data
 
-                local obj, metatable = environment.SetLinkedTable( env, "concommand", concommand )
+                local link, meta = metaworks.CreateLink( concommand, true, false )
+                environment.concommand = link
 
-                function obj.Add( name, ... )
+                function link.Add( name, ... )
                     data[ name ] = true
                     return concommand.Add( name, ... )
                 end
 
-                function obj.Remove( name, ... )
+                function link.Remove( name, ... )
                     data[ name ] = nil
                     return concommand.Remove( name, ... )
                 end
 
-                metatable.__newindex = concommand
+                meta.__newindex = concommand
 
             end
 
@@ -711,9 +715,10 @@ do
 
                 do
 
-                    local obj, metatable = environment.SetLinkedTable( env, "net", net )
+                    local link, meta = metaworks.CreateLink( net, true, false )
+                    environment.net = link
 
-                    function obj.Receive( messageName, ... )
+                    function link.Receive( messageName, ... )
                         if autoNames then
                             messageName = self:GetIdentifier( messageName )
                         end
@@ -723,20 +728,21 @@ do
                     end
 
                     if autoNames then
-                        function obj.Start( messageName, ... )
+                        function link.Start( messageName, ... )
                             return net.Start( self:GetIdentifier( messageName ), ... )
                         end
                     end
 
-                    metatable.__newindex = net
+                    meta.__newindex = net
 
                 end
 
                 if SERVER then
 
-                    local obj, metatable = environment.SetLinkedTable( env, "util", util )
+                    local link, meta = metaworks.CreateLink( util, true, false )
+                    environment.util = link
 
-                    function obj.AddNetworkString( messageName, ... )
+                    function link.AddNetworkString( messageName, ... )
                         if autoNames then
                             messageName = self:GetIdentifier( messageName )
                         end
@@ -745,7 +751,7 @@ do
                         return util.AddNetworkString( messageName, ... )
                     end
 
-                    metatable.__newindex = util
+                    meta.__newindex = util
 
                 end
 
@@ -758,9 +764,10 @@ do
                 callbacks.properties = data
                 local autoNames = self:HasAutoNames( "properties" )
 
-                local obj, metatable = environment.SetLinkedTable( env, "properties", properties )
+                local link, meta = metaworks.CreateLink( properties, true, false )
+                environment.properties = link
 
-                function obj.Add( name, ... )
+                function link.Add( name, ... )
                     if autoNames then
                         name = self:GetIdentifier( name )
                     end
@@ -769,11 +776,11 @@ do
                     return properties.Add( name, ... )
                 end
 
-                metatable.__newindex = properties
+                meta.__newindex = properties
 
             end
 
-            return env
+            return environment
         end
 
     end
