@@ -222,7 +222,7 @@ do
 end
 
 function Link( pkg, target )
-    if not pkg or not target then return end
+    if not pkg or not target then return false end
     ArgAssert( pkg, 1, "Package" )
 
     if IsPackage( target ) then

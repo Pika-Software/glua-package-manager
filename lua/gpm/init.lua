@@ -27,7 +27,7 @@ Msg( [[
 
 module( "gpm", package.seeall )
 
-_VERSION = 014100
+_VERSION = 014101
 
 if not Colors then
     Realm = "unknown"
@@ -193,7 +193,11 @@ if not MENU_DLL then
     IncludeComponent "commands"
 end
 
-ImportFolder( "packages", nil, true )
+if SERVER or MENU_DLL then
+    ImportFolder( "packages", nil, true )
+elseif not game.IsDedicated() then
+    util.NextTick( ImportFolder, "packages", nil, true )
+end
 
 Logger:Info( "Time taken to start-up: %.4f sec.", SysTime() - stopwatch )
 hook.Run( "GPM - Initialized" )
