@@ -20,9 +20,66 @@ end
 
 do
 
-    local typeIDs = {
-        { IsColor, TYPE_COLOR }
-    }
+    local TYPE_NONE = TYPE_NONE
+
+    local types = gpm.Types
+    if type( types ) ~= "table" then
+        types = {
+            -- https://wiki.facepunch.com/gmod/Enums/TYPE
+            ["Names"] = {
+                [TYPE_PARTICLESYSTEM] = "CNewParticleEffect",
+                [TYPE_PROJECTEDTEXTURE] = "ProjectedTexture",
+                [TYPE_PIXELVISHANDLE] = "pixelvis_handle_t",
+                [TYPE_RECIPIENTFILTER] = "CRecipientFilter",
+                [TYPE_SOUNDHANDLE] = "IGModAudioChannel",
+                [TYPE_LIGHTUSERDATA] = "light userdata",
+                [TYPE_PARTICLEEMITTER] = "CLuaEmitter",
+                [TYPE_DAMAGEINFO] = "CTakeDamageInfo",
+                [TYPE_LOCOMOTION] = "CLuaLocomotion",
+                [TYPE_SURFACEINFO] = "SurfaceInfo",
+                [TYPE_PHYSCOLLIDE] = "PhysCollide",
+                [TYPE_EFFECTDATA] = "CEffectData",
+                [TYPE_PARTICLE] = "CLuaParticle",
+                [TYPE_NAVLADDER] = "CNavLadder",
+                [TYPE_VIDEO] = "IVideoWriter",
+                [TYPE_MATERIAL] = "IMaterial",
+                [TYPE_MOVEDATA] = "CMoveData",
+                [TYPE_PATH] = "PathFollower",
+                [TYPE_SOUND] = "CSoundPatch",
+                [TYPE_USERDATA] = "userdata",
+                [TYPE_FUNCTION] = "function",
+                [TYPE_TEXTURE] = "ITexture",
+                [TYPE_USERCMD] = "CUserCmd",
+                [TYPE_RESTORE] = "IRestore",
+                [TYPE_NAVAREA] = "CNavArea",
+                [TYPE_PHYSOBJ] = "PhysObj",
+                [TYPE_DLIGHT] = "dlight_t",
+                [TYPE_USERMSG] = "bf_read",
+                [TYPE_MATRIX] = "VMatrix",
+                [TYPE_CONVAR] = "ConVar",
+                [TYPE_VECTOR] = "Vector",
+                [TYPE_ENTITY] = "Entity",
+                [TYPE_THREAD] = "thread",
+                [TYPE_STRING] = "string",
+                [TYPE_NUMBER] = "number",
+                [TYPE_NONE] = "unknown",
+                [TYPE_BOOL] = "boolean",
+                [TYPE_IMESH] = "IMesh",
+                [TYPE_PANEL] = "Panel",
+                [TYPE_ANGLE] = "Angle",
+                [TYPE_COLOR] = "Color",
+                [TYPE_TABLE] = "table",
+                [TYPE_SAVE] = "ISave",
+                [TYPE_FILE] = "File",
+                [TYPE_NIL] = "nil"
+            },
+            ["IDs"] = {}
+        }
+
+        gpm.Types = types
+    end
+
+    local ids = types.IDs
 
     -- https://wiki.facepunch.com/gmod/Global.TypeID
     do
@@ -30,8 +87,10 @@ do
         local TypeID = TypeID
 
         function gpm.TypeID( any )
-            for _, data in ipairs( typeIDs ) do
-                if data[ 1 ]( any ) == true then return data[ 2 ] end
+            for _, data in ipairs( ids ) do
+                if data[ 1 ]( any ) then
+                    return data[ 2 ]
+                end
             end
 
             return TypeID( any )
@@ -39,62 +98,13 @@ do
 
     end
 
-    local TYPE_NONE = TYPE_NONE
-
-    -- https://wiki.facepunch.com/gmod/Enums/TYPE
-    local types = {
-        [TYPE_PARTICLESYSTEM] = "CNewParticleEffect",
-        [TYPE_PROJECTEDTEXTURE] = "ProjectedTexture",
-        [TYPE_PIXELVISHANDLE] = "pixelvis_handle_t",
-        [TYPE_RECIPIENTFILTER] = "CRecipientFilter",
-        [TYPE_SOUNDHANDLE] = "IGModAudioChannel",
-        [TYPE_LIGHTUSERDATA] = "light userdata",
-        [TYPE_PARTICLEEMITTER] = "CLuaEmitter",
-        [TYPE_DAMAGEINFO] = "CTakeDamageInfo",
-        [TYPE_LOCOMOTION] = "CLuaLocomotion",
-        [TYPE_SURFACEINFO] = "SurfaceInfo",
-        [TYPE_PHYSCOLLIDE] = "PhysCollide",
-        [TYPE_EFFECTDATA] = "CEffectData",
-        [TYPE_PARTICLE] = "CLuaParticle",
-        [TYPE_NAVLADDER] = "CNavLadder",
-        [TYPE_VIDEO] = "IVideoWriter",
-        [TYPE_MATERIAL] = "IMaterial",
-        [TYPE_MOVEDATA] = "CMoveData",
-        [TYPE_PATH] = "PathFollower",
-        [TYPE_SOUND] = "CSoundPatch",
-        [TYPE_USERDATA] = "userdata",
-        [TYPE_FUNCTION] = "function",
-        [TYPE_TEXTURE] = "ITexture",
-        [TYPE_USERCMD] = "CUserCmd",
-        [TYPE_RESTORE] = "IRestore",
-        [TYPE_NAVAREA] = "CNavArea",
-        [TYPE_PHYSOBJ] = "PhysObj",
-        [TYPE_DLIGHT] = "dlight_t",
-        [TYPE_USERMSG] = "bf_read",
-        [TYPE_MATRIX] = "VMatrix",
-        [TYPE_CONVAR] = "ConVar",
-        [TYPE_VECTOR] = "Vector",
-        [TYPE_ENTITY] = "Entity",
-        [TYPE_THREAD] = "thread",
-        [TYPE_STRING] = "string",
-        [TYPE_NUMBER] = "number",
-        [TYPE_NONE] = "unknown",
-        [TYPE_BOOL] = "boolean",
-        [TYPE_IMESH] = "IMesh",
-        [TYPE_PANEL] = "Panel",
-        [TYPE_ANGLE] = "Angle",
-        [TYPE_COLOR] = "Color",
-        [TYPE_TABLE] = "table",
-        [TYPE_SAVE] = "ISave",
-        [TYPE_FILE] = "File",
-        [TYPE_NIL] = "nil"
-    }
+    local names = types.Names
 
     -- https://wiki.facepunch.com/gmod/Global.type
     function gpm.type( any )
-        local str = types[ gpm.TypeID( any ) ]
+        local str = names[ gpm.TypeID( any ) ]
         if str ~= nil then return str end
-        return types[ TYPE_NONE ] or "unknown"
+        return names[ TYPE_NONE ] or "unknown"
     end
 
     -- gpm.AddType( typeName, func )
@@ -102,20 +112,26 @@ do
         gpm.ArgAssert( typeName, 1, "string" )
         gpm.ArgAssert( func, 2, "function" )
 
-        local last = nil
-        for index, name in pairs( types ) do
-            if not last or index > last then
-                last = index
-            end
-
+        local index = 256
+        for key, name in pairs( names ) do
             if typeName == name then
-                return index
+                index = key
+                break
+            elseif key >= index then
+                index = key + 1
             end
         end
 
-        local index = ( last or 0 ) + 1
-        types[ index ] = typeName
-        typeIDs[ #typeIDs + 1 ] = { func, index }
+        names[ index ] = typeName
+
+        for index2, data in ipairs( ids ) do
+            if index == data[ 2 ] then
+                table.remove( ids, index2 )
+                break
+            end
+        end
+
+        ids[ #ids + 1 ] = { func, index }
         return index
     end
 
@@ -202,6 +218,8 @@ do
 
         return false
     end
+
+    gpm.AddType( "Color", IsColor )
 
 end
 
