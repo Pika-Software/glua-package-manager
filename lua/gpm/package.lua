@@ -404,6 +404,7 @@ do
             end
 
             environment.TypeID = nil
+            environment.HTTP = nil
             environment.http = nil
             environment.type = nil
             environment.file = nil
@@ -411,9 +412,12 @@ do
             local defaults = metadata.defaults
             if defaults then
                 if defaults.typeid then environment.TypeID = gpm.TypeID end
-                if defaults.http then environment.http = gpm.http end
                 if defaults.type then environment.type = gpm.type end
                 if defaults.file then environment.file = fs end
+                if defaults.http then
+                    environment.HTTP = gpm.HTTP
+                    environment.http = gpm.http
+                end
             end
 
             environment._VERSION = metadata.version
