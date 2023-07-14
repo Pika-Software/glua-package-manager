@@ -1,8 +1,9 @@
+local AddCSLuaFile = AddCSLuaFile
+local include = include
 AddCSLuaFile()
 
-local MENU_DLL = MENU_DLL
+local SERVER, MENU_DLL = SERVER, MENU_DLL
 local SysTime = SysTime
-local SERVER = SERVER
 local Color = Color
 local error = error
 local pcall = pcall
@@ -27,7 +28,8 @@ Msg( [[
 
 module( "gpm", package.seeall )
 
-_VERSION = 014102
+StartTime = SysTime()
+VERSION = "1.42.0"
 
 if not Colors then
     Realm = "unknown"
@@ -53,34 +55,21 @@ if not Colors then
     end
 end
 
-do
-
-    local AddCSLuaFile = AddCSLuaFile
-    local include = include
-
-    function IncludeComponent( filePath )
-        filePath = "gpm/" .. filePath  .. ".lua"
-        if SERVER then AddCSLuaFile( filePath ) end
-        return include( filePath )
-    end
-
+local function includeComponent( fileName )
+    local filePath = "gpm/" .. fileName  .. ".lua"
+    if SERVER then AddCSLuaFile( filePath ) end
+    return include( filePath )
 end
 
-local stopwatch = SysTime()
+includeComponent "utils"
+includeComponent "logger"
+Logger = CreateLogger( "GPM@" .. VERSION, Color( 180, 180, 255 ) )
 
-IncludeComponent "utils"
-IncludeComponent "logger"
+deflate = includeComponent "libs/deflate"
+Logger:Info( "%s v%s is initialized.", deflate._NAME, deflate._VERSION )
 
-Logger = CreateLogger( "GPM@" .. utils.Version( _VERSION ), Color( 180, 180, 255 ) )
-
-libs = {}
-libs.deflatelua = IncludeComponent "libs/deflatelua"
-Logger:Info( "%s v%s is initialized.", libs.deflatelua._NAME, libs.deflatelua._VERSION )
-
-IncludeComponent "libs/promise"
-local promise = promise
-
-Logger:Info( "gm_promise v%s is initialized.", promise._VERSION )
+includeComponent "libs/promise"
+Logger:Info( "gm_promise v%s is initialized.", promise.VERSION )
 
 local moonloader
 if util.IsBinaryModuleInstalled( "moonloader" ) then
@@ -117,26 +106,19 @@ do
 
 end
 
-IncludeComponent "libs/gmad"
+includeComponent "libs/gmad"
 Logger:Info( "gmad v%s is initialized.", utils.Version( gmad.GMA.Version ) )
 
-IncludeComponent "libs/metaworks"
-Logger:Info( "metaworks v%s is initialized.", metaworks._VERSION )
+includeComponent "libs/metaworks"
+Logger:Info( "metaworks v%s is initialized.", metaworks.VERSION )
 
-IncludeComponent "http"
-IncludeComponent "fs"
-IncludeComponent "zip"
+includeComponent "http"
+includeComponent "fs"
+includeComponent "zip"
 
 if type( Packages ) ~= "table" then
     Packages = {}
 end
-
-IncludeComponent "package"
-local fs = fs
-
-CacheLifetime = CreateConVar( "gpm_cache_lifetime", "24", FCVAR_ARCHIVE, "Packages cache lifetime, in hours, sets after how many hours the downloaded gpm packages will not be relevant.", 0, 60480 )
-WorkshopPath = fs.CreateDir( "gpm/" .. string.lower( Realm ) .. "/workshop/" )
-CachePath = fs.CreateDir( "gpm/" .. string.lower( Realm ) .. "/packages/" )
 
 do
 
@@ -163,6 +145,12 @@ do
 
 end
 
+includeComponent "package"
+
+CacheLifetime = CreateConVar( "gpm_cache_lifetime", "24", FCVAR_ARCHIVE, "Packages cache lifetime, in hours, sets after how many hours the downloaded gpm packages will not be relevant.", 0, 60480 )
+WorkshopPath = fs.CreateDir( "gpm/" .. string.lower( Realm ) .. "/workshop/" )
+CachePath = fs.CreateDir( "gpm/" .. string.lower( Realm ) .. "/packages/" )
+
 do
 
     local CompileFile = CompileFile
@@ -187,10 +175,10 @@ do
 
 end
 
-IncludeComponent "import"
+includeComponent "import"
 
 if not MENU_DLL then
-    IncludeComponent "commands"
+    includeComponent "commands"
 end
 
 if SERVER or MENU_DLL or game.IsDedicated() then
@@ -199,5 +187,5 @@ else
     util.NextTick( ImportFolder, "packages", nil, true )
 end
 
-Logger:Info( "Time taken to start-up: %.4f sec.", SysTime() - stopwatch )
+Logger:Info( "Time taken to start-up: %.4f sec.", SysTime() - StartTime )
 hook.Run( "GPM - Initialized" )

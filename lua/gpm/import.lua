@@ -3,7 +3,6 @@ local gpm = gpm
 -- Libraries
 local package = gpm.package
 local promise = promise
-local string = string
 local fs = gpm.fs
 
 -- Variables
@@ -21,9 +20,19 @@ if not sources then
     sources = {}; gpm.sources = sources
 end
 
-for _, fileName in ipairs( fs.Find( "gpm/sources/*", "LUA" ) ) do
-    local extension = string.GetExtensionFromFilename( fileName )
-    gpm.IncludeComponent( "sources/" .. string.sub( fileName, 1, #fileName - ( ( extension ~= nil and #extension or 0 ) + 1 ) ) )
+do
+
+    local sourcesFolder = "gpm/sources/"
+
+    for _, fileName in ipairs( fs.Find( sourcesFolder .. "*", "LUA" ) ) do
+        local filePath = sourcesFolder .. fileName
+        if SERVER then
+            AddCSLuaFile( filePath )
+        end
+
+        include( filePath )
+    end
+
 end
 
 local activeGamemode = engine.ActiveGamemode()

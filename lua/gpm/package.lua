@@ -198,11 +198,13 @@ end
 
 do
 
-    local link = metaworks.CreateLink( _G, true, false )
+    local metatable = {
+        ["__index"] = _G
+    }
 
     function ExtractMetadata( func )
         local environment = {}
-        debug.setmetatable( environment, link )
+        debug.setmetatable( environment, metatable )
         debug.setfenv( func, environment )
 
         local metadata = func()
@@ -420,7 +422,7 @@ do
                 end
             end
 
-            environment._VERSION = metadata.version
+            environment.VERSION = metadata.version
 
             local init = self.Init
             if init then
