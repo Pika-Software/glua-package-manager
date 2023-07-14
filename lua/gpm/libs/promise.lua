@@ -49,9 +49,7 @@ local _HTTP = HTTP
 local developer = GetConVar( "developer" )
 
 module( "promise" )
-
-_VERSION = "1.4.1" -- major.minor.patch
-_VERSION_NUM = 010401 -- _VERSION in number format: 1.2.3 -> 010203 | 99.56.13 -> 995613
+VERSION = "1.4.1"
 
 local function PromiseErrorHandler(...)
     if developer:GetInt() > 0 then

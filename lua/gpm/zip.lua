@@ -1,5 +1,5 @@
 -- Libraries
-local deflatelua = gpm.libs.deflatelua
+local deflatelua = gpm.deflate
 local fs = gpm.fs
 
 -- Variables

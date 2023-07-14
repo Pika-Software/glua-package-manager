@@ -9,7 +9,7 @@ local error = error
 local type = type
 
 module( "metaworks" )
-_VERSION = "1.0.0"
+VERSION = "1.0.0"
 
 GetValue = table_Lookup
 
