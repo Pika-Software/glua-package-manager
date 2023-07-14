@@ -13,6 +13,9 @@ if SERVER then
     end
 end
 
+-- HTTP client
+Client = reqwest or CHTTP or HTTP
+
 local queue = {}
 util.NextTick( function()
     for _, func in ipairs( queue ) do
@@ -22,10 +25,9 @@ util.NextTick( function()
     queue = nil
 end )
 
-local HTTP = reqwest or CHTTP or HTTP
-local function client( parameters )
+local function request( parameters )
     logger:Debug( "%s HTTP request to %s (timeout %d sec)", parameters.method, parameters.url, parameters.timeout )
-    return HTTP( parameters )
+    return Client( parameters )
 end
 
 local timeout = CreateConVar( "gpm_http_timeout", "10", FCVAR_ARCHIVE, "Default http timeout for gpm http library.", 5, 300 )
@@ -63,10 +65,10 @@ local function asyncHTTP( parameters )
 
     if queue ~= nil then
         queue[ #queue + 1 ] = function()
-            client( parameters )
+            request( parameters )
         end
     else
-        client( parameters )
+        request( parameters )
     end
 
     return promise
