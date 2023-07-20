@@ -286,7 +286,7 @@ if asyncio ~= nil then
 
         if asyncio.AsyncRead( filePath, gamePath, function( filePath, gamePath, status, fileContent )
             if status ~= 0 then
-                return p:Reject( "Error code: " .. status )
+                return p:Reject( "Async read error, code: " .. status )
             end
 
             p:Resolve( {
@@ -295,7 +295,7 @@ if asyncio ~= nil then
                 ["gamePath"] = gamePath
             } )
         end ) ~= 0 then
-            p:Reject( "Error code: " .. status )
+            p:Reject( "Async read error, code: " .. status )
         end
 
         return p
@@ -306,7 +306,7 @@ if asyncio ~= nil then
 
         if asyncio.AsyncWrite( filePath, fileContent, function( filePath, gamePath, status )
             if status ~= 0 then
-                return p:Reject( "Error code: " .. status )
+                return p:Reject( "Async write error, code: " .. status )
             end
 
             p:Resolve( {
@@ -314,7 +314,7 @@ if asyncio ~= nil then
                 ["gamePath"] = gamePath
             } )
         end ) ~= 0 then
-            p:Reject( "Error code: " .. status )
+            p:Reject( "Async write error, code: " .. status )
         end
 
         return p
@@ -325,7 +325,7 @@ if asyncio ~= nil then
 
         if asyncio.AsyncAppend( filePath, fileContent, function( filePath, gamePath, status )
             if status ~= 0 then
-                return p:Reject( "Error code: " .. status )
+                return p:Reject( "Async append error, code: " .. status )
             end
 
             p:Resolve( {
@@ -333,7 +333,7 @@ if asyncio ~= nil then
                 ["gamePath"] = gamePath
             } )
         end ) ~= 0 then
-            p:Reject( "Error code: " .. status )
+            p:Reject( "Async append error, code: " .. status )
         end
 
         return p
@@ -347,7 +347,7 @@ function AsyncRead( filePath, gamePath )
 
     if file.AsyncRead( filePath, gamePath, function( filePath, gamePath, status, fileContent )
         if status ~= 0 then
-            return p:Reject( "Error code: " .. status )
+            return p:Reject( "Async read error, code: " .. status )
         end
 
         p:Resolve( {
@@ -356,7 +356,7 @@ function AsyncRead( filePath, gamePath )
             ["fileContent"] = fileContent
         } )
     end ) ~= 0 then
-        p:Reject( "Error code: " .. status )
+        p:Reject( "Async read error, code: " .. status )
     end
 
     return p
@@ -368,14 +368,14 @@ if type( file.AsyncWrite ) == "function" then
 
         if file.AsyncWrite( filePath, fileContent, function( filePath, status )
             if status ~= 0 then
-                return p:Reject( "Error code: " .. status )
+                return p:Reject( "Async write error, code: " .. status )
             end
 
             p:Resolve( {
                 ["filePath"] = filePath
             } )
         end ) ~= 0 then
-            p:Reject( "Error code: " .. status )
+            p:Reject( "Async write error, code: " .. status )
         end
 
         return p
@@ -404,14 +404,14 @@ if type( file.AsyncAppen ) == "function" then
 
         if file.AsyncAppend( filePath, fileContent, function( filePath, status )
             if status ~= 0 then
-                return p:Reject( "Error code: " .. status )
+                return p:Reject( "Async append error, code: " .. status )
             end
 
             p:Resolve( {
                 ["filePath"] = filePath
             } )
         end ) ~= 0 then
-            p:Reject( "Error code: " .. status )
+            p:Reject( "Async append error, code: " .. status )
         end
 
         return p
