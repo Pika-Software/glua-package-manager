@@ -142,6 +142,10 @@ end
 
 function IsLuaFile( filePath, gamePath, compileMoon )
     local extension = string.GetExtensionFromFilename( filePath )
+    if extension and extension ~= "lua" and extension ~= "moon" then
+        return false
+    end
+
     filePath = string.sub( filePath, 1, #filePath - ( extension ~= nil and ( #extension + 1 ) or 0 ) )
 
     if ( SERVER or MENU_DLL ) and moonloader ~= nil then

@@ -18,9 +18,10 @@ local hook = hook
 local net = net
 
 -- Variables
-local ErrorNoHaltWithStack = ErrorNoHaltWithStack
 local CLIENT, SERVER, MENU_DLL = CLIENT, SERVER, MENU_DLL
+local ErrorNoHaltWithStack = ErrorNoHaltWithStack
 local AddCSLuaFolder = gpm.AddCSLuaFolder
+local package_seeall = package.seeall
 local addCSLuaFile = AddCSLuaFile
 local getmetatable = getmetatable
 local setmetatable = setmetatable
@@ -197,31 +198,23 @@ function FormatMetadata( metadata )
     return metadata
 end
 
-do
+function ExtractMetadata( func )
+    local environment = {}
+    package_seeall( environment )
+    debug.setfenv( func, environment )
 
-    local metatable = {
-        ["__index"] = _G
-    }
-
-    function ExtractMetadata( func )
-        local environment = {}
-        debug.setmetatable( environment, metatable )
-        debug.setfenv( func, environment )
-
-        local metadata = func()
-        if type( metadata ) ~= "table" then
-            debug.setmetatable( environment, nil )
-            metadata = environment
-        end
-
-        local PACKAGE = metadata.package
-        if type( PACKAGE ) == "table" then
-            metadata = PACKAGE
-        end
-
-        return metadata
+    local metadata = func()
+    if type( metadata ) ~= "table" then
+        debug.setmetatable( environment, nil )
+        metadata = environment
     end
 
+    local PACKAGE = metadata.package
+    if type( PACKAGE ) == "table" then
+        metadata = PACKAGE
+    end
+
+    return metadata
 end
 
 function Link( pkg, target )
@@ -736,10 +729,12 @@ do
                         return net.Receive( messageName, ... )
                     end
 
-                    if autoNames then
-                        function link.Start( messageName, ... )
-                            return net.Start( self:GetIdentifier( messageName ), ... )
+                    function link.Start( messageName, ... )
+                        if autoNames then
+                            messageName = self:GetIdentifier( messageName )
                         end
+
+                        return net.Start( messageName, ... )
                     end
 
                     meta.__newindex = net

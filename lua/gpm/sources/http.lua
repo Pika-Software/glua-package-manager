@@ -190,6 +190,10 @@ Import = promise.Async( function( metadata )
             end
 
             local initPath = package.GetCurrentInitByRealm( metadata.init )
+            if not initPath then
+                return promise.Reject( "Package does not support running from this realm." )
+            end
+
             local func = compiled[ initPath ]
             if not func then
                 return promise.Reject( "Package init file '" .. initPath .. "' is missing or compilation was failed." )

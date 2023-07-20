@@ -139,17 +139,21 @@ if SERVER then
 end
 
 function CompileInit( metadata )
-    local absolutePath = paths.FormatToLua( package.GetCurrentInitByRealm( metadata.init ) )
-    local importPath = metadata.importpath
+    local absolutePath = package.GetCurrentInitByRealm( metadata.init )
+    if not absolutePath then
+        return promise.Reject( "Package does not support running from this realm." )
+    end
 
-    local relativePath = importPath .. "/" .. absolutePath
+    absolutePath = paths.FormatToLua( absolutePath )
+
+    local relativePath = metadata.importpath .. "/" .. absolutePath
     if fs.IsLuaFile( relativePath, "LUA", true ) then
         return gpm.CompileLua( relativePath )
     elseif fs.IsLuaFile( absolutePath, "LUA", true ) then
         return gpm.CompileLua( absolutePath )
     end
 
-    error( "Package '" .. importPath .. "' init file '" .. absolutePath .. "' is missing.", 2 )
+    error( "Package '" .. metadata.importpath .. "' init file '" .. absolutePath .. "' is missing.", 2 )
 end
 
 Import = promise.Async( function( metadata )
