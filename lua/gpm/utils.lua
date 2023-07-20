@@ -331,8 +331,22 @@ function paths.Fix( filePath )
 end
 
 -- File path join
-function paths.Join( filePath, ... )
-    return paths.Fix( table.concat( { filePath, ... }, "/" ) )
+function paths.Join( ... )
+    local args, filePath = { ... }
+    local len = #args
+    for i = 1, len do
+        if filePath ~= nil then
+            filePath = filePath .. args[ i ]
+        else
+            filePath = args[ i ]
+        end
+
+        if i == len then
+            return paths.Fix( filePath )
+        end
+
+        filePath = filePath .. "/"
+    end
 end
 
 -- File path localization
