@@ -161,13 +161,6 @@ end
 function debug.fempty()
 end
 
--- Returns copy of function
-function debug.fcopy( func )
-    return function( ... )
-        return func( ... )
-    end
-end
-
 -- FileClass extensions
 do
 
