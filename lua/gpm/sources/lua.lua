@@ -10,6 +10,7 @@ local fs = gpm.fs
 
 -- Variables
 local SERVER, MENU_DLL = SERVER, MENU_DLL
+local AddCSLuaFolder = gpm.AddCSLuaFolder
 local AddCSLuaFile = AddCSLuaFile
 local ipairs = ipairs
 local error = error
@@ -117,13 +118,18 @@ if SERVER then
             for _, filePath in ipairs( send ) do
                 if isInFolder then
                     local localFilePath = importPath .. "/" .. filePath
-                    if fs.IsLuaFile( localFilePath, "lsv", true ) then
+                    if fs.IsDir( localFilePath, "lsv" ) then
+                        AddCSLuaFolder( localFilePath )
+                        continue
+                    elseif fs.IsLuaFile( localFilePath, "lsv", true ) then
                         AddCSLuaFile( paths.FormatToLua( localFilePath ) )
                         continue
                     end
                 end
 
-                if fs.IsLuaFile( filePath, "lsv", true ) then
+                if fs.IsDir( filePath, "lsv" ) then
+                    AddCSLuaFolder( filePath )
+                elseif fs.IsLuaFile( filePath, "lsv", true ) then
                     AddCSLuaFile( paths.FormatToLua( filePath ) )
                 end
             end

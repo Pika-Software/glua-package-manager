@@ -20,6 +20,7 @@ local net = net
 -- Variables
 local ErrorNoHaltWithStack = ErrorNoHaltWithStack
 local CLIENT, SERVER, MENU_DLL = CLIENT, SERVER, MENU_DLL
+local AddCSLuaFolder = gpm.AddCSLuaFolder
 local addCSLuaFile = AddCSLuaFile
 local getmetatable = getmetatable
 local setmetatable = setmetatable
@@ -401,6 +402,7 @@ do
                 self.Environment = environment
                 environment._PKG = self
 
+                environment.AddCSLuaFolder = AddCSLuaFolder
                 environment.AddCSLuaFile = addCSLuaFile
                 environment.ArgAssert = ArgAssert
             end

@@ -116,6 +116,28 @@ includeComponent "http"
 includeComponent "fs"
 includeComponent "zip"
 
+if SERVER then
+
+    local ipairs = ipairs
+    local paths = paths
+    local fs = fs
+
+    function AddCSLuaFolder( folder )
+        local files, folders = fs.Find( paths.Join( folder, "*" ), "lsv" )
+        for _, folderName in ipairs( folders ) do
+            AddCSLuaFolder( paths.Join( folder, folderName ) )
+        end
+
+        for _, fileName in ipairs( files ) do
+            local filePath = paths.Join( folder, fileName )
+            if fs.IsLuaFile( filePath, "lsv", true ) then
+                AddCSLuaFile( paths.FormatToLua( filePath ) )
+            end
+        end
+    end
+
+end
+
 if type( Packages ) ~= "table" then
     Packages = {}
 end
