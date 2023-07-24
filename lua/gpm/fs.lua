@@ -58,6 +58,10 @@ function MountGMA( gmaPath )
     error( "Not yet implemented." )
 end
 
+if type( MountedFiles ) ~= "table" then
+    MountedFiles = {}
+end
+
 if not MENU_DLL then
     function MountGMA( gmaPath )
         local ok, files = game_MountGMA( gmaPath )
@@ -73,10 +77,6 @@ if not MENU_DLL then
 
         return ok, files
     end
-end
-
-if type( MountedFiles ) ~= "table" then
-    MountedFiles = {}
 end
 
 local gamePaths = {
