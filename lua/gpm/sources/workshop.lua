@@ -12,12 +12,10 @@ local gmad = gmad
 local fs = gpm.fs
 
 -- Variables
+local cacheFolder = gpm.TempPath
 local steamworks = steamworks
 local tonumber = tonumber
 local type = type
-
-local cacheLifetime = gpm.CacheLifetime
-local cacheFolder = gpm.WorkshopPath
 
 module( "gpm.sources.workshop" )
 
@@ -53,22 +51,13 @@ function Download( wsid )
         gmaReader:ReadAllFiles()
         gmaReader:Close()
 
-        local cachePath = cacheFolder .. wsid .. ".gma.dat"
-        if fs.IsFile( cachePath, "DATA" ) then
-            if fs.Time( cachePath, "DATA" ) <= ( 60 * 60 * cacheLifetime:GetInt() ) then
-                p:Resolve( "data/" .. cachePath )
-                return
-            end
-
-            fs.Delete( cachePath )
-        end
-
-        local gmaWriter = gmad.Write( cachePath )
+        local gmaPath = cacheFolder .. "workshop_" .. wsid .. ".gma.dat"
+        local gmaWriter = gmad.Write( gmaPath )
         if not gmaWriter then
-            if fs.IsFile( cachePath, "DATA" ) then
-                gpm.Logger:Warn( "GMA file '" .. cachePath .. "' cannot be written, it is probably already mounted to the game, try restarting the game." )
+            if fs.IsFile( gmaPath, "DATA" ) then
+                gpm.Logger:Warn( "GMA file '" .. gmaPath .. "' cannot be written, it is probably already mounted to the game, try restarting the game." )
             else
-                p:Reject( "Unknown GMA file '" .. cachePath .. "' writing error." )
+                p:Reject( "Unknown GMA file '" .. gmaPath .. "' writing error." )
             end
 
             return
@@ -78,7 +67,7 @@ function Download( wsid )
         gmaWriter.Files = gmaReader.Files
         gmaWriter:Close()
 
-        p:Resolve( "data/" .. cachePath )
+        p:Resolve( "data/" .. gmaPath )
     end )
 
     return p

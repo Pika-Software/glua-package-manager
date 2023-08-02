@@ -10,8 +10,7 @@ local util = util
 local fs = gpm.fs
 
 -- Variables
-local cacheLifetime = gpm.CacheLifetime
-local cacheFolder = gpm.CachePath
+local cacheFolder = gpm.TempPath
 local ipairs = ipairs
 
 module( "gpm.sources.zip" )
@@ -35,11 +34,6 @@ local contentFolders = {
 
 Import = promise.Async( function( metadata )
     local importPath = metadata.importpath
-
-    local cachePath = cacheFolder .. "zip_" .. util.MD5( importPath ) .. ".gma.dat"
-    if fs.IsFile( cachePath, "DATA" ) and fs.Time( cachePath, "DATA" ) > ( 60 * 60 * cacheLifetime:GetInt() ) then
-        return gpm.SourceImport( "gma", "data/" .. cachePath )
-    end
 
     local fileClass = fs.Open( importPath, "rb", "GAME" )
     if not fileClass then
@@ -73,9 +67,14 @@ Import = promise.Async( function( metadata )
         return promise.Reject( "Zip archive is empty, no files to mount." )
     end
 
-    local gma = gmad.Write( cachePath )
+    local gmaPath = cacheFolder .. "zip_" .. util.MD5( importPath ) .. ".gma.dat"
+    local gma = gmad.Write( gmaPath )
     if not gma then
-        return promise.Reject( "Cache file '" .. cachePath .. "' construction error, mounting failed." )
+        if fs.IsFile( gmaPath, "DATA" ) then
+            return gpm.SourceImport( "gma", "data/" .. gmaPath )
+        end
+
+        return promise.Reject( "Cache file '" .. gmaPath .. "' construction error, mounting failed." )
     end
 
     gma:SetTitle( importPath )
@@ -86,5 +85,5 @@ Import = promise.Async( function( metadata )
 
     gma:Close()
 
-    return gpm.SourceImport( "gma", "data/" .. cachePath )
+    return gpm.SourceImport( "gma", "data/" .. gmaPath )
 end )

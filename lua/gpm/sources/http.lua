@@ -13,12 +13,10 @@ local util = util
 -- Variables
 local CompileMoonString = CompileMoonString
 local CompileString = CompileString
+local cacheFolder = gpm.TempPath
 local logger = gpm.Logger
 local ipairs = ipairs
 local type = type
-
-local cacheLifetime = gpm.CacheLifetime
-local cacheFolder = gpm.CachePath
 
 local supportedExtensions = {
     ["lua"] = true,
@@ -101,27 +99,7 @@ Import = promise.Async( function( metadata )
 
     local extension = metadata.extension
     local importpath = metadata.importpath
-
-    -- Cache
-    local cachePath = cacheFolder .. "http_" .. util.MD5( importpath ) .. "."  .. ( extension == "json" and "gma" or extension ) .. ".dat"
-    if fs.IsFile( cachePath, "DATA" ) and fs.Time( cachePath, "DATA" ) > ( 60 * 60 * cacheLifetime:GetInt() ) then
-        if extension == "json" then
-            return gpm.SourceImport( "gma", "data/" .. cachePath )
-        elseif extension == "gma" or extension == "zip" then
-            return gpm.SourceImport( extension, "data/" .. cachePath )
-        end
-
-        local func
-        if extension == "lua" then
-            func = fs.CompileLua( cachePath, "DATA" )
-        elseif extension == "moon" then
-            func = fs.CompileMoon( cachePath, "DATA" )
-        end
-
-        return package.Initialize( metadata, func, {
-            [ cachePath ] = func
-        } )
-    end
+    local gmaPath = cacheFolder .. "http_" .. util.MD5( importpath ) .. "."  .. ( extension == "json" and "gma" or extension ) .. ".dat"
 
     -- JSON
     if extension == "json" then
@@ -202,9 +180,13 @@ Import = promise.Async( function( metadata )
             return package.Initialize( metadata, func, compiled )
         end
 
-        local gma = gmad.Write( cachePath )
+        local gma = gmad.Write( gmaPath )
         if not gma then
-            return promise.Reject( "Package '" .. importpath .. "' cache file '" .. cachePath .. "' writing failed." )
+            if fs.IsFile( gmaPath, "DATA" ) then
+                return gpm.SourceImport( "gma", "data/" .. gmaPath )
+            end
+
+            return promise.Reject( "Package '" .. importpath .. "' cache file '" .. gmaPath .. "' writing failed." )
         end
 
         local name = metadata.name
@@ -225,7 +207,7 @@ Import = promise.Async( function( metadata )
 
         gma:Close()
 
-        return gpm.SourceImport( "gma", "data/" .. cachePath )
+        return gpm.SourceImport( "gma", "data/" .. gmaPath )
     end
 
     logger:Info( "Package '%s' is downloading...", importpath )
@@ -244,17 +226,17 @@ Import = promise.Async( function( metadata )
         return promise.Reject( "Package '%s' download failed, wrong HTTP response code (" .. result.code .. ")." )
     end
 
-    local ok, err = fs.AsyncWrite( cachePath, result.body ):SafeAwait()
+    local ok, err = fs.AsyncWrite( gmaPath, result.body ):SafeAwait()
     if not ok then
         return promise.Reject( "Package '" .. importpath .. "' cache writing failed, " .. err )
     end
 
     if extension == "lua" then
-        return package.Initialize( metadata, CompileString( result.body, cachePath ) )
+        return package.Initialize( metadata, CompileString( result.body, gmaPath ) )
     elseif extension == "moon" then
-        return package.Initialize( metadata, CompileMoonString( result.body, cachePath ) )
+        return package.Initialize( metadata, CompileMoonString( result.body, gmaPath ) )
     elseif extension == "gma" or extension == "zip" then
-        return gpm.SourceImport( extension, "data/" .. cachePath )
+        return gpm.SourceImport( extension, "data/" .. gmaPath )
     end
 
     return promise.Reject( "How did you do that?!" )
