@@ -4,8 +4,10 @@ AddCSLuaFile()
 
 local SERVER, MENU_DLL = SERVER, MENU_DLL
 local SysTime = SysTime
+local ipairs = ipairs
 local Color = Color
 local error = error
+local pairs = pairs
 local pcall = pcall
 local type = type
 local _G = _G
@@ -29,7 +31,7 @@ Msg( [[
 module( "gpm", package.seeall )
 
 StartTime = SysTime()
-VERSION = "1.43.2"
+VERSION = "1.44.0"
 
 if not Colors then
     Realm = "unknown"
@@ -116,11 +118,9 @@ includeComponent "http"
 includeComponent "fs"
 includeComponent "zip"
 
-if SERVER then
+TempPath = fs.CreateDir( "gpm/" .. string.lower( Realm ) .. "/temp/" )
 
-    local ipairs = ipairs
-    local paths = paths
-    local fs = fs
+if SERVER then
 
     function AddCSLuaFolder( folder )
         local files, folders = fs.Find( paths.Join( folder, "*" ), "lsv" )
@@ -145,7 +145,6 @@ end
 do
 
     local string_find = string.find
-    local pairs = pairs
 
     function Find( searchable, ignoreImportNames, noPatterns )
         local result = {}
@@ -168,10 +167,6 @@ do
 end
 
 includeComponent "package"
-
-CacheLifetime = CreateConVar( "gpm_cache_lifetime", "24", FCVAR_ARCHIVE, "Packages cache lifetime, in hours, sets after how many hours the downloaded gpm packages will not be relevant.", 0, 60480 )
-WorkshopPath = fs.CreateDir( "gpm/" .. string.lower( Realm ) .. "/workshop/" )
-CachePath = fs.CreateDir( "gpm/" .. string.lower( Realm ) .. "/packages/" )
 
 do
 
@@ -199,9 +194,130 @@ end
 
 includeComponent "import"
 
-if not MENU_DLL then
-    includeComponent "commands"
+function ClearCache()
+    local count, size = 0, 0
+
+    for _, fileName in ipairs( fs.Find( TempPath .. "*", "DATA" ) ) do
+        local filePath = TempPath .. fileName
+        fs.Delete( filePath )
+
+        if not fs.IsFile( filePath, "DATA" ) then
+            size = size + fs.Size( filePath, "DATA" )
+            count = count + 1
+            continue
+        end
+
+        Logger:Warn( "Unable to remove file '%s' probably used by the game, restart game and try again.", filePath )
+    end
+
+    Logger:Info( "Deleted %d cache files, freeing up %dMB of space.", count, size / 1024 / 1024 )
 end
+
+do
+
+    local MsgC = MsgC
+
+    function PrintPackageList( packages )
+        MsgC( Colors.Realm, Realm, Colors.PrimaryText, " packages:\n" )
+
+        if type( packages ) ~= "table" then
+            packages = {}
+
+            for _, pkg in pairs( Packages ) do
+                packages[ #packages + 1 ] = pkg
+            end
+        end
+
+        table.sort( packages, function( a, b )
+            return a:GetIdentifier() < b:GetIdentifier()
+        end )
+
+        local total = 0
+        for _, pkg in pairs( packages ) do
+            MsgC( Colors.Realm, "\t* ", Colors.PrimaryText, pkg:GetIdentifier() .. "\n" )
+            total = total + 1
+        end
+
+        MsgC( Colors .Realm, "\tTotal: ", Colors.PrimaryText, total, "\n" )
+    end
+
+end
+
+function Reload( ... )
+    local arguments = { ... }
+    if #arguments == 0 then
+        Logger:Warn( "There is no information for package reloading, if you are trying to do a full reload then just use .*" )
+        return
+    end
+
+    if SERVER then
+        net.Start( "GPM.Networking" )
+            net.WriteUInt( 2, 3 )
+            net.WriteTable( arguments )
+        net.Broadcast()
+    end
+
+    local packages, count = {}, 0
+    for _, searchable in ipairs( arguments ) do
+        if #searchable == 0 then continue end
+        for _, pkg in ipairs( Find( searchable, false, false ) ) do
+            packages[ pkg ] = true
+            count = count + 1
+        end
+    end
+
+    if count == 0 then
+        Logger:Info( "No candidates found for reloading, skipping..." )
+        return
+    end
+
+    Logger:Info( "Found %d candidates to reload, reloading...", count )
+
+    for pkg in pairs( packages ) do
+        pkg:Reload():Catch( function( message )
+            Logger:Error( "Package '%s' reload failed, error:\n%s", pkg:GetIdentifier(), message )
+        end )
+    end
+end
+
+function Uninstall( force, ... )
+    local arguments = {...}
+    if #arguments == 0 then
+        Logger:Warn( "There is no information for package uninstalling." )
+        return
+    end
+
+    local packages, count = {}, 0
+    for _, searchable in ipairs( arguments ) do
+        if #searchable == 0 then continue end
+        for _, pkg in ipairs( Find( searchable, false, false ) ) do
+            packages[ pkg ] = true
+            count = count + 1
+        end
+    end
+
+    if count == 0 then
+        Logger:Info( "No candidates found for uninstalling, skipping..." )
+        return
+    end
+
+    Logger:Info( "Found %d candidates to uninstall, uninstalling...", count )
+
+    for pkg in pairs( packages ) do
+        local children = pkg:GetChildren()
+        local childCount = #children
+        if childCount ~= 0 and not force then
+            Logger:Error( "Package '%s' uninstallation cancelled, %d dependencies found, try use -f to force uninstallation, skipping...", pkg:GetIdentifier(), childCount )
+            PrintPackageList( children )
+            continue
+        end
+
+        pkg:Uninstall()
+    end
+end
+
+includeComponent "commands"
+ClearCache()
 
 if SERVER or MENU_DLL or game.IsDedicated() then
     ImportFolder( "packages", nil, true )
