@@ -7,10 +7,11 @@ local type = type
 -- https://github.com/WilliamVenner/gmsv_reqwest
 -- https://github.com/timschumi/gmod-chttp
 
-local HTTP = HTTP
+local HTTP, isReqwest = HTTP, false
 if SERVER and game.IsDedicated() then
     if util.IsBinaryModuleInstalled( "reqwest" ) and pcall( require, "reqwest" ) then
         logger:Info( "A third-party http client 'reqwest' has been initialized." )
+        isReqwest = true
         HTTP = reqwest
     elseif util.IsBinaryModuleInstalled( "chttp" ) and pcall( require, "chttp" ) then
         logger:Info( "A third-party http client 'chttp' has been initialized." )
@@ -23,9 +24,6 @@ local function request( parameters )
     return HTTP( parameters )
 end
 
-local timeout = CreateConVar( "gpm_http_timeout", "10", FCVAR_ARCHIVE, "Default http timeout for gpm http library.", 5, 300 )
-local userAgent = string.format( "GLua Package Manager/%s - Garry's Mod/%s", gpm.VERSION, VERSIONSTR )
-
 local queue = {}
 util.NextTick( function()
     for _, func in ipairs( queue ) do
@@ -34,6 +32,11 @@ util.NextTick( function()
 
     queue = nil
 end )
+
+local gpm_http_timeout, userAgent = CreateConVar( "gpm_http_timeout", "10", FCVAR_ARCHIVE, "Default http timeout for gpm http library.", 5, 300 )
+if isReqwest then
+    userAgent = string.format( "GLua Package Manager/%s - Garry's Mod/%s", gpm.VERSION, VERSIONSTR )
+end
 
 local function asyncHTTP( parameters )
     ArgAssert( parameters, 1, "table" )
@@ -44,14 +47,16 @@ local function asyncHTTP( parameters )
     end
 
     if type( parameters.timeout ) ~= "number" then
-        parameters.timeout = timeout:GetInt()
+        parameters.timeout = gpm_http_timeout:GetInt()
     end
 
     if type( parameters.headers ) ~= "table" then
         parameters.headers = {}
     end
 
-    parameters.headers["User-Agent"] = userAgent
+    if isReqwest then
+        parameters.headers["User-Agent"] = userAgent
+    end
 
     parameters.success = function( code, body, headers )
         promise:Resolve( {
