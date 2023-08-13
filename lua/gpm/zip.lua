@@ -69,5 +69,6 @@ function Read( filePath, gamePath )
         files[ filePath ] = content
     end
 
+    fileHandle:Close()
     return files
 end
