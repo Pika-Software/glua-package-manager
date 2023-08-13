@@ -52,6 +52,10 @@ function Download( wsid )
         gmaReader:Close()
 
         local gmaPath = cacheFolder .. "workshop_" .. wsid .. ".gma.dat"
+        if fs.IsFile( gmaPath, "DATA" ) then
+            fs.Delete( gmaPath )
+        end
+
         local gmaWriter = gmad.Write( gmaPath )
         if not gmaWriter then
             if fs.IsFile( gmaPath, "DATA" ) then

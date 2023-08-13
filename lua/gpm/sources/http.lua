@@ -100,6 +100,9 @@ Import = promise.Async( function( metadata )
     local extension = metadata.extension
     local importpath = metadata.importpath
     local gmaPath = cacheFolder .. "http_" .. util.MD5( importpath ) .. "."  .. ( extension == "json" and "gma" or extension ) .. ".dat"
+    if fs.IsFile( gmaPath, "DATA" ) then
+        fs.Delete( gmaPath )
+    end
 
     -- JSON
     if extension == "json" then
@@ -226,16 +229,12 @@ Import = promise.Async( function( metadata )
         return promise.Reject( "Package '%s' download failed, wrong HTTP response code (" .. result.code .. ")." )
     end
 
-    local ok, err = fs.AsyncWrite( gmaPath, result.body ):SafeAwait()
-    if not ok then
-        return promise.Reject( "Package '" .. importpath .. "' cache writing failed, " .. err )
-    end
-
     if extension == "lua" then
         return package.Initialize( metadata, CompileString( result.body, gmaPath ) )
     elseif extension == "moon" then
         return package.Initialize( metadata, CompileMoonString( result.body, gmaPath ) )
     elseif extension == "gma" or extension == "zip" then
+        fs.Write( gmaPath, result.body )
         return gpm.SourceImport( extension, "data/" .. gmaPath )
     end
 

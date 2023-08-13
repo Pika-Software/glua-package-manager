@@ -68,6 +68,10 @@ Import = promise.Async( function( metadata )
     end
 
     local gmaPath = cacheFolder .. "zip_" .. util.MD5( importPath ) .. ".gma.dat"
+    if fs.IsFile( gmaPath, "DATA" ) then
+        fs.Delete( gmaPath )
+    end
+
     local gma = gmad.Write( gmaPath )
     if not gma then
         if fs.IsFile( gmaPath, "DATA" ) then
