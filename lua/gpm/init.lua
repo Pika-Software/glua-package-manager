@@ -23,6 +23,7 @@ Msg( [[
 
   GitHub: https://github.com/Pika-Software
   Discord: https://discord.gg/3UVxhZ
+  Website: https://pika-soft.ru
   Developers: Pika Software
   License: MIT
 
@@ -31,7 +32,7 @@ Msg( [[
 module( "gpm", package.seeall )
 
 StartTime = SysTime()
-VERSION = "1.44.0"
+VERSION = "1.45.0"
 
 if not Colors then
     Realm = "unknown"
