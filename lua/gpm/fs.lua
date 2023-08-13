@@ -47,9 +47,6 @@ Find = file.Find
 Size = file.Size
 Time = file.Time
 
-Exists = file.Exists
-IsDir = file.IsDir
-
 function IsFile( ... )
     return Exists( ... ) and not IsDir( ... )
 end
@@ -102,42 +99,15 @@ function IsMounted( filePath, gamePath, onlyDir )
 end
 
 function Exists( filePath, gamePath )
-    if IsMounted( filePath, gamePath ) then return true end
-    if file.Exists( filePath, gamePath ) then return true end
-    if SERVER then return false end
-
-    local files, folders = file.Find( filePath .. "*", gamePath )
-    if not files or not folders then return false end
-    if #files == 0 and #folders == 0 then return false end
-
-    local splits = string.Split( filePath, "/" )
-    local fileName = splits[ #splits ]
-
-    return table.HasIValue( files, fileName ) or table.HasIValue( folders, fileName )
+    return IsMounted( filePath, gamePath ) or file.Exists( filePath, gamePath )
 end
 
 function IsDir( filePath, gamePath )
-    if IsMounted( filePath, gamePath, true ) then return true end
-    if file.IsDir( filePath, gamePath ) then return true end
-    if SERVER then return false end
-
-    local _, folders = file.Find( filePath .. "*", gamePath )
-    if folders == nil or #folders == 0 then return false end
-
-    local splits = string.Split( filePath, "/" )
-    return table.HasIValue( folders, splits[ #splits ] )
+    return IsMounted( filePath, gamePath, true ) or file.IsDir( filePath, gamePath )
 end
 
 function IsFile( filePath, gamePath )
-    if IsMounted( filePath, gamePath ) then return true end
-    if file.Exists( filePath, gamePath ) and not file.IsDir( filePath, gamePath ) then return true end
-    if SERVER then return false end
-
-    local files, _ = file.Find( filePath .. "*", gamePath )
-    if not files or #files == 0 then return false end
-    local splits = string.Split( filePath, "/" )
-
-    return table.HasIValue( files, splits[ #splits ] )
+    return IsMounted( filePath, gamePath ) or ( file.Exists( filePath, gamePath ) and not file.IsDir( filePath, gamePath ) )
 end
 
 function IsLuaFile( filePath, gamePath, compileMoon )
@@ -167,7 +137,7 @@ function IsLuaFile( filePath, gamePath, compileMoon )
 end
 
 function Read( filePath, gamePath, length )
-    local fileClass = file.Open( filePath, "rb", gamePath )
+    local fileClass = Open( filePath, "rb", gamePath )
     if not fileClass then return end
 
     local fileContent = fileClass:Read( length )
@@ -176,18 +146,18 @@ function Read( filePath, gamePath, length )
     return fileContent
 end
 
-function Write( filePath, contents )
-    local fileClass = file.Open( filePath, "wb", "DATA" )
-    if not fileClass then return end
+function Write( filePath, contents, fileMode )
+    local fileClass = Open( filePath, fileMode or "wb", "DATA" )
+    if not fileClass then
+        error( "Writing file 'data/" .. filePath .. "' was failed!" )
+    end
+
     fileClass:Write( contents )
     fileClass:Close()
 end
 
 function Append( filePath, contents )
-    local fileClass = file.Open( filePath, "ab", "DATA" )
-    if not fileClass then return end
-    fileClass:Write( contents )
-    fileClass:Close()
+    Write( filePath, contents, "ab" )
 end
 
 function CreateDir( folderPath )
@@ -199,7 +169,7 @@ function CreateDir( folderPath )
         currentPath = currentPath and ( currentPath .. "/" .. folderName ) or folderName
         if IsDir( currentPath, "DATA" ) then continue end
 
-        file.Delete( currentPath )
+        Delete( currentPath )
         file.CreateDir( currentPath )
     end
 
