@@ -226,7 +226,7 @@ Import = promise.Async( function( metadata )
     end
 
     if result.code ~= 200 then
-        return promise.Reject( "Package '%s' download failed, wrong HTTP response code (" .. result.code .. ")." )
+        return promise.Reject( "Package '" .. importpath .. "' download failed, wrong HTTP response code (" .. result.code .. ")." )
     end
 
     if extension == "lua" then
