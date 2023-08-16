@@ -586,6 +586,7 @@ do
                 environment.hook = link
 
                 function link.Add( eventName, identifier, ... )
+                    ArgAssert( eventName, 1, "string" )
                     if autoNames and type( identifier ) == "string" then
                         identifier = self:GetIdentifier( identifier )
                     end
@@ -595,6 +596,7 @@ do
                 end
 
                 function link.Remove( eventName, identifier, ... )
+                    ArgAssert( eventName, 1, "string" )
                     if autoNames and type( identifier ) == "string" then
                         identifier = self:GetIdentifier( identifier )
                     end
@@ -620,6 +622,7 @@ do
                 for key, func in pairs( timer ) do
                     if key == "Destroy" or key == "Remove" or key == "Simple" then continue end
                     link[ key ] = function( identifier, ... )
+                        ArgAssert( identifier, 1, "string" )
                         if autoNames then
                             identifier = self:GetIdentifier( identifier )
                         end
@@ -630,6 +633,7 @@ do
                 end
 
                 local function removeFunction( identifier, ... )
+                    ArgAssert( identifier, 1, "string" )
                     if autoNames then
                         identifier = self:GetIdentifier( identifier )
                     end
@@ -695,11 +699,13 @@ do
                 environment.concommand = link
 
                 function link.Add( name, ... )
+                    ArgAssert( name, 1, "string" )
                     data[ name ] = true
                     return concommand.Add( name, ... )
                 end
 
                 function link.Remove( name, ... )
+                    ArgAssert( name, 1, "string" )
                     data[ name ] = nil
                     return concommand.Remove( name, ... )
                 end
@@ -721,6 +727,7 @@ do
                     environment.net = link
 
                     function link.Receive( messageName, ... )
+                        ArgAssert( messageName, 1, "string" )
                         if autoNames then
                             messageName = self:GetIdentifier( messageName )
                         end
@@ -730,6 +737,7 @@ do
                     end
 
                     function link.Start( messageName, ... )
+                        ArgAssert( messageName, 1, "string" )
                         if autoNames then
                             messageName = self:GetIdentifier( messageName )
                         end
@@ -747,6 +755,7 @@ do
                     environment.util = link
 
                     function link.AddNetworkString( messageName, ... )
+                        ArgAssert( messageName, 1, "string" )
                         if autoNames then
                             messageName = self:GetIdentifier( messageName )
                         end
@@ -772,6 +781,7 @@ do
                 environment.properties = link
 
                 function link.Add( name, ... )
+                    ArgAssert( name, 1, "string" )
                     if autoNames then
                         name = self:GetIdentifier( name )
                     end
