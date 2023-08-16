@@ -71,8 +71,9 @@ GetMetadata = promise.Async( function( importPath )
             return promise.Reject( result )
         end
 
-        if result.code ~= 200 then
-            return promise.Reject( "Package '%s' JSON download failed, wrong HTTP response code (" .. result.code .. ")." )
+        local code = result.code
+        if code ~= 200 then
+            return promise.Reject( "Package '%s' JSON download failed, response code: " .. code .. " ( " .. http.GetStatusDescription( code ) .. ")" )
         end
 
         local json = util.JSONToTable( body )
@@ -140,8 +141,9 @@ Import = promise.Async( function( metadata )
                     return promise.Reject( "Package '" .. importpath .. "' file '" .. filePath .. "' (" .. url .. ") download failed, " .. result .. "." )
                 end
 
-                if result.code ~= 200 then
-                    return promise.Reject( "Package '" .. importpath .. "' file '" .. filePath .. "' (" .. url .. ") download failed, wrong HTTP response code (" .. result.code .. ")." )
+                local code = result.code
+                if code ~= 200 then
+                    return promise.Reject( "Package '" .. importpath .. "' file '" .. filePath .. "' (" .. url .. ") download failed, response code: " .. code .. " ( " .. http.GetStatusDescription( code ) .. ")" )
                 end
 
                 files[ #files + 1 ] = {
@@ -225,8 +227,9 @@ Import = promise.Async( function( metadata )
         return promise.Reject( result )
     end
 
-    if result.code ~= 200 then
-        return promise.Reject( "Package '" .. importpath .. "' download failed, wrong HTTP response code (" .. result.code .. ")." )
+    local code = result.code
+    if code ~= 200 then
+        return promise.Reject( "Package '" .. importpath .. "' download failed, response code: " .. code .. " ( " .. http.GetStatusDescription( code ) .. ")" )
     end
 
     if extension == "lua" then
