@@ -145,7 +145,31 @@ function Read( filePath, gamePath, length )
     return content
 end
 
+function CreateDir( folderPath )
+    local currentPath
+    for _, folderName in ipairs( string.Split( folderPath, "/" ) ) do
+        if not folderName then continue end
+
+        currentPath = currentPath and ( currentPath .. "/" .. folderName ) or folderName
+        if file.IsDir( currentPath, "DATA" ) then continue end
+
+        Delete( currentPath )
+        file.CreateDir( currentPath )
+    end
+
+    return currentPath
+end
+
+function CreateFilePath( filePath )
+    local folder = string.GetPathFromFilename( filePath )
+    if folder then
+        return CreateDir( folder )
+    end
+end
+
 function Write( filePath, contents, fileMode )
+    CreateFilePath( filePath )
+
     local fileClass = Open( filePath, fileMode or "wb", "DATA" )
     if not fileClass then
         error( "Writing file 'data/" .. filePath .. "' was failed!" )
@@ -157,22 +181,6 @@ end
 
 function Append( filePath, contents )
     Write( filePath, contents, "ab" )
-end
-
-function CreateDir( folderPath )
-    local currentPath = nil
-
-    for _, folderName in ipairs( string.Split( folderPath, "/" ) ) do
-        if not folderName then continue end
-
-        currentPath = currentPath and ( currentPath .. "/" .. folderName ) or folderName
-        if IsDir( currentPath, "DATA" ) then continue end
-
-        Delete( currentPath )
-        file.CreateDir( currentPath )
-    end
-
-    return currentPath
 end
 
 function CompileLua( filePath, gamePath, handleError )
@@ -273,6 +281,7 @@ if asyncio ~= nil then
     end
 
     function AsyncWrite( filePath, content )
+        CreateFilePath( filePath )
         local p = promise.New()
 
         local status = asyncio.AsyncWrite( filePath, content, function( filePath, gamePath, status )
@@ -294,6 +303,7 @@ if asyncio ~= nil then
     end
 
     function AsyncAppend( filePath, content )
+        CreateFilePath( filePath )
         local p = promise.New()
 
         local status = asyncio.AsyncAppend( filePath, content, function( filePath, gamePath, status )
@@ -341,6 +351,7 @@ end
 
 if type( file.AsyncWrite ) == "function" then
     function AsyncWrite( filePath, content )
+        CreateFilePath( filePath )
         local p = promise.New()
 
         local status = file.AsyncWrite( filePath, content, function( filePath, status )
@@ -361,24 +372,16 @@ if type( file.AsyncWrite ) == "function" then
     end
 else
     function AsyncWrite( filePath, content )
-        local p = promise.New()
-
         Write( filePath, content )
-
-        if Exists( filePath, "DATA" ) then
-            p:Resolve( {
-                ["filePath"] = filePath
-            } )
-        else
-            p:Reject( "failed" )
-        end
-
-        return p
+        return promise.Resolve( {
+            ["filePath"] = filePath
+        } )
     end
 end
 
 if type( file.AsyncAppen ) == "function" then
     function AsyncAppend( filePath, content )
+        CreateFilePath( filePath )
         local p = promise.New()
 
         local status = file.AsyncAppend( filePath, content, function( filePath, status )
@@ -399,13 +402,9 @@ if type( file.AsyncAppen ) == "function" then
     end
 else
     function AsyncAppend( filePath, content )
-        local p = promise.New()
-
         Append( filePath, content )
-        p:Resolve( {
+        return promise.Resolve( {
             ["filePath"] = filePath
         } )
-
-        return p
     end
 end
