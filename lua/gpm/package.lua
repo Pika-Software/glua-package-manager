@@ -285,9 +285,16 @@ do
     end
 
     function PACKAGE:GetIdentifier( name )
-        local identifier = string.format( "%s@%s", self:GetName(), self:GetVersion() )
-        if type( name ) ~= "string" then return identifier end
-        return identifier .. "::" .. name
+        local identifier, version = self:GetName(), self:GetVersion()
+        if version ~= "unknown" then
+            identifier = identifier .. "@" .. version
+        end
+
+        if type( name ) == "string" then
+            return identifier .. "::" .. name
+        end
+
+        return identifier
     end
 
     function PACKAGE:GetSourceName()
