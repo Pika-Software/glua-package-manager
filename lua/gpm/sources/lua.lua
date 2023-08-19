@@ -95,16 +95,16 @@ end )
 if SERVER then
 
     function SendToClient( metadata )
-        local packagePath = metadata.packagepath
-        if packagePath then
-            AddCSLuaFile( paths.FormatToLua( packagePath ) )
-        end
-
         local importPath = metadata.importpath
         local isInFolder = fs.IsDir( importPath, "lsv" )
 
         local client = metadata.init.client
         if client then
+            local packagePath = metadata.packagepath
+            if packagePath then
+                AddCSLuaFile( paths.FormatToLua( packagePath ) )
+            end
+
             local filePath = importPath .. "/" .. client
             if fs.IsLuaFile( filePath, "lsv", true ) then
                 AddCSLuaFile( paths.FormatToLua( filePath ) )
