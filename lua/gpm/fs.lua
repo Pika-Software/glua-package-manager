@@ -103,7 +103,14 @@ function Exists( filePath, gamePath )
 end
 
 function IsDir( filePath, gamePath )
-    return IsMounted( filePath, gamePath, true ) or file.IsDir( filePath, gamePath )
+    if IsMounted( filePath, gamePath, true ) or file.IsDir( filePath, gamePath ) then return true end
+    if SERVER then return false end
+
+    local _, folders = Find( filePath .. "*", gamePath )
+    if folders == nil or #folders == 0 then return false end
+
+    local splits = string.Split( filePath, "/" )
+    return table.HasIValue( folders, splits[ #splits ] )
 end
 
 function IsFile( filePath, gamePath )
