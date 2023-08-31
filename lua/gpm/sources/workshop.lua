@@ -7,32 +7,31 @@ if SERVER and not steamworks and util.IsBinaryModuleInstalled( "workshop" ) and 
 end
 
 -- Libraries
+local steamworks = steamworks
 local promise = promise
-local gmad = gmad
 local fs = gpm.fs
 
 -- Variables
-local cacheFolder = gpm.TempPath
-local steamworks = steamworks
+local tempPath = gpm.TempPath
 local tonumber = tonumber
 local type = type
 
 module( "gpm.sources.workshop" )
 
 function CanImport( filePath )
-    return type( tonumber( filePath ) ) == "number"
+    return tonumber( filePath ) ~= nil
 end
 
 function Download( wsid )
-    if not steamworks and SERVER then
-        return promise.Reject( "There is no steamworks library on the server, it is required to work with the Steam Workshop, a supported binary: https://github.com/WilliamVenner/gmsv_workshop" )
+    if not steamworks then
+        return promise.Reject( "There is no steamworks library, it is required to work with the Steam Workshop, a supported binary for server side: https://github.com/WilliamVenner/gmsv_workshop" )
     end
 
     local p = promise.New()
     steamworks.DownloadUGC( wsid, function( filePath, fileClass )
         if type( filePath ) ~= "string" then
-            filePath = "unknown path"
-        elseif fs.IsFile( filePath, "GAME" ) then
+            filePath = "unknown/" .. wsid .. ".gma"
+        elseif fs.Exists( filePath, "GAME" ) then
             p:Resolve( filePath )
             return
         end
@@ -42,36 +41,27 @@ function Download( wsid )
             return
         end
 
-        local gmaReader = gmad.Open( fileClass )
-        if not gmaReader then
-            p:Reject( "Unknown error reading downloaded GMA file '" .. filePath .. "' failed." )
-            return
+        local content = fileClass:Read( fileClass:Size() )
+        if not content or #content == 0 then
+            return p:Reject( "GMA file '" .. filePath .. "' is corrupted and unreadable." )
         end
 
-        gmaReader:ReadAllFiles()
-        gmaReader:Close()
-
-        local gmaPath = cacheFolder .. "workshop_" .. wsid .. ".gma.dat"
-        if fs.IsFile( gmaPath, "DATA" ) then
-            fs.Delete( gmaPath )
+        local tepmFile = tempPath .. "workshop_" .. wsid .. ".gma.dat"
+        if fs.IsFile( tepmFile, "DATA" ) then
+            fs.Delete( tepmFile )
         end
 
-        local gmaWriter = gmad.Write( gmaPath )
-        if not gmaWriter then
-            if fs.IsFile( gmaPath, "DATA" ) then
-                gpm.Logger:Warn( "GMA file '" .. gmaPath .. "' cannot be written, it is probably already mounted to the game, try restarting the game." )
-            else
-                p:Reject( "Unknown GMA file '" .. gmaPath .. "' writing error." )
-            end
-
-            return
+        if fs.IsFile( tepmFile, "DATA" ) then
+            return p:Resolve( "data/" .. tepmFile )
         end
 
-        gmaWriter.Metadata = gmaReader.Metadata
-        gmaWriter.Files = gmaReader.Files
-        gmaWriter:Close()
+        fs.Write( tepmFile, content )
 
-        p:Resolve( "data/" .. gmaPath )
+        if not fs.IsFile( tepmFile, "DATA" ) then
+            return p:Reject( "Writing GMA '" .. tepmFile .. "' file was failed." )
+        end
+
+        p:Resolve( "data/" .. tepmFile )
     end )
 
     return p
