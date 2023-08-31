@@ -114,11 +114,11 @@ end
 
 -- Default debug filter
 local developer = GetConVar( "developer" )
+local setmetatable = setmetatable
+
 local function debugFilter()
     return developer:GetInt() > 0
 end
-
-local setmetatable = setmetatable
 
 function gpm.CreateLogger( name, color )
     ArgAssert( name, 1, "string" )
