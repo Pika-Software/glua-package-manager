@@ -438,6 +438,7 @@ local codes = {
     [409] = {"Conflict", "The server encountered a conflict with the request sent with the current state of the server"},
     [410] = {"Gone", "The requested content has been deleted from the server"},
     [411] = {"Length Required", "The server rejected the request because the Content-Length is not defined"},
+    [418] = {"I'm a teapot", "This client error response code indicates that the server refuses to brew coffee because it is, permanently, a teapot."},
     [429] = {"Rate limit reached for requests", "This error message indicates that you have hit your assigned rate limit for the API"},
 
     --[[--------------------
@@ -455,9 +456,7 @@ local codes = {
 
 function http.GetStatusDescription( code )
     local data = codes[ code ]
-    if not data then
-        return "I'm a teapot", "Any attempt to brew coffee with a teapot should result in the error code \"418 I'm a teapot\". The resulting entity body MAY be short and stout."
+    if data then
+        return data[ 1 ], data[ 2 ]
     end
-
-    return data[ 1 ], data[ 2 ]
 end
