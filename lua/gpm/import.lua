@@ -95,9 +95,9 @@ do
         return true
     end
 
-    local tasks = gpm.ImportTasks
+    local tasks = gpm.Tasks
     if type( tasks ) ~= "table" then
-        tasks = {}; gpm.ImportTasks = tasks
+        tasks = {}; gpm.Tasks = tasks
     end
 
     gpm.SourceImport = promise.Async( function( sourceName, importPath )

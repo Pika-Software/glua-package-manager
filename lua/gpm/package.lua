@@ -968,8 +968,8 @@ do
         end
 
         local importPath = self:GetImportPath()
-        gpm.ImportTasks[ importPath ] = nil
         gpm.Packages[ importPath ] = nil
+        gpm.Tasks[ importPath ] = nil
         self.Installed = nil
 
         logger:Info( "Package '%s' was successfully uninstalled, took %.4f seconds.", self:GetIdentifier(), SysTime() - stopwatch )
