@@ -40,16 +40,10 @@ local type = type
 
 module( "gpm.fs" )
 
-Delete = file.Delete
-Rename = file.Rename
+Move = file.Rename
 Open = file.Open
 Find = file.Find
-Size = file.Size
 Time = file.Time
-
-function IsFile( ... )
-    return Exists( ... ) and not IsDir( ... )
-end
 
 function MountGMA( gmaPath )
     error( "Not yet implemented." )
@@ -143,6 +137,25 @@ function IsLuaFile( filePath, gamePath, compileMoon )
     return IsFile( filePath .. ".lua", gamePath )
 end
 
+function Size( filePath, gamePath )
+    if IsDir( filePath, gamePath ) then
+        local files, folders = Find( paths.Join( filePath, "*" ), gamePath )
+        local size = 0
+
+        for _, folderName in ipairs( folders ) do
+            size = size + Size( paths.Join( filePath, folderName ), gamePath )
+        end
+
+        for _, fileName in ipairs( files ) do
+            size = size + Size( paths.Join( filePath, fileName ), gamePath )
+        end
+
+        return size
+    end
+
+    return file.Size( filePath, gamePath )
+end
+
 function Read( filePath, gamePath, length )
     local fileClass = Open( filePath, "rb", gamePath )
     if not fileClass then return end
@@ -150,6 +163,29 @@ function Read( filePath, gamePath, length )
     local content = fileClass:Read( length )
     fileClass:Close()
     return content
+end
+
+function Delete( filePath, gamePath, force )
+    gamePath = gamePath or "DATA"
+
+    if IsDir( filePath, gamePath ) then
+        if force then
+            local files, folders = Find( paths.Join( filePath, "*" ), gamePath )
+            for _, folderName in ipairs( folders ) do
+                Delete( paths.Join( filePath, folderName ), gamePath, force )
+            end
+
+            for _, fileName in ipairs( files ) do
+                Delete( paths.Join( filePath, fileName ), gamePath, force )
+            end
+        end
+
+        file.Delete( filePath, gamePath )
+        return not IsDir( filePath, gamePath )
+    end
+
+    file.Delete( filePath, gamePath )
+    return not IsFile( filePath, gamePath )
 end
 
 function CreateDir( folderPath )
