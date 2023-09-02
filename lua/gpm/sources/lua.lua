@@ -9,11 +9,13 @@ local table = table
 local fs = gpm.fs
 
 -- Variables
+local utils_LowerTableKeys = gpm.utils.LowerTableKeys
 local SERVER, MENU_DLL = SERVER, MENU_DLL
 local AddCSLuaFolder = gpm.AddCSLuaFolder
 local AddCSLuaFile = AddCSLuaFile
 local ipairs = ipairs
 local error = error
+local type = type
 
 if ( SERVER or MENU_DLL ) and efsw ~= nil then
 
@@ -72,12 +74,29 @@ GetMetadata = promise.Async( function( importPath )
     importPath = paths.Fix( importPath )
     local metadata = {}
 
-    if fs.IsDir( importPath, "LUA" ) then
+    local isFolder = fs.IsDir( importPath, "LUA" )
+    if isFolder then
         local packagePath = importPath .. "/package.lua"
         if fs.IsLuaFile( packagePath, "LUA", true ) then
-            metadata.packagepath = packagePath
             table.Merge( metadata, package.ExtractMetadata( gpm.CompileLua( packagePath ) ) )
+
+            if SERVER then
+                utils_LowerTableKeys( metadata )
+
+                local send = metadata.send
+                if type( send ) ~= "table" then
+                    send = {}; metadata.send = send
+                end
+
+                send[ #send + 1 ] = "package.lua"
+            end
         else
+            local initPath = importPath .. "/init.lua"
+            if not fs.IsLuaFile( initPath, "LUA", true ) then
+                return promise.Reject( "Package '" .. importPath .. "' missing entry point and package information, execution impossible." )
+            end
+
+            metadata.init = initPath
             metadata.autorun = true
         end
     elseif fs.IsFile( importPath, "LUA" ) then
@@ -85,26 +104,9 @@ GetMetadata = promise.Async( function( importPath )
         metadata.autorun = true
     end
 
-    if SERVER or MENU_DLL then
-        fs.Watch( importPath, "lsv", true )
-    end
-
-    return metadata
-end )
-
-if SERVER then
-
-    function SendToClient( metadata )
-        local importPath = metadata.importpath
-        local isInFolder = fs.IsDir( importPath, "lsv" )
-
-        local client = metadata.init.client
+    if SERVER then
+        local client = package.FormatInit( metadata.init ).client
         if client then
-            local packagePath = metadata.packagepath
-            if packagePath then
-                AddCSLuaFile( paths.FormatToLua( packagePath ) )
-            end
-
             local filePath = importPath .. "/" .. client
             if fs.IsLuaFile( filePath, "lsv", true ) then
                 AddCSLuaFile( paths.FormatToLua( filePath ) )
@@ -115,28 +117,33 @@ if SERVER then
 
         local send = metadata.send
         if send then
-            for _, filePath in ipairs( send ) do
-                if isInFolder then
-                    local localFilePath = importPath .. "/" .. filePath
-                    if fs.IsDir( localFilePath, "lsv" ) then
-                        AddCSLuaFolder( localFilePath )
+            for _, fileName in ipairs( send ) do
+                if isFolder then
+                    local filePath = importPath .. "/" .. fileName
+                    if fs.IsDir( filePath, "lsv" ) then
+                        AddCSLuaFolder( filePath )
                         continue
-                    elseif fs.IsLuaFile( localFilePath, "lsv", true ) then
-                        AddCSLuaFile( paths.FormatToLua( localFilePath ) )
+                    elseif fs.IsLuaFile( filePath, "lsv", true ) then
+                        AddCSLuaFile( paths.FormatToLua( filePath ) )
                         continue
                     end
                 end
 
-                if fs.IsDir( filePath, "lsv" ) then
-                    AddCSLuaFolder( filePath )
-                elseif fs.IsLuaFile( filePath, "lsv", true ) then
-                    AddCSLuaFile( paths.FormatToLua( filePath ) )
+                if fs.IsDir( fileName, "lsv" ) then
+                    AddCSLuaFolder( fileName )
+                elseif fs.IsLuaFile( fileName, "lsv", true ) then
+                    AddCSLuaFile( paths.FormatToLua( fileName ) )
                 end
             end
         end
     end
 
-end
+    if SERVER or MENU_DLL then
+        fs.Watch( importPath, "lsv", true )
+    end
+
+    return metadata
+end )
 
 function CompileInit( metadata )
     local absolutePath = package.GetCurrentInitByRealm( metadata.init )
