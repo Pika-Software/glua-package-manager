@@ -128,6 +128,10 @@ do
 
         task = source.Import( metadata )
         tasks[ importPath ] = task
+        task:Catch( function()
+            tasks[ importPath ] = nil
+        end )
+
         return task
     end )
 
