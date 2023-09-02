@@ -163,10 +163,6 @@ end )
 Reload = promise.Async( function( pkg, metadata )
     table.Empty( pkg.Files )
 
-    if SERVER then
-        SendToClient( metadata )
-    end
-
     pkg.Init = CompileInit( metadata )
 
     local ok, result = pkg:Initialize( metadata ):SafeAwait()

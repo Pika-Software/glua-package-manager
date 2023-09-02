@@ -58,14 +58,8 @@ do
 
     function gpm.CanBeInstalled( metadata, source )
         local init = metadata.init
-        if SERVER then
-            if ( init.client or metadata.send ) and source.SendToClient then
-                source.SendToClient( metadata, source )
-            end
-
-            if not init.server then
-                return false, "package does not support running on the server"
-            end
+        if SERVER and not init.server then
+            return false, "package does not support running on the server"
         end
 
         if CLIENT and not init.client then
