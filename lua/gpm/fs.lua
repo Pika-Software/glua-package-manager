@@ -119,17 +119,14 @@ function IsLuaFile( filePath, gamePath, compileMoon )
 
     filePath = string.sub( filePath, 1, #filePath - ( extension ~= nil and ( #extension + 1 ) or 0 ) )
 
-    if ( SERVER or MENU_DLL ) and moonloader ~= nil then
+    if compileMoon and ( SERVER or MENU_DLL ) and moonloader ~= nil then
         local moonPath = filePath  .. ".moon"
         if IsFile( moonPath, gamePath ) then
-            if compileMoon then
-                if not moonloader.PreCacheFile( moonPath ) then
-                    error( "Compiling Moonscript file '" .. moonPath .. "' into Lua is failed!" )
-                end
-
-                logger:Debug( "The MoonScript file '%s' was successfully compiled into Lua.", moonPath )
+            if not moonloader.PreCacheFile( moonPath ) then
+                error( "Compiling Moonscript file '" .. moonPath .. "' into Lua is failed!" )
             end
 
+            logger:Debug( "The MoonScript file '%s' was successfully compiled into Lua.", moonPath )
             return true
         end
     end
