@@ -251,10 +251,10 @@ function CompileMoon( filePath, gamePath, handleError )
     return CompileMoonString( content, filePath, handleError )
 end
 
-Watch = debug_fempty
-UnWatch = debug_fempty
-
-if efsw ~= nil then
+if not efsw then
+    Watch = debug_fempty
+    UnWatch = debug_fempty
+else
     local watchList = efsw.WatchList
     if type( watchList ) ~= "table" then
         watchList = {}; efsw.WatchList = watchList
