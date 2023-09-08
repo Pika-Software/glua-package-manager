@@ -152,13 +152,11 @@ do
 
                 local ok, message = gpm.CanBeInstalled( metadata, source )
                 if not ok then
-                    logger:Error( "Package '%s' import failed, %s.", importPath, message )
-                    return
+                    return promise.Reject( message )
                 end
 
                 if autorun and not metadata.autorun then
-                    logger:Debug( "Package '%s' autorun restricted.", importPath )
-                    return
+                    return promise.Reject( "autorun restricted." )
                 end
 
                 task = gpm.SourceImport( sourceName, importPath )
