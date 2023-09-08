@@ -63,12 +63,25 @@ Import = promise.Async( function( metadata )
             if ok then
                 xpcall( result, ErrorNoHaltWithStack )
             end
-        elseif string.StartsWith( luaPath, "packages/" ) then
-            local importPath = string.match( luaPath, "packages/[^/]+" )
-            if not importPath then continue end
 
-            if table.HasIValue( importPaths, importPath ) then continue end
-            importPaths[ #importPaths + 1 ] = importPath
+            continue
+        end
+
+        if string.StartsWith( luaPath, "includes/modules/" ) then
+            if not table.HasIValue( importPaths, luaPath ) and string.GetExtensionFromFilename( luaPath ) == "lua" then
+                importPaths[ #importPaths + 1 ] = luaPath
+            end
+
+            continue
+        end
+
+        local importPath = string.match( luaPath, "^packages/[^/]+" )
+        if importPath then
+            if not table.HasIValue( importPaths, importPath ) then
+                importPaths[ #importPaths + 1 ] = importPath
+            end
+
+            continue
         end
     end
 
