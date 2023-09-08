@@ -139,7 +139,7 @@ GetMetadata = promise.Async( function( importPath )
     end
 
     if SERVER or MENU_DLL then
-        fs.Watch( importPath, "lsv", true )
+        fs.Watch( importPath, "LUA", true )
     end
 
     return metadata
