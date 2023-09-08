@@ -21,9 +21,7 @@ if not sources then
 end
 
 do
-
     local sourcesFolder = "gpm/sources/"
-
     for _, fileName in ipairs( fs.Find( sourcesFolder .. "*", "LUA" ) ) do
         local filePath = sourcesFolder .. fileName
         if SERVER then
@@ -32,7 +30,6 @@ do
 
         include( filePath )
     end
-
 end
 
 local activeGamemode = engine.ActiveGamemode()
@@ -106,7 +103,6 @@ do
         end
 
         local metadata = {}
-
         if type( source.GetMetadata ) == "function" then
             local ok, result = source.GetMetadata( importPath ):SafeAwait()
             if not ok then
@@ -144,7 +140,6 @@ do
                 if not source.CanImport( importPath ) then continue end
 
                 local metadata = {}
-
                 if type( source.GetMetadata ) == "function" then
                     local ok, result = source.GetMetadata( importPath ):SafeAwait()
                     if not ok then return promise.Reject( result ) end
@@ -153,7 +148,6 @@ do
 
                 metadata.importpath = importPath
                 metadata.sourcename = sourceName
-
                 package.FormatMetadata( metadata )
 
                 local ok, message = gpm.CanBeInstalled( metadata, source )
@@ -251,18 +245,18 @@ function gpm.ImportFolder( folderPath, pkg2, autorun )
         return
     end
 
-    logger:Info( "Started import from folder: %s", folderPath )
+    logger:Info( "Started import packages from folder: '%s'", folderPath )
 
     local files, folders = fs.Find( folderPath .. "/*", "LUA" )
-    for _, folderName in ipairs( folders ) do
-        local importPath = folderPath .. "/" .. folderName
+    for _, fileName in ipairs( files ) do
+        local importPath = folderPath .. "/" .. fileName
         gpm.AsyncImport( importPath, pkg2, autorun ):Catch( function( message )
             logger:Error( "Package '%s' import failed, %s", importPath, message )
         end )
     end
 
-    for _, fileName in ipairs( files ) do
-        local importPath = folderPath .. "/" .. fileName
+    for _, folderName in ipairs( folders ) do
+        local importPath = folderPath .. "/" .. folderName
         gpm.AsyncImport( importPath, pkg2, autorun ):Catch( function( message )
             logger:Error( "Package '%s' import failed, %s", importPath, message )
         end )
