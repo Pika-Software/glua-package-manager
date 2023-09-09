@@ -14,7 +14,6 @@ local SERVER, MENU_DLL = SERVER, MENU_DLL
 local AddCSLuaFolder = gpm.AddCSLuaFolder
 local AddCSLuaFile = AddCSLuaFile
 local ipairs = ipairs
-local error = error
 local type = type
 
 if ( SERVER or MENU_DLL ) and efsw ~= nil then
