@@ -1,7 +1,8 @@
 [![Lint](https://github.com/Pika-Software/glua_package_manager/actions/workflows/glualint-check.yml/badge.svg)](https://github.com/Pika-Software/glua_package_manager/actions/workflows/glualint-check.yml)
 
 # GLua Package Manager
-Package manager supporting isolation, synchronous import, package dependency building and more.
+This addon is a powerful library/loader. It allows automatically build complex chains of libraries and other packages, no matter what source they are. It can load code from remote sources and control the startup process, supports various binary modules to extend its own features.
+Contains several useful libraries and actively uses and implements asynchronous code execution.
 
 ## Features
 - Package information structure like [package.json](https://docs.npmjs.com/cli/v6/configuring-npm/package-json)
