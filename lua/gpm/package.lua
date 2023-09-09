@@ -452,16 +452,18 @@ do
             -- import
             do
 
-                local function import( importPath, async, pkg2 )
+                local function import( importPath, async, parent )
                     local task
-                    if IsPackage( pkg2 ) then
-                        task = gpm.Import( importPath, true, pkg2 )
+                    if IsPackage( parent ) then
+                        task = gpm.Import( importPath, true, parent )
                     else
                         task = gpm.Import( importPath, true, self )
                     end
 
                     if not async then
-                        local result = task:Await()
+                        local ok, result = task:SafeAwait()
+                        if not ok then error( result, 2 ) end
+
                         if IsPackage( result ) then
                             return result:GetResult(), result
                         end
@@ -479,7 +481,9 @@ do
 
             -- install
             environment.install = function( ... )
-                local result = gpm.Install( self, true, ... ):Await()
+                local ok, result = gpm.Install( self, true, ... ):SafeAwait()
+                if not ok then error( result, 2 ) end
+
                 if IsPackage( result ) then
                     return result:GetResult(), result
                 end
@@ -487,16 +491,18 @@ do
                 return result
             end
 
-            gpml.Install = function( pkg2, async, ... )
+            gpml.Install = function( parent, async, ... )
                 local task
-                if IsPackage( pkg2 ) then
-                    task = gpm.Install( pkg2, true, ... )
+                if IsPackage( parent ) then
+                    task = gpm.Install( parent, true, ... )
                 else
                     task = gpm.Install( self, true, ... )
                 end
 
                 if not async then
-                    local result = task:Await()
+                    local ok, result = task:SafeAwait()
+                    if not ok then error( result, 2 ) end
+
                     if IsPackage( result ) then
                         return result:GetResult(), result
                     end
@@ -523,7 +529,10 @@ do
                     if folder then
                         local filePath = folder .. fileName
                         if fs.IsLuaFile( filePath, "LUA", true ) then
-                            local func = debug.setfenv( gpm.CompileLua( filePath ), environment )
+                            local ok, result = gpm.CompileLua( filePath ):SafeAwait()
+                            if not ok then error( result, 2 ) end
+
+                            local func = debug.setfenv( result, environment )
                             files[ fileName ] = func
                             return func( self )
                         end
@@ -531,12 +540,15 @@ do
                 end
 
                 if fs.IsLuaFile( fileName, "LUA", true ) then
-                    local func = debug.setfenv( gpm.CompileLua( fileName ), environment )
+                    local ok, result = gpm.CompileLua( fileName ):SafeAwait()
+                    if not ok then error( result, 2 ) end
+
+                    local func = debug.setfenv( result, environment )
                     files[ fileName ] = func
                     return func( self )
                 end
 
-                error( "Couldn't include file '" .. fileName .. "' - File not found" )
+                error( "Couldn't include file '" .. fileName .. "' - File not found", 2 )
             end
 
             -- require
@@ -553,7 +565,7 @@ do
                         local ok, pkg = gpm.AsyncImport( name, self, false ):SafeAwait()
                         if not ok then
                             if index ~= lenght then continue end
-                            error( pkg )
+                            error( pkg, 2 )
                         end
 
                         return pkg
@@ -566,7 +578,7 @@ do
                     if util.IsLuaModuleInstalled( name ) then
                         local ok, pkg = gpm.SourceImport( "lua", "includes/modules/" .. name .. ".lua" ):SafeAwait()
                         if not ok then
-                            error( pkg )
+                            error( pkg, 2 )
                         end
 
                         Link( self, pkg )
@@ -574,7 +586,7 @@ do
                     end
                 end
 
-                error( "Not one of the listed packages could be required." )
+                error( "Not one of the listed packages could be required.", 2 )
             end
 
             local callbacks = self.Callbacks
