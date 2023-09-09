@@ -217,34 +217,34 @@ function ExtractMetadata( func )
     return metadata
 end
 
-function Link( pkg, target )
-    if not pkg or not target then return false end
-    ArgAssert( pkg, 1, "Package" )
+function Link( parent, child )
+    if not parent or not child then return false end
+    ArgAssert( parent, 1, "Package" )
 
-    if IsPackage( target ) then
-        local ok, message = pcall( pkg.Link, pkg, target )
+    if IsPackage( child ) then
+        local ok, message = pcall( parent.Link, parent, child )
         if not ok then
-            logger:Error( "Linking package '%s' to package '%s' failed, %s.", pkg:GetIdentifier(), target:GetIdentifier(), message )
+            logger:Error( "Linking package '%s' to package '%s' failed, %s.", parent:GetIdentifier(), child:GetIdentifier(), message )
         end
 
         return true
     end
 
-    if promise.IsPromise( target ) then
-        if target:IsPending() then
-            target:Then( function( result )
-                Link( pkg, result )
+    if promise.IsPromise( child ) then
+        if child:IsPending() then
+            child:Then( function( result )
+                Link( parent, result )
             end )
-        elseif target:IsFulfilled() then
-            Link( pkg, target:GetResult() )
+        elseif child:IsFulfilled() then
+            Link( parent, child:GetResult() )
         end
 
         return true
     end
 
-    if type( target ) == "table" then
-        for _, subTarget in ipairs( target ) do
-            Link( pkg, subTarget )
+    if type( child ) == "table" then
+        for _, subChild in ipairs( child ) do
+            Link( parent, subChild )
         end
 
         return true

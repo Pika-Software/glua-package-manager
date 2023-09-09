@@ -131,7 +131,7 @@ do
         return task
     end )
 
-    gpm.AsyncImport = promise.Async( function( importPath, pkg, autorun )
+    gpm.AsyncImport = promise.Async( function( importPath, parent, autorun )
         local task = tasks[ importPath ]
         if not task then
             for _, sourceName in ipairs( sourceList ) do
@@ -168,16 +168,16 @@ do
             end
         end
 
-        package.Link( pkg, task )
+        package.Link( parent, task )
         return task
     end )
 
 end
 
-function gpm.Import( importPath, async, pkg2 )
+function gpm.Import( importPath, async, parent )
     assert( async or promise.RunningInAsync(), "import supposed to be running in coroutine/async function (do you running it from package)" )
 
-    local task = gpm.AsyncImport( importPath, pkg2 )
+    local task = gpm.AsyncImport( importPath, parent )
     if not async then
         local ok, result = task:SafeAwait()
         if not ok then
@@ -196,14 +196,14 @@ end
 
 _G.import = gpm.Import
 
-gpm.AsyncInstall = promise.Async( function( pkg2, ... )
+gpm.AsyncInstall = promise.Async( function( parent, ... )
     local arguments = {...}
     local length = #arguments
 
     for index, importPath in ipairs( arguments ) do
         if not gpm.CanImport( importPath ) then continue end
 
-        local ok, result = gpm.AsyncImport( importPath, pkg2, false ):SafeAwait()
+        local ok, result = gpm.AsyncImport( importPath, parent, false ):SafeAwait()
         if not ok then
             if index ~= length then continue end
             return promise.Reject( result )
@@ -215,10 +215,10 @@ gpm.AsyncInstall = promise.Async( function( pkg2, ... )
     return promise.Reject( "Not one of the listed packages '" .. table.concat( arguments, ", " ) .. "' could be imported." )
 end )
 
-function gpm.Install( pkg2, async, ... )
+function gpm.Install( parent, async, ... )
     assert( async or promise.RunningInAsync(), "import supposed to be running in coroutine/async function (do you running it from package)" )
 
-    local task = gpm.AsyncInstall( pkg2, ... )
+    local task = gpm.AsyncInstall( parent, ... )
     if not async then
         local ok, result = task:SafeAwait()
         if not ok then
@@ -237,7 +237,7 @@ end
 
 _G.install = gpm.Install
 
-function gpm.ImportFolder( folderPath, pkg2, autorun )
+function gpm.ImportFolder( folderPath, parent, autorun )
     if not fs.IsDir( folderPath, "LUA" ) then
         logger:Warn( "Import impossible, folder '%s' does not exist, skipping...", folderPath )
         return
@@ -248,14 +248,14 @@ function gpm.ImportFolder( folderPath, pkg2, autorun )
     local files, folders = fs.Find( folderPath .. "/*", "LUA" )
     for _, fileName in ipairs( files ) do
         local importPath = folderPath .. "/" .. fileName
-        gpm.AsyncImport( importPath, pkg2, autorun ):Catch( function( message )
+        gpm.AsyncImport( importPath, parent, autorun ):Catch( function( message )
             logger:Error( "Package '%s' import failed, %s", importPath, message )
         end )
     end
 
     for _, folderName in ipairs( folders ) do
         local importPath = folderPath .. "/" .. folderName
-        gpm.AsyncImport( importPath, pkg2, autorun ):Catch( function( message )
+        gpm.AsyncImport( importPath, parent, autorun ):Catch( function( message )
             logger:Error( "Package '%s' import failed, %s", importPath, message )
         end )
     end

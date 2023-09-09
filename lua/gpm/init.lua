@@ -32,7 +32,7 @@ Msg( [[
 module( "gpm", package.seeall )
 
 StartTime = SysTime()
-VERSION = "1.50.0"
+VERSION = "1.51.0"
 
 if not Colors then
     Realm = "unknown"
