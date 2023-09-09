@@ -32,7 +32,7 @@ Msg( [[
 module( "gpm", package.seeall )
 
 StartTime = SysTime()
-VERSION = "1.52.0"
+VERSION = "1.52.1"
 
 if not Colors then
     Realm = "unknown"
@@ -313,11 +313,6 @@ end
 includeComponent "commands"
 ClearCache()
 
-if SERVER or MENU_DLL or game.IsDedicated() then
-    ImportFolder( "packages", nil, true )
-else
-    util.NextTick( ImportFolder, "packages", nil, true )
-end
-
+ImportFolder( "packages", nil, true )
 Logger:Info( "Time taken to start-up: %.4f sec.", SysTime() - StartTime )
 hook.Run( "GPM - Initialized" )

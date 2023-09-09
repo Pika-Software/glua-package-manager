@@ -227,9 +227,9 @@ local asyncSources = {
     {
         CanBeInstalled = asyncio ~= nil,
         Functions = {
-            append = asyncio.Append,
-            write = asyncio.Write,
-            read = asyncio.Read
+            append = asyncio and asyncio.Append,
+            write = asyncio and asyncio.Write,
+            read = asyncio and asyncio.Read
         }
     },
     {
