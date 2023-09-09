@@ -78,7 +78,10 @@ GetMetadata = promise.Async( function( importPath )
     if isFolder then
         local packagePath = importPath .. "/package.lua"
         if fs.IsLuaFile( packagePath, "LUA", true ) then
-            table.Merge( metadata, package.ExtractMetadata( gpm.CompileLua( packagePath ) ) )
+            local ok, result = gpm.CompileLua( packagePath ):SafeAwait()
+            if not ok then return promise.Reject( result ) end
+
+            table.Merge( metadata, package.ExtractMetadata( result ) )
 
             if SERVER then
                 utils_LowerTableKeys( metadata )
@@ -160,27 +163,27 @@ function CompileInit( metadata )
         return gpm.CompileLua( absolutePath )
     end
 
-    error( "Package '" .. metadata.importpath .. "' init file '" .. absolutePath .. "' is missing.", 2 )
+    return promise.Reject( "Package '" .. metadata.importpath .. "' init file '" .. absolutePath .. "' is missing." )
 end
 
 Import = promise.Async( function( metadata )
-    return package.Initialize( metadata, CompileInit( metadata ) )
+    local ok, result = CompileInit( metadata ):SafeAwait()
+    if not ok then return promise.Reject( result ) end
+    return package.Initialize( metadata, result )
 end )
 
 Reload = promise.Async( function( pkg, metadata )
     table.Empty( pkg.Files )
 
-    pkg.Init = CompileInit( metadata )
+    local ok, result = CompileInit( metadata ):SafeAwait()
+    if not ok then return promise.Reject( result ) end
+    pkg.Init = result
 
     local ok, result = pkg:Initialize( metadata ):SafeAwait()
-    if not ok then
-        return promise.Reject( result )
-    end
+    if not ok then return promise.Reject( result ) end
 
     local ok, result = pkg:Run():SafeAwait()
-    if not ok then
-        return promise.Reject( result )
-    end
+    if not ok then return promise.Reject( result ) end
 
     return result
 end )

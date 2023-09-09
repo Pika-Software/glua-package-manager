@@ -9,10 +9,10 @@ local fs = gpm.fs
 -- Variables
 local ErrorNoHaltWithStack = ErrorNoHaltWithStack
 local util_JSONToTable = util.JSONToTable
+local debug_fcall = debug.fcall
 local gmad_Open = gmad.Read
 local MENU_DLL = MENU_DLL
 local ipairs = ipairs
-local xpcall = xpcall
 
 module( "gpm.sources.gma" )
 
@@ -59,11 +59,7 @@ Import = promise.Async( function( metadata )
                 continue
             end
 
-            local ok, result = xpcall( gpm.CompileLua, ErrorNoHaltWithStack, luaPath )
-            if ok then
-                xpcall( result, ErrorNoHaltWithStack )
-            end
-
+            gpm.CompileLua( luaPath ):Then( debug_fcall, ErrorNoHaltWithStack )
             continue
         end
 

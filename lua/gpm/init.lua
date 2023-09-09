@@ -173,23 +173,16 @@ do
 
     local CompileFile = CompileFile
 
-    function CompileLua( filePath )
-        local ok, result = pcall( fs.CompileLua, filePath, "LUA" )
-        if ok then
-            return result
-        end
+    CompileLua = promise.Async( function( filePath )
+        local ok, result = fs.CompileLua( filePath, "LUA" ):SafeAwait()
+        if ok then return result end
 
-        if MENU_DLL then
-            error( result )
-        end
+        if MENU_DLL then return promise.Reject( result ) end
 
         local func = CompileFile( filePath )
-        if not func then
-            error( "File compilation '" .. filePath .. "' failed, unknown error." )
-        end
-
+        if not func then return promise.Reject( result ) end
         return func
-    end
+    end )
 
 end
 
