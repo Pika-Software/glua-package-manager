@@ -45,27 +45,24 @@ Open = file.Open
 Find = file.Find
 Time = file.Time
 
-function MountGMA( gmaPath )
-    error( "Not yet implemented." )
-end
-
 if type( MountedFiles ) ~= "table" then
     MountedFiles = {}
 end
 
-if not MENU_DLL then
+if MENU_DLL then
+    function MountGMA( gmaPath )
+        error( "Not yet implemented." )
+    end
+else
     function MountGMA( gmaPath )
         local ok, files = game_MountGMA( gmaPath )
-        if ok then
-            for _, filePath in ipairs( files ) do
-                table.insert( MountedFiles, 1, filePath )
-            end
+        if not ok then error( "gma could not be mounted" ) end
 
-            logger:Debug( "GMA file '%s' was mounted to GAME with %d files.", gmaPath, #files  )
-        else
-            logger:Error( "GMA file '%s' mounting failed.", gmaPath )
+        for _, filePath in ipairs( files ) do
+            table.insert( MountedFiles, 1, filePath )
         end
 
+        logger:Debug( "GMA file '%s' was mounted to GAME with %d files.", gmaPath, #files  )
         return ok, files
     end
 end
@@ -297,38 +294,32 @@ else
     end
 end
 
-if asyncio ~= nil then
-    function AsyncRead( filePath, gamePath )
-        local p = promise.New()
+function AsyncRead( fileName, gameDir )
+    local p = promise.New()
 
-        local status = asyncio.AsyncRead( filePath, gamePath, function( filePath, gamePath, status, content )
-            if status ~= 0 then
-                return p:Reject( "Async read error, code: " .. status )
-            end
+    local status = file.AsyncRead( fileName, gameDir, function( filePath, gamePath, code, content )
+        if code ~= 0 then return p:Reject( "FSASYNC_ERR: " .. code ) end
+        p:Resolve( {
+            ["filePath"] = filePath,
+            ["gamePath"] = gamePath,
+            ["content"] = content
+        } )
+    end )
 
-            p:Resolve( {
-                ["filePath"] = filePath,
-                ["gamePath"] = gamePath,
-                ["content"] = content
-            } )
-        end )
-
-        if status ~= 0 then
-            p:Reject( "Async read error, code: " .. status )
-        end
-
-        return p
+    if status ~= 0 then
+        p:Reject( "Async read error, code: " .. status )
     end
 
-    function AsyncWrite( filePath, content )
-        CreateFilePath( filePath )
+    return p
+end
+
+if asyncio ~= nil then
+    function AsyncWrite( fileName, content )
+        CreateFilePath( fileName )
         local p = promise.New()
 
-        local status = asyncio.AsyncWrite( filePath, content, function( filePath, gamePath, status )
-            if status ~= 0 then
-                return p:Reject( "Async write error, code: " .. status )
-            end
-
+        local status = asyncio.AsyncWrite( fileName, content, function( filePath, gamePath, code )
+            if code ~= 0 then return p:Reject( "FSASYNC_ERR: " .. code ) end
             p:Resolve( {
                 ["filePath"] = filePath,
                 ["gamePath"] = gamePath
@@ -342,15 +333,12 @@ if asyncio ~= nil then
         return p
     end
 
-    function AsyncAppend( filePath, content )
-        CreateFilePath( filePath )
+    function AsyncAppend( fileName, content )
+        CreateFilePath( fileName )
         local p = promise.New()
 
-        local status = asyncio.AsyncAppend( filePath, content, function( filePath, gamePath, status )
-            if status ~= 0 then
-                return p:Reject( "Async append error, code: " .. status )
-            end
-
+        local status = asyncio.AsyncAppend( fileName, content, function( filePath, gamePath, code )
+            if code ~= 0 then return p:Reject( "FSASYNC_ERR: " .. code ) end
             p:Resolve( {
                 ["filePath"] = filePath,
                 ["gamePath"] = gamePath
@@ -367,38 +355,13 @@ if asyncio ~= nil then
     return
 end
 
-function AsyncRead( filePath, gamePath )
-    local p = promise.New()
-
-    local status = file.AsyncRead( filePath, gamePath, function( filePath, gamePath, status, content )
-        if status ~= 0 then
-            return p:Reject( "Async read error, code: " .. status )
-        end
-
-        p:Resolve( {
-            ["filePath"] = filePath,
-            ["gamePath"] = gamePath,
-            ["content"] = content
-        } )
-    end )
-
-    if status ~= 0 then
-        p:Reject( "Async read error, code: " .. status )
-    end
-
-    return p
-end
-
 if type( file.AsyncWrite ) == "function" then
-    function AsyncWrite( filePath, content )
-        CreateFilePath( filePath )
+    function AsyncWrite( fileName, content )
+        CreateFilePath( fileName )
         local p = promise.New()
 
-        local status = file.AsyncWrite( filePath, content, function( filePath, status )
-            if status ~= 0 then
-                return p:Reject( "Async write error, code: " .. status )
-            end
-
+        local status = file.AsyncWrite( fileName, content, function( filePath, code )
+            if code ~= 0 then return p:Reject( "FSASYNC_ERR: " .. code ) end
             p:Resolve( {
                 ["filePath"] = filePath
             } )
@@ -420,15 +383,12 @@ else
 end
 
 if type( file.AsyncAppen ) == "function" then
-    function AsyncAppend( filePath, content )
-        CreateFilePath( filePath )
+    function AsyncAppend( fileName, content )
+        CreateFilePath( fileName )
         local p = promise.New()
 
-        local status = file.AsyncAppend( filePath, content, function( filePath, status )
-            if status ~= 0 then
-                return p:Reject( "Async append error, code: " .. status )
-            end
-
+        local status = file.AsyncAppend( fileName, content, function( filePath, code )
+            if code ~= 0 then return p:Reject( "FSASYNC_ERR: " .. code ) end
             p:Resolve( {
                 ["filePath"] = filePath
             } )
