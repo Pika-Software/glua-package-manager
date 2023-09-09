@@ -220,33 +220,39 @@ function Append( filePath, contents )
     Write( filePath, contents, "ab" )
 end
 
-function CompileLua( filePath, gamePath, handleError )
+CompileLua = promise.Async( function( filePath, gamePath, handleError )
     if CLIENT and IsMounted( filePath, gamePath ) then
         filePath = "lua/" .. filePath
         gamePath = "GAME"
     end
 
-    local content = Read( filePath, gamePath )
+    local ok, result = AsyncRead( filePath, gamePath ):SafeAwait()
+    if not ok then return promise.Reject( result ) end
+
+    local content = result.content
     if not content then
-        error( "File compilation '" .. filePath .. "' failed, file cannot be read." )
+        return promise.Reject( "File compilation '" .. filePath .. "' failed, file cannot be read." )
     end
 
     local func = CompileString( content, filePath, handleError )
     if not func then
-        error( "File compilation '" .. filePath .. "' failed, unknown error." )
+        return promise.Reject( "File compilation '" .. filePath .. "' failed, unknown error." )
     end
 
     return func
-end
+end )
 
-function CompileMoon( filePath, gamePath, handleError )
-    local content = Read( filePath, gamePath )
+CompileMoon = promise.Async( function( filePath, gamePath, handleError )
+    local ok, result = AsyncRead( filePath, gamePath ):SafeAwait()
+    if not ok then return promise.Reject( result ) end
+
+    local content = result.content
     if not content then
-        error( "File compilation '" .. filePath .. "' failed, file cannot be read." )
+        return promise.Reject( "File compilation '" .. filePath .. "' failed, file cannot be read." )
     end
 
     return CompileMoonString( content, filePath, handleError )
-end
+end )
 
 if not efsw then
     Watch = debug_fempty
