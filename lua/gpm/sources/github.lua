@@ -7,8 +7,8 @@ local string = string
 
 module( "gpm.sources.github" )
 
-function CanImport( filePath )
-    return string.match( filePath, "github.com/(.+)" ) ~= nil
+Priority = 5
+
 end
 
 IsAvailable = promise.Async( function( user, repository, tree )

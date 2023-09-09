@@ -31,6 +31,8 @@ local jsonExtensions = {
 
 module( "gpm.sources.http" )
 
+Priority = 4
+
 function CanImport( filePath )
     return string.IsURL( filePath )
 end

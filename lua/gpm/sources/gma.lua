@@ -16,6 +16,8 @@ local ipairs = ipairs
 
 module( "gpm.sources.gma" )
 
+Priority = 3
+
 function CanImport( filePath )
     return fs.IsFile( filePath, "GAME" ) and string.EndsWith( filePath, ".gma.dat" ) or string.EndsWith( filePath, ".gma" )
 end

@@ -15,6 +15,8 @@ local ipairs = ipairs
 
 module( "gpm.sources.zip" )
 
+Priority = 3
+
 function CanImport( filePath )
     return fs.IsFile( filePath, "GAME" ) and string.EndsWith( filePath, ".zip.dat" ) or string.EndsWith( filePath, ".zip" )
 end

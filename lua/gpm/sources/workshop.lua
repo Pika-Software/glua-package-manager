@@ -18,6 +18,8 @@ local type = type
 
 module( "gpm.sources.workshop" )
 
+Priority = 0
+
 function CanImport( filePath )
     return tonumber( filePath ) ~= nil
 end

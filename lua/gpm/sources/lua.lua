@@ -59,6 +59,8 @@ end
 
 module( "gpm.sources.lua" )
 
+Priority = 2
+
 function CanImport( filePath )
     if fs.IsDir( filePath, "LUA" ) then return true end
     if fs.IsFile( filePath, "LUA" ) then

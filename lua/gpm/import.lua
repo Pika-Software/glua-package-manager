@@ -43,6 +43,10 @@ do
         sourceList[ #sourceList + 1 ] = sourceName
     end
 
+    table.sort( sourceList, function( a, b )
+        return ( sources[ a ].Priority or 10 ) > ( sources[ b ].Priority or 10 )
+    end )
+
     function gpm.CanImport( importPath )
         for _, sourceName in ipairs( sourceList ) do
             local source = sources[ sourceName ]
