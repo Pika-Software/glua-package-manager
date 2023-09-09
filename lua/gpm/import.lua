@@ -9,6 +9,7 @@ local fs = gpm.fs
 local CLIENT, SERVER, MENU_DLL = CLIENT, SERVER, MENU_DLL
 local table_HasIValue = table.HasIValue
 local gpm_IsPackage = gpm.IsPackage
+local ArgAssert = gpm.ArgAssert
 local logger = gpm.Logger
 local ipairs = ipairs
 local assert = assert
@@ -136,6 +137,8 @@ do
     end )
 
     gpm.AsyncImport = promise.Async( function( importPath, parent, autorun )
+        ArgAssert( importPath, 1, "string" )
+
         local task = tasks[ importPath ]
         if not task then
             for _, sourceName in ipairs( sourceList ) do

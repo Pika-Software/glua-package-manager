@@ -9,6 +9,8 @@ module( "gpm.sources.github" )
 
 Priority = 5
 
+function CanImport( str )
+    return string.match( str, "github.com/(.+)" ) ~= nil
 end
 
 IsAvailable = promise.Async( function( user, repository, tree )
