@@ -161,6 +161,10 @@ end
 function debug.fempty()
 end
 
+function debug.fcall( func )
+    return func()
+end
+
 -- FileClass extensions
 do
 
