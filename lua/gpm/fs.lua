@@ -27,6 +27,7 @@ local file = file
 local efsw = efsw
 
 -- Variables
+local gpm_fs_gmod_async = CreateConVar( "gpm_fs_gmod_async", "1", FCVAR_ARCHIVE, "Allow gpm to use standard async gmod file system functions.", 0, 1 )
 local CompileMoonString = CompileMoonString
 local CompileString = CompileString
 local game_MountGMA = game.MountGMA
@@ -35,6 +36,8 @@ local MENU_DLL = MENU_DLL
 local CLIENT = CLIENT
 local select = select
 local ipairs = ipairs
+local pcall = pcall
+local pairs = pairs
 local error = error
 local type = type
 
@@ -204,20 +207,146 @@ function CreateFilePath( filePath )
     end
 end
 
-function Write( filePath, contents, fileMode )
-    CreateFilePath( filePath )
+function Write( filePath, content, fileMode, fastMode )
+    if not fastMode then CreateFilePath( filePath ) end
 
     local fileClass = Open( filePath, fileMode or "wb", "DATA" )
     if not fileClass then
         error( "Writing file 'data/" .. filePath .. "' was failed!" )
     end
 
-    fileClass:Write( contents )
+    fileClass:Write( content )
     fileClass:Close()
 end
 
-function Append( filePath, contents )
-    Write( filePath, contents, "ab" )
+function Append( filePath, content, fastMode )
+    Write( filePath, content, "ab", fastMode )
+end
+
+local asyncSources = {
+    {
+        CanBeInstalled = asyncio ~= nil,
+        Functions = {
+            append = asyncio.Append,
+            write = asyncio.Write,
+            read = asyncio.Read
+        }
+    },
+    {
+        CanBeInstalled = file.AsyncAppen ~= nil,
+        Functions = {
+            append = file.AsyncAppen
+        }
+    },
+    {
+        CanBeInstalled = file.AsyncWrite ~= nil,
+        Functions = {
+            write = file.AsyncWrite
+        }
+    },
+    {
+        CanBeInstalled = file.AsyncRead ~= nil and gpm_fs_gmod_async:GetBool(),
+        Functions = {
+            read = file.AsyncRead
+        }
+    },
+    {
+        CanBeInstalled = true,
+        Functions = {
+            append = function( fileName, content, func )
+                local ok = pcall( Append, fileName, content, true )
+                local state = ok and 0 or -1
+                func( fileName, "DATA", state )
+                return state
+            end,
+            write = function( fileName, content, func )
+                local ok = pcall( Write, fileName, content, "wb", true )
+                local state = ok and 0 or -1
+                func( fileName, "DATA", state )
+                return state
+            end,
+            read = function( fileName, gamePath, func )
+                local ok, content = pcall( Read, fileName, gamePath )
+                local state = ok and 0 or -1
+                func( fileName, gamePath, state, content )
+                return state
+            end
+        }
+    }
+}
+
+local async = {
+    append = false,
+    write = false,
+    read = false
+}
+
+for _, source in ipairs( asyncSources ) do
+    if not source.CanBeInstalled then continue end
+    for funcName, func in pairs( async ) do
+        if func ~= false then continue end
+
+        func = source.Functions[ funcName ]
+        if not func then continue end
+        async[ funcName ] = func
+    end
+end
+
+function AsyncRead( fileName, gameDir )
+    local p = promise.New()
+
+    local state = async.read( fileName, gameDir, function( filePath, gamePath, code, content )
+        if code ~= 0 then return p:Reject( "FSASYNC_READ_ERR: " .. code ) end
+        p:Resolve( {
+            ["filePath"] = filePath,
+            ["gamePath"] = gamePath,
+            ["content"] = content
+        } )
+    end )
+
+    if state ~= 0 then
+        p:Reject( "FSASYNC_READ_ERR: " .. state )
+    end
+
+    return p
+end
+
+function AsyncWrite( fileName, content )
+    CreateFilePath( fileName )
+    local p = promise.New()
+
+    local state = async.write( fileName, content, function( filePath, gamePath, code )
+        if code ~= 0 then return p:Reject( "FSASYNC_WRITE_ERR: " .. code ) end
+        p:Resolve( {
+            ["filePath"] = filePath,
+            ["gamePath"] = gamePath
+        } )
+    end )
+
+    if state ~= 0 then
+        p:Reject( "FSASYNC_WRITE_ERR: " .. state )
+    end
+
+    return p
+end
+
+function AsyncAppend( fileName, content )
+    CreateFilePath( fileName )
+    local p = promise.New()
+
+    local state = async.append( fileName, content, function( filePath, gamePath, code )
+        if code ~= 0 then return p:Reject( "FSASYNC_APPEND_ERR: " .. code ) end
+        p:Resolve( {
+            ["filePath"] = filePath,
+            ["gamePath"] = gamePath
+        } )
+    end )
+
+    if state ~= 0 then
+        p:Reject( "FSASYNC_APPEND_ERR: " .. state )
+    end
+
+    return p
 end
 
 CompileLua = promise.Async( function( filePath, gamePath, handleError )
@@ -254,10 +383,7 @@ CompileMoon = promise.Async( function( filePath, gamePath, handleError )
     return CompileMoonString( content, filePath, handleError )
 end )
 
-if not efsw then
-    Watch = debug_fempty
-    UnWatch = debug_fempty
-else
+if efsw then
     local watchList = efsw.WatchList
     if type( watchList ) ~= "table" then
         watchList = {}; efsw.WatchList = watchList
@@ -298,119 +424,6 @@ else
         efsw.Unwatch( watchID )
         watchList[ filePath .. ";" .. gamePath ] = nil
     end
-end
-
-function AsyncRead( fileName, gameDir )
-    local p = promise.New()
-
-    local status = file.AsyncRead( fileName, gameDir, function( filePath, gamePath, code, content )
-        if code ~= 0 then return p:Reject( "FSASYNC_ERR: " .. code ) end
-        p:Resolve( {
-            ["filePath"] = filePath,
-            ["gamePath"] = gamePath,
-            ["content"] = content
-        } )
-    end )
-
-    if status ~= 0 then
-        p:Reject( "Async read error, code: " .. status )
-    end
-
-    return p
-end
-
-if asyncio ~= nil then
-    function AsyncWrite( fileName, content )
-        CreateFilePath( fileName )
-        local p = promise.New()
-
-        local status = asyncio.AsyncWrite( fileName, content, function( filePath, gamePath, code )
-            if code ~= 0 then return p:Reject( "FSASYNC_ERR: " .. code ) end
-            p:Resolve( {
-                ["filePath"] = filePath,
-                ["gamePath"] = gamePath
-            } )
-        end )
-
-        if status ~= 0 then
-            p:Reject( "Async write error, code: " .. status )
-        end
-
-        return p
-    end
-
-    function AsyncAppend( fileName, content )
-        CreateFilePath( fileName )
-        local p = promise.New()
-
-        local status = asyncio.AsyncAppend( fileName, content, function( filePath, gamePath, code )
-            if code ~= 0 then return p:Reject( "FSASYNC_ERR: " .. code ) end
-            p:Resolve( {
-                ["filePath"] = filePath,
-                ["gamePath"] = gamePath
-            } )
-        end )
-
-        if status ~= 0 then
-            p:Reject( "Async append error, code: " .. status )
-        end
-
-        return p
-    end
-
-    return
-end
-
-if type( file.AsyncWrite ) == "function" then
-    function AsyncWrite( fileName, content )
-        CreateFilePath( fileName )
-        local p = promise.New()
-
-        local status = file.AsyncWrite( fileName, content, function( filePath, code )
-            if code ~= 0 then return p:Reject( "FSASYNC_ERR: " .. code ) end
-            p:Resolve( {
-                ["filePath"] = filePath
-            } )
-        end )
-
-        if status ~= 0 then
-            p:Reject( "Async write error, code: " .. status )
-        end
-
-        return p
-    end
 else
-    function AsyncWrite( filePath, content )
-        Write( filePath, content )
-        return promise.Resolve( {
-            ["filePath"] = filePath
-        } )
-    end
-end
-
-if type( file.AsyncAppen ) == "function" then
-    function AsyncAppend( fileName, content )
-        CreateFilePath( fileName )
-        local p = promise.New()
-
-        local status = file.AsyncAppend( fileName, content, function( filePath, code )
-            if code ~= 0 then return p:Reject( "FSASYNC_ERR: " .. code ) end
-            p:Resolve( {
-                ["filePath"] = filePath
-            } )
-        end )
-
-        if status ~= 0 then
-            p:Reject( "Async append error, code: " .. status )
-        end
-
-        return p
-    end
-else
-    function AsyncAppend( filePath, content )
-        Append( filePath, content )
-        return promise.Resolve( {
-            ["filePath"] = filePath
-        } )
-    end
+    Watch, UnWatch = debug_fempty, debug_fempty
 end
