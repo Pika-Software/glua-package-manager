@@ -98,7 +98,6 @@ end
 
 function IsDir( filePath, gamePath )
     if IsMounted( filePath, gamePath, true ) or file.IsDir( filePath, gamePath ) then return true end
-    if SERVER then return false end
 
     local _, folders = Find( filePath .. "*", gamePath )
     if folders == nil or #folders == 0 then return false end
@@ -225,53 +224,63 @@ end
 
 local asyncSources = {
     {
-        CanBeInstalled = asyncio ~= nil,
-        Functions = {
-            append = asyncio and asyncio.Append,
-            write = asyncio and asyncio.Write,
-            read = asyncio and asyncio.Read
-        }
+        Available = asyncio ~= nil,
+        Get = function()
+            return {
+                append = asyncio.Append,
+                write = asyncio.Write,
+                read = asyncio.Read
+            }
+        end
     },
     {
-        CanBeInstalled = file.AsyncAppen ~= nil,
-        Functions = {
-            append = file.AsyncAppen
-        }
+        Available = file.AsyncAppen ~= nil,
+        Get = function()
+            return {
+                append = file.AsyncAppen
+            }
+        end
     },
     {
-        CanBeInstalled = file.AsyncWrite ~= nil,
-        Functions = {
-            write = file.AsyncWrite
-        }
+        Available = file.AsyncWrite ~= nil,
+        Get = function()
+            return {
+                write = file.AsyncWrite
+            }
+        end
     },
     {
-        CanBeInstalled = file.AsyncRead ~= nil and gpm_fs_gmod_async:GetBool(),
-        Functions = {
-            read = file.AsyncRead
-        }
+        Available = file.AsyncRead ~= nil and gpm_fs_gmod_async:GetBool(),
+        Get = function()
+            return {
+                read = file.AsyncRead
+            }
+        end
     },
     {
-        CanBeInstalled = true,
-        Functions = {
-            append = function( fileName, content, func )
-                local ok = pcall( Append, fileName, content, true )
-                local state = ok and 0 or -1
-                func( fileName, "DATA", state )
-                return state
-            end,
-            write = function( fileName, content, func )
-                local ok = pcall( Write, fileName, content, "wb", true )
-                local state = ok and 0 or -1
-                func( fileName, "DATA", state )
-                return state
-            end,
-            read = function( fileName, gamePath, func )
-                local ok, content = pcall( Read, fileName, gamePath )
-                local state = ok and 0 or -1
-                func( fileName, gamePath, state, content )
-                return state
-            end
-        }
+        Available = true,
+        Get = function()
+            return {
+                append = function( fileName, content, func )
+                    local ok = pcall( Append, fileName, content, true )
+                    local state = ok and 0 or -1
+                    func( fileName, "DATA", state )
+                    return state
+                end,
+                write = function( fileName, content, func )
+                    local ok = pcall( Write, fileName, content, "wb", true )
+                    local state = ok and 0 or -1
+                    func( fileName, "DATA", state )
+                    return state
+                end,
+                read = function( fileName, gamePath, func )
+                    local ok, content = pcall( Read, fileName, gamePath )
+                    local state = ok and 0 or -1
+                    func( fileName, gamePath, state, content )
+                    return state
+                end
+            }
+        end
     }
 }
 
@@ -282,13 +291,15 @@ local async = {
 }
 
 for _, source in ipairs( asyncSources ) do
-    if not source.CanBeInstalled then continue end
+    if not source.Available then continue end
+    local functions = source.Get()
+
     for funcName, func in pairs( async ) do
         if func ~= false then continue end
-
-        func = source.Functions[ funcName ]
-        if not func then continue end
-        async[ funcName ] = func
+        func = functions[ funcName ]
+        if func then
+            async[ funcName ] = func
+        end
     end
 end
 

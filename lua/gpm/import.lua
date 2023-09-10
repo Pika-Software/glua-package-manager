@@ -171,7 +171,7 @@ do
             end
 
             if not task then
-                return promise.Reject( "Requested package doesn't exist." )
+                return promise.Reject( "requested package doesn't exist." )
             end
         end
 
