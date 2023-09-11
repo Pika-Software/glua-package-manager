@@ -32,7 +32,7 @@ Msg( [[
 module( "gpm", package.seeall )
 
 StartTime = SysTime()
-VERSION = "1.52.2"
+VERSION = "1.53.0"
 
 if not Colors then
     Realm = "unknown"
@@ -66,7 +66,10 @@ end
 
 includeComponent "utils"
 includeComponent "logger"
-Logger = CreateLogger( "GPM@" .. VERSION, Color( 180, 180, 255 ) )
+
+if not Logger then
+    Logger = CreateLogger( "GPM@" .. VERSION, Color( 180, 180, 255 ) )
+end
 
 deflate = includeComponent "libs/deflate"
 Logger:Info( "%s v%s is initialized.", deflate._NAME, deflate._VERSION )
