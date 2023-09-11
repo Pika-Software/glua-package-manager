@@ -75,25 +75,14 @@ GetMetadata = promise.Async( function( importPath )
     importPath = paths.Fix( importPath )
     local metadata = {}
 
-    local isFolder = fs.IsDir( importPath, "LUA" )
+    local isFolder, packagePath = fs.IsDir( importPath, "LUA" )
     if isFolder then
-        local packagePath = importPath .. "/package.lua"
+        packagePath = importPath .. "/package.lua"
         if fs.IsLuaFile( packagePath, "LUA", true ) then
             local ok, result = gpm.CompileLua( packagePath ):SafeAwait()
             if not ok then return promise.Reject( result ) end
-
             table.Merge( metadata, package.ExtractMetadata( result ) )
-
-            if SERVER then
-                utils_LowerTableKeys( metadata )
-
-                local send = metadata.send
-                if type( send ) ~= "table" then
-                    send = {}; metadata.send = send
-                end
-
-                send[ #send + 1 ] = "package.lua"
-            end
+            if SERVER then utils_LowerTableKeys( metadata ) end
         else
             local initPath = importPath .. "/init.lua"
             if not fs.IsLuaFile( initPath, "LUA", true ) then
@@ -102,6 +91,7 @@ GetMetadata = promise.Async( function( importPath )
 
             metadata.init = initPath
             metadata.autorun = true
+            packagePath = nil
         end
     elseif fs.IsFile( importPath, "LUA" ) then
         metadata.init = importPath
@@ -111,6 +101,10 @@ GetMetadata = promise.Async( function( importPath )
     if SERVER then
         local client = package.FormatInit( metadata.init ).client
         if client then
+            if packagePath then
+                AddCSLuaFile( packagePath )
+            end
+
             local filePath = importPath .. "/" .. client
             if fs.IsLuaFile( filePath, "lsv", true ) then
                 AddCSLuaFile( paths.FormatToLua( filePath ) )
