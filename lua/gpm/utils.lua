@@ -144,7 +144,9 @@ do
 
     function gpm.ArgAssert( value, argNum, expected, errorlevel )
         local valueType = gpm.type( value )
-        if valueType == expected then return end
+        if valueType == expected then
+            return value
+        end
 
         local dinfo = debug.getinfo( 2, "n" )
         error( string.format( "bad argument #%d to \'%s\' (%s expected, got %s)", argNum, dinfo and dinfo.name or "func", expected, valueType ), errorlevel or 3 )
