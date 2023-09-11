@@ -1,126 +1,4 @@
 -- https://github.com/davidm/lua-compress-deflatelua/blob/master/lmod/compress/deflatelua.lua
---[[
-
-LUA MODULE
-
-  compress.deflatelua - deflate (and gunzip/zlib) implemented in Lua.
-
-SYNOPSIS
-
-  local DEFLATE = require 'compress.deflatelua'
-  -- uncompress gzip file
-  local fh = assert(io.open'foo.txt.gz', 'rb')
-  local ofh = assert(io.open'foo.txt', 'wb')
-  DEFLATE.gunzip {input=fh, output=ofh}
-  fh:close(); ofh:close()
-  -- can also uncompress from string including zlib and raw DEFLATE formats.
-
-DESCRIPTION
-
-  This is a pure Lua implementation of decompressing the DEFLATE format,
-  including the related zlib and gzip formats.
-
-  Note: This library only supports decompression.
-  Compression is not currently implemented.
-
-API
-
-  Note: in the following functions, input stream `fh` may be
-  a file handle, string, or an iterator function that returns strings.
-  Output stream `ofh` may be a file handle or a function that
-  consumes one byte (number 0..255) per call.
-
-  DEFLATE.inflate {input=fh, output=ofh}
-
-    Decompresses input stream `fh` in the DEFLATE format
-    while writing to output stream `ofh`.
-    DEFLATE is detailed in http://tools.ietf.org/html/rfc1951 .
-
-  DEFLATE.gunzip {input=fh, output=ofh, disable_crc=disable_crc}
-
-    Decompresses input stream `fh` with the gzip format
-    while writing to output stream `ofh`.
-    `disable_crc` (defaults to `false`) will disable CRC-32 checking
-    to increase speed.
-    gzip is detailed in http://tools.ietf.org/html/rfc1952 .
-
-  DEFLATE.inflate_zlib {input=fh, output=ofh, disable_crc=disable_crc}
-
-    Decompresses input stream `fh` with the zlib format
-    while writing to output stream `ofh`.
-    `disable_crc` (defaults to `false`) will disable CRC-32 checking
-    to increase speed.
-    zlib is detailed in http://tools.ietf.org/html/rfc1950 .
-
-  DEFLATE.adler32(byte, crc) --> rcrc
-
-    Returns adler32 checksum of byte `byte` (number 0..255) appended
-    to string with adler32 checksum `crc`.  This is internally used by
-    `inflate_zlib`.
-    ADLER32 in detailed in http://tools.ietf.org/html/rfc1950 .
-
-COMMAND LINE UTILITY
-
-  A `gunziplua` command line utility (in folder `bin`) is also provided.
-  This mimicks the *nix `gunzip` utility but is a pure Lua implementation
-  that invokes this library.  For help do
-
-    gunziplua -h
-
-DEPENDENCIES
-
-  Requires 'digest.crc32lua' (used for optional CRC-32 checksum checks).
-    https://github.com/davidm/lua-digest-crc32lua
-
-  Will use a bit library ('bit', 'bit32', 'bit.numberlua') if available.  This
-  is not that critical for this library but is required by digest.crc32lua.
-
-  'pythonic.optparse' is only required by the optional `gunziplua`
-  command-line utilty for command line parsing.
-    https://github.com/davidm/lua-pythonic-optparse
-
-INSTALLATION
-
-  Copy the `compress` directory into your LUA_PATH.
-
-REFERENCES
-
-  [1] DEFLATE Compressed Data Format Specification version 1.3
-      http://tools.ietf.org/html/rfc1951
-  [2] GZIP file format specification version 4.3
-      http://tools.ietf.org/html/rfc1952
-  [3] http://en.wikipedia.org/wiki/DEFLATE
-  [4] pyflate, by Paul Sladen
-      http://www.paul.sladen.org/projects/pyflate/
-  [5] Compress::Zlib::Perl - partial pure Perl implementation of
-      Compress::Zlib
-      http://search.cpan.org/~nwclark/Compress-Zlib-Perl/Perl.pm
-
-LICENSE
-
-  (c) 2008-2011 David Manura.  Licensed under the same terms as Lua (MIT).
-
-  Permission is hereby granted, free of charge, to any person obtaining a copy
-  of this software and associated documentation files (the "Software"), to deal
-  in the Software without restriction, including without limitation the rights
-  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-  copies of the Software, and to permit persons to whom the Software is
-  furnished to do so, subject to the following conditions:
-
-  The above copyright notice and this permission notice shall be included in
-  all copies or substantial portions of the Software.
-
-  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
-  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-  THE SOFTWARE.
-  (end license)
---]]
-
-local M = {_TYPE = 'module', _NAME = 'compress.deflatelua', _VERSION = '0.3.20111128'}
 
 local assert = assert
 local error = error
@@ -129,408 +7,412 @@ local pairs = pairs
 local print = print
 local tostring = tostring
 local type = type
+local rawget = rawget
 local setmetatable = setmetatable
-local io = io
 local math = math
+local util_CRC = util.CRC
 local table_sort = table.sort
 local math_max = math.max
+local string_byte = string.byte
 local string_char = string.char
+local lshift = bit.lshift
+local rshift = bit.rshift
+local band = bit.band
+
+module( "deflate", package.seeall )
+VERSION = "0.4.0"
 
 -- local crc32 = require "digest.crc32lua" . crc32_byte
 
 local DEBUG = false
 
-local band = bit.band
-local lshift = bit.lshift
-local rshift = bit.rshift
-
-
-local function warn(s)
-  io.stderr:write(s, '\n')
-end
-
-
-local function debug(...)
-  print('DEBUG', ...)
-end
-
-
-local function runtime_error(s, level)
-  level = level or 1
-  error({s}, level + 1)
-end
-
-
 local function make_outstate(outbs)
-  local outstate = {}
-  outstate.outbs = outbs
-  outstate.window = {}
-  outstate.window_pos = 1
-  return outstate
+    local outstate = {}
+    outstate.outbs = outbs
+    outstate.window = {}
+    outstate.window_pos = 1
+    return outstate
 end
 
-
-local function output(outstate, byte)
-  -- debug('OUTPUT:', s)
-  local window_pos = outstate.window_pos
-  outstate.outbs(byte)
-  outstate.window[window_pos] = byte
-  outstate.window_pos = window_pos % 32768 + 1  -- 32K
+local function output( outstate, byte )
+    local window_pos = outstate.window_pos
+    outstate.outbs( byte )
+    outstate.window[ window_pos ] = byte
+    outstate.window_pos = window_pos % 32768 + 1  -- 32K
 end
 
-
-local function noeof(val)
-  return assert(val, 'unexpected end of file')
+local function noeof( val )
+    return assert( val, "unexpected end of file" )
 end
 
-
-local function hasbit(bits, bit)
-  return bits % (bit + bit) >= bit
+local function hasbit( bits, bit )
+    return bits % ( bit + bit ) >= bit
 end
 
+local memoize_meta = {
+    ["__index"] = function( self, key )
+        local value = rawget( self, "Function" )( key )
+        self[ key ] = value
+        return value
+    end
+}
 
-local function memoize(f)
-  local mt = {}
-  local t = setmetatable({}, mt)
-  function mt:__index(k)
-    local v = f(k)
-    t[k] = v
-    return v
-  end
-  return t
+local function memoize( func )
+    return setmetatable( {
+        ["Function"] = func
+    }, memoize_meta )
 end
-
 
 -- small optimization (lookup table for powers of 2)
-local pow2 = memoize(function(n) return 2^n end)
+local pow2 = memoize( function( n )
+    return 2 ^ n
+end )
 
---local tbits = memoize(
---  function(bits)
---    return memoize( function(bit) return getbit(bits, bit) end )
---  end )
-
+-- local tbits = memoize( function(bits)
+--     return memoize( function(bit) return getbit(bits, bit) end )
+-- end )
 
 -- weak metatable marking objects as bitstream type
-local is_bitstream = setmetatable({}, {__mode = 'k'})
-
+local is_bitstream = setmetatable( {}, {
+    ["__mode"] = "k"
+} )
 
 -- DEBUG
 -- prints LSB first
 --[[
 local function bits_tostring(bits, nbits)
-  local s = ''
-  local tmp = bits
-  local function f()
-    local b = tmp % 2 == 1 and 1 or 0
-    s = s .. b
-    tmp = (tmp - b) / 2
-  end
-  if nbits then
-    for i=1,nbits do f() end
-  else
-    while tmp ~= 0 do f() end
-  end
+    local s = ""
+    local tmp = bits
+    local function f()
+        local b = tmp % 2 == 1 and 1 or 0
+        s = s .. b
+        tmp = (tmp - b) / 2
+    end
 
-  return s
+    if nbits then
+        for i=1,nbits do f() end
+    else
+        while tmp ~= 0 do f() end
+    end
+
+    return s
 end
 --]]
 
-local function bytestream_from_file(fh)
-  local o = {}
-  function o:read()
-    return fh:ReadByte()
-  end
-  return o
+local function bytestream_from_file( f )
+    return {
+        ["read"] = function()
+            return f:ReadByte()
+        end
+    }
 end
 
+local function bytestream_from_string( str )
+    local i = 1
+    return {
+        ["read"] = function()
+            local by
+            if i <= #str then
+                by = string_byte( str, i )
+                i = i + 1
+            end
 
-local function bytestream_from_string(s)
-  local i = 1
-  local o = {}
-  function o:read()
-    local by
-    if i <= #s then
-      by = s:byte(i)
-      i = i + 1
-    end
-    return by
-  end
-  return o
+            return by
+        end
+    }
 end
 
+local function bytestream_from_function( func )
+    local i, buffer = 0, ""
+    return {
+        ["read"] = function()
+            i = i + 1
 
-local function bytestream_from_function(f)
-  local i = 0
-  local buffer = ''
-  local o = {}
-  function o:read()
-    i = i + 1
-    if i > #buffer then
-      buffer = f()
-      if not buffer then return end
-      i = 1
-    end
-    return buffer:byte(i,i)
-  end
-  return o
+            if i > #buffer then
+                buffer = func()
+                if not buffer then return end
+                i = 1
+            end
+
+            return string_byte( buffer, i, i )
+        end
+    }
 end
-
 
 local function bitstream_from_bytestream(bys)
-  local buf_byte = 0
-  local buf_nbit = 0
-  local o = {}
+    local buf_byte = 0
+    local buf_nbit = 0
+    local o = {}
 
-  function o:nbits_left_in_byte()
-    return buf_nbit
-  end
-
-  function o:read(nbits)
-    nbits = nbits or 1
-    while buf_nbit < nbits do
-      local byte = bys:read()
-      if not byte then return end  -- note: more calls also return nil
-      buf_byte = buf_byte + lshift(byte, buf_nbit)
-      buf_nbit = buf_nbit + 8
+    function o:nbits_left_in_byte()
+        return buf_nbit
     end
-    local bits
-    if nbits == 0 then
-      bits = 0
-    elseif nbits == 32 then
-      bits = buf_byte
-      buf_byte = 0
-    else
-      bits = band(buf_byte, rshift(0xffffffff, 32 - nbits))
-      buf_byte = rshift(buf_byte, nbits)
+
+    function o:read( nbits )
+        nbits = nbits or 1
+
+        while buf_nbit < nbits do
+            local byte = bys:read()
+            if not byte then return end  -- note: more calls also return nil
+
+            buf_byte = buf_byte + lshift(byte, buf_nbit)
+            buf_nbit = buf_nbit + 8
+        end
+
+        local bits
+        if nbits == 0 then
+            bits = 0
+        elseif nbits == 32 then
+            bits = buf_byte
+            buf_byte = 0
+        else
+            bits = band(buf_byte, rshift(0xffffffff, 32 - nbits))
+            buf_byte = rshift(buf_byte, nbits)
+        end
+
+        buf_nbit = buf_nbit - nbits
+        return bits
     end
-    buf_nbit = buf_nbit - nbits
-    return bits
-  end
 
-  is_bitstream[o] = true
-
-  return o
+    is_bitstream[o] = true
+    return o
 end
-
 
 local function get_bitstream(o)
-  local bs
-  if is_bitstream[o] then
-    return o
-  elseif type(o) == 'file' then
-    bs = bitstream_from_bytestream(bytestream_from_file(o))
-  elseif type(o) == 'string' then
-    bs = bitstream_from_bytestream(bytestream_from_string(o))
-  elseif type(o) == 'function' then
-    bs = bitstream_from_bytestream(bytestream_from_function(o))
-  else
-    runtime_error 'unrecognized type'
-  end
-  return bs
-end
+    local bs
+    if is_bitstream[o] then
+        return o
+    elseif type(o) == "file" then
+        bs = bitstream_from_bytestream(bytestream_from_file(o))
+    elseif type(o) == "string" then
+        bs = bitstream_from_bytestream(bytestream_from_string(o))
+    elseif type(o) == "function" then
+        bs = bitstream_from_bytestream(bytestream_from_function(o))
+    else
+        error( "unrecognized type" )
+    end
 
+    return bs
+end
 
 local function get_obytestream(o)
-  local bs
-  if type(o) == 'file' then
-    bs = function(sbyte) o:Write(string_char(sbyte)) end
-  elseif type(o) == 'function' then
-    bs = o
-  elseif type(o) == 'table' then
-    o.n = 0
-    bs = function(sbyte)
-        o.n = o.n + 1
-        o[o.n] = string_char(sbyte)
-    end
-  else
-    runtime_error('unrecognized type: ' .. tostring(o))
-  end
-  return bs
-end
-
-
-local function HuffmanTable(init, is_full)
-  local t = {}
-  if is_full then
-    for val,nbits in pairs(init) do
-      if nbits ~= 0 then
-        t[#t + 1] = {val = val, nbits = nbits}
-        --debug('*',val,nbits)
-      end
-    end
-  else
-    for i = 1, #init - 2, 2 do
-      local firstval, nbits, nextval = init[i], init[i + 1], init[i + 2]
-      --debug(val, nextval, nbits)
-      if nbits ~= 0 then
-        for val = firstval, nextval - 1 do
-          t[#t + 1] = { val = val, nbits = nbits}
+    local bs
+    if type(o) == "file" then
+        bs = function(sbyte)
+            o:Write( string_char( sbyte ) )
         end
-      end
+    elseif type(o) == "function" then
+        bs = o
+    elseif type(o) == "table" then
+        o.n = 0
+        bs = function(sbyte)
+            o.n = o.n + 1
+            o[o.n] = string_char(sbyte)
+        end
+    else
+        error("unrecognized type: " .. tostring(o))
     end
-  end
-  table_sort(t, function(a,b)
-    return a.nbits == b.nbits and a.val < b.val or a.nbits < b.nbits
-  end)
 
-  -- assign codes
-  local code = 1  -- leading 1 marker
-  local nbits = 0
-  for i,s in ipairs(t) do
-    if s.nbits ~= nbits then
-      code = code * pow2[s.nbits - nbits]
-      nbits = s.nbits
-    end
-    s.code = code
-    --debug('huffman code:', i, s.nbits, s.val, code, bits_tostring(code))
-    code = code + 1
-  end
-
-  local minbits = math.huge
-  local look = {}
-  for i,s in ipairs(t) do
-    minbits = math.min(minbits, s.nbits)
-    look[s.code] = s.val
-  end
-
-  --for _,o in ipairs(t) do
-  --  debug(':', o.nbits, o.val)
-  --end
-
-  -- function t:lookup(bits) return look[bits] end
-
-  local msb = function(bits, nbits)
-    local res = 0
-    for i = 1, nbits do
-      res = lshift(res, 1) + band(bits, 1)
-      bits = rshift(bits, 1)
-    end
-    return res
-  end
-
-  local tfirstcode = memoize(
-    function(bits) return pow2[minbits] + msb(bits, minbits) end)
-
-  function t:read(bs)
-    local code = 1 -- leading 1 marker
-    local nbits = 0
-    while 1 do
-      if nbits == 0 then  -- small optimization (optional)
-        code = tfirstcode[noeof(bs:read(minbits))]
-        nbits = nbits + minbits
-      else
-        local b = noeof(bs:read())
-        nbits = nbits + 1
-        code = code * 2 + b   -- MSB first
-        --[[NATIVE_BITOPS
-        code = lshift(code, 1) + b   -- MSB first
-        --]]
-      end
-      --debug('code?', code, bits_tostring(code))
-      local val = look[code]
-      if val then
-        --debug('FOUND', val)
-        return val
-      end
-    end
-  end
-
-  return t
+    return bs
 end
 
+local function HuffmanTable( init, is_full )
+    local t = {}
+    if is_full then
+        for val, nbits in pairs( init ) do
+            if nbits ~= 0 then
+                t[ #t + 1 ] = {
+                    nbits = nbits,
+                    val = val
+                }
+                -- print("*",val,nbits)
+            end
+        end
+    else
+        for i = 1, #init - 2, 2 do
+            local firstval, nbits, nextval = init[i], init[i + 1], init[i + 2]
+            -- print(val, nextval, nbits)
+            if nbits ~= 0 then
+                for val = firstval, nextval - 1 do
+                    t[ #t + 1 ] = {
+                        nbits = nbits,
+                        val = val
+                    }
+                end
+            end
+        end
+    end
+
+    table_sort( t, function(a,b)
+        return a.nbits == b.nbits and a.val < b.val or a.nbits < b.nbits
+    end )
+
+    -- assign codes
+    local code = 1  -- leading 1 marker
+    local nbits = 0
+    for i,s in ipairs(t) do
+        if s.nbits ~= nbits then
+        code = code * pow2[s.nbits - nbits]
+        nbits = s.nbits
+        end
+        s.code = code
+        -- print("huffman code:", i, s.nbits, s.val, code, bits_tostring(code))
+        code = code + 1
+    end
+
+    local minbits = math.huge
+    local look = {}
+    for i,s in ipairs(t) do
+        minbits = math.min(minbits, s.nbits)
+        look[s.code] = s.val
+    end
+
+    --for _,o in ipairs(t) do
+    --   print(":", o.nbits, o.val)
+    --end
+
+    -- function t:lookup(bits) return look[bits] end
+
+    local msb = function( bits, nbits )
+        local res = 0
+        for i = 1, nbits do
+            res = lshift( res, 1) + band( bits, 1 )
+            bits = rshift( bits, 1 )
+        end
+
+        return res
+    end
+
+    local tfirstcode = memoize( function(bits)
+        return pow2[minbits] + msb(bits, minbits)
+    end )
+
+    function t:read(bs)
+        local code = 1 -- leading 1 marker
+        local nbits = 0
+
+        while 1 do
+            if nbits == 0 then  -- small optimization (optional)
+                code = tfirstcode[ noeof( bs:read( minbits ) ) ]
+                nbits = nbits + minbits
+            else
+                local b = noeof( bs:read() )
+                nbits = nbits + 1
+                code = code * 2 + b   -- MSB first
+                --[[NATIVE_BITOPS
+                code = lshift(code, 1) + b   -- MSB first
+                --]]
+            end
+
+            -- print("code?", code, bits_tostring(code))
+
+            local val = look[code]
+            if val then
+                -- print("FOUND", val)
+                return val
+            end
+        end
+    end
+
+    return t
+end
+
+local FLG_FHCRC = 2^1
+local FLG_FEXTRA = 2^2
+local FLG_FNAME = 2^3
+local FLG_FCOMMENT = 2^4
+-- local FLG_FTEXT = 2^0
 
 local function parse_gzip_header(bs)
-  -- local FLG_FTEXT = 2^0
-  local FLG_FHCRC = 2^1
-  local FLG_FEXTRA = 2^2
-  local FLG_FNAME = 2^3
-  local FLG_FCOMMENT = 2^4
-
-  local id1 = bs:read(8)
-  local id2 = bs:read(8)
-  if id1 ~= 31 or id2 ~= 139 then
-    runtime_error 'not in gzip format'
-  end
-  local cm = bs:read(8)  -- compression method
-  local flg = bs:read(8) -- FLaGs
-  local mtime = bs:read(32) -- Modification TIME
-  local xfl = bs:read(8) -- eXtra FLags
-  local os = bs:read(8) -- Operating System
-
-  if DEBUG then
-    debug('CM=', cm)
-    debug('FLG=', flg)
-    debug('MTIME=', mtime)
-    -- debug("MTIME_str=",os.date("%Y-%m-%d %H:%M:%S",mtime)) -- non-portable
-    debug('XFL=', xfl)
-    debug('OS=', os)
-  end
-
-  if not os then runtime_error 'invalid header' end
-
-  if hasbit(flg, FLG_FEXTRA) then
-    local xlen = bs:read(16)
-    local extra = 0
-    for i = 1, xlen do
-      extra = bs:read(8)
+    local id1 = bs:read(8)
+    local id2 = bs:read(8)
+    if id1 ~= 31 or id2 ~= 139 then
+        error( "not in gzip format" )
     end
 
-    if not extra then runtime_error 'invalid header' end
-  end
+    local cm = bs:read(8)  -- compression method
+    local flg = bs:read(8) -- FLaGs
+    local mtime = bs:read(32) -- Modification TIME
+    local xfl = bs:read(8) -- eXtra FLags
+    local os = bs:read(8) -- Operating System
 
-  local function parse_zstring(bs)
-    repeat
-      local by = bs:read(8)
-      if not by then runtime_error 'invalid header' end
-    until by == 0
-  end
+    if DEBUG then
+        print("CM=", cm)
+        print("FLG=", flg)
+        print("MTIME=", mtime)
+        --  print("MTIME_str=",os.date("%Y-%m-%d %H:%M:%S",mtime)) -- non-portable
+        print("XFL=", xfl)
+        print("OS=", os)
+    end
 
-  if hasbit(flg, FLG_FNAME) then
-    parse_zstring(bs)
-  end
+    if not os then
+        error( "invalid header" )
+    end
 
-  if hasbit(flg, FLG_FCOMMENT) then
-    parse_zstring(bs)
-  end
+    if hasbit(flg, FLG_FEXTRA) then
+        local xlen = bs:read(16)
+        local extra = 0
+        for i = 1, xlen do
+            extra = bs:read(8)
+        end
 
-  if hasbit(flg, FLG_FHCRC) then
-    local crc16 = bs:read(16)
-    if not crc16 then runtime_error 'invalid header' end
-    -- IMPROVE: check CRC.  where is an example .gz file that
-    -- has this set?
-    -- if DEBUG then
-    --   debug("CRC16=", crc16)
-    -- end
-  end
+        if not extra then error( "invalid header" ) end
+    end
+
+    local function parse_zstring(bs)
+        repeat
+            local by = bs:read(8)
+            if not by then error( "invalid header" ) end
+        until by == 0
+    end
+
+    if hasbit(flg, FLG_FNAME) then
+        parse_zstring(bs)
+    end
+
+    if hasbit(flg, FLG_FCOMMENT) then
+        parse_zstring(bs)
+    end
+
+    if hasbit( flg, FLG_FHCRC ) then
+        local crc16 = bs:read(16)
+        if not crc16 then error( "invalid header" ) end
+        -- IMPROVE: check CRC.  where is an example .gz file that
+        -- has this set?
+        -- if DEBUG then
+        --    print("CRC16=", crc16)
+        -- end
+    end
 end
 
 local function parse_zlib_header(bs)
-  local cm = bs:read(4) -- Compression Method
-  local cinfo = bs:read(4) -- Compression info
-  local fcheck = bs:read(5) -- FLaGs: FCHECK (check bits for CMF and FLG)
-  local fdict = bs:read(1) -- FLaGs: FDICT (present dictionary)
-  local flevel = bs:read(2) -- FLaGs: FLEVEL (compression level)
-  local cmf = cinfo * 16  + cm -- CMF (Compresion Method and flags)
-  local flg = fcheck + fdict * 32 + flevel * 64 -- FLaGs
+    local cm = bs:read(4) -- Compression Method
+    local cinfo = bs:read(4) -- Compression info
+    local fcheck = bs:read(5) -- FLaGs: FCHECK (check bits for CMF and FLG)
+    local fdict = bs:read(1) -- FLaGs: FDICT (present dictionary)
+    local flevel = bs:read(2) -- FLaGs: FLEVEL (compression level)
+    local cmf = cinfo * 16  + cm -- CMF (Compresion Method and flags)
+    local flg = fcheck + fdict * 32 + flevel * 64 -- FLaGs
 
-  if cm ~= 8 then -- not "deflate"
-    runtime_error('unrecognized zlib compression method: ' + cm)
-  end
-  if cinfo > 7 then
-    runtime_error('invalid zlib window size: cinfo=' + cinfo)
-  end
-  local window_size = 2 ^ (cinfo + 8)
+    if cm ~= 8 then -- not "deflate"
+        error( "unrecognized zlib compression method: " + cm )
+    end
 
-  if (cmf * 256 + flg) %  31 ~= 0 then
-    runtime_error('invalid zlib header (bad fcheck sum)')
-  end
+    if cinfo > 7 then
+        error( "invalid zlib window size: cinfo=" + cinfo )
+    end
 
-  if fdict == 1 then
-    runtime_error('FIX:TODO - FDICT not currently implemented')
-    -- local dictid_ = bs:read(32)
-  end
+    local window_size = 2 ^ (cinfo + 8)
+    if ( cmf * 256 + flg ) %  31 ~= 0 then
+        error( "invalid zlib header (bad fcheck sum)" )
+    end
 
-  return window_size
+    if fdict == 1 then
+        error( "FIX:TODO - FDICT not currently implemented" )
+        -- local dictid_ = bs:read(32)
+    end
+
+    return window_size
 end
 
 local function parse_huffmantables(bs)
@@ -543,44 +425,47 @@ local function parse_huffmantables(bs)
     local codelen_vals = {16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15}
 
     for i = 1, ncodelen_codes do
-      local nbits = bs:read(3)
-      local val = codelen_vals[i]
-      codelen_init[val] = nbits
+        local nbits = bs:read(3)
+        local val = codelen_vals[i]
+        codelen_init[val] = nbits
     end
 
     local codelentable = HuffmanTable(codelen_init, true)
 
     local function decode(ncodes)
-      local init = {}
-      local nbits
-      local val = 0
-      while val < ncodes do
-        local codelen = codelentable:read(bs)
-        --FIX:check nil?
-        local nrepeat
-        if codelen <= 15 then
-          nrepeat = 1
-          nbits = codelen
-          --debug('w', nbits)
-        elseif codelen == 16 then
-          nrepeat = 3 + noeof(bs:read(2))
-          -- nbits unchanged
-        elseif codelen == 17 then
-          nrepeat = 3 + noeof(bs:read(3))
-          nbits = 0
-        elseif codelen == 18 then
-          nrepeat = 11 + noeof(bs:read(7))
-          nbits = 0
-        else
-          error 'ASSERT'
-        end
-        for i = 1, nrepeat do
-          init[val] = nbits
-          val = val + 1
-        end
-      end
+        local init = {}
+        local nbits
+        local val = 0
 
-      return HuffmanTable( init, true )
+        while val < ncodes do
+            local codelen = codelentable:read(bs)
+            --FIX:check nil?
+
+            local nrepeat
+            if codelen <= 15 then
+                nrepeat = 1
+                nbits = codelen
+                -- print("w", nbits)
+            elseif codelen == 16 then
+                nrepeat = 3 + noeof(bs:read(2))
+                -- nbits unchanged
+            elseif codelen == 17 then
+                nrepeat = 3 + noeof(bs:read(3))
+                nbits = 0
+            elseif codelen == 18 then
+                nrepeat = 11 + noeof(bs:read(7))
+                nbits = 0
+            else
+                error( "ASSERT" )
+            end
+
+            for i = 1, nrepeat do
+                init[val] = nbits
+                val = val + 1
+            end
+        end
+
+        return HuffmanTable( init, true )
     end
 
     local nlit_codes = hlit + 257
@@ -589,217 +474,225 @@ local function parse_huffmantables(bs)
     return decode(nlit_codes), decode(ndist_codes)
 end
 
-
 local tdecode_len_base
 local tdecode_len_nextrabits
 local tdecode_dist_base
 local tdecode_dist_nextrabits
+
 local function parse_compressed_item(bs, outstate, littable, disttable)
-  local val = littable:read(bs)
-  --debug(val, val < 256 and string_char(val))
-  if val < 256 then -- literal
-    output(outstate, val)
-  elseif val == 256 then -- end of block
-    return true
-  else
-    if not tdecode_len_base then
-      local t = {[257] = 3}
-      local skip = 1
-      for i = 258, 285, 4 do
-        for j = i, i + 3 do t[j] = t[j - 1] + skip end
-        if i ~= 258 then skip = skip * 2 end
-      end
+    local val = littable:read(bs)
+    -- print(val, val < 256 and string_char(val))
 
-      t[285] = 258
-      tdecode_len_base = t
-      --for i=257,285 do debug('T1',i,t[i]) end
-    end
-    if not tdecode_len_nextrabits then
-      local t = {}
-      for i = 257, 285 do
-        local j = math_max(i - 261, 0)
-        t[i] = rshift(j, 2)
-      end
+    if val < 256 then -- literal
+        output(outstate, val)
+    elseif val == 256 then -- end of block
+        return true
+    else
+        if not tdecode_len_base then
+            local t = {[257] = 3}
+            local skip = 1
+            for i = 258, 285, 4 do
+                for j = i, i + 3 do t[j] = t[j - 1] + skip end
+                if i ~= 258 then skip = skip * 2 end
+            end
 
-      t[285] = 0
-      tdecode_len_nextrabits = t
-      --for i=257,285 do debug('T2',i,t[i]) end
-    end
-    local len_base = tdecode_len_base[val]
-    local nextrabits = tdecode_len_nextrabits[val]
-    local extrabits = bs:read(nextrabits)
-    local len = len_base + extrabits
+            t[285] = 258
+            tdecode_len_base = t
+            --for i=257,285 do print("T1",i,t[i]) end
+        end
 
-    if not tdecode_dist_base then
-      local t = {[0] = 1}
-      local skip = 1
-      for i = 1, 29, 2 do
-        for j = i, i + 1 do t[j] = t[j-1] + skip end
-        if i ~= 1 then skip = skip * 2 end
-      end
-      tdecode_dist_base = t
-      --for i=0,29 do debug('T3',i,t[i]) end
-    end
-    if not tdecode_dist_nextrabits then
-      local t = {}
-      for i = 0, 29 do
-        local j = math_max(i - 2, 0)
-        t[i] = rshift(j, 1)
-      end
-      tdecode_dist_nextrabits = t
-      --for i=0,29 do debug('T4',i,t[i]) end
-    end
-    local dist_val = disttable:read(bs)
-    local dist_base = tdecode_dist_base[dist_val]
-    local dist_nextrabits = tdecode_dist_nextrabits[dist_val]
-    local dist_extrabits = bs:read(dist_nextrabits)
-    local dist = dist_base + dist_extrabits
+        if not tdecode_len_nextrabits then
+            local t = {}
+            for i = 257, 285 do
+                local j = math_max(i - 261, 0)
+                t[i] = rshift(j, 2)
+            end
 
-    --debug('BACK', len, dist)
-    for i = 1, len do
-      local pos = (outstate.window_pos - 1 - dist) % 32768 + 1  -- 32K
-      output(outstate, assert(outstate.window[pos], 'invalid distance'))
+            t[285] = 0
+            tdecode_len_nextrabits = t
+            --for i=257,285 do print("T2",i,t[i]) end
+        end
+
+        local len_base = tdecode_len_base[val]
+        local nextrabits = tdecode_len_nextrabits[val]
+        local extrabits = bs:read(nextrabits)
+        local len = len_base + extrabits
+
+        if not tdecode_dist_base then
+            local t = {[0] = 1}
+            local skip = 1
+            for i = 1, 29, 2 do
+                for j = i, i + 1 do t[j] = t[j-1] + skip end
+                if i ~= 1 then skip = skip * 2 end
+            end
+
+            tdecode_dist_base = t
+            --for i=0,29 do print("T3",i,t[i]) end
+        end
+
+        if not tdecode_dist_nextrabits then
+            local t = {}
+            for i = 0, 29 do
+                local j = math_max(i - 2, 0)
+                t[i] = rshift(j, 1)
+            end
+
+            tdecode_dist_nextrabits = t
+            --for i=0,29 do print("T4",i,t[i]) end
+        end
+
+        local dist_val = disttable:read(bs)
+        local dist_base = tdecode_dist_base[dist_val]
+        local dist_nextrabits = tdecode_dist_nextrabits[dist_val]
+        local dist_extrabits = bs:read(dist_nextrabits)
+        local dist = dist_base + dist_extrabits
+
+        -- print("BACK", len, dist)
+        for i = 1, len do
+            local pos = (outstate.window_pos - 1 - dist) % 32768 + 1  -- 32K
+            output(outstate, assert(outstate.window[pos], "invalid distance"))
+        end
     end
-  end
-  return false
+
+    return false
 end
 
-
-local function parse_block(bs, outstate)
-  local bfinal = bs:read(1)
-  local btype = bs:read(2)
-
-  local BTYPE_NO_COMPRESSION = 0
-  local BTYPE_FIXED_HUFFMAN = 1
-  local BTYPE_DYNAMIC_HUFFMAN = 2
+local BTYPE_NO_COMPRESSION = 0
+local BTYPE_FIXED_HUFFMAN = 1
+local BTYPE_DYNAMIC_HUFFMAN = 2
 --   local BTYPE_RESERVED_ = 3
 
-  if DEBUG then
-    debug('bfinal=', bfinal)
-    debug('btype=', btype)
-  end
+local function parse_block(bs, outstate)
+    local bfinal = bs:read(1)
+    local btype = bs:read(2)
 
-  if btype == BTYPE_NO_COMPRESSION then
-    bs:read(bs:nbits_left_in_byte())
-    local len = bs:read(16)
-    noeof(bs:read(16))
 
-    for i = 1, len do
-      local by = noeof(bs:read(8))
-      output(outstate, by)
+    if DEBUG then
+        print("bfinal=", bfinal)
+        print("btype=", btype)
     end
-  elseif btype == BTYPE_FIXED_HUFFMAN or btype == BTYPE_DYNAMIC_HUFFMAN then
-    local littable, disttable
-    if btype == BTYPE_DYNAMIC_HUFFMAN then
-      littable, disttable = parse_huffmantables(bs)
+
+    if btype == BTYPE_NO_COMPRESSION then
+        bs:read(bs:nbits_left_in_byte())
+        local len = bs:read(16)
+        noeof(bs:read(16))
+
+        for i = 1, len do
+            local by = noeof(bs:read(8))
+            output(outstate, by)
+        end
+    elseif btype == BTYPE_FIXED_HUFFMAN or btype == BTYPE_DYNAMIC_HUFFMAN then
+        local littable, disttable
+        if btype == BTYPE_DYNAMIC_HUFFMAN then
+            littable, disttable = parse_huffmantables(bs)
+        else
+            littable  = HuffmanTable {0,8, 144,9, 256,7, 280,8, 288,nil}
+            disttable = HuffmanTable {0,5, 32,nil}
+        end
+
+        repeat
+        local is_done = parse_compressed_item(
+            bs, outstate, littable, disttable)
+        until is_done
     else
-      littable  = HuffmanTable {0,8, 144,9, 256,7, 280,8, 288,nil}
-      disttable = HuffmanTable {0,5, 32,nil}
+        error( "unrecognized compression type" )
     end
+
+    return bfinal ~= 0
+end
+
+function inflate(t)
+    local bs = get_bitstream( t.input )
+    local outbs = get_obytestream( t.output )
+    local outstate = make_outstate( outbs )
 
     repeat
-      local is_done = parse_compressed_item(
-        bs, outstate, littable, disttable)
-    until is_done
-  else
-    runtime_error 'unrecognized compression type'
-  end
-
-  return bfinal ~= 0
+        local is_final = parse_block( bs, outstate )
+    until is_final
 end
 
+function gunzip(t)
+    local bs = get_bitstream( t.input )
+    local outbs = get_obytestream( t.output )
+    local disable_crc = t.disable_crc
+    if disable_crc == nil then disable_crc = false end
 
-function M.inflate(t)
-  local bs = get_bitstream(t.input)
-  local outbs = get_obytestream(t.output)
-  local outstate = make_outstate(outbs)
+    parse_gzip_header( bs )
 
-  repeat
-    local is_final = parse_block(bs, outstate)
-  until is_final
-end
-local inflate = M.inflate
+    local content
+    inflate( {
+        ["input"] = bs,
+        -- TODO: Replace crc32
+        ["output"] = disable_crc and outbs or function( byte )
+            if not content then
+                content = byte
+            else
+                content = content .. byte
+            end
 
+            outbs( byte )
+        end
+    } )
 
-function M.gunzip(t)
-  local bs = get_bitstream(t.input)
-  local outbs = get_obytestream(t.output)
-  local disable_crc = t.disable_crc
-  if disable_crc == nil then disable_crc = false end
+    bs:read( bs:nbits_left_in_byte() )
 
-  parse_gzip_header(bs)
+    local expected_crc32 = bs:read( 32 )
+    local isize = bs:read( 32 ) -- ignored
 
-  local data_crc32 = 0
+    if DEBUG then
+        print("crc32=", expected_crc32)
+        print("isize=", isize)
+    end
 
-  inflate{ input = bs, output =
-    disable_crc and outbs or
-      function(byte)
-        data_crc32 = crc32(byte, data_crc32)
-        outbs(byte)
-      end
-  }
+    if not disable_crc and content and util_CRC( content ) ~= expected_crc32 then
+        error( "invalid compressed data--crc error" )
+    end
 
-  bs:read(bs:nbits_left_in_byte())
-
-  local expected_crc32 = bs:read(32)
-  local isize = bs:read(32) -- ignored
-  if DEBUG then
-    debug('crc32=', expected_crc32)
-    debug('isize=', isize)
-  end
-  if not disable_crc and data_crc32 and data_crc32 ~= expected_crc32 then
-    runtime_error('invalid compressed data--crc error')
-  end
-  if bs:read() then
-    warn 'trailing garbage ignored'
-  end
+    if bs:read() then
+        ErrorNoHalt( "trailing garbage ignored" )
+    end
 end
 
-
-function M.adler32(byte, crc)
-  local s1 = crc % 65536
-  local s2 = (crc - s1) / 65536
-  s1 = (s1 + byte) % 65521
-  s2 = (s2 + s1) % 65521
-  return s2 * 65536 + s1
+function adler32( byte, crc )
+    local s1 = crc % 65536
+    local s2 = ( crc - s1 ) / 65536
+    s1 = ( s1 + byte ) % 65521
+    s2 = ( s2 + s1 ) % 65521
+    return s2 * 65536 + s1
 end -- 65521 is the largest prime smaller than 2^16
 
+function inflate_zlib(t)
+    local bs = get_bitstream(t.input)
+    local outbs = get_obytestream(t.output)
+    local disable_crc = t.disable_crc
+    if disable_crc == nil then disable_crc = false end
 
-function M.inflate_zlib(t)
-  local bs = get_bitstream(t.input)
-  local outbs = get_obytestream(t.output)
-  local disable_crc = t.disable_crc
-  if disable_crc == nil then disable_crc = false end
+    parse_zlib_header(bs)
 
-parse_zlib_header(bs)
+    local data_adler32 = 1
 
-  local data_adler32 = 1
+    inflate( {
+        ["input"] = bs,
+        ["output"] = disable_crc and outbs or function( byte )
+            data_adler32 = adler32( byte, data_adler32 )
+            outbs( byte )
+        end
+    } )
 
-  inflate{ input = bs, output =
-    disable_crc and outbs or
-      function(byte)
-        data_adler32 = M.adler32(byte, data_adler32)
-        outbs(byte)
-      end
-  }
+    bs:read( bs:nbits_left_in_byte() )
 
-  bs:read(bs:nbits_left_in_byte())
+    local expected_adler32 = ( ( bs:read( 8 ) * 256 + bs:read( 8 ) ) * 256 + bs:read( 8 ) ) * 256 + bs:read( 8 )
+    if DEBUG then
+        print( "alder32=", expected_adler32 )
+    end
 
-  local b3 = bs:read(8)
-  local b2 = bs:read(8)
-  local b1 = bs:read(8)
-  local b0 = bs:read(8)
-  local expected_adler32 = ( ( b3 * 256 + b2 ) * 256 + b1 ) * 256 + b0
-  if DEBUG then
-    debug('alder32=', expected_adler32)
-  end
-  if not disable_crc and data_adler32 ~= expected_adler32 then
-    runtime_error('invalid compressed data--crc error')
-  end
-  if bs:read() then
-    warn 'trailing garbage ignored'
-  end
+    if not disable_crc and data_adler32 ~= expected_adler32 then
+        error( "invalid compressed data--crc error" )
+    end
+
+    if bs:read() then
+        ErrorNoHalt( "trailing garbage ignored" )
+    end
 end
 
-
-return M
+return _M
