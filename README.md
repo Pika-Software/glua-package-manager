@@ -4,9 +4,13 @@
 This addon is a powerful library/loader. It allows automatically build complex chains of libraries and other packages, no matter what source they are. It can load code from remote sources and control the startup process, supports various binary modules to extend its own features.
 Contains several useful libraries and actively uses and implements asynchronous code execution.
 
-## Features
-- Package information structure like [package.json](https://docs.npmjs.com/cli/v6/configuring-npm/package-json)
-- Synchronous import of packages from different sources
+## Roadmap
+- [ ] Rewrite/replace deflate
+- [ ] Remove gpm.zip and replace it with deflate
+- [ ] Improve package info file (links: npm, lua rocks)
+- [ ] Improve package reloading
+- [ ] Update promises
+- [ ] Add version control support
 
 ### Console commands
 - `gpm_clear_cache` - Clears the cache of externally downloaded packages.
@@ -14,7 +18,6 @@ Contains several useful libraries and actively uses and implements asynchronous 
 - `gpm_list` - Prints a list of loaded packages in the console.
 
 ### Console variables
-- `gpm_cache_lifetime` - Packages cache lifetime, in hours, sets after how many hours the downloaded gpm packages will not be relevant.
 - `gpm_http_timeout` - Default http timeout for gpm http library.
 
 ## How to create your own package?
