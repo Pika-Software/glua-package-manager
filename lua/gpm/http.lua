@@ -40,7 +40,7 @@ end
 
 local function asyncHTTP( parameters )
     ArgAssert( parameters, 1, "table" )
-    local promise = promise_New()
+    local p = promise_New()
 
     if type( parameters.method ) ~= "string" then
         parameters.method = "GET"
@@ -59,7 +59,7 @@ local function asyncHTTP( parameters )
     end
 
     parameters.success = function( code, body, headers )
-        promise:Resolve( {
+        p:Resolve( {
             ["code"] = code,
             ["body"] = body,
             ["headers"] = headers
@@ -67,7 +67,7 @@ local function asyncHTTP( parameters )
     end
 
     parameters.failed = function( err )
-        promise:Reject( err )
+        p:Reject( err )
     end
 
     if queue ~= nil then
@@ -78,7 +78,7 @@ local function asyncHTTP( parameters )
         request( parameters )
     end
 
-    return promise
+    return p
 end
 
 gpm.HTTP = asyncHTTP
