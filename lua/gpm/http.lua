@@ -1,27 +1,62 @@
 local gpm = gpm
+local http = http
+local util = gpm.util
+local metaworks = gpm.metaworks
+
 local promise_New = promise.New
-local ArgAssert = gpm.ArgAssert
 local logger = gpm.Logger
 local type = type
 
--- https://github.com/WilliamVenner/gmsv_reqwest
--- https://github.com/timschumi/gmod-chttp
+local lib = gpm.http
+if type( lib ) ~= "table" then
+    lib = metaworks.CreateLink( http, true )
+    gpm.http = lib
+end
 
-local HTTP, isReqwest = HTTP, false
-if SERVER and game.IsDedicated() then
-    if util.IsBinaryModuleInstalled( "reqwest" ) and pcall( require, "reqwest" ) then
-        logger:Info( "A third-party http client 'reqwest' has been initialized." )
-        isReqwest = true
-        HTTP = reqwest
-    elseif util.IsBinaryModuleInstalled( "chttp" ) and pcall( require, "chttp" ) then
-        logger:Info( "A third-party http client 'chttp' has been initialized." )
-        HTTP = CHTTP
+local clients = lib.Clients
+if type( clients ) ~= "table" then
+    clients = {
+        {
+            ["Name"] = "Garry's Mod",
+            ["Client"] = "HTTP",
+            ["Installed"] = true
+        }
+    }
+
+    if SERVER then
+        table.insert( clients, 1, {
+            ["Name"] = "chttp",
+            ["Client"] = "CHTTP"
+        } )
+
+        table.insert( clients, 1, {
+            ["Name"] = "reqwest",
+            ["Client"] = "reqwest"
+        } )
+    end
+
+    lib.Clients = clients
+end
+
+local client, clientName = lib.Client, lib.ClientName
+if type( client ) ~= "function" then
+    for _, data in ipairs( clients ) do
+        if not data.Installed and not ( util.IsBinaryModuleInstalled( data.Name ) and pcall( require, data.Name ) ) then continue end
+
+        clientName = data.Name
+        lib.ClientName = clientName
+
+        client = _G[ data.Client ]
+        lib.Client = client
+
+        logger:Info( "'%s' has been selected as gpm HTTP client.", data.Name )
+        break
     end
 end
 
 local function request( parameters )
     logger:Debug( "%s HTTP request to %s (timeout %d sec)", parameters.method, parameters.url, parameters.timeout )
-    return HTTP( parameters )
+    client( parameters )
 end
 
 local queue = {}
@@ -33,12 +68,7 @@ util.NextTick( function()
     queue = nil
 end )
 
-local gpm_http_timeout, userAgent = CreateConVar( "gpm_http_timeout", "10", FCVAR_ARCHIVE, "Default http timeout for gpm http library.", 5, 300 )
-if isReqwest then
-    userAgent = string.format( "GLua Package Manager/%s - Garry's Mod/%s", gpm.VERSION, VERSIONSTR )
-end
-
-local function asyncHTTP( parameters )
+local function HTTP( parameters )
     ArgAssert( parameters, 1, "table" )
     local p = promise_New()
 
@@ -54,7 +84,13 @@ local function asyncHTTP( parameters )
         parameters.headers = {}
     end
 
-    if isReqwest then
+    if clientName == "reqwest" then
+        local userAgent = lib.UserAgent
+        if not userAgent then
+            userAgent = string.format( "GLua Package Manager/%s - Garry's Mod/%s", gpm.VERSION, VERSIONSTR )
+            lib.UserAgent = userAgent
+        end
+
         parameters.headers["User-Agent"] = userAgent
     end
 
@@ -66,8 +102,8 @@ local function asyncHTTP( parameters )
         } )
     end
 
-    parameters.failed = function( err )
-        p:Reject( err )
+    parameters.failed = function( msg )
+        p:Reject( msg )
     end
 
     if queue ~= nil then
@@ -81,28 +117,7 @@ local function asyncHTTP( parameters )
     return p
 end
 
-gpm.HTTP = asyncHTTP
+gpm.HTTP = HTTP
 
-local lib = gpm.http
-if type( lib ) ~= "table" then
-    lib = gpm.metaworks.CreateLink( http, true, false )
-    gpm.http = lib
-end
 
-function lib.Fetch( url, headers, timeout )
-    return asyncHTTP( {
-        ["url"] = url,
-        ["headers"] = headers,
-        ["timeout"] = timeout
-    } )
-end
-
-function lib.Post( url, parameters, headers, timeout )
-    return asyncHTTP( {
-        ["url"] = url,
-        ["method"] = "POST",
-        ["headers"] = headers,
-        ["parameters"] = parameters,
-        ["timeout"] = timeout
-    } )
-end
+local timeout = CreateConVar( "http_timeout", "10", FCVAR_ARCHIVE, "Default http timeout for gpm http library.", 3, 300 )

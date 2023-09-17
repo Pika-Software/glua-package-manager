@@ -27,6 +27,7 @@
     https://github.com/dankmolot/gm_promise
 
     Documentation can be found at: https://github.com/dankmolot/gm_promise
+    This version gm_promise was specially modified by PrikolMen:-b for GPM.
 ]]
 
 local ErrorNoHaltWithStack = ErrorNoHaltWithStack
@@ -41,190 +42,215 @@ local coroutine = coroutine
 local tostring = tostring
 local istable = istable
 local ipairs = ipairs
-local Either = Either
 local xpcall = xpcall
 local error = error
 local _HTTP = HTTP
 
-local developer = GetConVar( "developer" )
+local developerMode = GetConVar( "developer" ):GetInt() > 0
+cvars.AddChangeCallback( "developer", function( _, __, new )
+    developerMode = ( tonumber( new ) or 0 ) > 0
+end )
 
 module( "promise" )
-VERSION = "1.4.1"
+VERSION = "1.5.0"
 
-local function PromiseErrorHandler(...)
-    if developer:GetInt() > 0 then
-        ErrorNoHaltWithStack(...)
+local function PromiseErrorHandler( ... )
+    if developerMode then
+        ErrorNoHaltWithStack( ... )
     end
 
     return ...
 end
 
+PROMISE_PENDING = 0
+PROMISE_REJECTED = 1
+PROMISE_FULFILLED = 2
+
+VALID_STATES = {
+    [ PROMISE_PENDING ] = true,
+    [ PROMISE_REJECTED ] = true,
+    [ PROMISE_FULFILLED ] = true
+}
+
 -- Promise object
 do
-    local VALID_STATES = {
-        ["pending"] = true,
-        ["fulfilled"] = true,
-        ["rejected"] = true,
-    }
 
-    PROMISE = PROMISE or {}
+    if type( PROMISE ) ~= "table" then
+        PROMISE = {}
+    end
+
     PROMISE.__index = PROMISE
 
-    function PROMISE:GetState()
-        return self.state or "pending"
-    end
-    function PROMISE:IsPending() return self:GetState() == "pending" end
-    function PROMISE:IsFulfilled() return self:GetState() == "fulfilled" end
-    function PROMISE:IsRejected() return self:GetState() == "rejected" end
+    function PROMISE:GetResult() return self.result end
+    function PROMISE:GetState() return self.state end
 
-    function PROMISE:GetResult()
-        return self.result
-    end
+    function PROMISE:IsPending() return PROMISE.GetState( self ) == PROMISE_PENDING end
+    function PROMISE:IsFulfilled() return PROMISE.GetState( self ) == PROMISE_FULFILLED end
+    function PROMISE:IsRejected() return PROMISE.GetState( self ) == PROMISE_REJECTED end
 
     function PROMISE:__tostring()
-        if self:GetResult() == nil then return string_format("Promise %p {<%s>}", self, self:GetState()) end
-        return string_format( "Promise %p {<%s>: %s}", self, self:GetState(), tostring(self:GetResult()) )
+        if PROMISE.GetResult( self ) == nil then
+            return string_format( "Promise %p {<%s>}", self, PROMISE.GetState( self ) )
+        end
+
+        return string_format( "Promise %p {<%s>: %s}", self, PROMISE.GetState( self ), tostring( PROMISE.GetResult( self ) ) )
     end
 
-    function PROMISE:_ProcessQueue()
-        if self:IsPending() then return end
-        if not self._processed and #self._queue == 0 then
-            if self:IsRejected() then ErrorNoHalt("Unhandled promise error: " .. tostring(self:GetResult()) .. "\n\n") end
+    function PROMISE:ProcessQueue()
+        if PROMISE.IsPending( self ) then return end
+
+        if not self.processed and #self.queue == 0 then
+            if PROMISE.IsRejected( self ) then
+                ErrorNoHalt( "Unhandled promise error: " .. tostring( PROMISE.GetResult( self ) ) .. "\n\n" )
+            end
+
             return
         end
 
-        self._processed = true
+        self.processed = true
 
-        for i, promise in ipairs(self._queue) do
-            self._queue[i] = nil
-            local handler = Either(self:IsFulfilled(), promise._OnFulfill, promise._OnReject)
+        for index, promise in ipairs( self.queue ) do
+            self.queue[ index ] = nil
 
-            local ok, result
+            local isFulfilled = PROMISE.IsFulfilled( self )
+
+            local handler, ok, result = isFulfilled and promise.OnFulfill or promise.OnReject
             if handler then
-                ok, result = xpcall(handler, PromiseErrorHandler, self:GetResult())
+                ok, result = xpcall( handler, PromiseErrorHandler, PROMISE.GetResult( self ) )
             else
-                ok, result = self:IsFulfilled(), self:GetResult()
+                ok, result = isFulfilled, PROMISE.GetResult( self )
             end
 
             if ok then
-                promise:Resolve(result)
+                PROMISE.Resolve( promise, result )
             else
-                promise:Reject(result)
+                PROMISE.Reject( promise, result )
             end
         end
     end
 
-    function PROMISE:_ChangeState(state, value)
-        if not self:IsPending() or self:GetState() == state or not VALID_STATES[state] then return end
-        self.state = state
-        self.result = value
+    function PROMISE:ChangeState( state, value )
+        if not PROMISE.IsPending( self ) or PROMISE.GetState( self ) == state or not VALID_STATES[ state ] then return end
+        self.state, self.result = state, value
 
-        if self:IsFulfilled() then
-            self:_ProcessQueue()
-        else
-            -- We must wait for reject handlers, so we won't throw error about unhandler error
-            timer_Simple(0, function()
-                if not self._processed then
-                    self:_ProcessQueue()
-                end
-            end)
+        if PROMISE.IsFulfilled( self ) then
+            PROMISE.ProcessQueue( self )
+            return
         end
+
+        -- We must wait for reject handlers, so we won't throw error about unhandler error
+        timer_Simple( 0, function()
+            if self.processed then return end
+            PROMISE.ProcessQueue( self )
+        end )
     end
 
-    function PROMISE:Resolve(value)
-        if self == value then return self:Reject("promise fulfill value refer to promise itself") end
-        if IsThenable(value) then
-            if IsPromise(value) and not value:IsPending() then
-                table_insert(value._queue, self)
-                value:_ProcessQueue()
-            return end
+    function PROMISE:Resolve( promise )
+        if self == promise then
+            return PROMISE.Reject( self, "promise fulfill value refer to promise itself" )
+        end
+
+        if IsThenable( promise ) then
+            if IsPromise( promise ) and not PROMISE.IsPending( promise ) then
+                table_insert( promise.queue, self )
+                PROMISE.ProcessQueue( promise )
+                return
+            end
 
             -- A little hack for thenable objects
             local called = false
-            local function onFulfill(result)
+            local function onFulfill( value )
                 if called then return end
                 called = true
-                return self:Resolve(result)
+
+                return PROMISE.Resolve( self, value )
             end
 
-            local function onReject(err)
+            local function onReject( msg )
                 if called then return end
                 called = true
-                return self:Reject(err)
+
+                return PROMISE.Reject( self, msg )
             end
 
-            local ok, err = xpcall(function()
-                value:Then(onFulfill, onReject)
-            end, PromiseErrorHandler)
+            local ok, msg = xpcall( function()
+                PROMISE.Then( promise, onFulfill, onReject )
+            end, PromiseErrorHandler )
 
-            if not ok then OnReject(err) end
-        return end
+            if not ok then OnReject( msg ) end
+            return
+        end
 
-        self:_ChangeState("fulfilled", value)
+        PROMISE.ChangeState( self, PROMISE_FULFILLED, promise )
     end
 
-    function PROMISE:Reject(value)
-        self:_ChangeState("rejected", value)
+    function PROMISE:Reject( msg )
+        PROMISE.ChangeState( self, PROMISE_REJECTED, msg )
     end
 
-    function PROMISE:Then(onFulfill, onReject)
+    function PROMISE:Then( onFulfill, onReject )
         local promise = New()
-        if isfunction(onFulfill) then
-            promise._OnFulfill = onFulfill
+        if isfunction( onFulfill ) then
+            promise.OnFulfill = onFulfill
         end
 
-        if isfunction(onReject) then
-            promise._OnReject = onReject
+        if isfunction( onReject ) then
+            promise.OnReject = onReject
         end
 
-        table_insert(self._queue, promise)
-        self:_ProcessQueue()
-
+        table_insert( self.queue, promise )
+        PROMISE.ProcessQueue( self )
         return promise
     end
 
-    function PROMISE:Catch(onReject)
-        return self:Then(nil, onReject)
+    function PROMISE:Catch( onReject )
+        return PROMISE.Then( self, nil, onReject )
     end
 
     function PROMISE:SafeAwait()
         local co = coroutine.running()
-        if not co then return false, ":Await() only works in coroutines or async functions!" end
+        if not co then
+            return false, "await only works in coroutines or async functions!"
+        end
 
-        if self:IsPending() then
+        if PROMISE.IsPending( self ) then
             local function resume()
-                coroutine.resume(co)
+                coroutine.resume( co )
             end
 
-            self:Then(resume, resume)
-
+            PROMISE.Then( self, resume, resume )
             coroutine.yield()
         end
 
-        self._processed = true
-        return self:IsFulfilled(), self:GetResult()
+        self.processed = true
+        return PROMISE.IsFulfilled( self ), PROMISE.GetResult( self )
     end
 
-    function PROMISE:Await(ignoreErrors)
-        local ok, result = self:SafeAwait()
+    function PROMISE:Await( ignoreErrors )
+        local ok, result = PROMISE.SafeAwait( self )
         if not ok then
-            if not ignoreErrors then return error(result, 2) end
-        return end
+            if not ignoreErrors then
+                return error( result, 2 )
+            end
+
+            return
+        end
 
         return result
     end
+
 end
 
-function IsThenable(obj)
-    return istable(obj) and isfunction(obj.Then)
+function IsThenable( obj )
+    return istable( obj ) and isfunction( obj.Then )
 end
 
-function IsAwaitable(obj)
-    return istable(obj) and isfunction(obj.Await)
+function IsAwaitable( obj )
+    return istable( obj ) and isfunction( obj.Await )
 end
 
-function IsPromise(obj)
-    return getmetatable(obj) == PROMISE
+function IsPromise( obj )
+    return getmetatable( obj ) == PROMISE
 end
 
 function RunningInAsync()
@@ -232,148 +258,62 @@ function RunningInAsync()
 end
 
 -- Creates new promise object
-function New(func)
-    local promise = setmetatable({}, PROMISE)
-    promise._queue = {}
+function New( func )
+    local promise = setmetatable( {
+        ["state"] = PROMISE_PENDING,
+        ["queue"] = {}
+    }, PROMISE )
 
-    if isfunction(func) then
-        local function resolve(value)
-            promise:Resolve(value)
-        end
-
-        local function reject(err)
-            promise:Reject(err)
-        end
-
-        func(resolve, reject)
+    -- TODO: args
+    if func then
+        func( function( value )
+            PROMISE.Resolve( promise, value )
+        end, function( msg )
+            PROMISE.Reject( promise, msg )
+        end )
     end
 
     return promise
 end
 
-function Async(func)
-    if not isfunction(func) then return end
+function Async( func )
+    return function( ... )
+        local promise = New()
 
-    local function run(p, ...)
-        local ok, result = xpcall(func, PromiseErrorHandler, ...)
-        if ok then
-            p:Resolve(result)
-        else
-            p:Reject(result)
-        end
-    end
-
-    return function(...)
-        local p = New()
-
-        local co = coroutine.create(run)
-        coroutine.resume(co, p, ...)
-
-        return p
-    end
-end
-
-function SafeAwait(p)
-    if IsPromise(p) then return p:SafeAwait() end
-    return true, p
-end
-
-function Await(p, ignoreErrors)
-    if IsAwaitable(p) then return p:Await(ignoreErrors) end
-    return p
-end
-
-function Delay(time)
-    return New(function(resolve) timer_Simple(time, resolve) end)
-end
-
-function Resolve(value)
-    if IsPromise(value) then return value end
-    return New(function(resolve) resolve(value) end)
-end
-
-function Reject(err)
-    if IsPromise(value) then return value end
-    return New(function(_, reject) reject(err) end)
-end
-
-function All(promises)
-    if #promises == 0 then return Resolve({}) end
-
-    local new_promise = New()
-
-    local results = {}
-    local calls = 0
-    local totalCalls = #promises
-
-    local onFulfill = function(i)
-        return function(result)
-            if not new_promise:IsPending() then return end
-            results[i] = result
-            calls = calls + 1
-
-            if calls == totalCalls then
-                new_promise:Resolve(results)
+        coroutine.resume( coroutine.create( function( self, ... )
+            local ok, result = xpcall( func, PromiseErrorHandler, ... )
+            if ok then
+                PROMISE.Resolve( self, result )
+                return
             end
-        end
-    end
 
-    local function onReject(err)
-        if new_promise:IsPending() then new_promise:Reject(err) end
-    end
+            PROMISE.Reject( self, result )
+        end ), promise, ... )
 
-    for i, p in ipairs(promises) do
-        if IsThenable(p) then
-            p:Then( onFulfill(i), onReject )
-        else
-            results[i] = result
-            calls = calls + 1
-        end
+        return promise
     end
-
-    return new_promise
 end
 
-function Race(promises)
-    if #promises == 0 then return Resolve({}) end
-
-    local new_promise = New()
-
-    local onFulfill = function(result)
-        if new_promise:IsPending() then new_promise:Resolve(result) end
+function SafeAwait( promise )
+    if IsPromise( promise ) then
+        return PROMISE.SafeAwait( promise )
     end
 
-    local onReject = function(err)
-        if new_promise:IsPending() then new_promise:Reject(err) end
-    end
-
-    for i, p in ipairs(promises) do
-        if IsThenable(p) then
-            p:Then(onFulfill, onReject)
-        end
-    end
-
-    return new_promise
+    return true, promise
 end
 
--- Async version of HTTP
-function HTTP(parameters)
-    local p = New()
-
-    parameters.success = function(code, body, headers)
-        p:Resolve({
-            code = code,
-            body = body,
-            headers = headers
-        })
-    end
-    parameters.failed = function(err)
-        p:Reject(err)
+function Await( promise, ignoreErrors )
+    if IsAwaitable( promise ) then
+        return PROMISE.Await( promise, ignoreErrors )
     end
 
-    local ok = _HTTP(parameters)
-    if not ok then p:Reject("failed to make http request") end
-    return p
+    return promise
+end
+
+function Delay( time )
+    return New( function( resolve )
+        timer_Simple( time, resolve )
+    end )
 end
 
 function Sleep( delay )
@@ -381,5 +321,87 @@ function Sleep( delay )
         error( "sleep should be performed in the coroutine/async function" )
     end
 
-    Delay( delay ):SafeAwait()
+    PROMISE.SafeAwait( Delay( delay or 0 ) )
 end
+
+function Resolve( value )
+    if IsPromise( value ) then
+        return value
+    end
+
+    return New( function( resolve )
+        resolve( value )
+    end )
+end
+
+function Reject( msg )
+    if IsPromise( msg ) then
+        return msg
+    end
+
+    return New( function( _, reject )
+        reject( msg )
+    end )
+end
+
+function All( promises )
+    if #promises == 0 then
+        return Resolve( promises )
+    end
+
+    local results, count = {}, #promises
+    local new_promise = New()
+
+    local onFulfill = function( index )
+        return function( value )
+            if not PROMISE.IsPending( new_promise ) then return end
+            results[ index ] = value
+
+            if #results ~= count then return end
+            PROMISE.Resolve( new_promise, results )
+        end
+    end
+
+    local function onReject( msg )
+        if not PROMISE.IsPending( new_promise ) then return end
+        PROMISE.Reject( new_promise, msg )
+    end
+
+    for index, promise in ipairs( promises ) do
+        if IsThenable( promise ) then
+            PROMISE.Then( promise, onFulfill( index ), onReject )
+            continue
+        end
+
+        results[ index ] = PROMISE.GetResult( promise )
+    end
+
+    return new_promise
+end
+
+function Race( promises )
+    if #promises == 0 then
+        return Resolve( promises )
+    end
+
+    local new_promise = New()
+
+    local function onFulfill( value )
+        if not PROMISE.IsPending( new_promise ) then return end
+        PROMISE.Resolve( new_promise, value )
+    end
+
+    local function onReject( msg )
+        if not PROMISE.IsPending( new_promise ) then return end
+        PROMISE.Reject( new_promise, msg )
+    end
+
+    for _, promise in ipairs( promises ) do
+        if not IsThenable( promise ) then continue end
+        PROMISE.Then( promise, onFulfill, onReject )
+    end
+
+    return new_promise
+end
+
+return _M
