@@ -72,13 +72,14 @@ lib_IsMounted = ( filePath, gamePath, onlyDir ) ->
     mountedFiles[ filePath ]
 
 lib.IsMounted = lib_IsMounted
+lib.Exists = ( filePath, gamePath ) -> lib_IsMounted( filePath, gamePath ) or file.Exists( filePath, gamePath )
 
-Exists = ( filePath, gamePath ) -> lib_IsMounted( filePath, gamePath ) or file.Exists( filePath, gamePath )
+lib_Find = lib.Find
 lib_IsDir = ( filePath, gamePath ) ->
     if lib_IsMounted( filePath, gamePath, true ) or file.IsDir( filePath, gamePath )
         return true
 
-    _, folders = Find( filePath .. "*", gamePath )
+    _, folders = lib_Find( filePath .. "*", gamePath )
     if folders == nil or #folders == 0
         return false
 
@@ -86,24 +87,24 @@ lib_IsDir = ( filePath, gamePath ) ->
     table.HasIValue( folders, splits[ #splits ] )
 
 lib.IsDir = lib_IsDir
-
-IsFile = ( filePath, gamePath ) -> lib_IsMounted( filePath, gamePath ) or ( file.Exists( filePath, gamePath ) and not lib_IsDir( filePath, gamePath ) )
-
+lib.IsFile = ( filePath, gamePath ) -> lib_IsMounted( filePath, gamePath ) or ( file.Exists( filePath, gamePath ) and not lib_IsDir( filePath, gamePath ) )
 paths_Join = paths.Join
-file_Find = file.Find
-file_Size = file.Size
 
-lib_Size = ( filePath, gamePath ) ->
-    if not fs_IsDir( filePath, gamePath )
-        return file_Size( filePath, gamePath )
+do
+    file_Size = file.Size
+    lib_Size = ( filePath, gamePath ) ->
+        if not lib_IsDir( filePath, gamePath )
+            return file_Size( filePath, gamePath )
 
-    size, files, folders = 0, file_Find( paths_Join( filePath, "*" ), gamePath )
-    for fileName in *files
-        size += file_Size( paths_Join( filePath, fileName ), gamePath )
+        size, files, folders = 0, lib_Find( paths_Join( filePath, "*" ), gamePath )
+        for fileName in *files
+            size += file_Size( paths_Join( filePath, fileName ), gamePath )
 
-    for folderName in *folders
-        size += lib_Size( paths_Join( filePath, folderName ), gamePath )
+        for folderName in *folders
+            size += lib_Size( paths_Join( filePath, folderName ), gamePath )
 
-    size
+        size
+
+    lib.Size = lib_Size
 
 lib
