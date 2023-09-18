@@ -76,20 +76,17 @@ cvars.AddChangeCallback "developer",
 
 if SERVER
     AddCSLuaFile "gpm/util.lua"
-    AddCSLuaFile "gpm/fs.lua"
-    AddCSLuaFile "gpm/http.lua"
     AddCSLuaFile "gpm/libs/promise.lua"
     AddCSLuaFile "gpm/filesystem.lua"
+    AddCSLuaFile "gpm/http.lua"
 
 include "gpm/util.lua"
 gpm.Logger\Info( "metaworks v%s is initialized.", gpm.metaworks.VERSION )
-include "gpm/fs.lua"
 
 include "gpm/libs/promise.lua"
 gpm.Logger\Info( "gm_promise v%s is initialized.", promise.VERSION )
-include "gpm/http.lua"
-
 include "gpm/filesystem.lua"
+include "gpm/http.lua"
 
 gpm.Logger\Info( "Start-up time: %.4f sec.", SysTime() - gpm.StartTime )
 gpm
