@@ -45,7 +45,7 @@ do
     lib.MountGMA = ( gmaPath ) ->
         ok, files = game_MountGMA( gmaPath )
         if not ok
-            error( "gma could not be mounted" )
+            error "gma could not be mounted"
 
         for filePath in *files
             mountedFiles[ filePath ] = true

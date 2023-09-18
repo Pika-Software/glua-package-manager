@@ -51,6 +51,11 @@ cvars.AddChangeCallback( "developer", function( _, __, new )
     developerMode = ( tonumber( new ) or 0 ) > 0
 end )
 
+-- local promise = gpm.promise
+-- if type( promise ) ~= "table" then
+--     promise = {}; gpm.promise = promise
+-- end
+
 module( "promise" )
 VERSION = "1.5.0"
 
@@ -62,9 +67,13 @@ local function PromiseErrorHandler( ... )
     return ...
 end
 
-PROMISE_PENDING = 0
-PROMISE_REJECTED = 1
-PROMISE_FULFILLED = 2
+local PROMISE_PENDING = 0
+local PROMISE_REJECTED = 1
+local PROMISE_FULFILLED = 2
+
+_M.PROMISE_PENDING = PROMISE_PENDING
+_M.PROMISE_REJECTED = PROMISE_REJECTED
+_M.PROMISE_FULFILLED = PROMISE_FULFILLED
 
 VALID_STATES = {
     [ PROMISE_PENDING ] = true,

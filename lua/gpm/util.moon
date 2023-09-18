@@ -63,17 +63,23 @@ typeNames = types.Names
 indexes = types.Indexes
 
 do
+
+    TYPE_USERDATA = TYPE_USERDATA
+    TYPE_TABLE = TYPE_TABLE
     TypeID = TypeID
+
     gpm.TypeID = ( any ) ->
-        for data in *indexes
-            if data[ 1 ]( any )
-                return data[ 2 ]
-        TypeID( any )
+        id = TypeID any
+        if id == TYPE_TABLE or id == TYPE_USERDATA
+            for data in *indexes
+                if data[ 1 ]( any )
+                    return data[ 2 ]
+
+        id
 
 do
     gpm_TypeID = gpm.TypeID
-    gpm.type = ( any ) ->
-        typeNames[ gpm_TypeID( any ) ] or "unknown"
+    gpm.type = ( any ) -> typeNames[ gpm_TypeID( any ) ] or "unknown"
 
 string = gpm.string
 if type( string ) ~= "table"
@@ -154,7 +160,8 @@ string_Split = string.Split
 table.Lookup = ( tbl, str, default ) ->
     for key in *string_Split( str, "." )
         tbl = tbl[ key ]
-        if not tbl return default
+        if not tbl
+            return default
     tbl
 
 table.SetValue = ( tbl, str, value, ifEmpty ) ->
@@ -381,6 +388,8 @@ do
     debugColor = colors.Debug
 
     class Logger
+        __tostring: () => "Logger [" .. @GetName! .. "]"
+
         new: ( name, color, func ) =>
             @DebugFilter = type( func ) == "function" and func or debugFilter
             @Name = type( name ) == "string" and name or "unknown"
@@ -391,8 +400,6 @@ do
         SetName: ( str ) =>
             gpm_ArgAssert( str, 1, "string" )
             @Name = str
-
-        __tostring: () => "Logger [" .. @GetName! .. "]"
 
         GetColor: => @Color
         SetColor: ( color ) =>
