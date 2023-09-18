@@ -107,4 +107,13 @@ do
 
     lib.Size = lib_Size
 
+lib_Open = lib.Open
+lib.Read = ( filePath, gamePath, length ) ->
+    f = lib_Open( filePath, "rb", gamePath )
+    if not f return
+
+    content = f:Read( length )
+    f:Close()
+    content
+
 lib
