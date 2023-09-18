@@ -44,6 +44,7 @@ local istable = istable
 local ipairs = ipairs
 local xpcall = xpcall
 local error = error
+local type = type
 
 local developerMode = GetConVar( "developer" ):GetInt() > 0
 cvars.AddChangeCallback( "developer", function( _, __, new )
