@@ -14,8 +14,8 @@ gpm.StartTime = SysTime!
 
 do
 
-    splash = table.Random {
-        "DarkRP is great way to be gay.",
+    splashes = {
+        "Flying over rooftops...",
         "We need more packages!",
         "Where's fireworks!?",
         "Now on MoonScript!",
@@ -31,6 +31,11 @@ do
         "That's me!",
         "I see you."
     }
+
+    if CLIENT
+        splashes[ #splashes + 1 ] = "I know you, " .. cvars.String( "name", "player" ) .. "..."
+
+    splash = table.Random splashes
 
     for i = 1, ( 25 - #splash ) / 2
         if i % 2 == 1
