@@ -1,5 +1,6 @@
 setmetatable = setmetatable
 ipairs = ipairs
+error = error
 type = type
 gpm = gpm
 _G = _G
@@ -103,17 +104,12 @@ if type( debug ) ~= "table"
     gpm.debug = debug
 
 debug.fempty = ->
-
+debug_getinfo = debug.getinfo
 debug.fcall = ( func, ... ) ->
     func(...)
 
-debug_getinfo = debug.getinfo
-
 do
-
     gpm_type = gpm.type
-    error = error
-
     gpm.ArgAssert = ( value, argNum, expected, errorlevel ) ->
         valueType, expectedType = gpm_type( value ), gpm_type( expected )
         if expectedType == "table"
@@ -278,6 +274,15 @@ paths.Join = ( ... ) ->
 paths_Localize = ( filePath ) -> string_gsub( string_gsub( string_gsub( filePath, "^cache/moonloader/", "" ), "^addons/[%w%-_]-/", "" ), "^lua/", "" )
 paths.Localize = paths_Localize
 
+debug.getfpath = ->
+    for i = 2, 6
+        info = debug_getinfo( i, "S" )
+        if not info
+            break
+
+        if info.what == "main"
+            return paths_Localize paths_Fix info.short_src
+
 do
     string_GetExtensionFromFilename = string.GetExtensionFromFilename
     paths.FormatToLua = ( filePath ) ->
@@ -308,15 +313,6 @@ do
 
         version = string_format( "%06d", number )
         string_format( "%d.%d.%d", tonumber( string_sub( version, 0, 2 ) ), tonumber( string_sub( version, 3, 4 ) ), tonumber( string_sub( version, 5 ) ) )
-
-    util.GetCurrentFilePath = () ->
-        for i = 2, 6 do
-            info = debug_getinfo( i, "S" )
-            if not info
-                break
-
-            if info.what == "main" then
-                return paths_Localize( paths_Fix( info.short_src ) )
 
     do
         timer_Simple = timer.Simple
@@ -448,3 +444,26 @@ do
     gpm.IsLogger = gpm_IsLogger
 
     gpm.Logger = Logger( "gpm@" .. gpm.VERSION, colors.gpm )
+
+do
+
+    CompileString = CompileString
+
+    moonloader_ToLua = nil
+    if type( moonloader ) == "table"
+        moonloader_ToLua = moonloader.ToLua
+
+    gpm.CompileMoonString = ( moonCode, identifier, handleError ) ->
+        if not moonloader_ToLua
+            error "Attempting to compile a Moonscript file fails, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader."
+
+        luaCode, msg = moonloader_ToLua moonCode
+        msg = msg or "MoonScript to Lua code compilation failed."
+        if not luaCode
+            error msg
+
+        func = CompileString luaCode, identifier, handleError
+        if type( func ) ~= "function"
+            error msg
+
+        func
