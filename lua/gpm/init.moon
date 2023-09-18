@@ -14,7 +14,8 @@ gpm.StartTime = SysTime!
 
 do
 
-    slashes = {
+    splash = table.Random {
+        "DarkRP is great way to be gay.",
         "We need more packages!",
         "Where's fireworks!?",
         "Now on MoonScript!",
@@ -22,22 +23,21 @@ do
         "Faster than ever.",
         "v" .. gpm.VERSION,
         "Blazing fast ☄",
-        "More slashes?!",
+        "More splashes?!",
         "Here For You ♪",
+        "Hello World!",
         "Once Again ♪",
         "Sandblast ♪",
         "That's me!",
         "I see you."
     }
 
-    slash = table.Random slashes
-
-    for i = 1, ( 25 - #slash ) / 2
+    for i = 1, ( 25 - #splash ) / 2
         if i % 2 == 1
-            slash = slash .. " "
-        slash = " " .. slash
+            splash = splash .. " "
+        splash = " " .. splash
 
-    MsgN string.format "\n                                     ___          __            \n                                   /'___`\\      /'__`\\          \n     __    _____     ___ ___      /\\_\\ /\\ \\    /\\ \\/\\ \\         \n   /'_ `\\ /\\ '__`\\ /' __` __`\\    \\/_/// /__   \\ \\ \\ \\ \\        \n  /\\ \\L\\ \\\\ \\ \\L\\ \\/\\ \\/\\ \\/\\ \\      // /_\\ \\ __\\ \\ \\_\\ \\   \n  \\ \\____ \\\\ \\ ,__/\\ \\_\\ \\_\\ \\_\\    /\\______//\\_\\\\ \\____/   \n   \\/___L\\ \\\\ \\ \\/  \\/_/\\/_/\\/_/    \\/_____/ \\/_/ \\/___/    \n     /\\____/ \\ \\_\\                                          \n     \\_/__/   \\/_/                %s                        \n\n  GitHub: https://github.com/Pika-Software\n  Discord: https://discord.gg/3UVxhZ\n  Website: https://pika-soft.ru\n  Developers: Pika Software\n  License: MIT\n", slash
+    MsgN string.format "\n                                     ___          __            \n                                   /'___`\\      /'__`\\          \n     __    _____     ___ ___      /\\_\\ /\\ \\    /\\ \\/\\ \\         \n   /'_ `\\ /\\ '__`\\ /' __` __`\\    \\/_/// /__   \\ \\ \\ \\ \\        \n  /\\ \\L\\ \\\\ \\ \\L\\ \\/\\ \\/\\ \\/\\ \\      // /_\\ \\ __\\ \\ \\_\\ \\   \n  \\ \\____ \\\\ \\ ,__/\\ \\_\\ \\_\\ \\_\\    /\\______//\\_\\\\ \\____/   \n   \\/___L\\ \\\\ \\ \\/  \\/_/\\/_/\\/_/    \\/_____/ \\/_/ \\/___/    \n     /\\____/ \\ \\_\\                                          \n     \\_/__/   \\/_/                %s                        \n\n  GitHub: https://github.com/Pika-Software\n  Discord: https://discord.gg/3UVxhZ\n  Website: https://pika-soft.ru\n  Developers: Pika Software\n  License: MIT\n", splash
 
 colors = gpm.Colors
 if type( colors ) ~= "table"
@@ -79,6 +79,7 @@ if SERVER
     AddCSLuaFile "gpm/fs.lua"
     AddCSLuaFile "gpm/http.lua"
     AddCSLuaFile "gpm/libs/promise.lua"
+    AddCSLuaFile "gpm/filesystem.lua"
 
 include "gpm/util.lua"
 gpm.Logger\Info( "metaworks v%s is initialized.", gpm.metaworks.VERSION )
@@ -87,6 +88,8 @@ include "gpm/fs.lua"
 include "gpm/libs/promise.lua"
 gpm.Logger\Info( "gm_promise v%s is initialized.", promise.VERSION )
 include "gpm/http.lua"
+
+include "gpm/filesystem.lua"
 
 gpm.Logger\Info( "Start-up time: %.4f sec.", SysTime() - gpm.StartTime )
 gpm
