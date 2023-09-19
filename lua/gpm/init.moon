@@ -91,9 +91,9 @@ gpm.Logger\Info "metaworks v%s is initialized.", gpm.metaworks.VERSION
 
 include "gpm/libs/promise.lua"
 gpm.Logger\Info "gm_promise v%s is initialized.", promise.VERSION
+
 include "gpm/filesystem.lua"
 include "gpm/http.lua"
-
 include "gpm/package.lua"
 
 gpm.Logger\Info "Start-up time: %.4f sec.", SysTime() - gpm.StartTime
