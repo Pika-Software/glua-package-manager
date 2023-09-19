@@ -340,6 +340,29 @@ do
 
         false
 
+    do
+
+        CompileString = CompileString
+
+        moonloader_ToLua = nil
+        if type( moonloader ) == "table"
+            moonloader_ToLua = moonloader.ToLua
+
+        util.CompileMoonString = ( moonCode, identifier, handleError ) ->
+            if not moonloader_ToLua
+                error "Attempting to compile a Moonscript file fails, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader."
+
+            luaCode, msg = moonloader_ToLua moonCode
+            msg = msg or "MoonScript to Lua code compilation failed."
+            if not luaCode
+                error msg
+
+            func = CompileString luaCode, identifier, handleError
+            if type( func ) ~= "function"
+                error msg
+
+            func
+
 do
 
     meta = FindMetaTable( "File" )
@@ -443,27 +466,4 @@ do
     gpm.AddType( "Logger", gpm_IsLogger )
     gpm.IsLogger = gpm_IsLogger
 
-    gpm.Logger = Logger( "gpm@" .. gpm.VERSION, colors.gpm )
-
-do
-
-    CompileString = CompileString
-
-    moonloader_ToLua = nil
-    if type( moonloader ) == "table"
-        moonloader_ToLua = moonloader.ToLua
-
-    gpm.CompileMoonString = ( moonCode, identifier, handleError ) ->
-        if not moonloader_ToLua
-            error "Attempting to compile a Moonscript file fails, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader."
-
-        luaCode, msg = moonloader_ToLua moonCode
-        msg = msg or "MoonScript to Lua code compilation failed."
-        if not luaCode
-            error msg
-
-        func = CompileString luaCode, identifier, handleError
-        if type( func ) ~= "function"
-            error msg
-
-        func
+    gpm.Logger = Logger "gpm@" .. gpm.VERSION, colors.gpm
