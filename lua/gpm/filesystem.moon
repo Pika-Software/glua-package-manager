@@ -400,7 +400,7 @@ do
                         count += 1
 
             if installed > 0
-                logger\Info "'%s' was selected as filesystem API.", source.Name
+                logger\Info "'%s' was connected as filesystem API.", source.Name
 
             if count > 2
                 break
