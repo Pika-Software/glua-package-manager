@@ -179,13 +179,16 @@ do
 
 lib_IsLuaFile = nil
 do
+
+    string_sub = string.sub
     moonloader = moonloader
+
     lib_IsLuaFile = ( filePath, gamePath, compileMoon ) ->
         extension = string_GetExtensionFromFilename filePath
         if extension and extension ~= "lua" and extension ~= "moon"
             return false
 
-        filePath = string.sub filePath, 1, #filePath - ( extension ~= nil and ( #extension + 1 ) or 0 )
+        filePath = string_sub filePath, 1, #filePath - ( extension ~= nil and ( #extension + 1 ) or 0 )
 
         if compileMoon and ( SERVER or MENU_DLL ) and moonloader ~= nil
             moonPath = filePath  .. ".moon"
@@ -193,10 +196,10 @@ do
                 unless moonloader.PreCacheFile moonPath
                     error "Compiling Moonscript file '" .. moonPath .. "' into Lua is failed!"
 
-                logger/Debug "The MoonScript file '%s' was successfully compiled into Lua.", moonPath
-                true
+                logger\Debug "The MoonScript file '%s' was successfully compiled into Lua.", moonPath
+                return true
 
-        lib_IsFile filePath .. ".lua", gamePath
+        return lib_IsFile filePath .. ".lua", gamePath
 
     lib.IsLuaFile = lib_IsLuaFile
 
