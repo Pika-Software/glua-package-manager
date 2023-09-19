@@ -46,7 +46,7 @@ if type( client ) ~= "function"
             client = _G[ item.Client ]
             lib.Client = client
 
-            logger\Info( "'%s' was selected as gpm HTTP client.", item.Name )
+            logger\Info( "'%s' was selected as HTTP client.", item.Name )
             break
 
 
