@@ -326,74 +326,85 @@ PROMISE_Resolve = PROMISE.Resolve
 lib_AsyncRead = nil
 do
 
-    sources = {
-        {
-            Name: "gm_asyncio",
-            Available: util.IsBinaryModuleInstalled( "asyncio" ),
-            Get: ->
-                require "asyncio"
-                return {
-                    Append: asyncio.Append,
-                    Write: asyncio.Write,
-                    Read: asyncio.Read
-                }
-        },
-        {
-            Name: "async_write",
-            Available: util.IsBinaryModuleInstalled( "async_write" ),
-            Get: ->
-                require "async_write"
-                return {
-                    Append: file.AsyncAppen,
-                    Write: file.AsyncWrite
-                }
-        },
-        {
-            Name: "Legacy Async",
-            Available: true,
-            Get: -> {
-                Read: file.AsyncRead
-            }
-        },
-        {
-            Name: "Legacy",
-            Available: true,
-            Get: -> {
-                    Append: ( fileName, content, func ) ->
-                        state = lib_Append( fileName, content, true ) and 0 or -1
-                        func( fileName, "DATA", state )
-                        return state,
-                    Write: ( fileName, content, func ) ->
-                        state = lib_Write( fileName, content, "wb", true ) and 0 or -1
-                        func( fileName, "DATA", state )
-                        return state,
-                    Read: ( fileName, gamePath, func ) ->
-                        ok, content = lib_Read( fileName, gamePath )
-                        state = ok and 0 or -1
-                        func( fileName, gamePath, state, content )
-                        return state
-                }
-        }
-    }
-
     async = {
         Append: false,
         Write: false,
         Read: false
     }
 
-    for source in *sources
-        unless source.Available
-            continue
+    do
 
-        functions = source.Get!
-        for funcName, func in pairs( async )
-            unless func
-                func = functions[ funcName ]
-                if func
-                    async[ funcName ] = func
+        sources = {
+            {
+                Name: "gm_asyncio",
+                Available: util.IsBinaryModuleInstalled( "asyncio" ),
+                Get: ->
+                    require "asyncio"
+                    return {
+                        Append: asyncio.AsyncAppend,
+                        Write: asyncio.AsyncWrite,
+                        Read: asyncio.AsyncRead
+                    }
+            },
+            {
+                Name: "async_write",
+                Available: util.IsBinaryModuleInstalled( "async_write" ),
+                Get: ->
+                    require "async_write"
+                    return {
+                        Append: file.AsyncAppen,
+                        Write: file.AsyncWrite
+                    }
+            },
+            {
+                Name: "Legacy Async",
+                Available: true,
+                Get: -> {
+                    Read: file.AsyncRead
+                }
+            },
+            {
+                Name: "Legacy",
+                Available: true,
+                Get: -> {
+                        Append: ( fileName, content, func ) ->
+                            state = lib_Append( fileName, content, true ) and 0 or -1
+                            func( fileName, "DATA", state )
+                            return state,
+                        Write: ( fileName, content, func ) ->
+                            state = lib_Write( fileName, content, "wb", true ) and 0 or -1
+                            func( fileName, "DATA", state )
+                            return state,
+                        Read: ( fileName, gamePath, func ) ->
+                            ok, content = lib_Read( fileName, gamePath )
+                            state = ok and 0 or -1
+                            func( fileName, gamePath, state, content )
+                            return state
+                    }
+            }
+        }
 
-        logger\Info "Filesystem API '%s' successfully connected.", source.Name
+        count = 0
+        for source in *sources
+            unless source.Available
+                continue
+
+            functions = source.Get!
+            installed = 0
+            for funcName, func in pairs( async )
+                unless func
+                    func = functions[ funcName ]
+                    if func
+                        async[ funcName ] = func
+                        installed += 1
+                        count += 1
+
+            if installed > 0
+                logger\Info "Filesystem API '%s' successfully connected.", source.Name
+
+            if count > 2
+                break
+
     lib_AsyncRead = ( filePath, gameDir ) ->
         p = promise_New()
         state = async.Read( filePath, gameDir, ( fileName, gamePath, code, content ) ->
