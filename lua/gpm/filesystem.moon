@@ -6,8 +6,9 @@ string = gpm.string
 
 string_GetPathFromFilename = string.GetPathFromFilename
 File = FindMetaTable( "File" )
-MENU_DLL = MENU_DLL
 logger = gpm.Logger
+MENU_DLL = MENU_DLL
+CLIENT = CLIENT
 SERVER = SERVER
 error = error
 type = type
@@ -35,7 +36,7 @@ if type( mountedFiles ) ~= "table"
 
             false
         __newindex: ( tbl, key ) ->
-            if not rawget( tbl, key )
+            unless rawget( tbl, key )
                 table_insert( tbl, 1, key )
                 rawset( tbl, key, true )
     } )
@@ -46,8 +47,8 @@ do
     game_MountGMA = game.MountGMA
     lib.MountGMA = ( gmaPath ) ->
         ok, files = game_MountGMA( gmaPath )
-        if not ok
-            error "gma could not be mounted"
+        unless ok
+            return false
 
         for filePath in *files
             mountedFiles[ filePath ] = true
@@ -56,31 +57,23 @@ do
         ok, files
 
 string_GetExtensionFromFilename = string.GetExtensionFromFilename
+lib_IsMounted = ( filePath, gamePath, onlyDir ) ->
+    if onlyDir and string_GetExtensionFromFilename( filePath )
+        return
 
-lib_IsMounted = nil
-do
-    luaPaths = {
-        LUA: true,
-        lsv: true,
-        lcl: true
-    }
+    if gamePath == "LUA" or gamePath == "lsv" or gamePath == "lcl"
+        filePath = "lua/" .. filePath
 
-    lib_IsMounted = ( filePath, gamePath, onlyDir ) ->
-        if onlyDir and string_GetExtensionFromFilename( filePath )
-            return
+    mountedFiles[ filePath ]
 
-        if luaPaths[ gamePath ]
-            filePath = "lua/" .. filePath
-
-        mountedFiles[ filePath ]
-
-    lib.IsMounted = lib_IsMounted
+lib.IsMounted = lib_IsMounted
 
 paths_Join = paths.Join
 lib_Find = file.Find
 lib.Find = lib_Find
 lib_CreateDir = nil
 lib_IsFile = nil
+lib_IsDir = nil
 
 do
     table_HasIValue = table.HasIValue
@@ -203,36 +196,40 @@ do
 
     lib.IsLuaFile = lib_IsLuaFile
 
-do
+lib_Open = file.Open
+lib.Open = lib_Open
 
-    file_Open = file.Open
+lib_Read = ( filePath, gamePath, length ) ->
+    fileObject = lib_Open filePath, "rb", gamePath
+    unless fileObject
+        return false
 
-    lib.Read = ( filePath, gamePath, length ) ->
-        fileObject = file_Open filePath, "rb", gamePath
-        unless fileObject
-            return
+    content = File.Read( fileObject, length )
+    File.Close( fileObject )
+    return true, content
+lib.Read = lib_Read
 
-        content = File.Read( fileObject, length )
-        File.Close( fileObject )
-        content
+lib_Write = ( filePath, content, fileMode, fastMode ) ->
+    unless fastMode
+        lib_BuildFilePath filePath
 
-    lib_Write = ( filePath, content, fileMode, fastMode ) ->
-        unless fastMode
-            lib_BuildFilePath filePath
+    fileObject = lib_Open filePath, fileMode or "wb", "DATA"
+    unless fileObject
+        return false
 
-        fileObject = file_Open filePath, fileMode or "wb", "DATA"
-        unless fileObject
-            error "Writing file 'data/" .. filePath .. "' was failed!"
+    File.Write fileObject, content
+    File.Close fileObject
+    true
+lib.Write = lib_Write
 
-        File.Write fileObject, content
-        File.Close fileObject
+lib_Append = ( filePath, content, fastMode ) ->
+    lib_Write filePath, content, "ab", fastMode
+lib.Append = lib_Append
 
-    lib.Write = lib_Write
-    lib.Append = ( filePath, content, fastMode ) ->
-        lib_Write filePath, content, "ab", fastMode
+paths_FormatToLua = paths.FormatToLua
+paths_Fix = paths.Fix
 
 if SERVER
-    paths_FormatToLua = paths.FormatToLua
     debug_getfpath = debug.getfpath
     gpm_ArgAssert = gpm.ArgAssert
     AddCSLuaFile = AddCSLuaFile
@@ -244,7 +241,7 @@ if SERVER
             return
 
         gpm_ArgAssert fileName, 1, "string"
-        fileName = paths_FormatToLua paths.Fix fileName
+        fileName = paths_FormatToLua paths_Fix fileName
 
         if luaPath
             folder = string_GetPathFromFilename luaPath
@@ -268,8 +265,231 @@ if SERVER
         for fileName in *files
             filePath = paths_Join folder, fileName
             if lib_IsLuaFile filePath, "lsv", true
-                AddCSLuaFile paths.FormatToLua filePath
+                AddCSLuaFile paths_FormatToLua  filePath
 
     lib.AddCSLuaFolder = lib_AddCSLuaFolder
+
+
+if type( efsw ) == "table"
+    watchList = lib.WatchList
+    if type( watchList ) ~= "table"
+        watchList = {}
+        lib.WatchList = watchList
+
+    efsw_Watch = efsw.Watch
+    lib_Watch = ( filePath, gamePath, recursively ) ->
+        filePath = paths_Fix( filePath )
+
+        if CLIENT and lib_IsMounted( filePath, gamePath )
+            return
+
+        if watchList[ filePath .. ";" .. gamePath ]
+            return
+
+        if lib_IsDir( filePath, gamePath )
+            filePath = filePath .. "/"
+            if recursively
+                _, folders = lib_Find filePath .. "*", gamePath
+                for folderName in *folders
+                    lib_Watch( filePath .. folderName, gamePath, recursively )
+
+        watchList[ filePath .. ";" .. gamePath ] = efsw_Watch( filePath, gamePath )
+
+    lib.Watch = lib_Watch
+
+    efsw_Unwatch = efsw.Unwatch
+    lib_UnWatch = ( filePath, gamePath, recursively ) ->
+        filePath = paths_Fix( filePath )
+
+        watchID = watchList[ filePath .. ";" .. gamePath ]
+        if not watchID
+            return
+
+        if lib_IsDir( filePath, gamePath )
+            filePath = filePath .. "/"
+            if recursively
+                _, folders = lib_Find filePath .. "*", gamePath
+                for folderName in *folders
+                    lib_UnWatch( filePath .. folderName, gamePath, recursively )
+
+        efsw_Unwatch( watchID )
+        watchList[ filePath .. ";" .. gamePath ] = nil
+
+    lib.UnWatch = lib_UnWatch
+
+promise = promise
+promise_New = promise.New
+PROMISE = promise.PROMISE
+PROMISE_Reject = PROMISE.Reject
+PROMISE_Resolve = PROMISE.Resolve
+
+lib_AsyncRead = nil
+do
+
+    sources = {
+        {
+            Name: "gm_asyncio",
+            Available: util.IsBinaryModuleInstalled( "asyncio" ),
+            Get: ->
+                require "asyncio"
+                return {
+                    Append: asyncio.Append,
+                    Write: asyncio.Write,
+                    Read: asyncio.Read
+                }
+        },
+        {
+            Name: "async_write",
+            Available: util.IsBinaryModuleInstalled( "async_write" ),
+            Get: ->
+                require "async_write"
+                return {
+                    Append: file.AsyncAppen,
+                    Write: file.AsyncWrite
+                }
+        },
+        {
+            Name: "Legacy Async",
+            Available: true,
+            Get: -> {
+                Read: file.AsyncRead
+            }
+        },
+        {
+            Name: "Legacy",
+            Available: true,
+            Get: -> {
+                    Append: ( fileName, content, func ) ->
+                        state = lib_Append( fileName, content, true ) and 0 or -1
+                        func( fileName, "DATA", state )
+                        return state,
+                    Write: ( fileName, content, func ) ->
+                        state = lib_Write( fileName, content, "wb", true ) and 0 or -1
+                        func( fileName, "DATA", state )
+                        return state,
+                    Read: ( fileName, gamePath, func ) ->
+                        ok, content = lib_Read( fileName, gamePath )
+                        state = ok and 0 or -1
+                        func( fileName, gamePath, state, content )
+                        return state
+                }
+        }
+    }
+
+    async = {
+        Append: false,
+        Write: false,
+        Read: false
+    }
+
+    for source in *sources
+        unless source.Available
+            continue
+
+        functions = source.Get!
+        for funcName, func in pairs( async )
+            unless func
+                func = functions[ funcName ]
+                if func
+                    async[ funcName ] = func
+
+        logger\Info "Filesystem API '%s' successfully connected.", source.Name
+    lib_AsyncRead = ( filePath, gameDir ) ->
+        p = promise_New()
+        state = async.Read( filePath, gameDir, ( fileName, gamePath, code, content ) ->
+            if code ~= 0
+                PROMISE_Reject p, "FSASYNC_READ_ERR: " .. code
+            else
+                PROMISE_Resolve p, {
+                    fileName: fileName,
+                    gamePath: gamePath,
+                    content: content
+                }
+        )
+
+        if state ~= 0
+            PROMISE_Reject p, "FSASYNC_READ_ERR: " .. state
+
+        return p
+    lib.AsyncRead = lib_AsyncRead
+
+    lib.AsyncWrite = ( filePath, content, fastMode ) ->
+        unless fastMode
+            lib_BuildFilePath( filePath )
+
+        p = promise_New()
+        state = async.Write( filePath, content, ( fileName, gamePath, code ) ->
+            if code ~= 0 then
+                PROMISE_Reject p, "FSASYNC_WRITE_ERR: " .. code
+            else
+                PROMISE_Resolve p, {
+                    fileName: fileName,
+                    gamePath: gamePath
+                }
+        )
+
+        if state ~= 0
+            PROMISE_Reject p, "FSASYNC_WRITE_ERR: " .. state
+
+        return p
+
+    lib.AsyncAppend = ( filePath, content, fastMode ) ->
+        unless fastMode
+            lib_BuildFilePath( filePath )
+
+        p = promise_New()
+        state = async.Append( filePath, content, ( fileName, gamePath, code ) ->
+            if code ~= 0
+                PROMISE_Reject p, "FSASYNC_APPEND_ERR: " .. code
+            else
+                PROMISE_Resolve p, {
+                    fileName: fileName,
+                    gamePath: gamePath
+                }
+        )
+
+        if state ~= 0
+            PROMISE_Reject p, "FSASYNC_APPEND_ERR: " .. state
+
+        return p
+
+promise_Reject = promise.Reject
+promise_Async = promise.Async
+
+do
+    util_CompileMoonString = util.CompileMoonString
+    lib.CompileLua = promise_Async( ( filePath, gamePath, handleError ) ->
+        if CLIENT and lib_IsMounted filePath, gamePath
+            filePath = "lua/" .. filePath
+            gamePath = "GAME"
+
+        ok, result = lib_AsyncRead( filePath, gamePath )\SafeAwait!
+        unless ok
+            return promise_Reject result
+
+        content = result.content
+        unless content
+            return promise_Reject "File compilation '" .. filePath .. "' failed, file cannot be read."
+
+        -- promise.Sleep( 0 )
+
+        func = util_CompileMoonString content, filePath, handleError
+        unless func
+            return promise_Reject "File compilation '" .. filePath .. "' failed, unknown error."
+
+        return func
+    )
+
+    lib.CompileMoon = promise_Async( ( filePath, gamePath, handleError ) ->
+        ok, result = lib_AsyncRead( filePath, gamePath )\SafeAwait!
+        unless ok
+            return promise_Reject result
+
+        content = result.content
+        unless content
+            return promise_Reject "File compilation '" .. filePath .. "' failed, file cannot be read."
+
+        return util_CompileMoonString content, filePath, handleError
+    )
 
 lib
