@@ -13,8 +13,8 @@ if type( lib ) ~= "table"
     lib = gpm.metaworks.CreateLink( http, true )
     gpm.http = lib
 
-clients = lib.Clients
-if type( clients ) ~= "table"
+client, clientName = nil, nil
+do
     clients = {
         {
             Name: "Garry's Mod",
@@ -34,18 +34,10 @@ if type( clients ) ~= "table"
             Name: "reqwest"
         } )
 
-    lib.Clients = clients
 
-client, clientName = lib.Client, lib.ClientName
-if type( client ) ~= "function"
     for item in *clients
         if item.Installed or ( util.IsBinaryModuleInstalled( item.Name ) and pcall( require, item.Name ) )
-            clientName = item.Name
-            lib.ClientName = clientName
-
-            client = _G[ item.Client ]
-            lib.Client = client
-
+            client, clientName = _G[ item.Client ], item.Name
             logger\Info( "'%s' was selected as HTTP client.", item.Name )
             break
 
