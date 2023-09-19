@@ -441,14 +441,13 @@ do
 
             if select( "#", ... ) > 0
                 str = string_format( str, ... )
-
-            MsgC( secondaryTextColor, os_date( "%d/%m/%Y %H:%M:%S " ), color, level, secondaryTextColor, " --- ", stateColor, "[" .. stateName .. "] ", @Color, @Name, secondaryTextColor, " : ", @TextColor, str, "\n"  )
+            MsgC( secondaryTextColor, os_date( "%d-%m-%Y %H:%M:%S " ), stateColor, "[" .. stateName .. "] ", color, level, secondaryTextColor, " --> ", @Color, @Name, secondaryTextColor, " : ", @TextColor, str, "\n" )
 
         Info: ( str, ... ) =>
-            @Log( infoColor, " INFO", str, ... )
+            @Log( infoColor, "INFO ", str, ... )
 
         Warn: ( str, ... ) =>
-            @Log( warnColor, " WARN", str, ... )
+            @Log( warnColor, "WARN ", str, ... )
 
         Error: ( str, ... ) =>
             @Log( errorColor, "ERROR", str, ... )
