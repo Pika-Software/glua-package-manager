@@ -285,15 +285,14 @@ debug.getfpath = ->
 
 do
     string_GetExtensionFromFilename = string.GetExtensionFromFilename
-    paths.FormatToLua = ( filePath ) ->
+    paths.ToLua = ( filePath ) ->
         extension = string_GetExtensionFromFilename( filePath )
         if extension ~= "lua"
             if extension
                 filePath = string_gsub( filePath, "%..+$", ".lua" )
             else
                 filePath = filePath .. ".lua"
-
-    filePath
+        return filePath
 
 do
 
@@ -312,7 +311,7 @@ do
             return number
 
         version = string_format( "%06d", number )
-        string_format( "%d.%d.%d", tonumber( string_sub( version, 0, 2 ) ), tonumber( string_sub( version, 3, 4 ) ), tonumber( string_sub( version, 5 ) ) )
+        return string_format( "%d.%d.%d", tonumber( string_sub( version, 0, 2 ) ), tonumber( string_sub( version, 3, 4 ) ), tonumber( string_sub( version, 5 ) ) )
 
     do
         timer_Simple = timer.Simple
@@ -338,7 +337,7 @@ do
         if jit_versionnum ~= 20004 and jit_arch == "x86" and isLinux then
             return file_Exists( string_format( fmt, name, "linux32" ), "GAME" )
 
-        false
+        return false
 
     do
 
@@ -361,7 +360,7 @@ do
             if type( func ) ~= "function"
                 error msg
 
-            func
+            return func
 
 do
 
@@ -381,7 +380,8 @@ do
         meta.Seek( self, startPos )
         data = meta.Read( self, len )
         meta.Skip( self, 1 )
-        data
+
+        return data
 
     meta.WriteString = ( self, str ) ->
         meta.Write( self, str )
