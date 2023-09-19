@@ -227,10 +227,10 @@ lib.Append = lib_Append
 paths_Fix = paths.Fix
 
 if SERVER
-    paths_FormatToLua = paths.FormatToLua
     debug_getfpath = debug.getfpath
     gpm_ArgAssert = gpm.ArgAssert
     AddCSLuaFile = AddCSLuaFile
+    paths_ToLua = paths.ToLua
 
     lib.AddCSLuaFile = ( fileName ) ->
         luaPath = debug_getfpath!
@@ -239,7 +239,7 @@ if SERVER
             return
 
         gpm_ArgAssert fileName, 1, "string"
-        fileName = paths_FormatToLua paths_Fix fileName
+        fileName = paths_ToLua paths_Fix fileName
 
         if luaPath
             folder = string_GetPathFromFilename luaPath
@@ -263,7 +263,7 @@ if SERVER
         for fileName in *files
             filePath = paths_Join folder, fileName
             if lib_IsLuaFile filePath, "lsv", true
-                AddCSLuaFile paths_FormatToLua filePath
+                AddCSLuaFile paths_ToLua filePath
     lib.AddCSLuaFolder = lib_AddCSLuaFolder
 
 if type( efsw ) == "table"
@@ -467,42 +467,48 @@ do
 
 do
 
-    util_CompileMoonString = util.CompileMoonString
     promise_Reject = promise.Reject
-    promise_Async = promise.Async
 
-    lib.CompileLua = promise_Async( ( filePath, gamePath, handleError ) ->
-        if CLIENT and lib_IsMounted filePath, gamePath
-            filePath = "lua/" .. filePath
-            gamePath = "GAME"
+    do
 
-        ok, result = lib_AsyncRead( filePath, gamePath )\SafeAwait!
-        unless ok
-            return promise_Reject result
+        CompileString = CompileString
+        CompileFile = CompileFile
 
-        content = result.content
-        unless content
-            return promise_Reject "File compilation '" .. filePath .. "' failed, file cannot be read."
+        lib.CompileLua = promise.Async( ( filePath, gamePath, handleError ) ->
+            if CLIENT and lib_IsMounted filePath, gamePath
+                filePath = "lua/" .. filePath
+                gamePath = "GAME"
 
-        -- promise.Sleep( 0 )
+            ok, result = lib_AsyncRead( filePath, gamePath )\SafeAwait!
+            unless ok
+                return promise_Reject result
 
-        func = util_CompileMoonString content, filePath, handleError
-        unless func
-            return promise_Reject "File compilation '" .. filePath .. "' failed, unknown error."
+            content = result.content
+            unless content
+                return promise_Reject "File compilation '" .. filePath .. "' failed, file cannot be read."
 
-        return func
-    )
+            func = CompileString content, filePath, handleError
+            if not func and ( gamePath == "LUA" or gamePath == "lsv" or gamePath == "lcl" )
+                func = CompileFile filePath
 
-    lib.CompileMoon = promise_Async( ( filePath, gamePath, handleError ) ->
-        ok, result = lib_AsyncRead( filePath, gamePath )\SafeAwait!
-        unless ok
-            return promise_Reject result
+            unless func
+                return promise_Reject "File compilation '" .. filePath .. "' failed, unknown error."
 
-        content = result.content
-        unless content
-            return promise_Reject "File compilation '" .. filePath .. "' failed, file cannot be read."
+            return func
+        )
 
-        return util_CompileMoonString content, filePath, handleError
-    )
+    do
+        util_CompileMoonString = util.CompileMoonString
+        lib.CompileMoon = promise.Async( ( filePath, gamePath, handleError ) ->
+            ok, result = lib_AsyncRead( filePath, gamePath )\SafeAwait!
+            unless ok
+                return promise_Reject result
+
+            content = result.content
+            unless content
+                return promise_Reject "File compilation '" .. filePath .. "' failed, file cannot be read."
+
+            return util_CompileMoonString content, filePath, handleError
+        )
 
 lib
