@@ -38,7 +38,7 @@ do
     for item in *clients
         if item.Installed or ( util.IsBinaryModuleInstalled( item.Name ) and pcall( require, item.Name ) )
             client, clientName = _G[ item.Client ], item.Name
-            logger\Info( "'%s' was selected as HTTP client.", item.Name )
+            logger\Info( "'%s' was connected as HTTP client.", item.Name )
             break
 
 
