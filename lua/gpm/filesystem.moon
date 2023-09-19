@@ -119,7 +119,7 @@ do
                 return not lib_IsDir filePath, gamePath
 
             file_Delete filePath, gamePath
-            not lib_IsFile filePath, gamePath
+            return not lib_IsFile filePath, gamePath
     lib.Delete = lib_Delete
 
     do
@@ -141,7 +141,7 @@ do
                         file_Delete currentPath, "DATA"
                         file_CreateDir currentPath
 
-            currentPath
+            return currentPath
         lib.CreateDir = lib_CreateDir
 
     do
@@ -157,7 +157,7 @@ do
             for folderName in *folders
                 size += lib_Size( paths_Join( filePath, folderName ), gamePath )
 
-            size
+            return size
         lib.Size = lib_Size
 
 lib_BuildFilePath = ( filePath ) ->
@@ -218,7 +218,7 @@ do
 
         File.Write fileObject, content
         File.Close fileObject
-        true
+        return true
     lib.Write = lib_Write
 
 lib_Append = ( filePath, content, fastMode ) ->
@@ -277,11 +277,8 @@ if type( efsw ) == "table"
         lib_Watch = ( filePath, gamePath, recursively ) ->
             filePath = paths_Fix( filePath )
 
-            if CLIENT and lib_IsMounted( filePath, gamePath )
-                return
-
-            if watchList[ filePath .. ";" .. gamePath ]
-                return
+            if watchList[ filePath .. ";" .. gamePath ] or ( CLIENT and lib_IsMounted( filePath, gamePath ) )
+                return false
 
             if lib_IsDir( filePath, gamePath )
                 filePath = filePath .. "/"
@@ -291,6 +288,7 @@ if type( efsw ) == "table"
                         lib_Watch( filePath .. folderName, gamePath, recursively )
 
             watchList[ filePath .. ";" .. gamePath ] = efsw_Watch( filePath, gamePath )
+            return true
         lib.Watch = lib_Watch
 
     do
@@ -300,7 +298,7 @@ if type( efsw ) == "table"
 
             watchID = watchList[ filePath .. ";" .. gamePath ]
             if not watchID
-                return
+                return false
 
             if lib_IsDir filePath, gamePath
                 filePath = filePath .. "/"
@@ -311,6 +309,7 @@ if type( efsw ) == "table"
 
             efsw_Unwatch watchID
             watchList[ filePath .. ";" .. gamePath ] = nil
+            return true
         lib.UnWatch = lib_UnWatch
 
 promise = promise
