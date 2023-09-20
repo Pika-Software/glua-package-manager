@@ -36,12 +36,10 @@ do
         splashes[ #splashes + 1 ] = "I know you, " .. cvars.String( "name", "player" ) .. "..."
 
     splash = table.Random splashes
-
     for i = 1, ( 25 - #splash ) / 2
         if i % 2 == 1
             splash = splash .. " "
         splash = " " .. splash
-
     MsgN string.format "\n                                     ___          __            \n                                   /'___`\\      /'__`\\          \n     __    _____     ___ ___      /\\_\\ /\\ \\    /\\ \\/\\ \\         \n   /'_ `\\ /\\ '__`\\ /' __` __`\\    \\/_/// /__   \\ \\ \\ \\ \\        \n  /\\ \\L\\ \\\\ \\ \\L\\ \\/\\ \\/\\ \\/\\ \\      // /_\\ \\ __\\ \\ \\_\\ \\   \n  \\ \\____ \\\\ \\ ,__/\\ \\_\\ \\_\\ \\_\\    /\\______//\\_\\\\ \\____/   \n   \\/___L\\ \\\\ \\ \\/  \\/_/\\/_/\\/_/    \\/_____/ \\/_/ \\/___/    \n     /\\____/ \\ \\_\\                                          \n     \\_/__/   \\/_/                %s                        \n\n  GitHub: https://github.com/Pika-Software\n  Discord: https://discord.gg/3UVxhZ\n  Website: https://pika-soft.ru\n  Developers: Pika Software\n  License: MIT\n", splash
 
 colors = gpm.Colors

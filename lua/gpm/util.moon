@@ -5,60 +5,64 @@ type = type
 gpm = gpm
 _G = _G
 
-types = gpm.Types
-if type( types ) ~= "table"
-    types = {
-        Indexes: {},
-        Names: {
-            [TYPE_PARTICLESYSTEM]: "CNewParticleEffect",
-            [TYPE_PROJECTEDTEXTURE]: "ProjectedTexture",
-            [TYPE_PIXELVISHANDLE]: "pixelvis_handle_t",
-            [TYPE_RECIPIENTFILTER]: "CRecipientFilter",
-            [TYPE_SOUNDHANDLE]: "IGModAudioChannel",
-            [TYPE_LIGHTUSERDATA]: "light userdata",
-            [TYPE_PARTICLEEMITTER]: "CLuaEmitter",
-            [TYPE_DAMAGEINFO]: "CTakeDamageInfo",
-            [TYPE_LOCOMOTION]: "CLuaLocomotion",
-            [TYPE_SURFACEINFO]: "SurfaceInfo",
-            [TYPE_PHYSCOLLIDE]: "PhysCollide",
-            [TYPE_EFFECTDATA]: "CEffectData",
-            [TYPE_PARTICLE]: "CLuaParticle",
-            [TYPE_NAVLADDER]: "CNavLadder",
-            [TYPE_VIDEO]: "IVideoWriter",
-            [TYPE_MATERIAL]: "IMaterial",
-            [TYPE_MOVEDATA]: "CMoveData",
-            [TYPE_PATH]: "PathFollower",
-            [TYPE_SOUND]: "CSoundPatch",
-            [TYPE_USERDATA]: "userdata",
-            [TYPE_FUNCTION]: "function",
-            [TYPE_TEXTURE]: "ITexture",
-            [TYPE_USERCMD]: "CUserCmd",
-            [TYPE_RESTORE]: "IRestore",
-            [TYPE_NAVAREA]: "CNavArea",
-            [TYPE_PHYSOBJ]: "PhysObj",
-            [TYPE_DLIGHT]: "dlight_t",
-            [TYPE_USERMSG]: "bf_read",
-            [TYPE_MATRIX]: "VMatrix",
-            [TYPE_CONVAR]: "ConVar",
-            [TYPE_VECTOR]: "Vector",
-            [TYPE_ENTITY]: "Entity",
-            [TYPE_THREAD]: "thread",
-            [TYPE_STRING]: "string",
-            [TYPE_NUMBER]: "number",
-            [TYPE_NONE]: "unknown",
-            [TYPE_BOOL]: "boolean",
-            [TYPE_IMESH]: "IMesh",
-            [TYPE_PANEL]: "Panel",
-            [TYPE_ANGLE]: "Angle",
-            [TYPE_COLOR]: "Color",
-            [TYPE_TABLE]: "table",
-            [TYPE_SAVE]: "ISave",
-            [TYPE_FILE]: "File",
-            [TYPE_NIL]: "nil"
-        },
-    }
+gpm_Lib = ( name, default ) ->
+    lib = gpm[ name ]
+    if type( lib ) ~= "table"
+        lib = default or {}
+        gpm[ name ] = lib
+    return lib
+gpm.Lib = gpm_Lib
 
-    gpm.Types = types
+types = gpm_Lib "Types", {
+    Indexes: {},
+    Names: {
+        [TYPE_PARTICLESYSTEM]: "CNewParticleEffect",
+        [TYPE_PROJECTEDTEXTURE]: "ProjectedTexture",
+        [TYPE_PIXELVISHANDLE]: "pixelvis_handle_t",
+        [TYPE_RECIPIENTFILTER]: "CRecipientFilter",
+        [TYPE_SOUNDHANDLE]: "IGModAudioChannel",
+        [TYPE_LIGHTUSERDATA]: "light userdata",
+        [TYPE_PARTICLEEMITTER]: "CLuaEmitter",
+        [TYPE_DAMAGEINFO]: "CTakeDamageInfo",
+        [TYPE_LOCOMOTION]: "CLuaLocomotion",
+        [TYPE_SURFACEINFO]: "SurfaceInfo",
+        [TYPE_PHYSCOLLIDE]: "PhysCollide",
+        [TYPE_EFFECTDATA]: "CEffectData",
+        [TYPE_PARTICLE]: "CLuaParticle",
+        [TYPE_NAVLADDER]: "CNavLadder",
+        [TYPE_VIDEO]: "IVideoWriter",
+        [TYPE_MATERIAL]: "IMaterial",
+        [TYPE_MOVEDATA]: "CMoveData",
+        [TYPE_PATH]: "PathFollower",
+        [TYPE_SOUND]: "CSoundPatch",
+        [TYPE_USERDATA]: "userdata",
+        [TYPE_FUNCTION]: "function",
+        [TYPE_TEXTURE]: "ITexture",
+        [TYPE_USERCMD]: "CUserCmd",
+        [TYPE_RESTORE]: "IRestore",
+        [TYPE_NAVAREA]: "CNavArea",
+        [TYPE_PHYSOBJ]: "PhysObj",
+        [TYPE_DLIGHT]: "dlight_t",
+        [TYPE_USERMSG]: "bf_read",
+        [TYPE_MATRIX]: "VMatrix",
+        [TYPE_CONVAR]: "ConVar",
+        [TYPE_VECTOR]: "Vector",
+        [TYPE_ENTITY]: "Entity",
+        [TYPE_THREAD]: "thread",
+        [TYPE_STRING]: "string",
+        [TYPE_NUMBER]: "number",
+        [TYPE_NONE]: "unknown",
+        [TYPE_BOOL]: "boolean",
+        [TYPE_IMESH]: "IMesh",
+        [TYPE_PANEL]: "Panel",
+        [TYPE_ANGLE]: "Angle",
+        [TYPE_COLOR]: "Color",
+        [TYPE_TABLE]: "table",
+        [TYPE_SAVE]: "ISave",
+        [TYPE_FILE]: "File",
+        [TYPE_NIL]: "nil"
+    }
+}
 
 typeNames = types.Names
 indexes = types.Indexes
@@ -82,11 +86,7 @@ do
     gpm_TypeID = gpm.TypeID
     gpm.type = ( any ) -> typeNames[ gpm_TypeID( any ) ] or "unknown"
 
-string = gpm.string
-if type( string ) ~= "table"
-    string = setmetatable( {}, { __index: _G.string } )
-    gpm.string = string
-
+string = gpm_Lib "string", setmetatable( {}, { __index: _G.string } )
 string.StartsWith = string.StartsWith or string.StartWith
 
 do
@@ -98,15 +98,11 @@ string_format = string.format
 string_lower = string.lower
 string_sub = string.sub
 
-debug = gpm.debug
-if type( debug ) ~= "table"
-    debug = setmetatable( {}, { __index: _G.debug } )
-    gpm.debug = debug
-
+debug = gpm_Lib "debug", setmetatable( {}, { __index: _G.debug } )
 debug.fempty = ->
 debug_getinfo = debug.getinfo
 debug.fcall = ( func, ... ) ->
-    func(...)
+    return func( ... )
 
 do
     gpm_type = gpm.type
@@ -133,10 +129,9 @@ do
         dinfo = debug_getinfo( 2, "n" )
         error( string_format( "bad argument #%d to \'%s\' (%s expected, got %s)", argNum, dinfo and dinfo.name or "func", expected, valueType ), errorlevel or 3 )
 
-table = gpm.table
-if type( table ) ~= "table"
-    table = setmetatable( {}, { __index: _G.table } )
-    gpm.table = table
+table = gpm_Lib "table", setmetatable( {}, { __index: _G.table } )
+table_remove = table.remove
+string_Split = string.Split
 
 table.HasIValue = ( tbl, any ) ->
     for value in *tbl do
@@ -144,14 +139,10 @@ table.HasIValue = ( tbl, any ) ->
             return true
     false
 
-table_remove = table.remove
-
 table.RemoveByIValue = ( tbl, any ) ->
     for index, value in ipairs( tbl )
         if value == any
             return table_remove( tbl, index )
-
-string_Split = string.Split
 
 table.Lookup = ( tbl, str, default ) ->
     for key in *string_Split( str, "." )
@@ -196,12 +187,10 @@ table_Lower = ( tbl ) ->
             tbl[ key ] = nil
 
     return tbl
-
 table.Lower = table_Lower
 
 if SERVER
     AddCSLuaFile "libs/metaworks.lua"
-
 metaworks = include "libs/metaworks.lua"
 
 gpm_ArgAssert = gpm.ArgAssert
@@ -247,11 +236,7 @@ do
     gpm_AddType( "Color", gpm_IsColor )
     gpm.IsColor = gpm_IsColor
 
-paths = gpm.paths
-if type( paths ) ~= "table"
-    paths = {}
-    gpm.paths = paths
-
+paths = gpm_Lib "paths"
 string_gsub = string.gsub
 paths_Fix = ( filePath ) -> string_lower( string_gsub( filePath, "[/\\]+", "/" ) )
 paths.Fix = paths_Fix
@@ -271,7 +256,8 @@ paths.Join = ( ... ) ->
 
         filePath = filePath .. "/"
 
-paths_Localize = ( filePath ) -> string_gsub( string_gsub( string_gsub( filePath, "^cache/moonloader/", "" ), "^addons/[%w%-_]-/", "" ), "^lua/", "" )
+paths_Localize = ( filePath ) ->
+    return string_gsub( string_gsub( string_gsub( filePath, "^cache/moonloader/", "" ), "^addons/[%w%-_]-/", "" ), "^lua/", "" )
 paths.Localize = paths_Localize
 
 debug.getfpath = ->
@@ -296,11 +282,7 @@ do
 
 do
 
-    util = gpm.util
-    if type( util ) ~= "table"
-        util = metaworks.CreateLink( _G.util, true )
-        gpm.util = util
-
+    util = gpm_Lib "util", metaworks.CreateLink _G.util, true
     tonumber = tonumber
 
     util.Version = ( number ) ->

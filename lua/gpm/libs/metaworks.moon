@@ -3,11 +3,7 @@ rawget = rawget
 error = error
 type = type
 
-metaworks = gpm.metaworks
-if type( metaworks ) ~= "table"
-    metaworks = {}
-    gpm.metaworks = metaworks
-
+metaworks = gpm.Lib "metaworks"
 metaworks.VERSION = "1.0.0"
 metaworks.GetValue = table.Lookup
 

@@ -8,11 +8,7 @@ logger = gpm.Logger
 type = type
 _G = _G
 
-lib = gpm.http
-if type( lib ) ~= "table"
-    lib = gpm.metaworks.CreateLink( http, true )
-    gpm.http = lib
-
+lib = gpm.Lib "http", gpm.metaworks.CreateLink( http, true )
 client, clientName = nil, nil
 do
     clients = {

@@ -17,13 +17,9 @@ type = type
 if SERVER and not efsw and util.IsBinaryModuleInstalled( "efsw" ) and pcall( require, "efsw" )
     logger\Info( "gm_efsw is initialized, package auto-reloading are available." )
 
-lib = gpm.fs
-if type( lib ) ~= "table"
-    lib = gpm.metaworks.CreateLink( file, true )
-    gpm.fs = lib
-
-    lib.Move = file.Rename
-    lib.Time = file.Time
+lib = gpm.Lib "fs", gpm.metaworks.CreateLink( file, true )
+lib.Move = file.Rename
+lib.Time = file.Time
 
 string_GetExtensionFromFilename = string.GetExtensionFromFilename
 lib_IsMounted = nil

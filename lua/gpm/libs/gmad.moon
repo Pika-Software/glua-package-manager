@@ -1,0 +1,2 @@
+
+gmad = gpm.Lib "gmad"

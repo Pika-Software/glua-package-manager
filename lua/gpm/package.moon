@@ -2,10 +2,7 @@ logger = gpm.Logger
 paths = gpm.paths
 fs = gpm.fs
 
-lib = gpm.package
-if type( lib ) ~= "table"
-    lib = {}
-    gpm.package = gpm.metaworks.CreateLink( package, true )
+lib = gpm.Lib "package", gpm.metaworks.CreateLink( package, true )
 
 class Package
     new: ( filePath ) =>
