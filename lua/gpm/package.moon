@@ -22,8 +22,8 @@ class Package
 do
 
     string_GetExtensionFromFilename = string.GetExtensionFromFilename
-    fs_CompileLua = fs.CompileLua
     package_seeall = package.seeall
+    fs_CompileLua = fs.CompileLua
     debug_setfenv = debug.setfenv
     AddCSLuaFile = AddCSLuaFile
     table_Empty = table.Empty
@@ -73,19 +73,44 @@ do
 
         if ok
             source = environment.SOURCE
+            sourceName = source.Name or filePath
+
+            if type( source.IsAvalibleFilePath ) ~= "function"
+                logger\Error "Function .IsAvalibleFilePath is missing from source '%s', source loading failed!", sourceName
+                return
+
+            func = source.GetInfo
+            if type( func ) == "function"
+                source.GetInfo = promise.Async( func )
+            else
+                logger\Error "Function .GetInfo is missing from source '%s', source loading failed!", sourceName
+                return
+
+            func = source.Install
+            if type( func ) == "function"
+                source.Install = promise.Async( func )
+            else
+                logger\Error "Function .Install is missing from source '%s', source loading failed!", sourceName
+                return
+
+            func = source.Reload
+            if type( func ) == "function"
+                source.Reload = promise.Async( func )
+
             sources[ #sources + 1 ] = source
-            sources[ source.Name or filePath ] = source
+            sources[ sourceName ] = source
+
         else
             logger\Error result
             return
 
         if processed == total
             files, folders = fs_Find "packages/*", "LUA"
-            for fileName in *files
-                importPath = "packages/" .. fileName
-
             for folderName in *folders
                 importPath = "packages/" .. folderName
+
+            for fileName in *files
+                importPath = "packages/" .. fileName
 
     )
 
