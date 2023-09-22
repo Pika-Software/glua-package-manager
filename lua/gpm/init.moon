@@ -2,6 +2,7 @@ export gpm
 
 AddCSLuaFile = AddCSLuaFile
 include = include
+SERVER = SERVER
 Color = Color
 type = type
 
@@ -14,7 +15,7 @@ gpm.StartTime = SysTime!
 
 do
 
-    splashes = {
+    splash = {
         "Flying over rooftops...",
         "We need more packages!",
         "Where's fireworks!?",
@@ -33,9 +34,9 @@ do
     }
 
     if CLIENT
-        splashes[ #splashes + 1 ] = "I know you, " .. cvars.String( "name", "player" ) .. "..."
-
-    splash = table.Random splashes
+        splash[ #splash + 1 ] = "I know you, " .. cvars.String( "name", "player" ) .. "..."
+    splash[ #splash + 1 ] = "Wow, here more " .. #splash .. " splashes!"
+    splash = splash[ math.random( 1, #splash ) ]
     for i = 1, ( 25 - #splash ) / 2
         if i % 2 == 1
             splash = splash .. " "
@@ -72,10 +73,11 @@ if type( state ) ~= "string"
 
     gpm.State = state or "unknown"
 
-gpm.Developer = cvars.Number "developer", 0
-cvars.AddChangeCallback "developer",
-    ( _, __, new ) -> gpm.Developer = tonumber( new ) or 0,
-    "gLua Package Manager"
+unless gpm.Developer
+    gpm.Developer = cvars.Number "developer", 0
+    cvars.AddChangeCallback "developer",
+        ( _, __, new ) -> gpm.Developer = tonumber( new ) or 0,
+        "gLua Package Manager"
 
 if SERVER
     AddCSLuaFile "gpm/util.lua"
