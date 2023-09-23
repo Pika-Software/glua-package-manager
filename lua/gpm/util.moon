@@ -137,7 +137,7 @@ table.HasIValue = ( tbl, any ) ->
     for value in *tbl do
         if value == any
             return true
-    false
+    return false
 
 table.RemoveByIValue = ( tbl, any ) ->
     for index, value in ipairs( tbl )
@@ -149,7 +149,7 @@ table.Lookup = ( tbl, str, default ) ->
         tbl = tbl[ key ]
         if not tbl
             return default
-    tbl
+    return tbl
 
 table.SetValue = ( tbl, str, value, ifEmpty ) ->
     keys = string_Split( str, "." )
@@ -215,7 +215,7 @@ gpm_AddType = ( typeName, func ) ->
             break
 
     indexes[ #indexes + 1 ] = { func, nextIndex }
-    nextIndex
+    return nextIndex
 
 gpm.AddType = gpm_AddType
 getmetatable = getmetatable
@@ -362,7 +362,6 @@ do
         meta.Seek( self, startPos )
         data = meta.Read( self, len )
         meta.Skip( self, 1 )
-
         return data
 
     meta.WriteString = ( self, str ) ->

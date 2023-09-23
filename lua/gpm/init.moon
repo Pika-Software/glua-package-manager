@@ -82,6 +82,7 @@ unless gpm.Developer
 if SERVER
     AddCSLuaFile "gpm/util.lua"
     AddCSLuaFile "gpm/libs/promise.lua"
+    AddCSLuaFile "gpm/libs/gmad.lua"
     AddCSLuaFile "gpm/filesystem.lua"
     AddCSLuaFile "gpm/http.lua"
     AddCSLuaFile "gpm/package.lua"
@@ -91,6 +92,8 @@ gpm.Logger\Info "metaworks v%s is initialized.", gpm.metaworks.VERSION
 
 include "gpm/libs/promise.lua"
 gpm.Logger\Info "gm_promise v%s is initialized.", promise.VERSION
+
+include "gpm/libs/gmad.lua"
 
 include "gpm/filesystem.lua"
 include "gpm/http.lua"

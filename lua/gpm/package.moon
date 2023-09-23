@@ -1,5 +1,6 @@
 logger = gpm.Logger
 paths = gpm.paths
+type = type
 fs = gpm.fs
 
 lib = gpm.Lib "package", gpm.metaworks.CreateLink( package, true )
