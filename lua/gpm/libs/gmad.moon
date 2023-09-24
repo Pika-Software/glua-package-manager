@@ -1,7 +1,11 @@
 gpm_ArgAssert = gpm.ArgAssert
 lib = gpm.Lib "gmad"
+string = gpm.string
+table = gpm.table
 error = error
 type = type
+
+lib.VERSION = "1.0.0"
 
 do
 
@@ -119,227 +123,319 @@ do
         return false
     lib.IsAllowedFilePath = lib_IsAllowedFilePath
 
-File = FindMetaTable "File"
+do
 
-class GMA
-    Identity: "GMAD"
-    Version: 3
+    File = FindMetaTable "File"
 
-    __tostring: =>
-        return "GMA File \'" .. @title .. "\'"
+    File_WriteString = File.WriteString
+    File_WriteUInt64 = File.WriteUInt64
+    File_ReadString = File.ReadString
+    File_ReadUInt64 = File.ReadUInt64
+    File_WriteULong = File.WriteULong
+    File_EndOfFile = File.EndOfFile
+    File_ReadULong = File.ReadULong
+    File_WriteLong = File.WriteLong
+    File_WriteByte = File.WriteByte
+    File_ReadByte = File.ReadByte
+    File_ReadLong = File.ReadLong
+    File_Write = File.Write
+    File_Close = File.Close
+    File_Seek = File.Seek
+    File_Read = File.Read
+    File_Tell = File.Tell
 
-    new: =>
-        @Title = "unknown"
-        @Author = "unknown"
-        @Description = "unknown"
-        @AddonVersion = 1
-        @Timestamp = 0
-        @Required = {}
-        @SteamID = 0
-        @Files = {}
+    string_lower = string.lower
+    string_len = string.len
+    fs_Open = gpm.fs.Open
+    tostring = tostring
+    tonumber = tonumber
 
-    Open: ( filePath, gamePath, fileMode ) =>
-        @Close!
+    class GMA
+        Identity: "GMAD"
+        Version: 3
 
-        fileObject = file.Open( filePath, fileMode or "rb", gamePath )
-        unless fileObject
-            error "File cannot be open."
+        __tostring: =>
+            return "GMA File \'" .. @title .. "\'"
 
-        @File = fileObject
-        return fileObject
+        new: =>
+            @Title = "unknown"
+            @Author = "unknown"
+            @Description = "unknown"
+            @AddonVersion = 1
+            @Timestamp = 0
+            @Required = {}
+            @SteamID = ""
+            @Files = {}
 
-    Close: =>
-        fileObject = @File
-        if fileObject
-            File.Close( fileObject )
-            @File = nil
-            return true
-        return false
+        GetTitle: =>
+            return @Title
 
-    Parse: =>
-        fileObject = @File
-        unless fileObject
-            error "File is not oppened"
+        SetTitle: ( str ) =>
+            gpm_ArgAssert( str, 1, "string" )
+            @Title = str
 
-        if File.Read( fileObject, 4 ) ~= @Identity
-            error "File is not a gma"
+        GetAuthor: =>
+            return @Author
 
-        version = File.ReadByte( fileObject )
-        if version > @Version
-            error "gma version is unsupported"
+        SetAuthor: ( str ) =>
+            gpm_ArgAssert( str, 1, "string" )
+            @Author = str
 
-        @File = fileObject
-        @Version = version
+        GetDescription: =>
+            return @Description
 
-        @SteamID = File.ReadUInt64( fileObject )
-        @Timestamp = File.ReadUInt64( fileObject )
+        SetDescription: ( str ) =>
+            gpm_ArgAssert( str, 1, "string" )
+            @Description = str
 
-        if version > 1
-            while not File.EndOfFile( fileObject )
-                contentName = File.ReadString( fileObject )
-                unless contentName
-                    break
-                @Required[ contentName ] = true
+        GetAddonVersion: =>
+            return @AddonVersion
 
-        @Title = File.ReadString( fileObject )
-        @Description = File.ReadString( fileObject )
-        @Author = File.ReadString( fileObject )
+        SetAddonVersion: ( int32 ) =>
+            gpm_ArgAssert( int32, 1, "number" )
+            @AddonVersion = int32
 
-        @AddonVersion = File.ReadLong( fileObject )
+        GetTimestamp: =>
+            return @Timestamp
 
-        files, offset = @Files, 0
-        while not File.EndOfFile( fileObject )
-            index = File.ReadULong( fileObject )
-            if index == 0
-                break
+        SetTimestamp: ( uint64 ) =>
+            gpm_ArgAssert( uint64, 1, "number" )
+            @Timestamp = uint64
 
-            data = {
-                FilePath: File.ReadString( fileObject ),
-                Position: offset
-            }
+        GetSteamID: =>
+            return @SteamID
 
-            size = File.ReadUInt64( fileObject )
-            data.Size = size
-            offset += size
+        SetSteamID: ( str ) =>
+            gpm_ArgAssert( str, 1, "string" )
+            @SteamID = str
 
-            data.CRC = File.ReadULong( fileObject )
-            files[ index ] = data
+        Open: ( filePath, gamePath, fileMode ) =>
+            @Close!
 
-        files.Pointer = File.Tell( fileObject )
+            unless filePath
+                filePath = @FilePath
 
-    Read: ( filePath, gamePath, readFiles ) =>
-        gpm_ArgAssert( filePath, 1, "string" )
-        gpm_ArgAssert( gamePath, 2, "string" )
+            unless gamePath
+                gamePath = @GamePath
 
-        table.Empty( @Required )
-        table.Empty( @Files )
+            gpm_ArgAssert( filePath, 1, "string" )
+            gpm_ArgAssert( gamePath, 2, "string" )
 
-        @Open( filePath, gamePath )
-        @Parse!
+            fileObject = fs_Open( filePath, fileMode or "rb", gamePath )
+            unless fileObject
+                error "File cannot be open."
 
-        if readFiles
-            @ReadFiles!
-        @Close!
+            @FilePath = filePath
+            @GamePath = gamePath
+            @File = fileObject
 
-    ReadFile: ( index ) =>
-        fileObject = @File
-        unless fileObject
-            error "File is not oppened"
+            if not fileMode or fileMode == "rb"
+                @Parse!
 
-        files = @Files
-        data = files[ index ]
-        unless data
-            error "File is non exists."
+            return fileObject
 
-        File.Seek( fileObject, files.Pointer + data.Position )
-        data.Content = File.Read( fileObject, data.Size )
-        return data
-
-    ReadFiles: =>
-        fileObject = @File
-        unless fileObject
-            error "File is not oppened"
-
-        files = @Files
-        pointer = files.Pointer
-        for data in *files
-            File.Seek( fileObject, pointer + data.Position )
-            data.Content = File.Read( fileObject, data.Size )
-        return files
-
-    VerifyCRC: =>
-        for data in *@Files
-            crc, content = data.CRC, data.Content
-            if crc and content and crc ~= util.CRC( content )
-                return false
-        return true
-
-    VerifyFiles: =>
-        files = @Files
-        unless #files == 0
+        Close: =>
+            fileObject = @File
+            if fileObject
+                File_Close( fileObject )
+                @File = nil
+                return true
             return false
 
-        for filePath in *files
-            unless lib_IsAllowedFilePath( filePath )
-                return false
+        Parse: =>
+            fileObject = @File
+            unless fileObject
+                error "File is not oppened"
 
-        return true
+            if File_Read( fileObject, 4 ) ~= @Identity
+                error "File is not a gma"
 
-    Write: ( filePath, gamePath, doCRCs ) =>
-        gpm_ArgAssert( filePath, 1, "string" )
-        gpm_ArgAssert( gamePath, 2, "string" )
+            version = File_ReadByte( fileObject )
+            if version > @Version
+                error "gma version is unsupported"
 
-        unless @VerifyFiles!
-            error "Not allowed by whitelist"
+            @File = fileObject
+            @Version = version
 
-        fileObject = @Open( filePath, gamePath, "wb" )
+            @SteamID = tostring( File_ReadUInt64( fileObject ) )
+            @Timestamp = File_ReadUInt64( fileObject )
 
-        File.Write( fileObject, @Identity )
-        File.WriteByte( fileObject, @Version )
+            if version > 1
+                while not File_EndOfFile( fileObject )
+                    contentName = File_ReadString( fileObject )
+                    unless contentName
+                        break
+                    @Required[ contentName ] = true
 
-        File.WriteUInt64( fileObject, @SteamID or 0 )
-        File.WriteUInt64( fileObject, @Timestamp or os.time() )
+            @Title = File_ReadString( fileObject )
+            @Description = File_ReadString( fileObject )
+            @Author = File_ReadString( fileObject )
 
-        hasRequired = false
-        for contentName in pairs( @Required )
-            File.WriteString( fileObject, contentName )
+            @AddonVersion = File_ReadLong( fileObject )
+
+            files, offset = @Files, 0
+            while not File_EndOfFile( fileObject )
+                index = File_ReadULong( fileObject )
+                if index == 0
+                    break
+
+                data = {
+                    FilePath: File_ReadString( fileObject ),
+                    Position: offset
+                }
+
+                size = File_ReadUInt64( fileObject )
+                data.Size = size
+                offset += size
+
+                data.CRC = File_ReadULong( fileObject )
+                files[ index ] = data
+
+            files.Pointer = File_Tell( fileObject )
+
+        Read: ( filePath, gamePath, readFiles ) =>
+            table.Empty( @Required )
+            table.Empty( @Files )
+
+            @Open( filePath, gamePath )
+
+            if readFiles
+                @ReadFiles!
+            @Close!
+
+        VerifyCRC: =>
+            for data in *@Files
+                crc, content = data.CRC, data.Content
+                if crc and content and crc ~= tonumber( util.CRC( content ) )
+                    return false, data
+            return true
+
+        VerifyFiles: =>
+            files = @Files
+            if #files == 0
+                return false, "unknown"
+
+            for data in *files
+                unless lib_IsAllowedFilePath( data.FilePath )
+                    return false, data
+
+            return true
+
+        Write: ( filePath, gamePath, doCRCs ) =>
+            ok, result = @VerifyFiles!
+            unless ok
+                error "'" .. result.FilePath .. "' file is not allowed by whitelist!"
+
+            fileObject = @Open( filePath, gamePath, "wb" )
+
+            File_Write( fileObject, @Identity )
+            File_WriteByte( fileObject, @Version )
+
+            File_WriteUInt64( fileObject, tonumber( @SteamID ) or 0 )
+            File_WriteUInt64( fileObject, @Timestamp or os.time() )
+
+            hasRequired = false
+            for contentName in pairs( @Required )
+                File_WriteString( fileObject, contentName )
+                unless hasRequired
+                    hasRequired = true
+
             unless hasRequired
-                hasRequired = true
+                File_WriteByte( fileObject, 0 )
 
-        unless hasRequired
-            File.WriteByte( fileObject, 0 )
+            File_WriteString( fileObject, @Title )
+            File_WriteString( fileObject, @Description )
+            File_WriteString( fileObject, @Author )
 
-        File.WriteString( fileObject, @Title )
-        File.WriteString( fileObject, @Description )
-        File.WriteString( fileObject, @Author )
+            File_WriteLong( fileObject, @AddonVersion )
 
-        File.WriteLong( fileObject, @AddonVersion )
+            files = @Files
+            for index = 1, #files
+                File_WriteULong( fileObject, index )
+                data = files[ index ]
 
-        files = @Files
-        for index = 1, #files
-            File.WiteULong( fileObject, index )
+                File_WriteString( fileObject, string_lower( data.FilePath ) )
+                File_WriteUInt64( fileObject, data.Size )
+
+                if doCRCs
+                    File_WriteULong( fileObject, tonumber( util.CRC( data.Content ) ) or 0 )
+                else
+                    File_WriteULong( fileObject, 0 )
+
+            File_WriteULong( fileObject, 0 )
+
+            for data in *files
+                content = data.Content
+                unless type( content ) == "string"
+                    error "file empty"
+
+                File_Write( fileObject, content )
+
+            @Close!
+
+            return true
+
+        ReadFile: ( index ) =>
+            gpm_ArgAssert( index, 1, "number" )
+
+            fileObject = @File
+            unless fileObject
+                error "File is not oppened"
+
+            files = @Files
             data = files[ index ]
+            unless data
+                error "File is non exists."
 
-            File.WriteString( fileObject, string.lower( data.FilePath ) )
-            File.WriteUInt64( fileObject, data.Size )
+            File_Seek( fileObject, files.Pointer + data.Position )
+            data.Content = File_Read( fileObject, data.Size )
+            return data
 
-            if doCRCs
-                File.WriteLong( fileObject, util.CRC( data.Content ) )
-            else
-                File.WriteLong( fileObject, 0 )
+        ReadFiles: =>
+            fileObject = @File
+            unless fileObject
+                error "File is not oppened"
 
-        File.WiteULong( fileObject, 0 )
+            files = @Files
+            pointer = files.Pointer
+            for data in *files
+                File_Seek( fileObject, pointer + data.Position )
+                data.Content = File_Read( fileObject, data.Size )
 
-        for index = 1, #files
-            data = files[ index ]
+            return files
 
-            content = data.Content
-            if not content or #content == 0
-                error "file empty"
+        GetFile: ( index ) =>
+            return @Files[ index ]
 
-            File.Write( content )
+        AddFile: ( filePath, content ) =>
+            gpm_ArgAssert( filePath, 1, "string" )
+            gpm_ArgAssert( content, 2, "string" )
+            files = @Files
 
-        @Close!
+            filePath = string_lower( filePath )
+            table.RemoveByFunction( files, ( _, data ) ->
+                return data.FilePath == filePath
+            )
 
-        return true
+            files[ #files + 1 ] = {
+                Size: string_len( content ),
+                CRC: tonumber( util.CRC( content ) ) or 0,
+                FilePath: filePath,
+                Content: content
+            }
 
-    AddRequiredContent: ( contentName ) =>
-        gpm_ArgAssert( contentName, 1, "string" )
-        @requiredContent[ contentName ] = true
+        ClearFiles: =>
+            table.Empty( @files )
 
-    RemoveRequiredContent: ( contentName ) =>
-        gpm_ArgAssert( contentName, 1, "string" )
-        @requiredContent[ contentName ] = nil
+        AddRequiredContent: ( contentName ) =>
+            gpm_ArgAssert( contentName, 1, "string" )
+            @requiredContent[ contentName ] = true
 
-    ClearRequiredContent: =>
-        table.Empty( @requiredContent )
+        RemoveRequiredContent: ( contentName ) =>
+            gpm_ArgAssert( contentName, 1, "string" )
+            @requiredContent[ contentName ] = nil
 
-    ClearFiles: =>
-        table.Empty( @files )
+        ClearRequiredContent: =>
+            table.Empty( @requiredContent )
 
-
-obj = GMA!
-obj\Open( "addons/colourable_hl2_crowbar_643148462.gma", "GAME" )
-obj\Parse!
-PrintTable( obj\ReadFiles! )
-obj\Close!
+lib.New = GMAD

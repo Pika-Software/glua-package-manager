@@ -94,6 +94,7 @@ include "gpm/libs/promise.lua"
 gpm.Logger\Info "gm_promise v%s is initialized.", promise.VERSION
 
 include "gpm/libs/gmad.lua"
+gpm.Logger\Info "gmad v%s is initialized.", gpm.gmad.VERSION
 
 include "gpm/filesystem.lua"
 include "gpm/http.lua"
