@@ -205,6 +205,8 @@ table.RemoveByFunction = ( tbl, func ) ->
 
     return result
 
+table.unpack = unpack
+
 metaworks = include "libs/metaworks.lua"
 gpm_ArgAssert = gpm.ArgAssert
 

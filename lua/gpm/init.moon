@@ -83,12 +83,8 @@ unless gpm.Developer
 
 include "gpm/util.lua"
 gpm.Logger\Info "metaworks v%s is initialized.", gpm.metaworks.VERSION
-
-include "gpm/libs/promise.lua"
-gpm.Logger\Info "gm_promise v%s is initialized.", promise.VERSION
-
-include "gpm/libs/gmad.lua"
-gpm.Logger\Info "gmad v%s is initialized.", gpm.gmad.VERSION
+gpm.Logger\Info "gm_promise v%s is initialized.", (include "gpm/libs/promise.lua").VERSION
+gpm.Logger\Info "gmad v%s is initialized.", (include "gpm/libs/gmad.lua").VERSION
 
 include "gpm/filesystem.lua"
 include "gpm/http.lua"
