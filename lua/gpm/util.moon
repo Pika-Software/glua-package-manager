@@ -189,6 +189,19 @@ table_Lower = ( tbl ) ->
     return tbl
 table.Lower = table_Lower
 
+table.RemoveByFunction = ( tbl, func ) ->
+    result, fulfilled = {}, false
+    while not fulfilled
+        fulfilled = true
+
+        for index, value in ipairs( tbl )
+            if func( index, value )
+                result[ #result + 1 ] = table.remove( tbl, index )
+                fulfilled = false
+                break
+
+    return result
+
 if SERVER
     AddCSLuaFile "libs/metaworks.lua"
 metaworks = include "libs/metaworks.lua"
@@ -347,26 +360,49 @@ do
 do
 
     meta = FindMetaTable( "File" )
-    meta.SkipEmpty = ( self ) ->
-        while not meta.EndOfFile( self ) do
-            if meta.ReadByte( self ) ~= 0 then
-                meta.Skip( self, -1 )
+
+    meta_WriteULong = meta.WriteULong
+    meta_ReadULong = meta.ReadULong
+    meta_WriteByte = meta.WriteByte
+    meta_EndOfFile = meta.EndOfFile
+    meta_ReadByte = meta.ReadByte
+    meta_Write = meta.Write
+    meta_Read = meta.Read
+    meta_Seek = meta.Seek
+    meta_Skip = meta.Skip
+    meta_Tell = meta.Tell
+
+    meta.SkipEmpty = ( fileObject ) ->
+        while not meta_EndOfFile( fileObject ) do
+            if meta_ReadByte( fileObject ) ~= 0 then
+                meta_Skip( fileObject, -1 )
                 break
 
-    meta.ReadString = ( self ) ->
-        startPos, len = meta.Tell( self ), 0
+    meta.ReadString = ( fileObject ) ->
+        startPos, len = meta_Tell( fileObject ), 0
 
-        while not meta.EndOfFile( self ) and meta.ReadByte( self ) ~= 0 do
+        while not meta_EndOfFile( fileObject ) and meta_ReadByte( fileObject ) ~= 0 do
             len = len + 1
 
-        meta.Seek( self, startPos )
-        data = meta.Read( self, len )
-        meta.Skip( self, 1 )
+        meta_Seek( fileObject, startPos )
+        data = meta_Read( fileObject, len )
+        meta_Skip( fileObject, 1 )
         return data
 
-    meta.WriteString = ( self, str ) ->
-        meta.Write( self, str )
-        meta.WriteByte( self, 0 )
+    meta.WriteString = ( fileObject, str ) ->
+        meta_Write( fileObject, str )
+        meta_WriteByte( fileObject, 0 )
+
+    unless meta.ReadUInt64
+        meta.ReadUInt64 = ( fileObject ) ->
+            number = meta_ReadULong( fileObject )
+            meta_Skip( fileObject, 4 )
+            return number
+
+    unless meta.WriteUInt64
+        meta.WriteUInt64 = ( fileObject, number ) ->
+            meta_WriteULong( fileObject, number )
+            meta_WriteULong( fileObject, 0 )
 
 do
 
