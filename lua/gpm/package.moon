@@ -1,3 +1,6 @@
+if SERVER
+    AddCSLuaFile!
+
 logger = gpm.Logger
 paths = gpm.paths
 type = type

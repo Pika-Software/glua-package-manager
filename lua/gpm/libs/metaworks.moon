@@ -1,3 +1,6 @@
+if SERVER
+    AddCSLuaFile!
+
 debug_setmetatable = debug.setmetatable
 rawget = rawget
 error = error

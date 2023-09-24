@@ -1,3 +1,7 @@
+if SERVER then
+    AddCSLuaFile()
+end
+
 --[[
     MIT License
 

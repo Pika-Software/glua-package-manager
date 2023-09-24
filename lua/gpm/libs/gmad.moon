@@ -1,3 +1,6 @@
+if SERVER
+    AddCSLuaFile!
+
 gpm_ArgAssert = gpm.ArgAssert
 lib = gpm.Lib "gmad"
 string = gpm.string
@@ -146,7 +149,7 @@ do
 
     string_lower = string.lower
     string_len = string.len
-    fs_Open = gpm.fs.Open
+    file_Open = file.Open
     tostring = tostring
     tonumber = tonumber
 
@@ -221,7 +224,7 @@ do
             gpm_ArgAssert( filePath, 1, "string" )
             gpm_ArgAssert( gamePath, 2, "string" )
 
-            fileObject = fs_Open( filePath, fileMode or "rb", gamePath )
+            fileObject = file_Open( filePath, fileMode or "rb", gamePath )
             unless fileObject
                 error "File cannot be open."
 

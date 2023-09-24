@@ -1,8 +1,10 @@
 export gpm
 
-AddCSLuaFile = AddCSLuaFile
-include = include
 SERVER = SERVER
+if SERVER
+    AddCSLuaFile!
+
+include = include
 Color = Color
 type = type
 
@@ -79,14 +81,6 @@ unless gpm.Developer
         ( _, __, new ) -> gpm.Developer = tonumber( new ) or 0,
         "gLua Package Manager"
 
-if SERVER
-    AddCSLuaFile "gpm/util.lua"
-    AddCSLuaFile "gpm/libs/promise.lua"
-    AddCSLuaFile "gpm/libs/gmad.lua"
-    AddCSLuaFile "gpm/filesystem.lua"
-    AddCSLuaFile "gpm/http.lua"
-    AddCSLuaFile "gpm/package.lua"
-
 include "gpm/util.lua"
 gpm.Logger\Info "metaworks v%s is initialized.", gpm.metaworks.VERSION
 
@@ -101,4 +95,4 @@ include "gpm/http.lua"
 include "gpm/package.lua"
 
 gpm.Logger\Info "Start-up time: %.4f sec.", SysTime() - gpm.StartTime
-gpm
+return gpm

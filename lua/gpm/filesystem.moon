@@ -1,3 +1,7 @@
+SERVER = SERVER
+if SERVER
+    AddCSLuaFile!
+
 gpm = gpm
 file = file
 util = gpm.util
@@ -9,7 +13,6 @@ File = FindMetaTable( "File" )
 logger = gpm.Logger
 MENU_DLL = MENU_DLL
 CLIENT = CLIENT
-SERVER = SERVER
 error = error
 type = type
 

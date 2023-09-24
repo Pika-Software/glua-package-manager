@@ -1,3 +1,7 @@
+SERVER = SERVER
+if SERVER
+    AddCSLuaFile!
+
 gpm = gpm
 http = http
 util = gpm.util

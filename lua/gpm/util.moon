@@ -1,3 +1,6 @@
+if SERVER
+    AddCSLuaFile!
+
 setmetatable = setmetatable
 ipairs = ipairs
 error = error
@@ -202,10 +205,7 @@ table.RemoveByFunction = ( tbl, func ) ->
 
     return result
 
-if SERVER
-    AddCSLuaFile "libs/metaworks.lua"
 metaworks = include "libs/metaworks.lua"
-
 gpm_ArgAssert = gpm.ArgAssert
 
 gpm_AddType = ( typeName, func ) ->
