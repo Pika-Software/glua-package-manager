@@ -442,3 +442,4 @@ do
             table.Empty( @requiredContent )
 
 lib.New = GMAD
+return lib
