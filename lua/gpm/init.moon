@@ -88,7 +88,7 @@ gpm.Logger\Info "gmad v%s is initialized.", (include "gpm/libs/gmad.lua").VERSIO
 
 include "gpm/filesystem.lua"
 include "gpm/http.lua"
-include "gpm/package.lua"
+-- include "gpm/package.lua"
 
 gpm.Logger\Info "Start-up time: %.4f sec.", SysTime() - gpm.StartTime
 return gpm
