@@ -6,7 +6,7 @@ rawget = rawget
 error = error
 type = type
 
-metaworks = gpm.Lib "metaworks"
+metaworks = gpm.Table gpm, "metaworks"
 metaworks.VERSION = "1.0.0"
 metaworks.GetValue = table.Lookup
 

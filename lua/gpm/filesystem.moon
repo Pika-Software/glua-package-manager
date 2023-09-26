@@ -2,15 +2,13 @@ SERVER = SERVER
 if SERVER
     AddCSLuaFile!
 
-gpm = gpm
 file = file
-util = gpm.util
-paths = gpm.paths
-string = gpm.string
+gpm = gpm
+
+import string, paths, util, metaworks, Logger, Table from gpm
 
 string_GetPathFromFilename = string.GetPathFromFilename
 File = FindMetaTable( "File" )
-logger = gpm.Logger
 MENU_DLL = MENU_DLL
 CLIENT = CLIENT
 error = error
@@ -18,9 +16,9 @@ type = type
 
 -- https://github.com/Pika-Software/gm_efsw
 if SERVER and not efsw and util.IsBinaryModuleInstalled( "efsw" ) and pcall( require, "efsw" )
-    logger\Info( "gm_efsw is initialized, package auto-reloading are available." )
+    Logger\Info( "gm_efsw is initialized, package auto-reloading are available." )
 
-lib = gpm.Lib "fs", gpm.metaworks.CreateLink( file, true )
+lib = Table gpm, "fs", metaworks.CreateLink( file, true )
 lib.Move = file.Rename
 lib.Time = file.Time
 
@@ -68,7 +66,7 @@ do
         for filePath in *files
             mountedFiles[ filePath ] = true
 
-        logger\Debug( "GMA file '%s' was mounted to GAME with %d files.", gmaPath, #files )
+        Logger\Debug( "GMA file '%s' was mounted to GAME with %d files.", gmaPath, #files )
         return ok, files
 
 lib_CreateDir, lib_IsFile, lib_IsDir = nil, nil, nil
@@ -186,7 +184,7 @@ do
                 unless moonloader_PreCacheFile moonPath
                     error "Compiling Moonscript file '" .. moonPath .. "' into Lua is failed!"
 
-                logger\Debug "The MoonScript file '%s' was successfully compiled into Lua.", moonPath
+                Logger\Debug "The MoonScript file '%s' was successfully compiled into Lua.", moonPath
                 return true
 
         return lib_IsFile filePath .. ".lua", gamePath
@@ -394,7 +392,7 @@ do
                         count += 1
 
             if installed > 0
-                logger\Info "'%s' was connected as filesystem API.", source.Name
+                Logger\Info "'%s' was connected as filesystem API.", source.Name
 
             if count > 2
                 break

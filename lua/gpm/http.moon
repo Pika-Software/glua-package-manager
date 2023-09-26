@@ -2,17 +2,15 @@ SERVER = SERVER
 if SERVER
     AddCSLuaFile!
 
-gpm = gpm
 http = http
-util = gpm.util
-
-gpm_ArgAssert = gpm.ArgAssert
-promise_New = promise.New
-logger = gpm.Logger
-type = type
+gpm = gpm
 _G = _G
 
-lib = gpm.Lib "http", gpm.metaworks.CreateLink( http, true )
+import util, metaworks, ArgAssert, Logger, Table from gpm
+promise_New = promise.New
+type = type
+
+lib = Table gpm, "http", metaworks.CreateLink( http, true )
 client, clientName = nil, nil
 do
     clients = {
@@ -38,12 +36,12 @@ do
     for item in *clients
         if item.Installed or ( util.IsBinaryModuleInstalled( item.Name ) and pcall( require, item.Name ) )
             client, clientName = _G[ item.Client ], item.Name
-            logger\Info( "'%s' was connected as HTTP client.", item.Name )
+            Logger\Info( "'%s' was connected as HTTP client.", item.Name )
             break
 
 
 request = ( parameters ) ->
-    logger\Debug( "%s HTTP request to '%s', using '%s', with timeout %d seconds.", parameters.method, parameters.url, clientName, parameters.timeout )
+    Logger\Debug( "%s HTTP request to '%s', using '%s', with timeout %d seconds.", parameters.method, parameters.url, clientName, parameters.timeout )
     client( parameters )
 
 queue = {}
@@ -59,7 +57,7 @@ cvars.AddChangeCallback( "http_timeout", ( _, __, int ) ->
 "gLua Package Manager" )
 
 HTTP = ( parameters ) ->
-    gpm_ArgAssert( parameters, 1, "table" )
+    ArgAssert( parameters, 1, "table" )
     p = promise_New()
 
     if type( parameters.method ) ~= "string"

@@ -4,7 +4,7 @@ if SERVER
 string_format = string.format
 tostring = tostring
 
-lib = gpm.Lib "promise", {
+lib = gpm.Table gpm, "promise", {
     VERSION: "2.0.0",
     PROMISE_PENDING: 0,
     PROMISE_REJECTED: 1,

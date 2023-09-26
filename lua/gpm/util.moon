@@ -1,3 +1,7 @@
+MENU_DLL = MENU_DLL
+CLIENT = CLIENT
+SERVER = SERVER
+
 if SERVER
     AddCSLuaFile!
 
@@ -8,15 +12,18 @@ type = type
 gpm = gpm
 _G = _G
 
-gpm_Lib = ( name, default ) ->
-    lib = gpm[ name ]
-    if type( lib ) ~= "table"
-        lib = default or {}
-        gpm[ name ] = lib
-    return lib
-gpm.Lib = gpm_Lib
+gpm_Table = ( parent, name, default ) ->
+    tbl = parent[ name ]
+    unless type( tbl ) == "table"
+        if type( default ) == "function"
+            default = default( parent, name )
 
-types = gpm_Lib "Types", {
+        tbl = default or {}
+        parent[ name ] = tbl
+    return tbl
+gpm.Table = gpm_Table
+
+types = gpm_Table gpm, "Types", {
     Indexes: {},
     Names: {
         [TYPE_PARTICLESYSTEM]: "CNewParticleEffect",
@@ -89,7 +96,7 @@ do
     gpm_TypeID = gpm.TypeID
     gpm.type = ( any ) -> typeNames[ gpm_TypeID( any ) ] or "unknown"
 
-string = gpm_Lib "string", setmetatable( {}, { __index: _G.string } )
+string = gpm_Table gpm, "string", setmetatable( {}, { __index: _G.string } )
 string.StartsWith = string.StartsWith or string.StartWith
 
 do
@@ -101,7 +108,7 @@ string_format = string.format
 string_lower = string.lower
 string_sub = string.sub
 
-debug = gpm_Lib "debug", setmetatable( {}, { __index: _G.debug } )
+debug = gpm_Table gpm, "debug", setmetatable( {}, { __index: _G.debug } )
 debug.fempty = ->
 debug_getinfo = debug.getinfo
 debug.fcall = ( func, ... ) ->
@@ -132,7 +139,7 @@ do
         dinfo = debug_getinfo( 2, "n" )
         error( string_format( "bad argument #%d to \'%s\' (%s expected, got %s)", argNum, dinfo and dinfo.name or "func", expected, valueType ), errorlevel or 3 )
 
-table = gpm_Lib "table", setmetatable( {}, { __index: _G.table } )
+table = gpm_Table gpm, "table", setmetatable( {}, { __index: _G.table } )
 table_remove = table.remove
 string_Split = string.Split
 
@@ -251,7 +258,7 @@ do
     gpm_AddType( "Color", gpm_IsColor )
     gpm.IsColor = gpm_IsColor
 
-paths = gpm_Lib "paths"
+paths = gpm_Table gpm, "paths"
 string_gsub = string.gsub
 paths_Fix = ( filePath ) -> string_lower( string_gsub( filePath, "[/\\]+", "/" ) )
 paths.Fix = paths_Fix
@@ -297,7 +304,7 @@ do
 
 do
 
-    util = gpm_Lib "util", metaworks.CreateLink _G.util, true
+    util = gpm_Table gpm, "util", metaworks.CreateLink _G.util, true
     tonumber = tonumber
 
     util.Version = ( number ) ->
@@ -408,13 +415,34 @@ do
 
 do
 
-    colors = gpm.Colors
+    Color = Color
+
+    colors = gpm_Table gpm, "Colors", {
+        SecondaryText: Color 150, 150, 150,
+        PrimaryText: Color 200, 200, 200,
+        White: Color 255, 255, 255,
+        Info: Color 70, 135, 255,
+        Warn: Color 255, 130, 90,
+        Error: Color 250, 55, 40,
+        Debug: Color 0, 200, 150,
+        gpm: Color 180, 180, 255
+    }
+
     whiteColor = colors.White
+    state, stateColor = gpm.State, colors.State
+    if type( state ) ~= "string"
+        if MENU_DLL
+            state, stateColor = "Menu", Color 75, 175, 80
+        elseif CLIENT
+            state, stateColor = "Client", Color 225, 170, 10
+        elseif SERVER
+            state, stateColor = "Server", Color 5, 170, 250
+        gpm.State, colors.State = state or "unknown", stateColor or whiteColor
+
     debugFilter = () -> gpm.Developer > 0
     primaryTextColor = colors.PrimaryText
     secondaryTextColor = colors.SecondaryText
-    stateName, stateColor = string.upper( gpm.State ), colors.State
-
+    state = string.upper( state )
     gpm_IsColor = gpm.IsColor
     os_date = os.date
     select = select
@@ -460,7 +488,7 @@ do
 
             if select( "#", ... ) > 0
                 str = string_format( str, ... )
-            MsgC( secondaryTextColor, os_date( "%d-%m-%Y %H:%M:%S " ), stateColor, "[" .. stateName .. "] ", color, level, secondaryTextColor, " --> ", @Color, @Name, secondaryTextColor, " : ", @TextColor, str, "\n" )
+            MsgC( secondaryTextColor, os_date( "%d-%m-%Y %H:%M:%S " ), stateColor, "[" .. state .. "] ", color, level, secondaryTextColor, " --> ", @Color, @Name, secondaryTextColor, " : ", @TextColor, str, "\n" )
 
         Info: ( str, ... ) =>
             @Log( infoColor, "INFO ", str, ... )
@@ -484,4 +512,6 @@ do
     gpm.AddType( "Logger", gpm_IsLogger )
     gpm.IsLogger = gpm_IsLogger
 
-    gpm.Logger = Logger "gpm@" .. gpm.VERSION, colors.gpm
+    logger = Logger "gpm@" .. gpm.VERSION, colors.gpm
+    gpm.Logger = logger
+    logger\Info "metaworks v%s is initialized.", metaworks.VERSION

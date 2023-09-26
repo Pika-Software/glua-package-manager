@@ -1,12 +1,11 @@
 if SERVER
     AddCSLuaFile!
 
-logger = gpm.Logger
-paths = gpm.paths
 type = type
-fs = gpm.fs
+gpm = gpm
 
-lib = gpm.Lib "package", gpm.metaworks.CreateLink( package, true )
+import fs, paths, metaworks, Logger, Table from gpm
+lib = Table gpm, "package", metaworks.CreateLink( package, true )
 
 class Package
     new: ( filePath ) =>
@@ -60,7 +59,7 @@ do
 
         ok, result = fs_CompileLua( filePath, "LUA" )\SafeAwait!
         unless ok
-            logger\Error "Source '%s' compile failed, %s.", filePath, result
+            Logger\Error "Source '%s' compile failed, %s.", filePath, result
             processed += 1
             return
 
@@ -80,21 +79,21 @@ do
             sourceName = source.Name or filePath
 
             if type( source.IsAvalibleFilePath ) ~= "function"
-                logger\Error "Function .IsAvalibleFilePath is missing from source '%s', source loading failed!", sourceName
+                Logger\Error "Function .IsAvalibleFilePath is missing from source '%s', source loading failed!", sourceName
                 return
 
             func = source.GetInfo
             if type( func ) == "function"
                 source.GetInfo = promise.Async( func )
             else
-                logger\Error "Function .GetInfo is missing from source '%s', source loading failed!", sourceName
+                Logger\Error "Function .GetInfo is missing from source '%s', source loading failed!", sourceName
                 return
 
             func = source.Install
             if type( func ) == "function"
                 source.Install = promise.Async( func )
             else
-                logger\Error "Function .Install is missing from source '%s', source loading failed!", sourceName
+                Logger\Error "Function .Install is missing from source '%s', source loading failed!", sourceName
                 return
 
             func = source.Reload
@@ -105,7 +104,7 @@ do
             sources[ sourceName ] = source
 
         else
-            logger\Error result
+            Logger\Error result
             return
 
         if processed == total

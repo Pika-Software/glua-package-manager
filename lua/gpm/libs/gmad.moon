@@ -1,10 +1,8 @@
 if SERVER
     AddCSLuaFile!
 
-gpm_ArgAssert = gpm.ArgAssert
-lib = gpm.Lib "gmad"
-string = gpm.string
-table = gpm.table
+import string, table, ArgAssert, Table from gpm
+lib = Table gpm, "gmad"
 error = error
 type = type
 
@@ -148,6 +146,7 @@ do
     File_Tell = File.Tell
 
     string_lower = string.lower
+    table_Empty = table.Empty
     string_len = string.len
     file_Open = file.Open
     tostring = tostring
@@ -174,42 +173,42 @@ do
             return @Title
 
         SetTitle: ( str ) =>
-            gpm_ArgAssert( str, 1, "string" )
+            ArgAssert( str, 1, "string" )
             @Title = str
 
         GetAuthor: =>
             return @Author
 
         SetAuthor: ( str ) =>
-            gpm_ArgAssert( str, 1, "string" )
+            ArgAssert( str, 1, "string" )
             @Author = str
 
         GetDescription: =>
             return @Description
 
         SetDescription: ( str ) =>
-            gpm_ArgAssert( str, 1, "string" )
+            ArgAssert( str, 1, "string" )
             @Description = str
 
         GetAddonVersion: =>
             return @AddonVersion
 
         SetAddonVersion: ( int32 ) =>
-            gpm_ArgAssert( int32, 1, "number" )
+            ArgAssert( int32, 1, "number" )
             @AddonVersion = int32
 
         GetTimestamp: =>
             return @Timestamp
 
         SetTimestamp: ( uint64 ) =>
-            gpm_ArgAssert( uint64, 1, "number" )
+            ArgAssert( uint64, 1, "number" )
             @Timestamp = uint64
 
         GetSteamID: =>
             return @SteamID
 
         SetSteamID: ( str ) =>
-            gpm_ArgAssert( str, 1, "string" )
+            ArgAssert( str, 1, "string" )
             @SteamID = str
 
         Open: ( filePath, gamePath, fileMode ) =>
@@ -221,8 +220,8 @@ do
             unless gamePath
                 gamePath = @GamePath
 
-            gpm_ArgAssert( filePath, 1, "string" )
-            gpm_ArgAssert( gamePath, 2, "string" )
+            ArgAssert( filePath, 1, "string" )
+            ArgAssert( gamePath, 2, "string" )
 
             fileObject = file_Open( filePath, fileMode or "rb", gamePath )
             unless fileObject
@@ -297,8 +296,8 @@ do
             files.Pointer = File_Tell( fileObject )
 
         Read: ( filePath, gamePath, readFiles ) =>
-            table.Empty( @Required )
-            table.Empty( @Files )
+            table_Empty( @Required )
+            table_Empty( @Files )
 
             @Open( filePath, gamePath )
 
@@ -379,7 +378,7 @@ do
             return true
 
         ReadFile: ( index ) =>
-            gpm_ArgAssert( index, 1, "number" )
+            ArgAssert( index, 1, "number" )
 
             fileObject = @File
             unless fileObject
@@ -411,8 +410,8 @@ do
             return @Files[ index ]
 
         AddFile: ( filePath, content ) =>
-            gpm_ArgAssert( filePath, 1, "string" )
-            gpm_ArgAssert( content, 2, "string" )
+            ArgAssert( filePath, 1, "string" )
+            ArgAssert( content, 2, "string" )
             files = @Files
 
             filePath = string_lower( filePath )
@@ -428,18 +427,18 @@ do
             }
 
         ClearFiles: =>
-            table.Empty( @files )
+            table_Empty( @files )
 
         AddRequiredContent: ( contentName ) =>
-            gpm_ArgAssert( contentName, 1, "string" )
+            ArgAssert( contentName, 1, "string" )
             @requiredContent[ contentName ] = true
 
         RemoveRequiredContent: ( contentName ) =>
-            gpm_ArgAssert( contentName, 1, "string" )
+            ArgAssert( contentName, 1, "string" )
             @requiredContent[ contentName ] = nil
 
         ClearRequiredContent: =>
-            table.Empty( @requiredContent )
+            table_Empty( @requiredContent )
 
 lib.New = GMAD
 return lib
