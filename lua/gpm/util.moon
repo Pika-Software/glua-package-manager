@@ -381,37 +381,37 @@ do
     meta_Skip = meta.Skip
     meta_Tell = meta.Tell
 
-    meta.SkipEmpty = ( fileObject ) ->
-        while not meta_EndOfFile( fileObject ) do
-            if meta_ReadByte( fileObject ) ~= 0 then
-                meta_Skip( fileObject, -1 )
+    meta.SkipEmpty = ( fileHandle ) ->
+        while not meta_EndOfFile( fileHandle ) do
+            if meta_ReadByte( fileHandle ) ~= 0 then
+                meta_Skip( fileHandle, -1 )
                 break
 
-    meta.ReadString = ( fileObject ) ->
-        startPos, len = meta_Tell( fileObject ), 0
+    meta.ReadString = ( fileHandle ) ->
+        startPos, len = meta_Tell( fileHandle ), 0
 
-        while not meta_EndOfFile( fileObject ) and meta_ReadByte( fileObject ) ~= 0 do
+        while not meta_EndOfFile( fileHandle ) and meta_ReadByte( fileHandle ) ~= 0 do
             len = len + 1
 
-        meta_Seek( fileObject, startPos )
-        data = meta_Read( fileObject, len )
-        meta_Skip( fileObject, 1 )
+        meta_Seek( fileHandle, startPos )
+        data = meta_Read( fileHandle, len )
+        meta_Skip( fileHandle, 1 )
         return data
 
-    meta.WriteString = ( fileObject, str ) ->
-        meta_Write( fileObject, str )
-        meta_WriteByte( fileObject, 0 )
+    meta.WriteString = ( fileHandle, str ) ->
+        meta_Write( fileHandle, str )
+        meta_WriteByte( fileHandle, 0 )
 
     unless meta.ReadUInt64
-        meta.ReadUInt64 = ( fileObject ) ->
-            number = meta_ReadULong( fileObject )
-            meta_Skip( fileObject, 4 )
+        meta.ReadUInt64 = ( fileHandle ) ->
+            number = meta_ReadULong( fileHandle )
+            meta_Skip( fileHandle, 4 )
             return number
 
     unless meta.WriteUInt64
-        meta.WriteUInt64 = ( fileObject, number ) ->
-            meta_WriteULong( fileObject, number )
-            meta_WriteULong( fileObject, 0 )
+        meta.WriteUInt64 = ( fileHandle, number ) ->
+            meta_WriteULong( fileHandle, number )
+            meta_WriteULong( fileHandle, 0 )
 
 do
 

@@ -223,77 +223,77 @@ do
             ArgAssert( filePath, 1, "string" )
             ArgAssert( gamePath, 2, "string" )
 
-            fileObject = file_Open( filePath, fileMode or "rb", gamePath )
-            unless fileObject
+            fileHandle = file_Open( filePath, fileMode or "rb", gamePath )
+            unless fileHandle
                 error "File cannot be open."
 
             @FilePath = filePath
             @GamePath = gamePath
-            @File = fileObject
+            @File = fileHandle
 
             if not fileMode or fileMode == "rb"
                 @Parse!
 
-            return fileObject
+            return fileHandle
 
         Close: =>
-            fileObject = @File
-            if fileObject
-                File_Close( fileObject )
+            fileHandle = @File
+            if fileHandle
+                File_Close( fileHandle )
                 @File = nil
                 return true
             return false
 
         Parse: =>
-            fileObject = @File
-            unless fileObject
+            fileHandle = @File
+            unless fileHandle
                 error "File is not oppened"
 
-            if File_Read( fileObject, 4 ) ~= @Identity
+            if File_Read( fileHandle, 4 ) ~= @Identity
                 error "File is not a gma"
 
-            version = File_ReadByte( fileObject )
+            version = File_ReadByte( fileHandle )
             if version > @Version
                 error "gma version is unsupported"
 
-            @File = fileObject
+            @File = fileHandle
             @Version = version
 
-            @SteamID = tostring( File_ReadUInt64( fileObject ) )
-            @Timestamp = File_ReadUInt64( fileObject )
+            @SteamID = tostring( File_ReadUInt64( fileHandle ) )
+            @Timestamp = File_ReadUInt64( fileHandle )
 
             if version > 1
-                while not File_EndOfFile( fileObject )
-                    contentName = File_ReadString( fileObject )
+                while not File_EndOfFile( fileHandle )
+                    contentName = File_ReadString( fileHandle )
                     unless contentName
                         break
                     @Required[ contentName ] = true
 
-            @Title = File_ReadString( fileObject )
-            @Description = File_ReadString( fileObject )
-            @Author = File_ReadString( fileObject )
+            @Title = File_ReadString( fileHandle )
+            @Description = File_ReadString( fileHandle )
+            @Author = File_ReadString( fileHandle )
 
-            @AddonVersion = File_ReadLong( fileObject )
+            @AddonVersion = File_ReadLong( fileHandle )
 
             files, offset = @Files, 0
-            while not File_EndOfFile( fileObject )
-                index = File_ReadULong( fileObject )
+            while not File_EndOfFile( fileHandle )
+                index = File_ReadULong( fileHandle )
                 if index == 0
                     break
 
                 data = {
-                    FilePath: File_ReadString( fileObject ),
+                    FilePath: File_ReadString( fileHandle ),
                     Position: offset
                 }
 
-                size = File_ReadUInt64( fileObject )
+                size = File_ReadUInt64( fileHandle )
                 data.Size = size
                 offset += size
 
-                data.CRC = File_ReadULong( fileObject )
+                data.CRC = File_ReadULong( fileHandle )
                 files[ index ] = data
 
-            files.Pointer = File_Tell( fileObject )
+            files.Pointer = File_Tell( fileHandle )
 
         Read: ( filePath, gamePath, readFiles ) =>
             table_Empty( @Required )
@@ -328,50 +328,50 @@ do
             unless ok
                 error "'" .. result.FilePath .. "' file is not allowed by whitelist!"
 
-            fileObject = @Open( filePath, gamePath, "wb" )
+            fileHandle = @Open( filePath, gamePath, "wb" )
 
-            File_Write( fileObject, @Identity )
-            File_WriteByte( fileObject, @Version )
+            File_Write( fileHandle, @Identity )
+            File_WriteByte( fileHandle, @Version )
 
-            File_WriteUInt64( fileObject, tonumber( @SteamID ) or 0 )
-            File_WriteUInt64( fileObject, @Timestamp or os.time() )
+            File_WriteUInt64( fileHandle, tonumber( @SteamID ) or 0 )
+            File_WriteUInt64( fileHandle, @Timestamp or os.time() )
 
             hasRequired = false
             for contentName in pairs( @Required )
-                File_WriteString( fileObject, contentName )
+                File_WriteString( fileHandle, contentName )
                 unless hasRequired
                     hasRequired = true
 
             unless hasRequired
-                File_WriteByte( fileObject, 0 )
+                File_WriteByte( fileHandle, 0 )
 
-            File_WriteString( fileObject, @Title )
-            File_WriteString( fileObject, @Description )
-            File_WriteString( fileObject, @Author )
+            File_WriteString( fileHandle, @Title )
+            File_WriteString( fileHandle, @Description )
+            File_WriteString( fileHandle, @Author )
 
-            File_WriteLong( fileObject, @AddonVersion )
+            File_WriteLong( fileHandle, @AddonVersion )
 
             files = @Files
             for index = 1, #files
-                File_WriteULong( fileObject, index )
+                File_WriteULong( fileHandle, index )
                 data = files[ index ]
 
-                File_WriteString( fileObject, string_lower( data.FilePath ) )
-                File_WriteUInt64( fileObject, data.Size )
+                File_WriteString( fileHandle, string_lower( data.FilePath ) )
+                File_WriteUInt64( fileHandle, data.Size )
 
                 if doCRCs
-                    File_WriteULong( fileObject, tonumber( util.CRC( data.Content ) ) or 0 )
+                    File_WriteULong( fileHandle, tonumber( util.CRC( data.Content ) ) or 0 )
                 else
-                    File_WriteULong( fileObject, 0 )
+                    File_WriteULong( fileHandle, 0 )
 
-            File_WriteULong( fileObject, 0 )
+            File_WriteULong( fileHandle, 0 )
 
             for data in *files
                 content = data.Content
                 unless type( content ) == "string"
                     error "file empty"
 
-                File_Write( fileObject, content )
+                File_Write( fileHandle, content )
 
             @Close!
 
@@ -380,8 +380,8 @@ do
         ReadFile: ( index ) =>
             ArgAssert( index, 1, "number" )
 
-            fileObject = @File
-            unless fileObject
+            fileHandle = @File
+            unless fileHandle
                 error "File is not oppened"
 
             files = @Files
@@ -389,20 +389,20 @@ do
             unless data
                 error "File is non exists."
 
-            File_Seek( fileObject, files.Pointer + data.Position )
-            data.Content = File_Read( fileObject, data.Size )
+            File_Seek( fileHandle, files.Pointer + data.Position )
+            data.Content = File_Read( fileHandle, data.Size )
             return data
 
         ReadFiles: =>
-            fileObject = @File
-            unless fileObject
+            fileHandle = @File
+            unless fileHandle
                 error "File is not oppened"
 
             files = @Files
             pointer = files.Pointer
             for data in *files
-                File_Seek( fileObject, pointer + data.Position )
-                data.Content = File_Read( fileObject, data.Size )
+                File_Seek( fileHandle, pointer + data.Position )
+                data.Content = File_Read( fileHandle, data.Size )
 
             return files
 

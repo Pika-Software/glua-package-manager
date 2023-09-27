@@ -196,12 +196,12 @@ do
     lib.Open = lib_Open
 
     lib_Read = ( filePath, gamePath, length ) ->
-        fileObject = lib_Open filePath, "rb", gamePath
-        unless fileObject
+        fileHandle = lib_Open filePath, "rb", gamePath
+        unless fileHandle
             return false
 
-        content = File.Read( fileObject, length )
-        File.Close( fileObject )
+        content = File.Read( fileHandle, length )
+        File.Close( fileHandle )
         return true, content
     lib.Read = lib_Read
 
@@ -209,12 +209,12 @@ do
         unless fastMode
             lib_BuildFilePath filePath
 
-        fileObject = lib_Open filePath, fileMode or "wb", "DATA"
-        unless fileObject
+        fileHandle = lib_Open filePath, fileMode or "wb", "DATA"
+        unless fileHandle
             return false
 
-        File.Write fileObject, content
-        File.Close fileObject
+        File.Write fileHandle, content
+        File.Close fileHandle
         return true
     lib.Write = lib_Write
 
