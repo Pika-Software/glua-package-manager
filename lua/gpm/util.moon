@@ -368,6 +368,12 @@ do
 
 do
 
+    math = gpm_Table gpm, "math", metaworks.CreateLink _G.math, true
+    math.inf = 1 / 0
+    math.nan = 0 / 0
+
+do
+
     meta = FindMetaTable( "File" )
 
     meta_WriteULong = meta.WriteULong
