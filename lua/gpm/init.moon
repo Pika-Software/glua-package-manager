@@ -23,7 +23,6 @@ do
         "Faster than ever.",
         "v" .. gpm.VERSION,
         "Blazing fast ☄",
-        "More splashes?!",
         "Here For You ♪",
         "Hello World!",
         "Once Again ♪",
@@ -38,7 +37,7 @@ do
     splash = splash[ math.random( 1, #splash ) ]
     for i = 1, ( 25 - #splash ) / 2
         if i % 2 == 1
-            splash = splash .. " "
+            splash ..= " "
         splash = " " .. splash
     MsgN string.format "\n                                     ___          __            \n                                   /'___`\\      /'__`\\          \n     __    _____     ___ ___      /\\_\\ /\\ \\    /\\ \\/\\ \\         \n   /'_ `\\ /\\ '__`\\ /' __` __`\\    \\/_/// /__   \\ \\ \\ \\ \\        \n  /\\ \\L\\ \\\\ \\ \\L\\ \\/\\ \\/\\ \\/\\ \\      // /_\\ \\ __\\ \\ \\_\\ \\   \n  \\ \\____ \\\\ \\ ,__/\\ \\_\\ \\_\\ \\_\\    /\\______//\\_\\\\ \\____/   \n   \\/___L\\ \\\\ \\ \\/  \\/_/\\/_/\\/_/    \\/_____/ \\/_/ \\/___/    \n     /\\____/ \\ \\_\\                                          \n     \\_/__/   \\/_/                %s                        \n\n  GitHub: https://github.com/Pika-Software\n  Discord: https://discord.gg/Gzak99XGvv\n  Website: https://pika-soft.ru\n  Developers: Pika Software\n  License: MIT\n", splash
 
@@ -54,6 +53,7 @@ include "gpm/util.lua"
 
 logger = gpm.Logger
 logger\Info "gm_promise v%s is initialized.", (include "gpm/libs/promise.lua").VERSION
+logger\Info "deflate v%s is initialized.", (include "gpm/libs/deflate.lua").VERSION
 logger\Info "gmad v%s is initialized.", (include "gpm/libs/gmad.lua").VERSION
 
 include "gpm/filesystem.lua"
