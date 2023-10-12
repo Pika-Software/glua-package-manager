@@ -6,66 +6,67 @@ rawget = rawget
 error = error
 type = type
 
-metaworks = gpm.Table gpm, "metaworks"
-metaworks.VERSION = "1.0.0"
-metaworks.GetValue = table.Lookup
+lib = gpm.Table( gpm, "metaworks", {
+    VERSION: "1.0.0"
+} )
+
+lib.GetValue = table.Lookup
 
 do
 
     table_SetValue = table.SetValue
     debug_setfenv = debug.setfenv
 
-    metaworks.SetValue = ( tbl, keyPath, value ) ->
+    lib.SetValue = ( tbl, keyPath, value ) ->
         if type( value ) == "function" then
             debug_setfenv( value, tbl )
         table_SetValue( tbl, keyPath, value )
 
-metaworks.GetLinks = ( tbl ) ->
-    rawget( tbl, "__indexes" )
-
-metaworks_GetLinks = metaworks.GetLinks
+metaworks_GetLinks = ( any ) ->
+    return rawget( any, "__indexes" )
+lib.GetLinks = metaworks_GetLinks
 
 do
     table_RemoveByIValue = table.RemoveByIValue
-    metaworks.UnLink = ( table1, table2 ) ->
+    lib.UnLink = ( table1, table2 ) ->
         table_RemoveByIValue( metaworks_GetLinks( table1 ), table2 )
-        table1
+        return table1
 
+metaworks_Link = nil
 do
 
-    metaworks_UnLink = metaworks.UnLink
+    metaworks_UnLink = lib.UnLink
     table_insert = table.insert
 
-    metaworks.Link = ( table1, table2 ) ->
+    metaworks_Link = ( table1, table2 ) ->
         metaworks_UnLink( table1, table2 )
         table_insert( metaworks_GetLinks( table1 ), 1, table2 )
-        table1
+        return table1
+    lib.Link = metaworks_Link
 
 do
 
-    metaworks_Link = metaworks.Link
-
-    meta = metaworks.META
+    meta = lib.ObjectMeta
     if type( meta ) ~= "table"
         meta = {}
-        metaworks.META = meta
+        lib.ObjectMeta = meta
 
     meta.__index = ( key ) ->
-        for link in *metaworks_GetLinks( self )
+        for link in *metaworks_GetLinks( @ )
             value = rawget( link, key )
             if value ~= nil
                 return value
 
-    metaworks.Create = ( any ) ->
+    lib.Create = ( any ) ->
         object = { __indexes: {} }
-        debug_setmetatable( object, meta )
+        unless debug_setmetatable( object, meta )
+            error( "Object creation failed." )
 
         if any ~= nil
             return metaworks_Link( object, any )
+        return object
 
-        object
-
-metaworks.CreateLink = ( object, read, write ) ->
+lib.CreateLink = ( object, read, write ) ->
     meta = {}
     if read
         meta.__index = object
@@ -76,7 +77,6 @@ metaworks.CreateLink = ( object, read, write ) ->
     result = {}
     if debug_setmetatable( result, meta )
         return result, meta
-
     error( "Unable to create a link to a given object." )
 
-metaworks
+return lib
