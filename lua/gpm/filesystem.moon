@@ -508,4 +508,4 @@ do
             return util_CompileMoonString content, filePath, handleError
         )
 
-lib
+return lib
