@@ -1,12 +1,16 @@
 if SERVER
     AddCSLuaFile!
 
-import string, table, ArgAssert, Table from gpm
-lib = Table gpm, "gmad"
+gpm = gpm
+ArgAssert = gpm.ArgAssert
+string = gpm.string
+table = gpm.table
 error = error
 type = type
 
-lib.VERSION = "1.0.0"
+lib = gpm.Table( gpm, "gmad", {
+    VERSION: "1.0.0"
+} )
 
 do
 
@@ -29,6 +33,7 @@ do
 
         lib.TypeExists = ( any ) ->
             return table_HasIValue( types, any )
+        lib.Types = types
 
     do
 
@@ -46,7 +51,7 @@ do
 
         lib.TagExists = ( any ) ->
             return table_HasIValue( tags, any )
-
+        lib.Tags = tags
 
 lib_IsAllowedFilePath = nil
 do
@@ -59,6 +64,7 @@ do
         "scripts/vehicles/*.txt",
         "resource/localization/*/*.properties",
         "maps/*.bsp",
+        "maps/*.lmp",
         "maps/*.nav",
         "maps/*.ain",
         "maps/thumb/*.png",
@@ -70,6 +76,7 @@ do
         "materials/*.png",
         "materials/*.jpg",
         "materials/*.jpeg",
+        "materials/colorcorrection/*.raw",
         "models/*.mdl",
         "models/*.vtx",
         "models/*.phy",
@@ -96,6 +103,7 @@ do
         "gamemodes/*/content/materials/*.png",
         "gamemodes/*/content/materials/*.jpg",
         "gamemodes/*/content/materials/*.jpeg",
+        "gamemodes/*/content/materials/colorcorrection/*.raw",
         "gamemodes/*/content/scenes/*.vcd",
         "gamemodes/*/content/particles/*.pcf",
         "gamemodes/*/content/resource/fonts/*.ttf",
@@ -107,14 +115,34 @@ do
         "gamemodes/*/content/maps/thumb/*.png",
         "gamemodes/*/content/sound/*.wav",
         "gamemodes/*/content/sound/*.mp3",
-        "gamemodes/*/content/sound/*.ogg"
+        "gamemodes/*/content/sound/*.ogg",
+
+        -- static version of the data/ folder
+        -- (because you wouldn't be able to modify these)
+        "data_static/*.txt",
+        "data_static/*.dat",
+        "data_static/*.json",
+        "data_static/*.xml",
+        "data_static/*.csv",
+        "data_static/*.dem",
+        "data_static/*.vcd",
+
+        "data_static/*.vtf",
+        "data_static/*.vmt",
+        "data_static/*.png",
+        "data_static/*.jpg",
+        "data_static/*.jpeg",
+
+        "data_static/*.mp3",
+        "data_static/*.wav",
+        "data_static/*.ogg"
     }
 
     -- Formatting to lua patterns
     do
         string_Replace = string.Replace
-        for index, str in ipairs( wildcard )
-            wildcard[ index ] = string_Replace( string_Replace( str, ".", "%." ), "*", ".+" )
+        for index, value in ipairs( wildcard )
+            wildcard[ index ] = string_Replace( string_Replace( value, ".", "%." ), "*", ".+" )
 
     string_find = string.find
     lib_IsAllowedFilePath = ( filePath ) ->
@@ -225,7 +253,7 @@ do
 
             fileHandle = file_Open( filePath, fileMode or "rb", gamePath )
             unless fileHandle
-                error "File cannot be open."
+                error "file read handler is missing, opening is impossible"
 
             @FilePath = filePath
             @GamePath = gamePath
@@ -247,7 +275,7 @@ do
         Parse: =>
             fileHandle = @File
             unless fileHandle
-                error "File is not oppened"
+                error "file read handler is missing, parsing is impossible"
 
             if File_Read( fileHandle, 4 ) ~= @Identity
                 error "File is not a gma"
@@ -264,10 +292,10 @@ do
 
             if version > 1
                 while not File_EndOfFile( fileHandle )
-                    contentName = File_ReadString( fileHandle )
-                    unless contentName
+                    value = File_ReadString( fileHandle )
+                    unless value
                         break
-                    @Required[ contentName ] = true
+                    @Required[ value ] = true
 
             @Title = File_ReadString( fileHandle )
             @Description = File_ReadString( fileHandle )
@@ -326,7 +354,7 @@ do
         Write: ( filePath, gamePath, doCRCs ) =>
             ok, result = @VerifyFiles!
             unless ok
-                error "'" .. result.FilePath .. "' file is not allowed by whitelist!"
+                error "file is not allowed by whitelist (" .. result.FilePath .. ")"
 
             fileHandle = @Open( filePath, gamePath, "wb" )
 
@@ -336,14 +364,9 @@ do
             File_WriteUInt64( fileHandle, tonumber( @SteamID ) or 0 )
             File_WriteUInt64( fileHandle, @Timestamp or os.time() )
 
-            hasRequired = false
-            for contentName in pairs( @Required )
-                File_WriteString( fileHandle, contentName )
-                unless hasRequired
-                    hasRequired = true
-
-            unless hasRequired
-                File_WriteByte( fileHandle, 0 )
+            for value in pairs( @Required )
+                File_WriteString( fileHandle, value )
+            File_WriteByte( fileHandle, 0 )
 
             File_WriteString( fileHandle, @Title )
             File_WriteString( fileHandle, @Description )
@@ -369,10 +392,8 @@ do
             for data in *files
                 content = data.Content
                 unless type( content ) == "string"
-                    error "file empty"
-
+                    error "file content must be a string (" .. data.FilePath .. ")"
                 File_Write( fileHandle, content )
-
             @Close!
 
             return true
@@ -382,12 +403,12 @@ do
 
             fileHandle = @File
             unless fileHandle
-                error "File is not oppened"
+                error "file read handler is missing, reading is not possible"
 
             files = @Files
             data = files[ index ]
             unless data
-                error "File is non exists."
+                error "requested file does not exist"
 
             File_Seek( fileHandle, files.Pointer + data.Position )
             data.Content = File_Read( fileHandle, data.Size )
@@ -396,7 +417,7 @@ do
         ReadFiles: =>
             fileHandle = @File
             unless fileHandle
-                error "File is not oppened"
+                error "file read handler is missing, reading is not possible"
 
             files = @Files
             pointer = files.Pointer
@@ -429,13 +450,13 @@ do
         ClearFiles: =>
             table_Empty( @files )
 
-        AddRequiredContent: ( contentName ) =>
-            ArgAssert( contentName, 1, "string" )
-            @requiredContent[ contentName ] = true
+        AddRequiredContent: ( value ) =>
+            ArgAssert( value, 1, "string" )
+            @requiredContent[ value ] = true
 
-        RemoveRequiredContent: ( contentName ) =>
-            ArgAssert( contentName, 1, "string" )
-            @requiredContent[ contentName ] = nil
+        RemoveRequiredContent: ( value ) =>
+            ArgAssert( value, 1, "string" )
+            @requiredContent[ value ] = nil
 
         ClearRequiredContent: =>
             table_Empty( @requiredContent )
