@@ -51,7 +51,10 @@ util.NextTick( () ->
 )
 
 http_timeout = CreateConVar( "http_timeout", "10", FCVAR_ARCHIVE, "Default http timeout for gpm http library.", 3, 300 )\GetInt!
-cvars.AddChangeCallback( "http_timeout", ( _, __, int ) -> http_timeout = tonumber( int ) or 10, "gLua Package Manager" )
+cvars.AddChangeCallback( "http_timeout"
+    ( _, __, int ) ->
+        http_timeout = tonumber( int ) or 10
+"gLua Package Manager" )
 
 request = ( parameters ) ->
     Logger\Debug( "%s HTTP request to '%s', using '%s', with timeout %d seconds.", parameters.method, parameters.url, clientName, parameters.timeout )
