@@ -2,17 +2,18 @@ SERVER = SERVER
 if SERVER
     AddCSLuaFile!
 
-http = http
 gpm = gpm
-_G = _G
-
-import util, metaworks, ArgAssert, Logger, Table from gpm
+ArgAssert = gpm.ArgAssert
+metaworks = gpm.metaworks
 promise_New = promise.New
+Logger = gpm.Logger
+util = gpm.util
 type = type
 
-lib = Table gpm, "http", metaworks.CreateLink( http, true )
+lib = gpm.Table( gpm, "http", metaworks.CreateLink( http, true ) )
 client, clientName = nil, nil
 do
+
     clients = {
         {
             Name: "Garry's Mod",
@@ -22,27 +23,25 @@ do
     }
 
     if SERVER
-        table.insert( clients, 1, {
+        table_insert = table.insert
+
+        table_insert( clients, 1, {
             Client: "CHTTP",
             Name: "chttp"
         } )
 
-        table.insert( clients, 1, {
+        table_insert( clients, 1, {
             Client: "reqwest",
             Name: "reqwest"
         } )
 
+    _G = _G
 
     for item in *clients
         if item.Installed or ( util.IsBinaryModuleInstalled( item.Name ) and pcall( require, item.Name ) )
             client, clientName = _G[ item.Client ], item.Name
             Logger\Info( "'%s' was connected as HTTP client.", item.Name )
             break
-
-
-request = ( parameters ) ->
-    Logger\Debug( "%s HTTP request to '%s', using '%s', with timeout %d seconds.", parameters.method, parameters.url, clientName, parameters.timeout )
-    client( parameters )
 
 queue = {}
 util.NextTick( () ->
@@ -52,9 +51,11 @@ util.NextTick( () ->
 )
 
 http_timeout = CreateConVar( "http_timeout", "10", FCVAR_ARCHIVE, "Default http timeout for gpm http library.", 3, 300 )\GetInt!
-cvars.AddChangeCallback( "http_timeout", ( _, __, int ) ->
-    http_timeout = tonumber( int ) or 10,
-"gLua Package Manager" )
+cvars.AddChangeCallback( "http_timeout", ( _, __, int ) -> http_timeout = tonumber( int ) or 10, "gLua Package Manager" )
+
+request = ( parameters ) ->
+    Logger\Debug( "%s HTTP request to '%s', using '%s', with timeout %d seconds.", parameters.method, parameters.url, clientName, parameters.timeout )
+    client( parameters )
 
 HTTP = ( parameters ) ->
     ArgAssert( parameters, 1, "table" )
@@ -71,18 +72,17 @@ HTTP = ( parameters ) ->
 
     if clientName == "reqwest"
         userAgent = lib.UserAgent
-        if not userAgent
+        unless userAgent
             userAgent = string.format( "GLua Package Manager/%s - Garry's Mod/%s", gpm.VERSION, VERSIONSTR )
             lib.UserAgent = userAgent
-
         parameters.headers["User-Agent"] = userAgent
 
     parameters.success = ( code, body, headers ) ->
-        p\Resolve {
+        p\Resolve( {
             headers: headers,
             body: body,
             code: code
-        }
+        } )
 
     parameters.failed = ( msg ) ->
         p\Reject( msg )
@@ -92,9 +92,7 @@ HTTP = ( parameters ) ->
             request( parameters )
     else
         request( parameters )
-
-    p
-
+    return p
 gpm.HTTP = HTTP
 
 lib.Fetch = ( url, headers, timeout ) ->
