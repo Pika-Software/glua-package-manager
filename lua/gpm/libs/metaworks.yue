@@ -6,9 +6,10 @@ rawget = rawget
 error = error
 type = type
 
-lib = gpm.Table( gpm, "metaworks", {
-    VERSION: "1.0.0"
-} )
+lib = gpm.Table( gpm, "metaworks", ->
+    return {
+        VERSION: "1.0.0"
+    } )
 
 lib.GetValue = table.Lookup
 

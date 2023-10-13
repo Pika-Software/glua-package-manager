@@ -10,7 +10,7 @@ Logger = gpm.Logger
 util = gpm.util
 type = type
 
-lib = gpm.Table( gpm, "http", metaworks.CreateLink( http, true ) )
+lib = gpm.Table( gpm, "http", metaworks.CreateLink, http, true )
 client, clientName = nil, nil
 do
 

@@ -3,9 +3,12 @@ if SERVER
 
 type = type
 gpm = gpm
+fs = gpm.fs
+paths = gpm.paths
+metaworks = gpm.metaworks
+Logger = gpm.Logger
 
-import fs, paths, metaworks, Logger, Table from gpm
-lib = Table gpm, "package", metaworks.CreateLink( package, true )
+lib = gpm.Table( gpm, "package", metaworks.CreateLink, package, true )
 
 class Package
     new: ( filePath ) =>

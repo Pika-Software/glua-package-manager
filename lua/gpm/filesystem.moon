@@ -4,8 +4,11 @@ if SERVER
 
 file = file
 gpm = gpm
-
-import string, paths, util, metaworks, Logger, Table from gpm
+util = gpm.util
+paths = gpm.paths
+string = gpm.string
+metaworks = gpm.metaworks
+Logger = gpm.Logger
 
 string_GetPathFromFilename = string.GetPathFromFilename
 File = FindMetaTable( "File" )
@@ -18,7 +21,7 @@ type = type
 if SERVER and not efsw and util.IsBinaryModuleInstalled( "efsw" ) and pcall( require, "efsw" )
     Logger\Info( "gm_efsw is initialized, package auto-reloading are available." )
 
-lib = Table gpm, "fs", metaworks.CreateLink( file, true )
+lib = gpm.Table( gpm, "fs", metaworks.CreateLink, file, true )
 lib.Move = file.Rename
 lib.Time = file.Time
 
