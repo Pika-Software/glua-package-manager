@@ -331,45 +331,47 @@ do
 
         sources = {
             {
-                Name: "gm_asyncio",
-                Available: util.IsBinaryModuleInstalled( "asyncio" ),
+                Name: "gm_asyncio"
+                Available: util.IsBinaryModuleInstalled( "asyncio" )
                 Get: ->
                     require( "asyncio" )
                     return {
-                        Append: asyncio.AsyncAppend,
-                        Write: asyncio.AsyncWrite,
+                        Append: asyncio.AsyncAppend
+                        Write: asyncio.AsyncWrite
                         Read: asyncio.AsyncRead
                     }
             },
             {
-                Name: "async_write",
-                Available: util.IsBinaryModuleInstalled( "async_write" ),
+                Name: "async_write"
+                Available: util.IsBinaryModuleInstalled( "async_write" )
                 Get: ->
                     require( "async_write" )
                     return {
-                        Append: file.AsyncAppen,
+                        Append: file.AsyncAppen
                         Write: file.AsyncWrite
                     }
             },
             {
-                Name: "Legacy Async",
-                Available: not MENU_DLL,
-                Get: -> {
+                Name: "Legacy Async"
+                Available: not MENU_DLL
+                Get: ->
+                    return {
                     Read: file.AsyncRead
                 }
             },
             {
-                Name: "Legacy",
-                Available: true,
-                Get: -> {
+                Name: "Legacy"
+                Available: true
+                Get: ->
+                    return {
                         Append: ( fileName, content, func ) ->
                             state = lib_Append( fileName, content, true ) and 0 or -1
                             func( fileName, "DATA", state )
-                            return state,
+                            return state
                         Write: ( fileName, content, func ) ->
                             state = lib_Write( fileName, content, "wb", true ) and 0 or -1
                             func( fileName, "DATA", state )
-                            return state,
+                            return state
                         Read: ( fileName, gamePath, func ) ->
                             ok, content = lib_Read( fileName, gamePath )
                             state = ok and 0 or -1
