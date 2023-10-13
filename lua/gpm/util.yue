@@ -10,154 +10,165 @@ ipairs = ipairs
 error = error
 type = type
 gpm = gpm
-_G = _G
 
-gpm_Table = ( parent, name, default ) ->
-    tbl = parent[ name ]
-    unless type( tbl ) == "table"
-        if type( default ) == "function"
-            default = default( parent, name )
-
-        tbl = default or {}
-        parent[ name ] = tbl
-    return tbl
+gpm_Table = ( tbl, name, func, ... ) ->
+    result = tbl[ name ]
+    if type( result ) ~= "table"
+        if func
+            result = func( ... )
+        else
+            result = { ... }
+        tbl[ name ] = result
+    return result
 gpm.Table = gpm_Table
 
-types = gpm_Table gpm, "Types", {
-    Indexes: {},
-    Names: {
-        [TYPE_PARTICLESYSTEM]: "CNewParticleEffect",
-        [TYPE_PROJECTEDTEXTURE]: "ProjectedTexture",
-        [TYPE_PIXELVISHANDLE]: "pixelvis_handle_t",
-        [TYPE_RECIPIENTFILTER]: "CRecipientFilter",
-        [TYPE_SOUNDHANDLE]: "IGModAudioChannel",
-        [TYPE_LIGHTUSERDATA]: "light userdata",
-        [TYPE_PARTICLEEMITTER]: "CLuaEmitter",
-        [TYPE_DAMAGEINFO]: "CTakeDamageInfo",
-        [TYPE_LOCOMOTION]: "CLuaLocomotion",
-        [TYPE_SURFACEINFO]: "SurfaceInfo",
-        [TYPE_PHYSCOLLIDE]: "PhysCollide",
-        [TYPE_EFFECTDATA]: "CEffectData",
-        [TYPE_PARTICLE]: "CLuaParticle",
-        [TYPE_NAVLADDER]: "CNavLadder",
-        [TYPE_VIDEO]: "IVideoWriter",
-        [TYPE_MATERIAL]: "IMaterial",
-        [TYPE_MOVEDATA]: "CMoveData",
-        [TYPE_PATH]: "PathFollower",
-        [TYPE_SOUND]: "CSoundPatch",
-        [TYPE_USERDATA]: "userdata",
-        [TYPE_FUNCTION]: "function",
-        [TYPE_TEXTURE]: "ITexture",
-        [TYPE_USERCMD]: "CUserCmd",
-        [TYPE_RESTORE]: "IRestore",
-        [TYPE_NAVAREA]: "CNavArea",
-        [TYPE_PHYSOBJ]: "PhysObj",
-        [TYPE_DLIGHT]: "dlight_t",
-        [TYPE_USERMSG]: "bf_read",
-        [TYPE_MATRIX]: "VMatrix",
-        [TYPE_CONVAR]: "ConVar",
-        [TYPE_VECTOR]: "Vector",
-        [TYPE_ENTITY]: "Entity",
-        [TYPE_THREAD]: "thread",
-        [TYPE_STRING]: "string",
-        [TYPE_NUMBER]: "number",
-        [TYPE_NONE]: "unknown",
-        [TYPE_BOOL]: "boolean",
-        [TYPE_IMESH]: "IMesh",
-        [TYPE_PANEL]: "Panel",
-        [TYPE_ANGLE]: "Angle",
-        [TYPE_COLOR]: "Color",
-        [TYPE_TABLE]: "table",
-        [TYPE_SAVE]: "ISave",
-        [TYPE_FILE]: "File",
-        [TYPE_NIL]: "nil"
-    }
-}
+types = gpm_Table( gpm, "Types", ->
+    return {
+        Indexes: {}
+        Names: {
+            [-1]: "unknown"
+            [0]: "nil"
+            [1]: "boolean"
+            [2]: "light userdata"
+            [3]: "number"
+            [4]: "string"
+            [5]: "table"
+            [6]: "function"
+            [7]: "userdata"
+            [8]: "thread"
+            [9]: "Entity"
+            [10]: "Vector"
+            [11]: "Angle"
+            [12]: "PhysObj"
+            [13]: "ISave"
+            [14]: "IRestore"
+            [15]: "CTakeDamageInfo"
+            [16]: "CEffectData"
+            [17]: "CMoveData"
+            [18]: "CRecipientFilter"
+            [19]: "CUserCmd"
+            [21]: "IMaterial"
+            [22]: "Panel"
+            [23]: "CLuaParticle"
+            [24]: "CLuaEmitter"
+            [25]: "ITexture"
+            [26]: "bf_read"
+            [27]: "ConVar"
+            [28]: "IMesh"
+            [29]: "VMatrix"
+            [30]: "CSoundPatch"
+            [31]: "pixelvis_handle_t"
+            [32]: "dlight_t"
+            [33]: "IVideoWriter"
+            [34]: "File"
+            [35]: "CLuaLocomotion"
+            [36]: "PathFollower"
+            [37]: "CNavArea"
+            [38]: "IGModAudioChannel"
+            [39]: "CNavLadder"
+            [40]: "CNewParticleEffect"
+            [41]: "ProjectedTexture"
+            [42]: "PhysCollide"
+            [43]: "SurfaceInfo"
+            [255]: "Color"
+        }
+    } )
 
 typeNames = types.Names
 indexes = types.Indexes
 
+gpm_type = nil
 do
 
     TYPE_USERDATA = TYPE_USERDATA
     TYPE_TABLE = TYPE_TABLE
     TypeID = TypeID
 
-    gpm.TypeID = ( any ) ->
+    gpm_TypeID = ( any ) ->
         id = TypeID any
         if id == TYPE_TABLE or id == TYPE_USERDATA
             for data in *indexes
-                if data[ 1 ]( any )
-                    return data[ 2 ]
+                unless data[ 1 ]( any )
+                    continue
+                return data[ 2 ]
+        return id
+    gpm.TypeID = gpm_TypeID
 
-        id
+    gpm_type = ( any ) ->
+        return typeNames[ gpm_TypeID( any ) ] or "unknown"
+    gpm.type = gpm_type
 
-do
-    gpm_TypeID = gpm.TypeID
-    gpm.type = ( any ) -> typeNames[ gpm_TypeID( any ) ] or "unknown"
+string = gpm_Table( gpm, "string", ->
+    return setmetatable( {}, { __index: string } )
+)
 
-string = gpm_Table gpm, "string", setmetatable( {}, { __index: _G.string } )
 string.StartsWith = string.StartsWith or string.StartWith
 
 do
     string_match = string.match
     string.IsURL = ( str ) ->
-        string_match( str, "^https?://.+$" ) ~= nil
+        if string_match( str, "[a-z]+://[^ >,;]+" ) ~= nil
+            return true
+        return false
 
 string_format = string.format
 string_lower = string.lower
 string_sub = string.sub
 
-debug = gpm_Table gpm, "debug", setmetatable( {}, { __index: _G.debug } )
+debug = gpm_Table( gpm, "debug", ->
+    return setmetatable( {}, { __index: debug } )
+)
+
 debug.fempty = ->
-debug_getinfo = debug.getinfo
 debug.fcall = ( func, ... ) ->
     return func( ... )
+debug_getinfo = debug.getinfo
 
-do
-    gpm_type = gpm.type
-    gpm.ArgAssert = ( value, argNum, expected, errorlevel ) ->
-        valueType, expectedType = gpm_type( value ), gpm_type( expected )
-        if expectedType == "table"
-            str, len = "[ ", #expected
-            for index = 1, len
-                typeName = expected[ index ]
+gpm_ArgAssert = ( value, argNum, expected, errorlevel ) ->
+    valueType, expectedType = gpm_type( value ), gpm_type( expected )
+    if expectedType == "table"
+        str, len = "[ ", #expected
+        for index = 1, len
+            typeName = expected[ index ]
 
-                if valueType == typeName
-                    return value
-                elseif index ~= len
-                    str = str .. typeName .. ", "
-
-            expected = str .. " ]"
-        elseif expectedType == "function"
-            expected = expected( value, argNum )
-            if type( expected ) ~= "string"
+            if valueType == typeName
                 return value
-        elseif valueType == expected
+            elseif index ~= len
+                str = str .. typeName .. ", "
+
+        expected = str .. " ]"
+    elseif expectedType == "function"
+        expected = expected( value, argNum )
+        if type( expected ) ~= "string"
             return value
+    elseif valueType == expected
+        return value
 
-        dinfo = debug_getinfo( 2, "n" )
-        error( string_format( "bad argument #%d to \'%s\' (%s expected, got %s)", argNum, dinfo and dinfo.name or "func", expected, valueType ), errorlevel or 3 )
+    dinfo = debug_getinfo( 2, "n" )
+    error( string_format( "bad argument #%d to \'%s\' (%s expected, got %s)", argNum, dinfo and dinfo.name or "func", expected, valueType ), errorlevel or 2 )
+gpm.ArgAssert = gpm_ArgAssert
 
-table = gpm_Table gpm, "table", setmetatable( {}, { __index: _G.table } )
-table_remove = table.remove
-string_Split = string.Split
+table = gpm_Table( gpm, "table", ->
+    return setmetatable( {}, { __index: table } )
+)
 
 table.HasIValue = ( tbl, any ) ->
-    for value in *tbl do
+    for value in *tbl
         if value == any
             return true
     return false
 
+table_remove = table.remove
 table.RemoveByIValue = ( tbl, any ) ->
     for index, value in ipairs( tbl )
         if value == any
             return table_remove( tbl, index )
 
+string_Split = string.Split
 table.Lookup = ( tbl, str, default ) ->
     for key in *string_Split( str, "." )
         tbl = tbl[ key ]
-        if not tbl
+        unless tbl
             return default
     return tbl
 
@@ -214,34 +225,31 @@ table.RemoveByFunction = ( tbl, func ) ->
 
 table.unpack = unpack
 
-metaworks = include "libs/metaworks.lua"
-gpm_ArgAssert = gpm.ArgAssert
-
 gpm_AddType = ( typeName, func ) ->
     gpm_ArgAssert( typeName, 1, "string" )
     gpm_ArgAssert( func, 2, "function" )
 
     nextIndex = 256
-    for key, name in pairs typeNames
+    for key, name in pairs( typeNames )
         if typeName == name
             nextIndex = key
             break
         elseif key >= nextIndex
             nextIndex = key + 1
-
     typeNames[ nextIndex ] = typeName
 
-    for index, data in ipairs indexes
+    for index, data in ipairs( indexes )
         if nextIndex == data[ 2 ]
             table_remove( indexes, index )
             break
 
-    indexes[ #indexes + 1 ] = { func, nextIndex }
+    indexes[] = { func, nextIndex }
     return nextIndex
-
 gpm.AddType = gpm_AddType
+
 getmetatable = getmetatable
 
+gpm_IsColor = nil
 do
 
     meta = FindMetaTable( "Color" )
@@ -249,50 +257,49 @@ do
     gpm_IsColor = ( any ) ->
         if getmetatable( any ) == meta
             return true
-
-        if type( any ) == "table"
+        elseif type( any ) == "table"
             return type( any.r ) == "number" and type( any.g ) == "number" and type( any.b ) == "number"
-
         return false
-
     gpm_AddType( "Color", gpm_IsColor )
     gpm.IsColor = gpm_IsColor
 
-paths = gpm_Table gpm, "paths"
+paths = gpm_Table( gpm, "paths" )
 string_gsub = string.gsub
-paths_Fix = ( filePath ) -> string_lower( string_gsub( filePath, "[/\\]+", "/" ) )
+
+paths_Fix = ( filePath ) ->
+    return string_lower( string_gsub( filePath, "[/\\]+", "/" ) )
 paths.Fix = paths_Fix
 
 paths.Join = ( ... ) ->
-    args, filePath = { ... }
-    len = #args
+    arguments, filePath = { ... }, nil
+    length = #arguments
 
-    for i = 1, len do
+    for index = 1, length
         if filePath ~= nil
-            filePath = filePath .. args[ i ]
+            filePath = filePath .. arguments[ index ]
         else
-            filePath = args[ i ]
-
-        if i == len then
+            filePath = arguments[ index ]
+        if index == length
             return paths_Fix( filePath )
-
         filePath = filePath .. "/"
 
 paths_Localize = ( filePath ) ->
-    return string_gsub( string_gsub( string_gsub( filePath, "^cache/moonloader/", "" ), "^addons/[%w%-_]-/", "" ), "^lua/", "" )
+    return string_gsub( string_gsub( string_gsub( filePath, "^cache/%w+/", "" ), "^addons/[%w%-_]-/", "" ), "^lua/", "" )
 paths.Localize = paths_Localize
 
 debug.getfpath = ->
     for i = 2, 6
         info = debug_getinfo( i, "S" )
-        if not info
+        unless info
             break
 
         if info.what == "main"
-            return paths_Localize paths_Fix info.short_src
+            return paths_Localize( paths_Fix( info.short_src ) )
 
 do
+
     string_GetExtensionFromFilename = string.GetExtensionFromFilename
+
     paths.ToLua = ( filePath ) ->
         extension = string_GetExtensionFromFilename( filePath )
         if extension ~= "lua"
@@ -304,29 +311,34 @@ do
 
 do
 
-    util = gpm_Table gpm, "util", metaworks.CreateLink _G.util, true
-    tonumber = tonumber
+    util = gpm_Table( gpm, "util", ->
+        return setmetatable( {}, { __index: util } )
+    )
 
-    util.Version = ( number ) ->
-        if not number
-            return "unknown"
+    do
+        tonumber = tonumber
+        util.Version = ( number ) ->
+            unless number
+                return "unknown"
+            elseif type( number ) == "string"
+                return number
 
-        if type( number ) == "string"
-            return number
-
-        version = string_format( "%06d", number )
-        return string_format( "%d.%d.%d", tonumber( string_sub( version, 0, 2 ) ), tonumber( string_sub( version, 3, 4 ) ), tonumber( string_sub( version, 5 ) ) )
+            version = string_format( "%06d", number )
+            return string_format( "%d.%d.%d", tonumber( string_sub( version, 0, 2 ) ), tonumber( string_sub( version, 3, 4 ) ), tonumber( string_sub( version, 5 ) ) )
 
     do
         timer_Simple = timer.Simple
         util.NextTick = ( func, a, b, c, d ) ->
             gpm_ArgAssert( func, 1, "function" )
-            timer_Simple( 0, () -> func( a, b, c, d ) )
+            timer_Simple( 0, ->
+                func( a, b, c, d )
+            )
 
     file_Exists = file.Exists
-    util.IsLuaModuleInstalled = ( name ) -> file_Exists( "includes/modules/" .. name .. ".lua", "LUA" )
+    util.IsLuaModuleInstalled = ( name ) ->
+        return file_Exists( "includes/modules/" .. name .. ".lua", "LUA" )
 
-    isWindows, isLinux = system.IsWindows(), system.IsLinux()
+    isWindows, isLinux = system.IsWindows!, system.IsLinux!
     jit_versionnum, jit_arch = jit.versionnum, jit.arch
 
     suffix = ( { "osx64", "osx", "linux64", "linux", "win64", "win32" } )[ ( isWindows and 4 or 0 ) + ( isLinux and 2 or 0 ) + ( jit_arch == "x86" and 1 or 0 ) + 1 ]
@@ -334,13 +346,10 @@ do
 
     util.IsBinaryModuleInstalled = ( name ) ->
         gpm_ArgAssert( name, 1, "string" )
-
-        if file_Exists( string_format( fmt, name, suffix ), "GAME" ) then
+        if file_Exists( string_format( fmt, name, suffix ), "GAME" )
             return true
-
-        if jit_versionnum ~= 20004 and jit_arch == "x86" and isLinux then
+        elseif jit_versionnum ~= 20004 and jit_arch == "x86" and isLinux
             return file_Exists( string_format( fmt, name, "linux32" ), "GAME" )
-
         return false
 
     do
@@ -352,23 +361,27 @@ do
             moonloader_ToLua = moonloader.ToLua
 
         util.CompileMoonString = ( moonCode, identifier, handleError ) ->
-            if not moonloader_ToLua
-                error "Attempting to compile a Moonscript file fails, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader."
+            unless moonloader_ToLua
+                error( "Attempting to compile a Moonscript file fails, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader." )
 
-            luaCode, msg = moonloader_ToLua moonCode
+            luaCode, msg = moonloader_ToLua( moonCode )
             msg = msg or "MoonScript to Lua code compilation failed."
-            if not luaCode
-                error msg
 
-            func = CompileString luaCode, identifier, handleError
+            unless luaCode
+                error( msg )
+
+            func = CompileString( luaCode, identifier, handleError )
             if type( func ) ~= "function"
-                error msg
+                error( msg )
 
             return func
 
 do
 
-    math = gpm_Table gpm, "math", metaworks.CreateLink _G.math, true
+    math = gpm_Table( gpm, "math", ->
+        return setmetatable( {}, { __index: math } )
+    )
+
     math.inf = 1 / 0
     math.nan = 0 / 0
 
@@ -423,19 +436,19 @@ do
 
     Color = Color
 
-    colors = gpm_Table gpm, "Colors", {
-        SecondaryText: Color 150, 150, 150,
-        PrimaryText: Color 200, 200, 200,
-        White: Color 255, 255, 255,
-        Info: Color 70, 135, 255,
-        Warn: Color 255, 130, 90,
-        Error: Color 250, 55, 40,
-        Debug: Color 0, 200, 150,
-        gpm: Color 180, 180, 255
-    }
+    colors = gpm_Table( gpm, "Colors", ->
+        return {
+            SecondaryText: Color 150, 150, 150,
+            PrimaryText: Color 200, 200, 200,
+            White: Color 255, 255, 255,
+            Info: Color 70, 135, 255,
+            Warn: Color 255, 130, 90,
+            Error: Color 250, 55, 40,
+            Debug: Color 0, 200, 150,
+            gpm: Color 180, 180, 255
+        } )
 
-    whiteColor = colors.White
-    state, stateColor = gpm.State, colors.State
+    state, stateColor, whiteColor = gpm.State, colors.State, colors.White
     if type( state ) ~= "string"
         if MENU_DLL
             state, stateColor = "Menu", Color 75, 175, 80
@@ -445,11 +458,12 @@ do
             state, stateColor = "Server", Color 5, 170, 250
         gpm.State, colors.State = state or "unknown", stateColor or whiteColor
 
-    debugFilter = () -> gpm.Developer > 0
+    debugFilter = ->
+        return gpm.Developer > 0
+
     primaryTextColor = colors.PrimaryText
     secondaryTextColor = colors.SecondaryText
     state = string.upper( state )
-    gpm_IsColor = gpm.IsColor
     os_date = os.date
     select = select
     MsgC = MsgC
@@ -513,11 +527,10 @@ do
     gpm.LOGGER = meta
 
     gpm_IsLogger = ( any ) ->
-        getmetatable( any ) == meta
+        return getmetatable( any ) == meta
 
     gpm.AddType( "Logger", gpm_IsLogger )
     gpm.IsLogger = gpm_IsLogger
 
     logger = Logger "gpm@" .. gpm.VERSION, colors.gpm
     gpm.Logger = logger
-    logger\Info "metaworks v%s is initialized.", metaworks.VERSION
