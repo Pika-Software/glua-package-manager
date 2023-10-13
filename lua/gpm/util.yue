@@ -523,14 +523,12 @@ do
             if @DebugFilter( str, ... ) then
                 @Log( debugColor, "DEBUG", str, ... )
 
-    meta = Logger.__index
-    gpm.LOGGER = meta
+    do
+        meta = Logger.__base
+        gpm_IsLogger = ( any ) ->
+            return getmetatable( any ) == meta
+        gpm.IsLogger = gpm_IsLogger
+        gpm.AddType( "Logger", gpm_IsLogger )
 
-    gpm_IsLogger = ( any ) ->
-        return getmetatable( any ) == meta
-
-    gpm.AddType( "Logger", gpm_IsLogger )
-    gpm.IsLogger = gpm_IsLogger
-
-    logger = Logger "gpm@" .. gpm.VERSION, colors.gpm
-    gpm.Logger = logger
+    gpm.Logger = Logger( "gpm@" .. gpm.VERSION, colors.gpm )
+    gpm.CreateLogger = Logger
