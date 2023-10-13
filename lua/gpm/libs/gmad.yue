@@ -8,9 +8,10 @@ table = gpm.table
 error = error
 type = type
 
-lib = gpm.Table( gpm, "gmad", {
-    VERSION: "1.0.0"
-} )
+lib = gpm.Table( gpm, "gmad", ->
+    return {
+        VERSION: "1.0.0"
+    } )
 
 do
 
