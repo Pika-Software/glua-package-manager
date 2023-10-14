@@ -145,7 +145,7 @@ gpm_ArgAssert = ( value, argNum, expected, errorlevel ) ->
         return value
 
     dinfo = debug_getinfo( 2, "n" )
-    error( string_format( "bad argument #%d to \'%s\' (%s expected, got %s)", argNum, dinfo and dinfo.name or "func", expected, valueType ), errorlevel or 2 )
+    error( string_format( "bad argument #%d to \'%s\' (%s expected, got %s)", argNum, dinfo and dinfo.name or "func", expected, valueType ), errorlevel or 3 )
 gpm.ArgAssert = gpm_ArgAssert
 
 table = gpm_Table( gpm, "table", ->
@@ -311,6 +311,15 @@ do
 
 do
 
+    math = gpm_Table( gpm, "math", ->
+        return setmetatable( {}, { __index: math } )
+    )
+
+    math.inf = 1 / 0
+    math.nan = 0 / 0
+
+do
+
     util = gpm_Table( gpm, "util", ->
         return setmetatable( {}, { __index: util } )
     )
@@ -334,23 +343,26 @@ do
                 func( a, b, c, d )
             )
 
-    file_Exists = file.Exists
-    util.IsLuaModuleInstalled = ( name ) ->
-        return file_Exists( "includes/modules/" .. name .. ".lua", "LUA" )
+    do
 
-    isWindows, isLinux = system.IsWindows!, system.IsLinux!
-    jit_versionnum, jit_arch = jit.versionnum, jit.arch
+        file_Exists = file.Exists
 
-    suffix = ( { "osx64", "osx", "linux64", "linux", "win64", "win32" } )[ ( isWindows and 4 or 0 ) + ( isLinux and 2 or 0 ) + ( jit_arch == "x86" and 1 or 0 ) + 1 ]
-    fmt = "lua/bin/gm" .. ( ( CLIENT and not MENU_DLL ) and "cl" or "sv" ) .. "_%s_%s.dll"
+        util.IsLuaModuleInstalled = ( name ) ->
+            return file_Exists( "includes/modules/" .. name .. ".lua", "LUA" )
 
-    util.IsBinaryModuleInstalled = ( name ) ->
-        gpm_ArgAssert( name, 1, "string" )
-        if file_Exists( string_format( fmt, name, suffix ), "GAME" )
-            return true
-        elseif jit_versionnum ~= 20004 and jit_arch == "x86" and isLinux
-            return file_Exists( string_format( fmt, name, "linux32" ), "GAME" )
-        return false
+        isWindows, isLinux = system.IsWindows!, system.IsLinux!
+        jit_versionnum, jit_arch = jit.versionnum, jit.arch
+
+        suffix = ( { "osx64", "osx", "linux64", "linux", "win64", "win32" } )[ ( isWindows and 4 or 0 ) + ( isLinux and 2 or 0 ) + ( jit_arch == "x86" and 1 or 0 ) + 1 ]
+        fmt = "lua/bin/gm" .. ( ( CLIENT and not MENU_DLL ) and "cl" or "sv" ) .. "_%s_%s.dll"
+
+        util.IsBinaryModuleInstalled = ( name ) ->
+            gpm_ArgAssert( name, 1, "string" )
+            if file_Exists( string_format( fmt, name, suffix ), "GAME" )
+                return true
+            elseif jit_versionnum ~= 20004 and jit_arch == "x86" and isLinux
+                return file_Exists( string_format( fmt, name, "linux32" ), "GAME" )
+            return false
 
     do
 
@@ -376,152 +388,173 @@ do
 
             return func
 
-do
+    do
 
-    math = gpm_Table( gpm, "math", ->
-        return setmetatable( {}, { __index: math } )
-    )
+        string_byte = string.byte
+        string_len = string.len
+        math_Clamp = math.Clamp
 
-    math.inf = 1 / 0
-    math.nan = 0 / 0
+        class ByteStream
+            new: ( data ) =>
+                @Data = data
+                @Pointer = 1
+                @Length = string_len( data )
 
-do
+            Close: =>
+                @Pointer = 1
+                @Length = 0
+                @Data = ""
 
-    meta = FindMetaTable( "File" )
+            Size: =>
+                return @Length
 
-    meta_WriteULong = meta.WriteULong
-    meta_ReadULong = meta.ReadULong
-    meta_WriteByte = meta.WriteByte
-    meta_EndOfFile = meta.EndOfFile
-    meta_ReadByte = meta.ReadByte
-    meta_Write = meta.Write
-    meta_Read = meta.Read
-    meta_Seek = meta.Seek
-    meta_Skip = meta.Skip
-    meta_Tell = meta.Tell
+            Tell: =>
+                return @Pointer
 
-    meta.SkipEmpty = ( fileHandle ) ->
-        while not meta_EndOfFile( fileHandle ) do
-            if meta_ReadByte( fileHandle ) ~= 0 then
-                meta_Skip( fileHandle, -1 )
-                break
+            Seek: ( pos ) =>
+                @Pointer = math_Clamp( pos or 1, 1, @Length )
 
-    meta.ReadString = ( fileHandle ) ->
-        startPos, len = meta_Tell( fileHandle ), 0
+            Skip: ( length ) =>
+                @Seek( @Pointer + ( length or 1 ) )
 
-        while not meta_EndOfFile( fileHandle ) and meta_ReadByte( fileHandle ) ~= 0 do
-            len = len + 1
+            EndOfFile: =>
+                return @Pointer >= @Length
 
-        meta_Seek( fileHandle, startPos )
-        data = meta_Read( fileHandle, len )
-        meta_Skip( fileHandle, 1 )
-        return data
+            ReadByte: ( length ) =>
+                pointer = @Pointer
+                @Skip( length )
+                return string_byte( @Data, pointer, length )
 
-    meta.WriteString = ( fileHandle, str ) ->
-        meta_Write( fileHandle, str )
-        meta_WriteByte( fileHandle, 0 )
+            ReadBool: =>
+                return @ReadByte! ~= 0
 
-    unless meta.ReadUInt64
-        meta.ReadUInt64 = ( fileHandle ) ->
-            number = meta_ReadULong( fileHandle )
-            meta_Skip( fileHandle, 4 )
-            return number
+            Read: ( length ) =>
+                data, pointer, fileLength, result = @Data, @Pointer, @Length, nil
+                while ( length > 0 and pointer < fileLength )
+                    unless result
+                        result = data[ pointer ]
+                    else
+                        result = result .. data[ pointer ]
+                    length -= 1
+                    pointer += 1
+                @Seek( pointer )
+                return result
 
-    unless meta.WriteUInt64
-        meta.WriteUInt64 = ( fileHandle, number ) ->
-            meta_WriteULong( fileHandle, number )
-            meta_WriteULong( fileHandle, 0 )
+            ReadUInt: ( length ) =>
+                uInt = 0
+                for i = 1, length
+                    uInt = uInt + @ReadByte! * 0x100 ^ ( i - 1 )
+                return uInt
 
-do
+            ReadULong: =>
+                return @ReadUInt( 4 )
 
-    Color = Color
+            ReadUShort: =>
+                return @ReadUInt( 2 )
 
-    colors = gpm_Table( gpm, "Colors", ->
-        return {
-            SecondaryText: Color 150, 150, 150,
-            PrimaryText: Color 200, 200, 200,
-            White: Color 255, 255, 255,
-            Info: Color 70, 135, 255,
-            Warn: Color 255, 130, 90,
-            Error: Color 250, 55, 40,
-            Debug: Color 0, 200, 150,
-            gpm: Color 180, 180, 255
-        } )
+            ReadString: =>
+                startPos, length = @Tell!, -1
 
-    state, stateColor, whiteColor = gpm.State, colors.State, colors.White
-    if type( state ) ~= "string"
-        if MENU_DLL
-            state, stateColor = "Menu", Color 75, 175, 80
-        elseif CLIENT
-            state, stateColor = "Client", Color 225, 170, 10
-        elseif SERVER
-            state, stateColor = "Server", Color 5, 170, 250
-        gpm.State, colors.State = state or "unknown", stateColor or whiteColor
+                while not @EndOfFile! and @ReadByte! ~= 0
+                    length += 1
 
-    debugFilter = ->
-        return gpm.Developer > 0
+                @Seek( startPos )
+                data = @Read( length )
+                @Skip( 1 )
+                return data
 
-    primaryTextColor = colors.PrimaryText
-    secondaryTextColor = colors.SecondaryText
-    state = string.upper( state )
-    os_date = os.date
-    select = select
-    MsgC = MsgC
+        util.ByteStream = ByteStream
 
-    infoColor = colors.Info
-    warnColor = colors.Warn
-    errorColor = colors.Error
-    debugColor = colors.Debug
+    do
 
-    class Logger
-        __tostring: () => "Logger [" .. @GetName! .. "]"
+        Color = Color
 
-        new: ( name, color, func ) =>
-            @DebugFilter = type( func ) == "function" and func or debugFilter
-            @Name = type( name ) == "string" and name or "unknown"
-            @Color = gpm_IsColor( color ) and color or whiteColor
-            @TextColor = primaryTextColor
+        colors = gpm_Table( gpm, "Colors", ->
+            return {
+                SecondaryText: Color( 150, 150, 150 )
+                PrimaryText: Color( 200, 200, 200 )
+                White: Color( 255, 255, 255 )
+                Info: Color( 70, 135, 255 )
+                Warn: Color( 255, 130, 90 )
+                Error: Color( 250, 55, 40 )
+                Debug: Color( 0, 200, 150 )
+                gpm: Color( 180, 180, 255 )
+            } )
 
-        GetName: => @Name
-        SetName: ( str ) =>
-            gpm_ArgAssert( str, 1, "string" )
-            @Name = str
+        state, stateColor, whiteColor = gpm.State, colors.State, colors.White
+        if type( state ) ~= "string"
+            if MENU_DLL
+                state, stateColor = "Menu", Color( 75, 175, 80 )
+            elseif CLIENT
+                state, stateColor = "Client", Color( 225, 170, 10 )
+            elseif SERVER
+                state, stateColor = "Server", Color( 5, 170, 250 )
+            gpm.State, colors.State = state or "unknown", stateColor or whiteColor
 
-        GetColor: => @Color
-        SetColor: ( color ) =>
-            gpm_ArgAssert( color, 1, "Color" )
-            @Color = color
+        debugFilter = ->
+            return gpm.Developer > 0
 
-        GetTextColor: => @TextColor
-        SetTextColor: ( color ) =>
-            gpm_ArgAssert( color, 1, "Color" )
-            @TextColor = color
+        primaryTextColor = colors.PrimaryText
+        secondaryTextColor = colors.SecondaryText
+        state = string.upper( state )
+        os_date = os.date
+        select = select
+        MsgC = MsgC
 
-        GetDebugFilter: => @DebugFilter
-        SetDebugFilter: ( func ) =>
-            gpm_ArgAssert( func, 1, "function" )
-            @DebugFilter = func
+        infoColor = colors.Info
+        warnColor = colors.Warn
+        errorColor = colors.Error
+        debugColor = colors.Debug
 
-        Log: ( color, level, str, ... ) =>
-            gpm_ArgAssert( color, 1, "Color" )
-            gpm_ArgAssert( level, 2, "string" )
+        class Logger
+            __tostring: () => "Logger [" .. @GetName! .. "]"
 
-            if select( "#", ... ) > 0
-                str = string_format( str, ... )
-            MsgC( secondaryTextColor, os_date( "%d-%m-%Y %H:%M:%S " ), stateColor, "[" .. state .. "] ", color, level, secondaryTextColor, " --> ", @Color, @Name, secondaryTextColor, " : ", @TextColor, str, "\n" )
+            new: ( name, color, func ) =>
+                @DebugFilter = type( func ) == "function" and func or debugFilter
+                @Name = type( name ) == "string" and name or "unknown"
+                @Color = gpm_IsColor( color ) and color or whiteColor
+                @TextColor = primaryTextColor
 
-        Info: ( str, ... ) =>
-            @Log( infoColor, "INFO ", str, ... )
+            GetName: => @Name
+            SetName: ( str ) =>
+                gpm_ArgAssert( str, 1, "string" )
+                @Name = str
 
-        Warn: ( str, ... ) =>
-            @Log( warnColor, "WARN ", str, ... )
+            GetColor: => @Color
+            SetColor: ( color ) =>
+                gpm_ArgAssert( color, 1, "Color" )
+                @Color = color
 
-        Error: ( str, ... ) =>
-            @Log( errorColor, "ERROR", str, ... )
+            GetTextColor: => @TextColor
+            SetTextColor: ( color ) =>
+                gpm_ArgAssert( color, 1, "Color" )
+                @TextColor = color
 
-        Debug: ( str, ... ) =>
-            if @DebugFilter( str, ... ) then
-                @Log( debugColor, "DEBUG", str, ... )
+            GetDebugFilter: => @DebugFilter
+            SetDebugFilter: ( func ) =>
+                gpm_ArgAssert( func, 1, "function" )
+                @DebugFilter = func
 
-    gpm.LoggerClass = Logger
-    gpm.Logger = Logger( "gpm@" .. gpm.VERSION, colors.gpm )
+            Log: ( color, level, str, ... ) =>
+                gpm_ArgAssert( color, 1, "Color" )
+                gpm_ArgAssert( level, 2, "string" )
+
+                if select( "#", ... ) > 0
+                    str = string_format( str, ... )
+                MsgC( secondaryTextColor, os_date( "%d-%m-%Y %H:%M:%S " ), stateColor, "[" .. state .. "] ", color, level, secondaryTextColor, " --> ", @Color, @Name, secondaryTextColor, " : ", @TextColor, str, "\n" )
+
+            Info: ( str, ... ) =>
+                @Log( infoColor, "INFO ", str, ... )
+
+            Warn: ( str, ... ) =>
+                @Log( warnColor, "WARN ", str, ... )
+
+            Error: ( str, ... ) =>
+                @Log( errorColor, "ERROR", str, ... )
+
+            Debug: ( str, ... ) =>
+                if @DebugFilter( str, ... ) then
+                    @Log( debugColor, "DEBUG", str, ... )
+
+        gpm.Logger = Logger( "gpm@" .. gpm.VERSION, colors.gpm )
+        util.Logger = Logger
