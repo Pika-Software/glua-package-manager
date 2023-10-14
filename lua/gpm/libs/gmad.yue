@@ -170,6 +170,7 @@ do
     File_ReadLong = File.ReadLong
     File_Write = File.Write
     File_Close = File.Close
+    File_Size = File.Size
     File_Seek = File.Seek
     File_Read = File.Read
     File_Tell = File.Tell
@@ -178,6 +179,7 @@ do
     table_Empty = table.Empty
     string_len = string.len
     file_Open = file.Open
+    util_CRC = util.CRC
     tostring = tostring
     tonumber = tonumber
 
@@ -186,7 +188,7 @@ do
         Version: 3
 
         __tostring: =>
-            return "GMA File \'" .. @title .. "\'"
+            return "Garry's Mod Addon File \'" .. @title .. "\'"
 
         new: =>
             @Title = "unknown"
@@ -196,7 +198,9 @@ do
             @Timestamp = 0
             @Required = {}
             @SteamID = ""
+            @RealCRC = 0
             @Files = {}
+            @CRC = 0
 
         GetTitle: =>
             return @Title
@@ -254,14 +258,11 @@ do
 
             fileHandle = file_Open( filePath, fileMode or "rb", gamePath )
             unless fileHandle
-                error "file read handler is missing, opening is impossible"
+                error( "file read handler is missing, opening is impossible" )
 
             @FilePath = filePath
             @GamePath = gamePath
             @File = fileHandle
-
-            if not fileMode or fileMode == "rb"
-                @Parse!
 
             return fileHandle
 
@@ -273,21 +274,22 @@ do
                 return true
             return false
 
-        Parse: =>
+        Parse: ( doCRCs ) =>
             fileHandle = @File
             unless fileHandle
-                error "file read handler is missing, parsing is impossible"
+                error( "file read handler is missing, parsing is impossible" )
+
+            File_Seek( fileHandle, 0 )
+            doCRCs = doCRCs ~= false
 
             if File_Read( fileHandle, 4 ) ~= @Identity
-                error "File is not a gma"
+                error( "File is not a gma" )
 
             version = File_ReadByte( fileHandle )
             if version > @Version
-                error "gma version is unsupported"
+                error( "gma version is unsupported" )
 
-            @File = fileHandle
             @Version = version
-
             @SteamID = tostring( File_ReadUInt64( fileHandle ) )
             @Timestamp = File_ReadUInt64( fileHandle )
 
@@ -324,20 +326,51 @@ do
 
             files.Pointer = File_Tell( fileHandle )
 
-        Read: ( filePath, gamePath, readFiles ) =>
+            unless doCRCs
+                return
+
+            contentSize = File_Size( fileHandle ) - 4
+            File_Seek( fileHandle, contentSize )
+
+            crc = File_ReadULong( fileHandle )
+            unless crc
+                return
+
+            @CRC = crc
+            File_Seek( fileHandle, 0 )
+            @RealCRC = tonumber( util_CRC( File_Read( fileHandle, contentSize ) ) )
+
+        Read: ( filePath, gamePath, readFiles, doCRCs ) =>
             table_Empty( @Required )
             table_Empty( @Files )
 
-            @Open( filePath, gamePath )
+            @Open( filePath, gamePath, "rb" )
+            @Parse( doCRCs )
 
             if readFiles
-                @ReadFiles!
+                @ReadFiles( doCRCs )
             @Close!
 
         VerifyCRC: =>
+            crc = @CRC
+            if crc == 0
+                return true
+            return crc == @RealCRC
+
+        VerifyFilesCRC: =>
             for data in *@Files
-                crc, content = data.CRC, data.Content
-                if crc and content and crc ~= tonumber( util.CRC( content ) )
+                crc = data.CRC
+                unless crc
+                    continue
+
+                realCRC = data.RealCRC
+                unless realCRC
+                    content = data.Content
+                    if content
+                        realCRC = tonumber( util_CRC( content ) )
+                        data.RealCRC = realCRC
+
+                if crc ~= realCRC
                     return false, data
             return true
 
@@ -355,10 +388,13 @@ do
         Write: ( filePath, gamePath, doCRCs ) =>
             ok, result = @VerifyFiles!
             unless ok
-                error "file is not allowed by whitelist (" .. result.FilePath .. ")"
+                error( "file is not allowed by whitelist (" .. result.FilePath .. ")" )
 
             fileHandle = @Open( filePath, gamePath, "wb" )
+            unless fileHandle
+                error( "file read handler is missing, opening is impossible" )
 
+            doCRCs = doCRCs ~= false
             File_Write( fileHandle, @Identity )
             File_WriteByte( fileHandle, @Version )
 
@@ -384,18 +420,34 @@ do
                 File_WriteUInt64( fileHandle, data.Size )
 
                 if doCRCs
-                    File_WriteULong( fileHandle, tonumber( util.CRC( data.Content ) ) or 0 )
+                    File_WriteULong( fileHandle, tonumber( util_CRC( data.Content ) ) )
                 else
                     File_WriteULong( fileHandle, 0 )
-
             File_WriteULong( fileHandle, 0 )
 
             for data in *files
                 content = data.Content
                 unless type( content ) == "string"
-                    error "file content must be a string (" .. data.FilePath .. ")"
+                    error( "file content must be a string (" .. data.FilePath .. ")" )
                 File_Write( fileHandle, content )
             @Close!
+
+            if doCRCs
+                fileHandle = @Open( filePath, gamePath, "rb" )
+                unless fileHandle
+                    error( "file read handler is missing, opening is impossible" )
+
+                crc = tonumber( util_CRC( File_Read( fileHandle ) ) )
+                @RealCRC = crc
+                @CRC = crc
+
+                fileHandle = @Open( filePath, gamePath, "ab" )
+                unless fileHandle
+                    error( "file read handler is missing, opening is impossible" )
+                File_WriteULong( fileHandle, crc )
+                @Close!
+            else
+                File_WriteULong( fileHandle, 0 )
 
             return true
 
@@ -404,36 +456,40 @@ do
 
             fileHandle = @File
             unless fileHandle
-                error "file read handler is missing, reading is not possible"
+                error( "file read handler is missing, reading is not possible" )
 
             files = @Files
             data = files[ index ]
             unless data
-                error "requested file does not exist"
+                error( "requested file does not exist" )
 
             File_Seek( fileHandle, files.Pointer + data.Position )
             data.Content = File_Read( fileHandle, data.Size )
             return data
 
-        ReadFiles: =>
+        ReadFiles: ( doCRCs ) =>
             fileHandle = @File
             unless fileHandle
-                error "file read handler is missing, reading is not possible"
+                error( "file read handler is missing, reading is not possible" )
 
             files = @Files
             pointer = files.Pointer
             for data in *files
                 File_Seek( fileHandle, pointer + data.Position )
-                data.Content = File_Read( fileHandle, data.Size )
+                content = File_Read( fileHandle, data.Size )
+                data.Content = content
+                if doCRCs
+                    data.RealCRC = tonumber( util_CRC( content ) )
 
             return files
 
         GetFile: ( index ) =>
             return @Files[ index ]
 
-        AddFile: ( filePath, content ) =>
+        AddFile: ( filePath, content, doCRCs ) =>
             ArgAssert( filePath, 1, "string" )
             ArgAssert( content, 2, "string" )
+            doCRCs = doCRCs ~= false
             files = @Files
 
             filePath = string_lower( filePath )
@@ -441,12 +497,17 @@ do
                 return data.FilePath == filePath
             )
 
-            files[ #files + 1 ] = {
-                Size: string_len( content ),
-                CRC: tonumber( util.CRC( content ) ) or 0,
-                FilePath: filePath,
+            data = {
+                Size: string_len( content )
+                FilePath: filePath
                 Content: content
             }
+
+            if doCRCs
+                crc = tonumber( util_CRC( content ) )
+                data.RealCRC = crc
+                data.CRC = crc
+            files[] = data
 
         ClearFiles: =>
             table_Empty( @files )
@@ -462,5 +523,5 @@ do
         ClearRequiredContent: =>
             table_Empty( @requiredContent )
 
-lib.New = GMAD
+lib.GMA = GMA
 return lib
