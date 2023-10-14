@@ -53,16 +53,17 @@ unless gpm.Developer
     "gLua Package Manager" )
 
 include = include or require
-include "gpm/util.lua"
+include( "gpm/util.lua" )
 logger = gpm.Logger
 
-logger\Info( "LibDeflate v%s is initialized.", include( "gpm/libs/3rd-party/deflate.lua" )._VERSION )
 logger\Info( "gm_promise v%s is initialized.", include( "gpm/libs/promise.lua" ).VERSION )
 logger\Info( "metaworks v%s is initialized.", include( "libs/metaworks.lua" ).VERSION )
-logger\Info( "gmad v%s is initialized.", include( "gpm/libs/gmad.lua" ).VERSION )
 
+logger\Info( "LibDeflate v%s is initialized.", include( "gpm/libs/3rd-party/deflate.lua" )._VERSION )
 include( "gpm/filesystem.lua" )
 include( "gpm/http.lua" )
+
+logger\Info( "gmad v%s is initialized.", include( "gpm/libs/gmad.lua" ).VERSION )
 include( "gpm/package.lua" )
 
 logger\Info( "Start-up time: %.4f sec.", sysTime! - gpm.StartTime )
