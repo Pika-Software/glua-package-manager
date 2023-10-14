@@ -309,14 +309,12 @@ do
                 filePath = filePath .. ".lua"
         return filePath
 
-do
+math = gpm_Table( gpm, "math", ->
+    return setmetatable( {}, { __index: math } )
+)
 
-    math = gpm_Table( gpm, "math", ->
-        return setmetatable( {}, { __index: math } )
-    )
-
-    math.inf = 1 / 0
-    math.nan = 0 / 0
+math.inf = 1 / 0
+math.nan = 0 / 0
 
 do
 

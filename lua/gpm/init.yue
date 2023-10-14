@@ -36,7 +36,7 @@ do
         "I see you."
     }
 
-    splash[] = "Wow, here more " .. ( #splash + 1 ) .. " splashes!"
+    splash[] = "Wow, here more " .. #splash .. " splashes!"
     splash = splash[ math.random( 1, #splash ) ]
     for i = 1, ( 25 - #splash ) / 2
         if i % 2 == 1

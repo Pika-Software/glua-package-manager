@@ -209,14 +209,14 @@ do
         File_Tell = File.Tell
 
         File.SkipEmpty = ( fileHandle ) ->
-            while not File_EndOfFile( fileHandle ) do
-                if File_ReadByte( fileHandle ) ~= 0 then
+            while not File_EndOfFile( fileHandle )
+                if File_ReadByte( fileHandle ) ~= 0
                     File_Skip( fileHandle, -1 )
                     break
 
         File.ReadString = ( fileHandle ) ->
             startPos, len = File_Tell( fileHandle ), 0
-            while not File_EndOfFile( fileHandle ) and File_ReadByte( fileHandle ) ~= 0 do
+            while not File_EndOfFile( fileHandle ) and File_ReadByte( fileHandle ) ~= 0
                 len = len + 1
 
             File_Seek( fileHandle, startPos )
@@ -472,7 +472,7 @@ do
 
             p = promise_New()
             state = async_Write( filePath, content, ( fileName, gamePath, code ) ->
-                if code ~= 0 then
+                if code ~= 0
                     PROMISE_Reject( p, "FSASYNC_WRITE_ERR: " .. code )
                 else
                     PROMISE_Resolve( p, {
@@ -588,7 +588,7 @@ do
                 compressedData = fileHandle\Read( compressedSize )
                 data = deflate_DecompressDeflate( compressedData )
 
-            if data and tostring( crc ) ~= util_CRC( data ) then
+            if data and tostring( crc ) ~= util_CRC( data )
                 data = nil
 
             return fileName, data
