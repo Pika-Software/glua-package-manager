@@ -392,16 +392,20 @@ do
 
         string_byte = string.byte
         string_len = string.len
-        math_Clamp = math.Clamp
+        math_max = math.max
+        math_min = math.min
 
         class ByteStream
+            __tostring: =>
+                return string_format( "ByteStream: %p [%d/%d]", @, @Pointer, @Size )
+
             new: ( data ) =>
+                @Length = string_len( data ) - 1
                 @Data = data
-                @Pointer = 1
-                @Length = string_len( data )
+                @Pointer = 0
 
             Close: =>
-                @Pointer = 1
+                @Pointer = 0
                 @Length = 0
                 @Data = ""
 
@@ -411,8 +415,10 @@ do
             Tell: =>
                 return @Pointer
 
-            Seek: ( pos ) =>
-                @Pointer = math_Clamp( pos or 1, 1, @Length )
+            Seek: ( position ) =>
+                position = math_max( position or 0, 0 )
+                @Pointer = position
+                return position
 
             Skip: ( length ) =>
                 @Seek( @Pointer + ( length or 1 ) )
@@ -420,49 +426,62 @@ do
             EndOfFile: =>
                 return @Pointer >= @Length
 
-            ReadByte: ( length ) =>
-                pointer = @Pointer
-                @Skip( length )
-                return string_byte( @Data, pointer, length )
+            ReadByte: =>
+                pointer, length = @Pointer, @Length
+                if pointer < length
+                    @Skip!
+                if pointer > length
+                    return
+                return string_byte( @Data, pointer + 1 )
 
             ReadBool: =>
-                return @ReadByte! ~= 0
+                byte = @ReadByte!
+                unless byte
+                    return
+                return byte ~= 0
 
-            Read: ( length ) =>
-                data, pointer, fileLength, result = @Data, @Pointer, @Length, nil
-                while ( length > 0 and pointer < fileLength )
-                    unless result
-                        result = data[ pointer ]
-                    else
-                        result = result .. data[ pointer ]
-                    length -= 1
-                    pointer += 1
-                @Seek( pointer )
+            Read: ( distance ) =>
+                pointer, length, data = @Pointer, @Length, @Data
+                distance = math_min( pointer + ( distance or length ), length )
+                @Seek( distance )
+                result = ""
+
+                for index = pointer, distance - 1
+                    result ..= data[ index + 1 ]
                 return result
 
-            ReadUInt: ( length ) =>
-                uInt = 0
-                for i = 1, length
-                    uInt = uInt + @ReadByte! * 0x100 ^ ( i - 1 )
-                return uInt
+            ReadUInt: ( distance ) =>
+                pointer, length, data = @Pointer, @Length, @Data
+                distance = math_min( pointer + ( distance or length ), length )
+                @Seek( distance )
+                result = 0
 
-            ReadULong: =>
-                return @ReadUInt( 4 )
+                counter = 1
+                for index = pointer, distance - 1
+                    result += string_byte( data, index + 1 ) * 0x100 ^ ( counter - 1 )
+                    counter += 1
+                return result
 
             ReadUShort: =>
                 return @ReadUInt( 2 )
 
-            ReadString: =>
-                startPos, length = @Tell!, -1
+            ReadULong: =>
+                return @ReadUInt( 4 )
 
-                while not @EndOfFile! and @ReadByte! ~= 0
+            ReadUInt64: =>
+                return @ReadUInt( 8 )
+
+            ReadString: =>
+                pointer, data = @Pointer, @Data
+
+                length = 0
+                for index = pointer, @Length
+                    if string_byte( data, index + 1 ) == 0
+                        break
                     length += 1
 
-                @Seek( startPos )
-                data = @Read( length )
-                @Skip( 1 )
-                return data
-
+                if length > 0
+                    return @Read( length ), @Skip!
         util.ByteStream = ByteStream
 
     do
@@ -507,7 +526,8 @@ do
         debugColor = colors.Debug
 
         class Logger
-            __tostring: () => "Logger [" .. @GetName! .. "]"
+            __tostring: () =>
+                return string_format( "Logger: %p [%s]", @, @GetName! )
 
             new: ( name, color, func ) =>
                 @DebugFilter = type( func ) == "function" and func or debugFilter
