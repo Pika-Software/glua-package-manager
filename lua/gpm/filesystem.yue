@@ -189,14 +189,56 @@ do
         return lib_IsFile( filePath .. ".lua", gamePath )
     lib.IsLuaFile = lib_IsLuaFile
 
-File = FindMetaTable( "File" )
-File_Close = File.Close
-
 lib_Read, lib_Write = nil, nil
 do
 
+    File = FindMetaTable( "File" )
+    File_Close = File.Close
     File_Write = File.Write
     File_Read = File.Read
+
+    do
+
+        File_WriteULong = File.WriteULong
+        File_ReadULong = File.ReadULong
+        File_WriteByte = File.WriteByte
+        File_EndOfFile = File.EndOfFile
+        File_ReadByte = File.ReadByte
+        File_Seek = File.Seek
+        File_Skip = File.Skip
+        File_Tell = File.Tell
+
+        File.SkipEmpty = ( fileHandle ) ->
+            while not File_EndOfFile( fileHandle ) do
+                if File_ReadByte( fileHandle ) ~= 0 then
+                    File_Skip( fileHandle, -1 )
+                    break
+
+        File.ReadString = ( fileHandle ) ->
+            startPos, len = File_Tell( fileHandle ), 0
+            while not File_EndOfFile( fileHandle ) and File_ReadByte( fileHandle ) ~= 0 do
+                len = len + 1
+
+            File_Seek( fileHandle, startPos )
+            data = File_Read( fileHandle, len )
+            File_Skip( fileHandle, 1 )
+            return data
+
+        File.WriteString = ( fileHandle, str ) ->
+            File_Write( fileHandle, str )
+            File_WriteByte( fileHandle, 0 )
+
+        unless File.ReadUInt64
+            File.ReadUInt64 = ( fileHandle ) ->
+                number = File_ReadULong( fileHandle )
+                File_Skip( fileHandle, 4 )
+                return number
+
+        unless File.WriteUInt64
+            File.WriteUInt64 = ( fileHandle, number ) ->
+                File_WriteULong( fileHandle, number )
+                File_WriteULong( fileHandle, 0 )
+
     lib_Open = file.Open
     lib.Open = lib_Open
 
