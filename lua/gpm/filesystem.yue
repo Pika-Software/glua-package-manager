@@ -356,8 +356,8 @@ do
                 Available: not MENU_DLL
                 Get: ->
                     return {
-                    Read: file.AsyncRead
-                }
+                        Read: file.AsyncRead
+                    }
             },
             {
                 Name: "Legacy"
@@ -508,5 +508,47 @@ do
                 return promise_Reject( "File compilation '" .. filePath .. "' failed, file cannot be read." )
             return util_CompileMoonString( content, filePath, handleError )
         )
+
+do
+
+    deflate_DecompressDeflate = gpm.deflate.DecompressDeflate
+    debug_fempty = debug.fempty
+    tostring = tostring
+    util_CRC = util.CRC
+
+    lib.IterateZipFiles = ( fileHandle ) ->
+        unless fileHandle
+            return debug_fempty
+
+        return ->
+            if fileHandle\Read( 4 ) ~= "PK\x03\x04"
+                return
+            fileHandle\Skip( 4 )
+
+            compressionMethod = fileHandle\ReadUShort!
+            fileHandle\Skip( 4 )
+
+            crc = fileHandle\ReadULong()
+            compressedSize = fileHandle\ReadULong!
+            fileHandle\Skip( 4 )
+
+            fileNameLen = fileHandle\ReadUShort!
+            extraLen = fileHandle\ReadUShort!
+            fileName = fileHandle\Read( fileNameLen )
+            fileHandle\Skip( extraLen )
+
+            data = nil
+            if compressionMethod == 0
+                -- No compression
+                data = fileHandle\Read( compressedSize )
+            elseif compressionMethod == 8
+                -- Deflate compression
+                compressedData = fileHandle\Read( compressedSize )
+                data = deflate_DecompressDeflate( compressedData )
+
+            if data and tostring( crc ) ~= util_CRC( data ) then
+                data = nil
+
+            return fileName, data
 
 return lib
