@@ -1,4 +1,3 @@
-require "moonloader"
-moonloader.PreCacheDir "gpm"
-AddCSLuaFile "gpm/init.lua"
-include "gpm/init.lua"
+require( "moonloader" )
+moonloader.PreCacheDir( "gpm" )
+include( "gpm/init.lua" )
