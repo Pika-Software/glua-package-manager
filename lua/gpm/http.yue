@@ -35,16 +35,25 @@ do
             Name: "reqwest"
         } )
 
+    util_IsBinaryModuleInstalled = util.IsBinaryModuleInstalled
+    require = require
+    pcall = pcall
     _G = _G
 
     for item in *clients
-        if item.Installed or ( util.IsBinaryModuleInstalled( item.Name ) and pcall( require, item.Name ) )
+        if item.Installed or ( util_IsBinaryModuleInstalled( item.Name ) and pcall( require, item.Name ) )
             client, clientName = _G[ item.Client ], item.Name
             Logger\Info( "'%s' was connected as HTTP client.", item.Name )
             break
 
+    util_IsBinaryModuleInstalled = nil
+    require = nil
+    clients = nil
+    pcall = nil
+    _G = nil
+
 queue = {}
-util.NextTick( () ->
+util.NextTick( ->
     for func in *queue
         func!
     queue = nil
@@ -91,7 +100,7 @@ HTTP = ( parameters ) ->
         p\Reject( msg )
 
     if queue ~= nil
-        queue[ #queue + 1 ] = () ->
+        queue[ #queue + 1 ] = ->
             request( parameters )
     else
         request( parameters )
