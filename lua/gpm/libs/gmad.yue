@@ -1,527 +1,495 @@
 if SERVER
     AddCSLuaFile!
 
-gpm = gpm
-ArgAssert = gpm.ArgAssert
-string = gpm.string
-table = gpm.table
-error = error
-type = type
+wildcard = {
+    "lua/*.lua",
+    "scenes/*.vcd",
+    "particles/*.pcf",
+    "resource/fonts/*.ttf",
+    "scripts/vehicles/*.txt",
+    "resource/localization/*/*.properties",
+    "maps/*.bsp",
+    "maps/*.lmp",
+    "maps/*.nav",
+    "maps/*.ain",
+    "maps/thumb/*.png",
+    "sound/*.wav",
+    "sound/*.mp3",
+    "sound/*.ogg",
+    "materials/*.vmt",
+    "materials/*.vtf",
+    "materials/*.png",
+    "materials/*.jpg",
+    "materials/*.jpeg",
+    "materials/colorcorrection/*.raw",
+    "models/*.mdl",
+    "models/*.vtx",
+    "models/*.phy",
+    "models/*.ani",
+    "models/*.vvd",
+    "gamemodes/*/*.txt",
+    "gamemodes/*/*.fgd",
+    "gamemodes/*/logo.png",
+    "gamemodes/*/icon24.png",
+    "gamemodes/*/gamemode/*.lua",
+    "gamemodes/*/entities/effects/*.lua",
+    "gamemodes/*/entities/weapons/*.lua",
+    "gamemodes/*/entities/entities/*.lua",
+    "gamemodes/*/backgrounds/*.png",
+    "gamemodes/*/backgrounds/*.jpg",
+    "gamemodes/*/backgrounds/*.jpeg",
+    "gamemodes/*/content/models/*.mdl",
+    "gamemodes/*/content/models/*.vtx",
+    "gamemodes/*/content/models/*.phy",
+    "gamemodes/*/content/models/*.ani",
+    "gamemodes/*/content/models/*.vvd",
+    "gamemodes/*/content/materials/*.vmt",
+    "gamemodes/*/content/materials/*.vtf",
+    "gamemodes/*/content/materials/*.png",
+    "gamemodes/*/content/materials/*.jpg",
+    "gamemodes/*/content/materials/*.jpeg",
+    "gamemodes/*/content/materials/colorcorrection/*.raw",
+    "gamemodes/*/content/scenes/*.vcd",
+    "gamemodes/*/content/particles/*.pcf",
+    "gamemodes/*/content/resource/fonts/*.ttf",
+    "gamemodes/*/content/scripts/vehicles/*.txt",
+    "gamemodes/*/content/resource/localization/*/*.properties",
+    "gamemodes/*/content/maps/*.bsp",
+    "gamemodes/*/content/maps/*.nav",
+    "gamemodes/*/content/maps/*.ain",
+    "gamemodes/*/content/maps/thumb/*.png",
+    "gamemodes/*/content/sound/*.wav",
+    "gamemodes/*/content/sound/*.mp3",
+    "gamemodes/*/content/sound/*.ogg",
 
-lib = gpm.Table( gpm, "gmad", ->
-    return {
-        VERSION: "1.0.0"
-    } )
+    -- static version of the data/ folder
+    -- (because you wouldn't be able to modify these)
+    "data_static/*.txt",
+    "data_static/*.dat",
+    "data_static/*.json",
+    "data_static/*.xml",
+    "data_static/*.csv",
+    "data_static/*.dem",
+    "data_static/*.vcd",
 
+    "data_static/*.vtf",
+    "data_static/*.vmt",
+    "data_static/*.png",
+    "data_static/*.jpg",
+    "data_static/*.jpeg",
+
+    "data_static/*.mp3",
+    "data_static/*.wav",
+    "data_static/*.ogg"
+}
+
+types = {
+    "gamemode",
+    "map",
+    "weapon",
+    "vehicle",
+    "npc",
+    "entity",
+    "tool",
+    "effects",
+    "model",
+    "servercontent"
+}
+
+tags = {
+    "fun",
+    "roleplay",
+    "scenic",
+    "movie",
+    "realism",
+    "cartoon",
+    "water",
+    "comic",
+    "build"
+}
+
+string_Replace, string_lower, string_find, string_len = nil, nil, nil, nil
 do
-
-    table_HasIValue = table.HasIValue
-
-    do
-
-        types = {
-            "gamemode",
-            "map",
-            "weapon",
-            "vehicle",
-            "npc",
-            "entity",
-            "tool",
-            "effects",
-            "model",
-            "servercontent"
-        }
-
-        lib.TypeExists = ( any ) ->
-            return table_HasIValue( types, any )
-        lib.Types = types
-
-    do
-
-        tags = {
-            "fun",
-            "roleplay",
-            "scenic",
-            "movie",
-            "realism",
-            "cartoon",
-            "water",
-            "comic",
-            "build"
-        }
-
-        lib.TagExists = ( any ) ->
-            return table_HasIValue( tags, any )
-        lib.Tags = tags
-
-lib_IsAllowedFilePath = nil
-do
-
-    wildcard = {
-        "lua/*.lua",
-        "scenes/*.vcd",
-        "particles/*.pcf",
-        "resource/fonts/*.ttf",
-        "scripts/vehicles/*.txt",
-        "resource/localization/*/*.properties",
-        "maps/*.bsp",
-        "maps/*.lmp",
-        "maps/*.nav",
-        "maps/*.ain",
-        "maps/thumb/*.png",
-        "sound/*.wav",
-        "sound/*.mp3",
-        "sound/*.ogg",
-        "materials/*.vmt",
-        "materials/*.vtf",
-        "materials/*.png",
-        "materials/*.jpg",
-        "materials/*.jpeg",
-        "materials/colorcorrection/*.raw",
-        "models/*.mdl",
-        "models/*.vtx",
-        "models/*.phy",
-        "models/*.ani",
-        "models/*.vvd",
-        "gamemodes/*/*.txt",
-        "gamemodes/*/*.fgd",
-        "gamemodes/*/logo.png",
-        "gamemodes/*/icon24.png",
-        "gamemodes/*/gamemode/*.lua",
-        "gamemodes/*/entities/effects/*.lua",
-        "gamemodes/*/entities/weapons/*.lua",
-        "gamemodes/*/entities/entities/*.lua",
-        "gamemodes/*/backgrounds/*.png",
-        "gamemodes/*/backgrounds/*.jpg",
-        "gamemodes/*/backgrounds/*.jpeg",
-        "gamemodes/*/content/models/*.mdl",
-        "gamemodes/*/content/models/*.vtx",
-        "gamemodes/*/content/models/*.phy",
-        "gamemodes/*/content/models/*.ani",
-        "gamemodes/*/content/models/*.vvd",
-        "gamemodes/*/content/materials/*.vmt",
-        "gamemodes/*/content/materials/*.vtf",
-        "gamemodes/*/content/materials/*.png",
-        "gamemodes/*/content/materials/*.jpg",
-        "gamemodes/*/content/materials/*.jpeg",
-        "gamemodes/*/content/materials/colorcorrection/*.raw",
-        "gamemodes/*/content/scenes/*.vcd",
-        "gamemodes/*/content/particles/*.pcf",
-        "gamemodes/*/content/resource/fonts/*.ttf",
-        "gamemodes/*/content/scripts/vehicles/*.txt",
-        "gamemodes/*/content/resource/localization/*/*.properties",
-        "gamemodes/*/content/maps/*.bsp",
-        "gamemodes/*/content/maps/*.nav",
-        "gamemodes/*/content/maps/*.ain",
-        "gamemodes/*/content/maps/thumb/*.png",
-        "gamemodes/*/content/sound/*.wav",
-        "gamemodes/*/content/sound/*.mp3",
-        "gamemodes/*/content/sound/*.ogg",
-
-        -- static version of the data/ folder
-        -- (because you wouldn't be able to modify these)
-        "data_static/*.txt",
-        "data_static/*.dat",
-        "data_static/*.json",
-        "data_static/*.xml",
-        "data_static/*.csv",
-        "data_static/*.dem",
-        "data_static/*.vcd",
-
-        "data_static/*.vtf",
-        "data_static/*.vmt",
-        "data_static/*.png",
-        "data_static/*.jpg",
-        "data_static/*.jpeg",
-
-        "data_static/*.mp3",
-        "data_static/*.wav",
-        "data_static/*.ogg"
-    }
-
-    -- Formatting to lua patterns
-    do
-        string_Replace = string.Replace
-        for index, value in ipairs( wildcard )
-            wildcard[ index ] = string_Replace( string_Replace( value, ".", "%." ), "*", ".+" )
-
-    string_find = string.find
-    lib_IsAllowedFilePath = ( filePath ) ->
-        for pattern in *wildcard
-            if string_find( filePath, pattern )
-                return true
-        return false
-    lib.IsAllowedFilePath = lib_IsAllowedFilePath
-
-do
-
-    File = FindMetaTable "File"
-
-    File_WriteString = File.WriteString
-    File_WriteUInt64 = File.WriteUInt64
-    File_ReadString = File.ReadString
-    File_ReadUInt64 = File.ReadUInt64
-    File_WriteULong = File.WriteULong
-    File_EndOfFile = File.EndOfFile
-    File_ReadULong = File.ReadULong
-    File_WriteLong = File.WriteLong
-    File_WriteByte = File.WriteByte
-    File_ReadByte = File.ReadByte
-    File_ReadLong = File.ReadLong
-    File_Write = File.Write
-    File_Close = File.Close
-    File_Size = File.Size
-    File_Seek = File.Seek
-    File_Read = File.Read
-    File_Tell = File.Tell
-
+    string = string
+    string_Replace = string.Replace
     string_lower = string.lower
-    table_Empty = table.Empty
+    string_find = string.find
     string_len = string.len
-    file_Open = file.Open
-    util_CRC = util.CRC
-    tostring = tostring
-    tonumber = tonumber
 
-    class GMA
-        Identity: "GMAD"
-        Version: 3
+-- Formatting wildcard to lua patterns
+for index, value in ipairs( wildcard )
+    wildcard[ index ] = string_Replace( string_Replace( value, ".", "%." ), "*", ".+" )
 
-        __tostring: =>
-            return "Garry's Mod Addon File \'" .. @title .. "\'"
+table_RemoveByFunction, table_HasIValue, table_Empty = nil, nil, nil
+do
+    table = gpm.table
+    table_RemoveByFunction = table.RemoveByFunction
+    table_HasIValue = table.HasIValue
+    table_Empty = table.Empty
 
-        new: =>
-            @Title = "unknown"
-            @Author = "unknown"
-            @Description = "unknown"
-            @AddonVersion = 1
-            @Timestamp = 0
-            @Required = {}
-            @SteamID = ""
-            @RealCRC = 0
-            @Files = {}
-            @CRC = 0
+ArgAssert = gpm.ArgAssert
+file_Open = file.Open
+isstring = isstring
+util_CRC = util.CRC
+tostring = tostring
+tonumber = tonumber
+error = error
 
-        GetTitle: =>
-            return @Title
+isFilePathAllowed = ( filePath ) ->
+    for pattern in *wildcard
+        if string_find( filePath, pattern )
+            return true
+    return false
 
-        SetTitle: ( str ) =>
-            ArgAssert( str, 1, "string" )
-            @Title = str
+class GMAD
+    VERSION: "1.0.0"
+    Identity: "GMAD"
+    FormatVersion: 3
 
-        GetAuthor: =>
-            return @Author
+    __tostring: =>
+        return "Garry's Mod Addon File \'" .. @title .. "\'"
 
-        SetAuthor: ( str ) =>
-            ArgAssert( str, 1, "string" )
-            @Author = str
+    new: =>
+        @Title = "unknown"
+        @Author = "unknown"
+        @Description = "unknown"
+        @Version = 1
+        @Timestamp = 0
+        @Required = {}
+        @SteamID = ""
+        @RealCRC = 0
+        @Files = {}
+        @CRC = 0
 
-        GetDescription: =>
-            return @Description
+    IsFilePathAllowed: isFilePathAllowed
 
-        SetDescription: ( str ) =>
-            ArgAssert( str, 1, "string" )
-            @Description = str
+    Types: types
+    TypeExists: ( any ) ->
+        return table_HasIValue( types, any )
 
-        GetAddonVersion: =>
-            return @AddonVersion
+    Tags: tags
+    TagExists: ( any ) ->
+        return table_HasIValue( tags, any )
 
-        SetAddonVersion: ( int32 ) =>
-            ArgAssert( int32, 1, "number" )
-            @AddonVersion = int32
+    GetTitle: =>
+        return @Title
 
-        GetTimestamp: =>
-            return @Timestamp
+    SetTitle: ( str ) =>
+        ArgAssert( str, 1, "string" )
+        @Title = str
 
-        SetTimestamp: ( uint64 ) =>
-            ArgAssert( uint64, 1, "number" )
-            @Timestamp = uint64
+    GetAuthor: =>
+        return @Author
 
-        GetSteamID: =>
-            return @SteamID
+    SetAuthor: ( str ) =>
+        ArgAssert( str, 1, "string" )
+        @Author = str
 
-        SetSteamID: ( str ) =>
-            ArgAssert( str, 1, "string" )
-            @SteamID = str
+    GetDescription: =>
+        return @Description
 
-        Open: ( filePath, gamePath, fileMode ) =>
-            @Close!
+    SetDescription: ( str ) =>
+        ArgAssert( str, 1, "string" )
+        @Description = str
 
-            unless filePath
-                filePath = @FilePath
+    GetAddonVersion: =>
+        return @Version
 
-            unless gamePath
-                gamePath = @GamePath
+    SetAddonVersion: ( int32 ) =>
+        ArgAssert( int32, 1, "number" )
+        @Version = int32
 
-            ArgAssert( filePath, 1, "string" )
-            ArgAssert( gamePath, 2, "string" )
+    GetTimestamp: =>
+        return @Timestamp
 
-            fileHandle = file_Open( filePath, fileMode or "rb", gamePath )
-            unless fileHandle
-                error( "file read handler is missing, opening is impossible" )
+    SetTimestamp: ( uint64 ) =>
+        ArgAssert( uint64, 1, "number" )
+        @Timestamp = uint64
 
-            @FilePath = filePath
-            @GamePath = gamePath
-            @File = fileHandle
+    GetSteamID: =>
+        return @SteamID
 
-            return fileHandle
+    SetSteamID: ( str ) =>
+        ArgAssert( str, 1, "string" )
+        @SteamID = str
 
-        Close: =>
-            fileHandle = @File
-            if fileHandle
-                File_Close( fileHandle )
-                @File = nil
-                return true
-            return false
+    Open: ( filePath, gamePath, fileMode ) =>
+        @Close!
 
-        Parse: ( doCRCs ) =>
-            fileHandle = @File
-            unless fileHandle
-                error( "file read handler is missing, parsing is impossible" )
+        unless filePath
+            filePath = @FilePath
 
-            File_Seek( fileHandle, 0 )
-            doCRCs = doCRCs ~= false
+        unless gamePath
+            gamePath = @GamePath
 
-            if File_Read( fileHandle, 4 ) ~= @Identity
-                error( "File is not a gma" )
+        ArgAssert( filePath, 1, "string" )
+        ArgAssert( gamePath, 2, "string" )
 
-            version = File_ReadByte( fileHandle )
-            if version > @Version
-                error( "gma version is unsupported" )
+        fileHandle = file_Open( filePath, fileMode or "rb", gamePath )
+        unless fileHandle
+            error( "file read handler is missing, opening is impossible" )
 
-            @Version = version
-            @SteamID = tostring( File_ReadUInt64( fileHandle ) )
-            @Timestamp = File_ReadUInt64( fileHandle )
+        @FilePath = filePath
+        @GamePath = gamePath
+        @File = fileHandle
 
-            if version > 1
-                while not File_EndOfFile( fileHandle )
-                    value = File_ReadString( fileHandle )
-                    unless value
-                        break
-                    @Required[ value ] = true
+        return fileHandle
 
-            @Title = File_ReadString( fileHandle )
-            @Description = File_ReadString( fileHandle )
-            @Author = File_ReadString( fileHandle )
+    Close: =>
+        fileHandle = @File
+        if fileHandle
+            fileHandle\Close!
+            @File = nil
+            return true
+        return false
 
-            @AddonVersion = File_ReadLong( fileHandle )
+    Parse: ( doCRCs ) =>
+        fileHandle = @File
+        unless fileHandle
+            error( "file read handler is missing, parsing is impossible" )
 
-            files, offset = @Files, 0
-            while not File_EndOfFile( fileHandle )
-                index = File_ReadULong( fileHandle )
-                if index == 0
+        fileHandle\Seek( 0 )
+        doCRCs = doCRCs ~= false
+
+        if fileHandle\Read( 4 ) ~= @Identity
+            error( "File is not a gma" )
+
+        version = fileHandle\ReadByte!
+        if version > @FormatVersion
+            error( "gma version is unsupported" )
+
+        @FormatVersion = version
+        @SteamID = tostring( fileHandle\ReadUInt64! ) or ""
+        @Timestamp = fileHandle\ReadUInt64!
+
+        if version > 1
+            while not fileHandle\EndOfFile!
+                value = fileHandle\ReadString!
+                unless value
                     break
+                @Required[ value ] = true
 
-                data = {
-                    FilePath: File_ReadString( fileHandle ),
-                    Position: offset
-                }
+        @Title = fileHandle\ReadString!
+        @Description = fileHandle\ReadString!
+        @Author = fileHandle\ReadString!
 
-                size = File_ReadUInt64( fileHandle )
-                data.Size = size
-                offset += size
+        @Version = fileHandle\ReadLong!
 
-                data.CRC = File_ReadULong( fileHandle )
-                files[ index ] = data
-
-            files.Pointer = File_Tell( fileHandle )
-
-            unless doCRCs
-                return
-
-            contentSize = File_Size( fileHandle ) - 4
-            File_Seek( fileHandle, contentSize )
-
-            crc = File_ReadULong( fileHandle )
-            unless crc
-                return
-
-            @CRC = crc
-            File_Seek( fileHandle, 0 )
-            @RealCRC = tonumber( util_CRC( File_Read( fileHandle, contentSize ) ) )
-
-        Read: ( filePath, gamePath, readFiles, doCRCs ) =>
-            table_Empty( @Required )
-            table_Empty( @Files )
-
-            @Open( filePath, gamePath, "rb" )
-            @Parse( doCRCs )
-
-            if readFiles
-                @ReadFiles( doCRCs )
-            @Close!
-
-        VerifyCRC: =>
-            crc = @CRC
-            if crc == 0
-                return true
-            return crc == @RealCRC
-
-        VerifyFilesCRC: =>
-            for data in *@Files
-                crc = data.CRC
-                unless crc
-                    continue
-
-                realCRC = data.RealCRC
-                unless realCRC
-                    content = data.Content
-                    if content
-                        realCRC = tonumber( util_CRC( content ) )
-                        data.RealCRC = realCRC
-
-                if crc ~= realCRC
-                    return false, data
-            return true
-
-        VerifyFiles: =>
-            files = @Files
-            if #files == 0
-                return false, "unknown"
-
-            for data in *files
-                unless lib_IsAllowedFilePath( data.FilePath )
-                    return false, data
-
-            return true
-
-        Write: ( filePath, gamePath, doCRCs ) =>
-            ok, result = @VerifyFiles!
-            unless ok
-                error( "file is not allowed by whitelist (" .. result.FilePath .. ")" )
-
-            fileHandle = @Open( filePath, gamePath, "wb" )
-            unless fileHandle
-                error( "file read handler is missing, opening is impossible" )
-
-            doCRCs = doCRCs ~= false
-            File_Write( fileHandle, @Identity )
-            File_WriteByte( fileHandle, @Version )
-
-            File_WriteUInt64( fileHandle, tonumber( @SteamID ) or 0 )
-            File_WriteUInt64( fileHandle, @Timestamp or os.time() )
-
-            for value in pairs( @Required )
-                File_WriteString( fileHandle, value )
-            File_WriteByte( fileHandle, 0 )
-
-            File_WriteString( fileHandle, @Title )
-            File_WriteString( fileHandle, @Description )
-            File_WriteString( fileHandle, @Author )
-
-            File_WriteLong( fileHandle, @AddonVersion )
-
-            files = @Files
-            for index = 1, #files
-                File_WriteULong( fileHandle, index )
-                data = files[ index ]
-
-                File_WriteString( fileHandle, string_lower( data.FilePath ) )
-                File_WriteUInt64( fileHandle, data.Size )
-
-                if doCRCs
-                    File_WriteULong( fileHandle, tonumber( util_CRC( data.Content ) ) )
-                else
-                    File_WriteULong( fileHandle, 0 )
-            File_WriteULong( fileHandle, 0 )
-
-            for data in *files
-                content = data.Content
-                unless type( content ) == "string"
-                    error( "file content must be a string (" .. data.FilePath .. ")" )
-                File_Write( fileHandle, content )
-            @Close!
-
-            if doCRCs
-                fileHandle = @Open( filePath, gamePath, "rb" )
-                unless fileHandle
-                    error( "file read handler is missing, opening is impossible" )
-
-                crc = tonumber( util_CRC( File_Read( fileHandle ) ) )
-                @RealCRC = crc
-                @CRC = crc
-
-                fileHandle = @Open( filePath, gamePath, "ab" )
-                unless fileHandle
-                    error( "file read handler is missing, opening is impossible" )
-                File_WriteULong( fileHandle, crc )
-                @Close!
-            else
-                File_WriteULong( fileHandle, 0 )
-
-            return true
-
-        ReadFile: ( index ) =>
-            ArgAssert( index, 1, "number" )
-
-            fileHandle = @File
-            unless fileHandle
-                error( "file read handler is missing, reading is not possible" )
-
-            files = @Files
-            data = files[ index ]
-            unless data
-                error( "requested file does not exist" )
-
-            File_Seek( fileHandle, files.Pointer + data.Position )
-            data.Content = File_Read( fileHandle, data.Size )
-            return data
-
-        ReadFiles: ( doCRCs ) =>
-            fileHandle = @File
-            unless fileHandle
-                error( "file read handler is missing, reading is not possible" )
-
-            files = @Files
-            pointer = files.Pointer
-            for data in *files
-                File_Seek( fileHandle, pointer + data.Position )
-                content = File_Read( fileHandle, data.Size )
-                data.Content = content
-                if doCRCs
-                    data.RealCRC = tonumber( util_CRC( content ) )
-
-            return files
-
-        GetFile: ( index ) =>
-            return @Files[ index ]
-
-        AddFile: ( filePath, content, doCRCs ) =>
-            ArgAssert( filePath, 1, "string" )
-            ArgAssert( content, 2, "string" )
-            doCRCs = doCRCs ~= false
-            files = @Files
-
-            filePath = string_lower( filePath )
-            table.RemoveByFunction( files, ( _, data ) ->
-                return data.FilePath == filePath
-            )
+        files, offset = @Files, 0
+        while not fileHandle\EndOfFile!
+            index = fileHandle\ReadULong!
+            if index == 0
+                break
 
             data = {
-                Size: string_len( content )
-                FilePath: filePath
-                Content: content
+                FilePath: fileHandle\ReadString!,
+                Position: offset
             }
 
+            size = fileHandle\ReadUInt64!
+            data.Size = size
+            offset += size
+
+            data.CRC = fileHandle\ReadULong!
+            files[ index ] = data
+
+        files.Pointer = fileHandle\Tell!
+
+        unless doCRCs
+            return
+
+        contentSize = fileHandle\Size! - 4
+        fileHandle\Seek( contentSize )
+
+        crc = fileHandle\ReadULong!
+        unless crc
+            return
+
+        @CRC = crc
+        fileHandle\Seek( 0 )
+        @RealCRC = tonumber( util_CRC( fileHandle\Read( contentSize ) ) )
+
+    Read: ( filePath, gamePath, readFiles, doCRCs ) =>
+        table_Empty( @Required )
+        table_Empty( @Files )
+
+        @Open( filePath, gamePath, "rb" )
+        @Parse( doCRCs )
+
+        if readFiles
+            @ReadFiles( doCRCs )
+        @Close!
+
+    VerifyCRC: =>
+        crc = @CRC
+        if crc == 0
+            return true
+        return crc == @RealCRC
+
+    VerifyFilesCRC: =>
+        for data in *@Files
+            crc = data.CRC
+            unless crc
+                continue
+
+            realCRC = data.RealCRC
+            unless realCRC
+                content = data.Content
+                if content
+                    realCRC = tonumber( util_CRC( content ) )
+                    data.RealCRC = realCRC
+
+            if crc ~= realCRC
+                return false, data
+        return true
+
+    VerifyFiles: =>
+        files = @Files
+        if #files == 0
+            return false, "unknown"
+
+        for data in *files
+            unless isFilePathAllowed( data.FilePath )
+                return false, data
+
+        return true
+
+    Write: ( filePath, gamePath, doCRCs ) =>
+        ok, result = @VerifyFiles!
+        unless ok
+            error( "file is not allowed by whitelist (" .. result.FilePath .. ")" )
+
+        fileHandle = @Open( filePath, gamePath, "wb" )
+        unless fileHandle
+            error( "file read handler is missing, opening is impossible" )
+
+        doCRCs = doCRCs ~= false
+        fileHandle\Write( @Identity )
+        fileHandle\WriteByte( @FormatVersion )
+
+        fileHandle\WriteUInt64( tonumber( @SteamID ) or 0 )
+        fileHandle\WriteUInt64( @Timestamp or os.time() )
+
+        for value in pairs( @Required )
+            fileHandle\WriteString( value )
+        fileHandle\WriteByte( 0 )
+
+        fileHandle\WriteString( @Title )
+        fileHandle\WriteString( @Description )
+        fileHandle\WriteString( @Author )
+
+        fileHandle\WriteLong( @Version )
+
+        files = @Files
+        for index = 1, #files
+            fileHandle\WriteULong( index )
+            data = files[ index ]
+
+            fileHandle\WriteString( string_lower( data.FilePath ) )
+            fileHandle\WriteUInt64( data.Size )
+
             if doCRCs
-                crc = tonumber( util_CRC( content ) )
-                data.RealCRC = crc
-                data.CRC = crc
-            files[] = data
+                fileHandle\WriteULong( tonumber( util_CRC( data.Content ) ) )
+            else
+                fileHandle\WriteULong( 0 )
+        fileHandle\WriteULong( 0 )
 
-        ClearFiles: =>
-            table_Empty( @files )
+        for data in *files
+            content = data.Content
+            unless isstring( content )
+                error( "file content must be a string (" .. data.FilePath .. ")" )
+            fileHandle\Write( content )
+        @Close!
 
-        AddRequiredContent: ( value ) =>
-            ArgAssert( value, 1, "string" )
-            @requiredContent[ value ] = true
+        if doCRCs
+            fileHandle = @Open( filePath, gamePath, "rb" )
+            unless fileHandle
+                error( "file read handler is missing, opening is impossible" )
 
-        RemoveRequiredContent: ( value ) =>
-            ArgAssert( value, 1, "string" )
-            @requiredContent[ value ] = nil
+            crc = tonumber( util_CRC( fileHandle\Read! ) )
+            @RealCRC = crc
+            @CRC = crc
 
-        ClearRequiredContent: =>
-            table_Empty( @requiredContent )
+            fileHandle = @Open( filePath, gamePath, "ab" )
+            unless fileHandle
+                error( "file read handler is missing, opening is impossible" )
+            fileHandle\WriteULong( crc )
+            @Close!
+        else
+            fileHandle\WriteULong( 0 )
 
-lib.GMA = GMA
-return lib
+        return true
+
+    ReadFile: ( index ) =>
+        ArgAssert( index, 1, "number" )
+
+        fileHandle = @File
+        unless fileHandle
+            error( "file read handler is missing, reading is not possible" )
+
+        files = @Files
+        data = files[ index ]
+        unless data
+            error( "requested file does not exist" )
+
+        fileHandle\Seek( files.Pointer + data.Position )
+        data.Content = fileHandle\Read( data.Size )
+        return data
+
+    ReadFiles: ( doCRCs ) =>
+        fileHandle = @File
+        unless fileHandle
+            error( "file read handler is missing, reading is not possible" )
+
+        files = @Files
+        pointer = files.Pointer
+        for data in *files
+            fileHandle\Seek( pointer + data.Position )
+            content = fileHandle\Read( data.Size )
+            data.Content = content
+            if doCRCs
+                data.RealCRC = tonumber( util_CRC( content ) )
+
+        return files
+
+    GetFile: ( index ) =>
+        return @Files[ index ]
+
+    AddFile: ( filePath, content, doCRCs ) =>
+        ArgAssert( filePath, 1, "string" )
+        ArgAssert( content, 2, "string" )
+        doCRCs = doCRCs ~= false
+        files = @Files
+
+        filePath = string_lower( filePath )
+        table_RemoveByFunction( files, ( _, data ) ->
+            return data.FilePath == filePath
+        )
+
+        data = {
+            Size: string_len( content )
+            FilePath: filePath
+            Content: content
+        }
+
+        if doCRCs
+            crc = tonumber( util_CRC( content ) )
+            data.RealCRC = crc
+            data.CRC = crc
+        files[] = data
+
+    ClearFiles: =>
+        table_Empty( @files )
+
+    AddRequiredContent: ( value ) =>
+        ArgAssert( value, 1, "string" )
+        @requiredContent[ value ] = true
+
+    RemoveRequiredContent: ( value ) =>
+        ArgAssert( value, 1, "string" )
+        @requiredContent[ value ] = nil
+
+    ClearRequiredContent: =>
+        table_Empty( @requiredContent )
+
+export default GMAD
