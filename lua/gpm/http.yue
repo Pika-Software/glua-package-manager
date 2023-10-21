@@ -5,7 +5,7 @@ if SERVER
 gpm = gpm
 ArgAssert = gpm.ArgAssert
 metaworks = gpm.metaworks
-promise_New = promise.New
+Promise = gpm.Promise
 Logger = gpm.Logger
 util = gpm.util
 type = type
@@ -71,7 +71,7 @@ request = ( parameters ) ->
 
 HTTP = ( parameters ) ->
     ArgAssert( parameters, 1, "table" )
-    p = promise_New()
+    p = Promise!
 
     if type( parameters.method ) ~= "string"
         parameters.method = "GET"
