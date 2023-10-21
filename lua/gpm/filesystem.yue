@@ -354,14 +354,11 @@ if type( efsw ) == "table"
             return true
         lib.UnWatch = lib_UnWatch
 
-promise = promise
+Promise = gpm.Promise
+Promise_Resolve = Promise.Resolve
+
 lib_AsyncRead = nil
 do
-
-    PROMISE = promise.PROMISE
-    PROMISE_Resolve = PROMISE.Resolve
-    PROMISE_Reject = PROMISE.Reject
-    promise_New = promise.New
 
     async = {
         Append: false,
@@ -447,20 +444,20 @@ do
     do
         async_Read = async.Read
         lib_AsyncRead = ( filePath, gameDir ) ->
-            p = promise_New()
+            p = Promise!
             state = async_Read( filePath, gameDir, ( fileName, gamePath, code, content ) ->
                 if code ~= 0
-                    PROMISE_Reject( p, "FSASYNC_READ_ERR: " .. code )
+                    p\Reject "FSASYNC_READ_ERR: " .. code
                 else
-                    PROMISE_Resolve( p, {
+                    p\Resolve {
                         fileName: fileName,
                         gamePath: gamePath,
                         content: content
-                    } )
+                    }
             )
 
             if state ~= 0
-                PROMISE_Reject( p, "FSASYNC_READ_ERR: " .. state )
+                p\Reject "FSASYNC_READ_ERR: " .. state
             return p
         lib.AsyncRead = lib_AsyncRead
 
@@ -470,19 +467,19 @@ do
             unless fastMode
                 lib_BuildFilePath( filePath )
 
-            p = promise_New()
+            p = Promise!
             state = async_Write( filePath, content, ( fileName, gamePath, code ) ->
                 if code ~= 0
-                    PROMISE_Reject( p, "FSASYNC_WRITE_ERR: " .. code )
+                    p\Reject "FSASYNC_WRITE_ERR: " .. code
                 else
-                    PROMISE_Resolve( p, {
+                    p\Resolve {
                         fileName: fileName,
                         gamePath: gamePath
-                    } )
+                    }
             )
 
             if state ~= 0
-                PROMISE_Reject( p, "FSASYNC_WRITE_ERR: " .. state )
+                p\Reject "FSASYNC_WRITE_ERR: " .. state
             return p
 
     do
@@ -491,63 +488,64 @@ do
             unless fastMode
                 lib_BuildFilePath( filePath )
 
-            p = promise_New()
+            p = Promise!
             state = async_Append( filePath, content, ( fileName, gamePath, code ) ->
                 if code ~= 0
-                    PROMISE_Reject( p, "FSASYNC_APPEND_ERR: " .. code )
+                    p\Reject "FSASYNC_APPEND_ERR: " .. code
                 else
-                    PROMISE_Resolve( p, {
+                    p\Resolve {
                         fileName: fileName,
                         gamePath: gamePath
-                    } )
+                    }
             )
 
             if state ~= 0
-                PROMISE_Reject( p, "FSASYNC_APPEND_ERR: " .. state )
+                p\Reject "FSASYNC_APPEND_ERR: " .. state
             return p
 
 do
 
-    promise_Reject = promise.Reject
+    Promise_Reject = Promise.Reject
+    Promise_Async = Promise.Async
 
     do
 
         CompileString = CompileString
         CompileFile = CompileFile
 
-        lib.CompileLua = promise.Async( ( filePath, gamePath, handleError ) ->
+        lib.CompileLua = Promise_Async( ( filePath, gamePath, handleError ) ->
             if CLIENT and lib_IsMounted( filePath, gamePath )
                 filePath = "lua/" .. filePath
                 gamePath = "GAME"
 
             ok, result = lib_AsyncRead( filePath, gamePath )\SafeAwait!
             unless ok
-                return promise_Reject( result )
+                return Promise_Reject( result )
 
             content = result.content
             unless content
-                return promise_Reject( "File compilation '" .. filePath .. "' failed, file cannot be read." )
+                return Promise_Reject( "File compilation '" .. filePath .. "' failed, file cannot be read." )
 
             func = CompileString( content, filePath, handleError )
             if not func and ( gamePath == "LUA" or gamePath == "lsv" or gamePath == "lcl" )
                 func = CompileFile( filePath )
 
             unless func
-                return promise_Reject( "File compilation '" .. filePath .. "' failed, unknown error." )
+                return Promise_Reject( "File compilation '" .. filePath .. "' failed, unknown error." )
 
             return func
         )
 
     do
         util_CompileMoonString = util.CompileMoonString
-        lib.CompileMoon = promise.Async( ( filePath, gamePath, handleError ) ->
+        lib.CompileMoon = Promise_Async( ( filePath, gamePath, handleError ) ->
             ok, result = lib_AsyncRead( filePath, gamePath )\SafeAwait!
             unless ok
-                return promise_Reject( result )
+                return Promise_Reject( result )
 
             content = result.content
             unless content
-                return promise_Reject( "File compilation '" .. filePath .. "' failed, file cannot be read." )
+                return Promise_Reject( "File compilation '" .. filePath .. "' failed, file cannot be read." )
             return util_CompileMoonString( content, filePath, handleError )
         )
 
