@@ -46,8 +46,6 @@ do
 
 unless gpm.Developer
     gpm.Developer = cvars.Number( "developer", 0 )
-    tonumber = tonumber
-
     cvars.AddChangeCallback( "developer", ( _, __, new ) ->
         gpm.Developer = tonumber( new ) or 0
     "gLua Package Manager" )
@@ -56,14 +54,19 @@ include = include or require
 include( "gpm/util.lua" )
 logger = gpm.Logger
 
-logger\Info( "gm_promise v%s is initialized.", include( "gpm/libs/promise.lua" ).VERSION )
+Promise = include( "gpm/libs/promise.lua" )
+gpm.Promise = Promise
+logger\Info( "gm_promise v%s is initialized.", Promise.VERSION )
 logger\Info( "metaworks v%s is initialized.", include( "libs/metaworks.lua" ).VERSION )
 
 logger\Info( "LibDeflate v%s is initialized.", include( "gpm/libs/3rd-party/deflate.lua" )._VERSION )
 include( "gpm/filesystem.lua" )
 include( "gpm/http.lua" )
 
-logger\Info( "gmad v%s is initialized.", include( "gpm/libs/gmad.lua" ).VERSION )
+GMAD = include( "gpm/libs/gmad.lua" )
+gpm.GMAD = GMAD
+logger\Info( "%s%d v%s is initialized.", GMAD.Identity, GMAD.FormatVersion, GMAD.VERSION )
+
 include( "gpm/package.lua" )
 
 logger\Info( "Start-up time: %.4f sec.", sysTime! - gpm.StartTime )
