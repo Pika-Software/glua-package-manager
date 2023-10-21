@@ -1,0 +1,237 @@
+--[[
+    MIT License
+
+    Copyright (c) 2023 Retro
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.
+--]]
+
+gpm = gpm
+util = gpm.util
+istable = istable
+isfunction = isfunction
+util_NextTick = util.NextTick
+
+iscallable = (obj) ->
+    if isfunction obj then return true
+    if istable obj then
+        meta = getmetatable obj
+        return istable(meta) and isfunction(meta.__call)
+
+get_thenable = (obj) ->
+    then_fn = obj.Then
+    iscallable(then_fn) and then_fn
+
+once = () ->
+    was_called = false
+    (wrapped_fn) ->
+        (...) ->
+            return ... if was_called
+            was_called = true
+            wrapped_fn ...
+
+class Promise
+    STATE_PENDING: 1
+    STATE_FULFILLED: 2
+    STATE_REJECTED: 3
+
+    IsPromise: (obj) -> istable(obj) and obj.__class == Promise
+
+    new: (executor) =>
+        @state = @STATE_PENDING
+        @value = nil
+        @reason = nil
+        @queue = nil -- Queue is created only if then called in pending state
+
+        if iscallable executor
+            try
+                executor @\Resolve, @\Reject
+            catch err
+                @\Reject err
+
+    __tostring: =>
+        ptr = string.format "%p", @
+        return switch @state
+            when @STATE_PENDING
+                "Promise #{ptr} { <state>: \"pending\" }"
+            when @STATE_FULFILLED
+                "Promise #{ptr} { <state>: \"fulfilled\", <value>: #{@value} }"
+            when @STATE_REJECTED
+                "Promise #{ptr} { <state>: \"rejected\", <reason>: #{@reason} }"
+            else
+                "Promise #{ptr} { <state>: \"invalid\" }"
+
+    _FinalizePromise: (p) =>
+        try
+            if @state == @STATE_FULFILLED
+                if p.on_fulfilled then p\Resolve p.on_fulfilled @value
+                else p\Resolve @value
+            elseif @state == @STATE_REJECTED
+                if p.on_rejected then p\Resolve p.on_rejected @reason
+                else p\Reject @reason
+            if p.on_finally then p.on_finally!
+        catch err
+            p\Reject err
+
+    _Finalize: =>
+        return if @state == @STATE_PENDING
+        return unless @queue
+        util_NextTick ->
+            for i, p in ipairs @queue
+                @_FinalizePromise p
+                @queue[i] = nil
+
+    _Fulfill: (value) =>
+        @state = @STATE_FULFILLED
+        @value = value
+        @_Finalize!
+
+    _ResolveThenable: (obj, thenable) =>
+        once_wrapper = once!
+        onFulfill = once_wrapper (value) -> @Resolve value
+        onReject = once_wrapper (reason) -> @Reject reason
+        unless ok, err = try thenable obj, onFulfill, onReject
+            onReject err
+
+    Resolve: (value) =>
+        return unless @state == @STATE_PENDING
+        return @Reject "Cannot resolve a promise with itself" if value == @ -- TODO use TypeError object
+        @on_fulfilled = nil
+        @on_rejected = nil
+        if @.IsPromise value
+            if value.state == @STATE_PENDING
+                value.queue = {} unless value.queue
+                value.queue[] = @
+            else
+                value\_FinalizePromise @
+        elseif istable value
+            ok, thenable = try get_thenable value
+            unless ok then return @\Reject thenable
+
+            if thenable
+                @_ResolveThenable value, thenable
+            else
+                @_Fulfill value
+        else
+            @_Fulfill value
+
+    @__base.resolve = @__base.Resolve
+
+    Reject: (reason) =>
+        return unless @state == @STATE_PENDING
+        @state = @STATE_REJECTED
+        @reason = reason
+        @_Finalize!
+
+    @__base.reject = @__base.Reject
+
+    Then: (on_fulfilled, on_rejected, on_finally) =>
+        p = Promise!
+        p.on_fulfilled = on_fulfilled if iscallable on_fulfilled
+        p.on_rejected = on_rejected if iscallable on_rejected
+        p.on_finally = on_finally if iscallable on_finally
+        @queue = {} unless @queue
+        @queue[] = p
+        @_Finalize!
+        return p
+
+    @__base.then = @__base.Then
+    @__base.next = @__base.Then
+    @__base.andThen = @__base.Then
+
+    Catch: (on_rejected) => @Then nil, on_rejected
+    Finally: (on_finally) => @Then nil, nil, on_finally
+    @__base.catch = @__base.Catch
+    @__base.finally = @__base.Finally
+
+    @Resolve: (value) ->
+        with Promise!
+            \Resolve value
+
+    @resolve: @Resolve
+
+    @Reject: (reason) ->
+        with Promise!
+            \Reject reason
+
+    @reject: @Reject
+
+    @All: (promises) ->
+        p = Promise!
+        count = #promises
+        values = {}
+        if count == 0 then p\Resolve values
+        for i, promise in ipairs promises
+            if Promise.IsPromise promise
+                promise\Then (value) ->
+                        values[i] = value
+                        count -= 1
+                        p\Resolve values if count == 0,
+                    (reason) => p\Reject reason
+            else
+                values[i] = promise
+                count -= 1
+                p\Resolve values if count == 0
+        return p
+
+    @all: @All
+
+    @AllSettled: (promises) ->
+        p = Promise!
+        count = #promises
+        values = {}
+        if count == 0 then p\Resolve values
+        for i, promise in ipairs promises
+            promise\Then (value) ->
+                    values[i] = { status: "fulfilled", value: value }
+                    count -= 1
+                    p\Resolve values if count == 0,
+                (reason) ->
+                    values[i] = { status: "rejected", reason: reason }
+                    count -= 1
+                    p\Resolve values if count == 0
+        return p
+
+    @allSettled: @AllSettled
+
+    @Any: (promises) ->
+        p = Promise!
+        count = #promises
+        reasons = {}
+        if count == 0 then p\Reject "No promises to resolve"
+        for i, promise in ipairs promises
+            promise\Then (value) -> p\Resolve value,
+                (reason) ->
+                    reasons[i] = reason
+                    count -= 1
+                    p\Resolve reasons if count == 0
+        return p
+
+    @any: @Any
+
+    @Race: (promises) ->
+        p = Promise!
+        for promise in *promises
+            promise\Then (value) -> p\Resolve value,
+                (reason) -> p\Reject reason
+        return p
+
+    @race: @Race
+
+export default Promise
