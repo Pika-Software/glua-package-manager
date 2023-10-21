@@ -56,72 +56,72 @@ do
     processed, total = 0, #files
     table_Empty( sources )
 
-    initSource = promise.Async( ( filePath ) ->
-        if SERVER
-            AddCSLuaFile filePath
+    -- initSource = promise.Async( ( filePath ) ->
+    --     if SERVER
+    --         AddCSLuaFile filePath
 
-        ok, result = fs_CompileLua( filePath, "LUA" )\SafeAwait!
-        unless ok
-            Logger\Error "Source '%s' compile failed, %s.", filePath, result
-            processed += 1
-            return
+    --     ok, result = fs_CompileLua( filePath, "LUA" )\SafeAwait!
+    --     unless ok
+    --         Logger\Error "Source '%s' compile failed, %s.", filePath, result
+    --         processed += 1
+    --         return
 
-        environment = {
-            SOURCE: {
-                FilePath: filePath
-            }
-        }
+    --     environment = {
+    --         SOURCE: {
+    --             FilePath: filePath
+    --         }
+    --     }
 
-        debug_setfenv( result, environment )
-        package_seeall( environment )
-        ok, result = pcall( result )
-        processed += 1
+    --     debug_setfenv( result, environment )
+    --     package_seeall( environment )
+    --     ok, result = pcall( result )
+    --     processed += 1
 
-        if ok
-            source = environment.SOURCE
-            sourceName = source.Name or filePath
+    --     if ok
+    --         source = environment.SOURCE
+    --         sourceName = source.Name or filePath
 
-            if type( source.IsAvalibleFilePath ) ~= "function"
-                Logger\Error "Function .IsAvalibleFilePath is missing from source '%s', source loading failed!", sourceName
-                return
+    --         if type( source.IsAvalibleFilePath ) ~= "function"
+    --             Logger\Error "Function .IsAvalibleFilePath is missing from source '%s', source loading failed!", sourceName
+    --             return
 
-            func = source.GetInfo
-            if type( func ) == "function"
-                source.GetInfo = promise.Async( func )
-            else
-                Logger\Error "Function .GetInfo is missing from source '%s', source loading failed!", sourceName
-                return
+    --         func = source.GetInfo
+    --         if type( func ) == "function"
+    --             source.GetInfo = promise.Async( func )
+    --         else
+    --             Logger\Error "Function .GetInfo is missing from source '%s', source loading failed!", sourceName
+    --             return
 
-            func = source.Install
-            if type( func ) == "function"
-                source.Install = promise.Async( func )
-            else
-                Logger\Error "Function .Install is missing from source '%s', source loading failed!", sourceName
-                return
+    --         func = source.Install
+    --         if type( func ) == "function"
+    --             source.Install = promise.Async( func )
+    --         else
+    --             Logger\Error "Function .Install is missing from source '%s', source loading failed!", sourceName
+    --             return
 
-            func = source.Reload
-            if type( func ) == "function"
-                source.Reload = promise.Async( func )
+    --         func = source.Reload
+    --         if type( func ) == "function"
+    --             source.Reload = promise.Async( func )
 
-            sources[ #sources + 1 ] = source
-            sources[ sourceName ] = source
+    --         sources[ #sources + 1 ] = source
+    --         sources[ sourceName ] = source
 
-        else
-            Logger\Error result
-            return
+    --     else
+    --         Logger\Error result
+    --         return
 
-        if processed == total
-            files, folders = fs_Find "packages/*", "LUA"
-            for folderName in *folders
-                importPath = "packages/" .. folderName
+    --     if processed == total
+    --         files, folders = fs_Find "packages/*", "LUA"
+    --         for folderName in *folders
+    --             importPath = "packages/" .. folderName
 
-            for fileName in *files
-                importPath = "packages/" .. fileName
+    --         for fileName in *files
+    --             importPath = "packages/" .. fileName
 
-    )
+    -- )
 
-    for index = 1, total
-        initSource files[ index ]
-    files = nil
+    -- for index = 1, total
+    --     initSource files[ index ]
+    -- files = nil
 
 return lib
