@@ -2,14 +2,15 @@ if SERVER
     AddCSLuaFile!
 
 debug_setmetatable = debug.setmetatable
+isfunction = isfunction
+istable = istable
+table = gpm.table
 rawget = rawget
 error = error
-type = type
 
-lib = gpm.Table( gpm, "metaworks", ->
-    return {
-        VERSION: "1.0.0"
-    } )
+lib = gpm.Table( gpm, "metaworks", -> {
+    VERSION: "1.0.0"
+} )
 
 lib.GetValue = table.Lookup
 
@@ -19,53 +20,49 @@ do
     debug_setfenv = debug.setfenv
 
     lib.SetValue = ( tbl, keyPath, value ) ->
-        if type( value ) == "function" then
+        if isfunction( value )
             debug_setfenv( value, tbl )
         table_SetValue( tbl, keyPath, value )
 
-metaworks_GetLinks = ( any ) ->
+lib_GetLinks = ( any ) ->
     return rawget( any, "__indexes" )
-lib.GetLinks = metaworks_GetLinks
+lib.GetLinks = lib_GetLinks
 
+lib_UnLink = nil
 do
+
     table_RemoveByIValue = table.RemoveByIValue
-    lib.UnLink = ( table1, table2 ) ->
-        table_RemoveByIValue( metaworks_GetLinks( table1 ), table2 )
-        return table1
 
-metaworks_Link = nil
+    lib_UnLink = ( table1, table2 ) ->
+        table_RemoveByIValue( lib_GetLinks( table1 ), table2 )
+        return table1
+    lib.UnLink = lib_UnLink
+
+lib_Link = nil
 do
 
-    metaworks_UnLink = lib.UnLink
     table_insert = table.insert
 
-    metaworks_Link = ( table1, table2 ) ->
-        metaworks_UnLink( table1, table2 )
-        table_insert( metaworks_GetLinks( table1 ), 1, table2 )
+    lib_Link = ( table1, table2 ) ->
+        lib_UnLink( table1, table2 )
+        table_insert( lib_GetLinks( table1 ), 1, table2 )
         return table1
-    lib.Link = metaworks_Link
+    lib.Link = lib_Link
 
-do
-
-    meta = lib.ObjectMeta
-    if type( meta ) ~= "table"
-        meta = {}
-        lib.ObjectMeta = meta
-
-    meta.__index = ( key ) ->
-        for link in *metaworks_GetLinks( @ )
+-- MIT - Multi index table
+class MIT
+    __index: ( key ) =>
+        for link in *lib_GetLinks( @ )
             value = rawget( link, key )
             if value ~= nil
                 return value
 
-    lib.Create = ( any ) ->
-        object = { __indexes: {} }
-        unless debug_setmetatable( object, meta )
-            error( "Object creation failed." )
-
+    new: ( any ) =>
+        @__indexes = {}
         if any ~= nil
-            return metaworks_Link( object, any )
-        return object
+            lib_Link( @, any )
+
+lib.MIT = MIT
 
 lib.CreateLink = ( object, read, write ) ->
     meta = {}
