@@ -108,14 +108,14 @@ HTTP = ( parameters ) ->
 gpm.HTTP = HTTP
 
 lib.Fetch = ( url, headers, timeout ) ->
-    HTTP( {
+    return HTTP( {
         headers: headers,
         timeout: timeout,
         url: url
     } )
 
 lib.Post = ( url, parameters, headers, timeout ) ->
-    HTTP( {
+    return HTTP( {
         parameters: parameters,
         headers: headers,
         timeout: timeout,
