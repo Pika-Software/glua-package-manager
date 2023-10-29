@@ -508,8 +508,7 @@ do
                 state, stateColor = "Server", Color( 5, 170, 250 )
             gpm.State, colors.State = state or "unknown", stateColor or whiteColor
 
-        debugFilter = ->
-            return gpm.Developer > 0
+        debugFilter = -> gpm.Developer > 0
 
         primaryTextColor = colors.PrimaryText
         secondaryTextColor = colors.SecondaryText
