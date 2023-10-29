@@ -1,11 +1,7 @@
 SERVER = SERVER
-if SERVER and AddCSLuaFile
-    AddCSLuaFile!
 
 sysTime = SysTime or os.time
-type = type
-
-if type( gpm ) ~= "table"
+unless istable( gpm )
     global gpm = { VERSION: "2.0.0" }
 
 gpm = gpm
@@ -44,7 +40,7 @@ do
         splash = " " .. splash
     print( string.format( "\n                                     ___          __            \n                                   /'___`\\      /'__`\\          \n     __    _____     ___ ___      /\\_\\ /\\ \\    /\\ \\/\\ \\         \n   /'_ `\\ /\\ '__`\\ /' __` __`\\    \\/_/// /__   \\ \\ \\ \\ \\        \n  /\\ \\L\\ \\\\ \\ \\L\\ \\/\\ \\/\\ \\/\\ \\      // /_\\ \\ __\\ \\ \\_\\ \\   \n  \\ \\____ \\\\ \\ ,__/\\ \\_\\ \\_\\ \\_\\    /\\______//\\_\\\\ \\____/   \n   \\/___L\\ \\\\ \\ \\/  \\/_/\\/_/\\/_/    \\/_____/ \\/_/ \\/___/    \n     /\\____/ \\ \\_\\                                          \n     \\_/__/   \\/_/                %s                        \n\n  GitHub: https://github.com/Pika-Software\n  Discord: https://discord.gg/Gzak99XGvv\n  Website: https://pika-soft.ru\n  Developers: Pika Software\n  License: MIT\n", splash ) )
 
-unless gpm.Developer
+unless CLIENT and gpm.Developer
     gpm.Developer = cvars.Number( "developer", 0 )
     cvars.AddChangeCallback( "developer", ( _, __, new ) ->
         gpm.Developer = tonumber( new ) or 0
@@ -54,20 +50,46 @@ include = include or require
 include( "gpm/util.lua" )
 logger = gpm.Logger
 
+logger\Info( "metaworks v%s initialized.", include( "libs/metaworks.lua" ).VERSION )
+
+gm_error = include( "gpm/libs/error.lua" )
+gpm.Error, gpm.TypeError = gm_error.Error, gm_error.TypeError
+logger\Info( "gm_error initialized." )
+
 Promise = include( "gpm/libs/promise.lua" )
 gpm.Promise = Promise
-logger\Info( "gm_promise v%s is initialized.", Promise.VERSION )
-logger\Info( "metaworks v%s is initialized.", include( "libs/metaworks.lua" ).VERSION )
+logger\Info( "gm_promise v%s initialized.", Promise.VERSION )
 
-logger\Info( "LibDeflate v%s is initialized.", include( "gpm/libs/3rd-party/deflate.lua" )._VERSION )
+logger\Info( "LibDeflate v%s initialized.", include( "gpm/libs/3rd-party/deflate.lua" )._VERSION )
 include( "gpm/filesystem.lua" )
 include( "gpm/http.lua" )
 
 GMAD = include( "gpm/libs/gmad.lua" )
 gpm.GMAD = GMAD
-logger\Info( "%s%d v%s is initialized.", GMAD.Identity, GMAD.FormatVersion, GMAD.VERSION )
+logger\Info( "%s%d v%s initialized.", GMAD.Identity, GMAD.FormatVersion, GMAD.VERSION )
 
 include( "gpm/package.lua" )
+
+if SERVER
+    AddCSLuaFile = AddCSLuaFile
+    AddCSLuaFile!
+
+    clientFiles = {
+        "util.lua"
+        "libs/metaworks.lua"
+        "libs/error.lua"
+        "libs/promise.lua"
+        "libs/3rd-party/deflate.lua"
+        "filesystem.lua"
+        "http.lua"
+        "libs/gmad.lua"
+        "package.lua"
+    }
+
+    for fileName in *clientFiles
+        fileName = "gpm/" .. fileName
+        AddCSLuaFile( fileName )
+        logger\Debug( "File '%s' was sent to the client.", fileName )
 
 logger\Info( "Start-up time: %.4f sec.", sysTime! - gpm.StartTime )
 return gpm
