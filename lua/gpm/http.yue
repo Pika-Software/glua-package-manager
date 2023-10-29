@@ -1,14 +1,5 @@
-SERVER = SERVER
-if SERVER
-    AddCSLuaFile!
-
 gpm = gpm
-ArgAssert = gpm.ArgAssert
-metaworks = gpm.metaworks
-Promise = gpm.Promise
-Logger = gpm.Logger
-util = gpm.util
-type = type
+:ArgAssert, :metaworks, :Promise, :Logger, :util = gpm
 
 lib = gpm.Table( gpm, "http", metaworks.CreateLink, http, true )
 client, clientName = nil, nil
@@ -38,7 +29,6 @@ do
     util_IsBinaryModuleInstalled = util.IsBinaryModuleInstalled
     require = require
     pcall = pcall
-    _G = _G
 
     for item in *clients
         if item.Installed or ( util_IsBinaryModuleInstalled( item.Name ) and pcall( require, item.Name ) )
@@ -46,18 +36,11 @@ do
             Logger\Info( "'%s' was connected as HTTP client.", item.Name )
             break
 
-    util_IsBinaryModuleInstalled = nil
-    require = nil
-    clients = nil
-    pcall = nil
-    _G = nil
-
 queue = {}
-util.NextTick( ->
+util.NextTick ->
     for func in *queue
         func!
     queue = nil
-)
 
 http_timeout = CreateConVar( "http_timeout", "10", FCVAR_ARCHIVE, "Default http timeout for gpm http library.", 3, 300 )\GetInt!
 cvars.AddChangeCallback( "http_timeout"
@@ -65,21 +48,28 @@ cvars.AddChangeCallback( "http_timeout"
         http_timeout = tonumber( int ) or 10
 "gLua Package Manager" )
 
-request = ( parameters ) ->
-    Logger\Debug( "%s HTTP request to '%s', using '%s', with timeout %d seconds.", parameters.method, parameters.url, clientName, parameters.timeout )
-    client( parameters )
+:HTTPError = Promise
+request = ( parameters, p ) ->
+    if client( parameters ) or clientName ~= "Garry's Mod"
+        Logger\Debug( "%s HTTP request to '%s', using '%s', with timeout %d seconds.", parameters.method, parameters.url, clientName, parameters.timeout )
+    else
+        p\Reject( HTTPError( "failed to make http request" ) )
+
+isstring = isstring
+isnumber = isnumber
+istable = istable
 
 HTTP = ( parameters ) ->
     ArgAssert( parameters, 1, "table" )
     p = Promise!
 
-    if type( parameters.method ) ~= "string"
+    unless isstring( parameters.method )
         parameters.method = "GET"
 
-    if type( parameters.timeout ) ~= "number"
+    unless isnumber( parameters.timeout )
         parameters.timeout = http_timeout
 
-    if type( parameters.headers ) ~= "table"
+    unless istable( parameters.headers )
         parameters.headers = {}
 
     if clientName == "reqwest"
@@ -89,36 +79,20 @@ HTTP = ( parameters ) ->
             lib.UserAgent = userAgent
         parameters.headers["User-Agent"] = userAgent
 
-    parameters.success = ( code, body, headers ) ->
-        p\Resolve( {
-            headers: headers,
-            body: body,
-            code: code
-        } )
-
+    parameters.success = ( code, body, headers ) -> p\Resolve( { :code, :body, :headers } )
     parameters.failed = ( msg ) ->
-        p\Reject( msg )
+        p\Reject( HTTPError( msg ) )
+        return -- for better stacktrace
 
     if queue ~= nil
-        queue[ #queue + 1 ] = ->
-            request( parameters )
+        queue[ #queue + 1 ] = -> request( parameters )
     else
         request( parameters )
     return p
 gpm.HTTP = HTTP
 
 lib.Fetch = ( url, headers, timeout ) ->
-    return HTTP( {
-        headers: headers,
-        timeout: timeout,
-        url: url
-    } )
+    return HTTP( { :url, :headers, :timeout, method: "GET" } )
 
 lib.Post = ( url, parameters, headers, timeout ) ->
-    return HTTP( {
-        parameters: parameters,
-        headers: headers,
-        timeout: timeout,
-        method: "POST",
-        url: url
-    } )
+    return HTTP( { :url, :parameters, :headers, :timeout, method: "POST" } )
