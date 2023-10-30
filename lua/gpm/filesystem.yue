@@ -159,14 +159,15 @@ do
     moonloader_PreCacheFile = moonloader and moonloader.PreCacheFile or nil
     string_sub = string.sub
 
-    compilableExtensions = { "yue", "moon" }
+    compilableExtensions = { "moon", "yue" }
+    gamePath = SERVER and "lsv" or "LUA"
     codeExtensions = {
         moon: true
         yue: true
         lua: true
     }
 
-    lib_IsCompilable = ( filePath, gamePath, preCompile ) ->
+    lib_IsCompilable = ( filePath, preCompile ) ->
         extension = string_GetExtensionFromFilename( filePath )
         if extension ~= nil
             unless codeExtensions[ extension ]
@@ -285,11 +286,11 @@ if SERVER
             folder = string_GetPathFromFilename( luaPath )
             if folder
                 filePath = folder .. fileName
-                if lib_IsCompilable( filePath, "LUA", true )
+                if lib_IsCompilable( filePath, true )
                     AddCSLuaFile( filePath )
                     return
 
-        if lib_IsCompilable( fileName, "LUA", true )
+        if lib_IsCompilable( fileName, true )
             AddCSLuaFile( fileName )
             return
 
@@ -302,7 +303,7 @@ if SERVER
 
         for fileName in *files
             filePath = path_Join( folder, fileName )
-            if lib_IsCompilable( filePath, "lsv", true )
+            if lib_IsCompilable( filePath, true )
                 AddCSLuaFile( path_ReplaceExtension( filePath, "lua" ) )
     lib.AddCSLuaFolder = lib_AddCSLuaFolder
 
