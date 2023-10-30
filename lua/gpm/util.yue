@@ -1,19 +1,18 @@
 MENU_DLL = MENU_DLL
 CLIENT = CLIENT
-SERVER = SERVER
-
-if SERVER
-    AddCSLuaFile!
 
 setmetatable = setmetatable
+isfunction = isfunction
+isstring = isstring
+isnumber = isnumber
+istable = istable
 ipairs = ipairs
 error = error
-type = type
 gpm = gpm
 
 gpm_Table = ( tbl, name, func, ... ) ->
     result = tbl[ name ]
-    if type( result ) ~= "table"
+    unless istable( result )
         if func
             result = func( ... )
         else
@@ -103,6 +102,7 @@ string = gpm_Table( gpm, "string", ->
 )
 
 string.StartsWith = string.StartsWith or string.StartWith
+string.GetPathFromFilename = string.GetPathFromFilename
 
 do
     string_match = string.match
@@ -125,8 +125,9 @@ debug.fcall = ( func, ... ) ->
 debug_getinfo = debug.getinfo
 
 gpm_ArgAssert = ( value, argNum, expected, errorlevel ) ->
-    valueType, expectedType = gpm_type( value ), gpm_type( expected )
-    if expectedType == "table"
+    valueType = gpm_type( value )
+
+    if istable( expected )
         str, len = "[ ", #expected
         for index = 1, len
             typeName = expected[ index ]
@@ -137,9 +138,9 @@ gpm_ArgAssert = ( value, argNum, expected, errorlevel ) ->
                 str = str .. typeName .. ", "
 
         expected = str .. " ]"
-    elseif expectedType == "function"
+    elseif isfunction( expected )
         expected = expected( value, argNum )
-        if type( expected ) ~= "string"
+        unless isstring( expected )
             return value
     elseif valueType == expected
         return value
@@ -189,21 +190,20 @@ table.SetValue = ( tbl, str, value, ifEmpty ) ->
         nextValue = tbl[ key ]
         if nextValue == nil
             tbl[ key ] = {}
-        elseif type( nextValue ) ~= "table"
+        elseif not istable( nextValue )
             return
 
         tbl = tbl[ key ]
 
 table_Lower = ( tbl ) ->
     for key, value in pairs( tbl )
-        if type( value ) == "table"
+        if istable( value )
             value = table_Lower( value )
 
-        keyType = type( key )
-        if keyType == "string"
+        if isstring( key )
             tbl[ string_lower( key ) ] = value
             tbl[ key ] = nil
-        elseif keyType == "table"
+        elseif istable( key )
             tbl[ table_Lower( key ) ] = value
             tbl[ key ] = nil
 
@@ -257,8 +257,8 @@ do
     gpm_IsColor = ( any ) ->
         if getmetatable( any ) == meta
             return true
-        elseif type( any ) == "table"
-            return type( any.r ) == "number" and type( any.g ) == "number" and type( any.b ) == "number"
+        elseif istable( any )
+            return isnumber( any.r ) and isnumber( any.g ) and isnumber( any.b )
         return false
     gpm_AddType( "Color", gpm_IsColor )
     gpm.IsColor = gpm_IsColor
@@ -327,7 +327,7 @@ do
         util.Version = ( number ) ->
             unless number
                 return "unknown"
-            elseif type( number ) == "string"
+            elseif isstring( number )
                 return number
 
             version = string_format( "%06d", number )
@@ -337,9 +337,7 @@ do
         timer_Simple = timer.Simple
         util.NextTick = ( func, a, b, c, d ) ->
             gpm_ArgAssert( func, 1, "function" )
-            timer_Simple( 0, ->
-                func( a, b, c, d )
-            )
+            timer_Simple 0, -> func( a, b, c, d )
 
     do
 
@@ -367,7 +365,7 @@ do
         CompileString = CompileString
 
         moonloader_ToLua = nil
-        if type( moonloader ) == "table"
+        if istable( moonloader )
             moonloader_ToLua = moonloader.ToLua
 
         util.CompileMoonString = ( moonCode, identifier, handleError ) ->
@@ -381,7 +379,7 @@ do
                 error( msg )
 
             func = CompileString( luaCode, identifier, handleError )
-            if type( func ) ~= "function"
+            unless isfunction( func )
                 error( msg )
 
             return func
@@ -499,7 +497,7 @@ do
             } )
 
         state, stateColor, whiteColor = gpm.State, colors.State, colors.White
-        if type( state ) ~= "string"
+        unless isstring( state )
             if MENU_DLL
                 state, stateColor = "Menu", Color( 75, 175, 80 )
             elseif CLIENT
@@ -527,8 +525,8 @@ do
                 return string_format( "Logger: %p [%s]", @, @GetName! )
 
             new: ( name, color, func ) =>
-                @DebugFilter = type( func ) == "function" and func or debugFilter
-                @Name = type( name ) == "string" and name or "unknown"
+                @DebugFilter = isfunction( func ) and func or debugFilter
+                @Name = isstring( name ) and name or "unknown"
                 @Color = gpm_IsColor( color ) and color or whiteColor
                 @TextColor = primaryTextColor
 
