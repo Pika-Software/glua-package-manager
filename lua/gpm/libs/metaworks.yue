@@ -1,6 +1,3 @@
-if SERVER
-    AddCSLuaFile!
-
 debug_setmetatable = debug.setmetatable
 isfunction = isfunction
 istable = istable
