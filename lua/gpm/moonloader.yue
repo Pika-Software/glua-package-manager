@@ -13,64 +13,61 @@ else
     return
 
 CompileString = CompileString
-:ArgAssert = gpm
 isfunction = isfunction
+istable = istable
+:ArgAssert = gpm
 error = error
 
 -- MoonScript
 moonloader = moonloader
-unless moonloader
-    return
+if istable( moonloader )
+    gpm.moonloader = moonloader
+    moonloader_ToLua = moonloader.ToLua
 
-gpm.moonloader = moonloader
-moonloader_ToLua = moonloader.ToLua
+    util.CompileMoonString = ( moonCode, identifier, handleError ) ->
+        ArgAssert( moonCode, "string", 1 )
+        ArgAssert( identifier, "string", 2 )
 
-util.CompileMoonString = ( moonCode, identifier, handleError ) ->
-    ArgAssert( moonCode, "string", 1 )
-    ArgAssert( identifier, "string", 2 )
+        luaCode, message = moonloader_ToLua( moonCode )
+        message = message or "MoonScript to Lua compilation failed."
 
-    luaCode, message = moonloader_ToLua( moonCode )
-    message = message or "MoonScript to Lua compilation failed."
+        unless luaCode
+            error( message )
 
-    unless luaCode
-        error( message )
+        func = CompileString( luaCode, identifier, handleError == true )
+        unless isfunction( func )
+            error( message )
 
-    func = CompileString( luaCode, identifier, handleError == true )
-    unless isfunction( func )
-        error( message )
+        return func
 
-    return func
-
-Logger\Info( "MoonScript is now supported!" )
+    Logger\Info( "MoonScript: ✔" )
+else
+    Logger\Info( "MoonScript: ✖" )
 
 -- Yuescript
-yueloader = moonloader.yue
-unless yueloader
-    return
+yue = moonloader and moonloader.yue
+if istable( yue )
+    yue_ToLua = yue.ToLua
 
-yueloader.PreCacheFile = moonloader.PreCacheFile
-yueloader.PreCacheDir = moonloader.PreCacheDir
-gpm.yueloader = yueloader
+    -- https://github.com/pigpigyyy/Yuescript/src/yuescript/yue_compiler.h#L28
+    util.CompileYueString = ( yueCode, identifier, handleError, yueConfig ) ->
+        ArgAssert( yueCode, "string", 1 )
+        ArgAssert( identifier, "string", 2 )
+        if yueConfig ~= nil
+            ArgAssert( yueConfig, "table", 4 )
 
-yueloader_ToLua = yueloader.ToLua
+        luaCode, message = yue_ToLua( yueCode, yueConfig )
+        message = message or "Yuescript to Lua compilation failed."
 
--- https://github.com/pigpigyyy/Yuescript/src/yuescript/yue_compiler.h#L28
-util.CompileYueString = ( yueCode, identifier, handleError, yueConfig ) ->
-    ArgAssert( yueCode, "string", 1 )
-    ArgAssert( identifier, "string", 2 )
-    if yueConfig ~= nil
-        ArgAssert( yueConfig, "table", 4 )
+        unless luaCode
+            error( message )
 
-    luaCode, message = yueloader_ToLua( yueCode, yueConfig )
-    message = message or "Yuescript to Lua compilation failed."
+        func = CompileString( luaCode, identifier, handleError == true )
+        unless isfunction( func )
+            error( message )
 
-    unless luaCode
-        error( message )
+        return func
 
-    func = CompileString( luaCode, identifier, handleError == true )
-    unless isfunction( func )
-        error( message )
-
-    return func
-
-Logger\Info( "Yuescript is now supported!" )
+    Logger\Info( "Yuescript: ✔" )
+else
+    Logger\Info( "Yuescript: ✖" )
