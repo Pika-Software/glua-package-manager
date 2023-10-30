@@ -50,6 +50,7 @@ include = include or require
 include( "gpm/util.lua" )
 logger = gpm.Logger
 
+include( "gpm/moonloader.lua" )
 logger\Info( "metaworks v%s initialized.", include( "libs/metaworks.lua" ).VERSION )
 
 gm_error = include( "gpm/libs/error.lua" )
@@ -76,6 +77,7 @@ if SERVER
 
     clientFiles = {
         "util.lua"
+        "moonloader.lua"
         "libs/metaworks.lua"
         "libs/error.lua"
         "libs/promise.lua"

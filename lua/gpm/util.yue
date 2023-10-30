@@ -10,6 +10,12 @@ ipairs = ipairs
 error = error
 gpm = gpm
 
+util.CompileMoonString = ->
+    error( "Attempt to compile MoonScript failed, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader." )
+
+util.CompileYueString = ->
+    error( "Attempt to compile Yuescript failed, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader." )
+
 gpm_Table = ( tbl, name, func, ... ) ->
     result = tbl[ name ]
     unless istable( result )
@@ -359,30 +365,6 @@ do
             elseif jit_versionnum ~= 20004 and jit_arch == "x86" and isLinux
                 return file_Exists( string_format( fmt, name, "linux32" ), "GAME" )
             return false
-
-    do
-
-        CompileString = CompileString
-
-        moonloader_ToLua = nil
-        if istable( moonloader )
-            moonloader_ToLua = moonloader.ToLua
-
-        util.CompileMoonString = ( moonCode, identifier, handleError ) ->
-            unless moonloader_ToLua
-                error( "Attempting to compile a Moonscript file fails, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader." )
-
-            luaCode, msg = moonloader_ToLua( moonCode )
-            msg = msg or "MoonScript to Lua code compilation failed."
-
-            unless luaCode
-                error( msg )
-
-            func = CompileString( luaCode, identifier, handleError )
-            unless isfunction( func )
-                error( msg )
-
-            return func
 
     do
 
