@@ -1,121 +1,62 @@
 gpm = gpm
-:fs, :paths, :metaworks, :Logger = gpm
-type = type
+:fs, :path, :metaworks, :Logger, :Promise, :Table = gpm
+luaGameDir = fs.LuaGameDir
+istable = istable
 
-lib = gpm.Table( gpm, "package", metaworks.CreateLink, package, true )
+packages = Table( gpm, "Packages" )
 
 class Package
-    new: ( filePath ) =>
+    new: ( url ) =>
+        @url = url
         @name = "unknown"
-        @source = "unknown"
         @version = "unknown"
-        @filepath = filePath
+        @dependencies = {}
+        @environment = {}
 
     GetInfo: =>
+        p = @info
+        if p ~= nil
+            return p
+        p = @source\GetInfo( @ )
+        @info = p
+        return p
 
     Install: =>
 
-    Reload: =>
+gpm.Package = Package
 
-    Uninstall: =>
+sources = Table( gpm, "Sources" )
+table.Empty( sources )
 
-do
+files = fs.Find( "gpm/sources/*", luaGameDir )
+processed, total = 0, #files
 
-    string_GetExtensionFromFilename = string.GetExtensionFromFilename
-    package_seeall = package.seeall
-    fs_CompileLua = fs.CompileLua
-    debug_setfenv = debug.setfenv
-    AddCSLuaFile = AddCSLuaFile
-    table_Empty = table.Empty
-    fs_Find = fs.Find
-    SERVER = SERVER
-    pcall = pcall
+for index = 1, total
+    filePath = "gpm/sources/" .. files[ index ]
+    if string.GetExtensionFromFilename( filePath ) ~= "lua"
+        continue
 
-    sources = lib.Sources
-    if type( sources ) ~= "table"
-        sources = {}
-        lib.Sources = sources
+    fs.CompileLua( filePath, luaGameDir )\Then(
+        ( func ) ->
+            processed += 1
 
-    -- lib.SourceImport = ( importPath, sourceName ) ->
-    --     source = sources[ sourceName ]
-    --     unless source
-    --         return
+            environment = {}
+            package.seeall( environment )
 
-    files = {}
-    for fileName in *fs_Find "gpm/sources/" .. "*", "LUA"
-        filePath = "gpm/sources/" .. fileName
-        if string_GetExtensionFromFilename( filePath ) == "lua"
-            files[ #files + 1 ] = filePath
+            if xpcall( setfenv( func, environment ), ErrorNoHaltWithStack )
+                if SERVER
+                    AddCSLuaFile( filePath )
+                sources[] = environment
 
-    processed, total = 0, #files
-    table_Empty( sources )
+            if index == total
+                files, folders = fs.Find( "packages/*", luaGameDir )
+                for folderName in *folders
+                    importPath = "packages/" .. folderName
 
-    -- initSource = promise.Async( ( filePath ) ->
-    --     if SERVER
-    --         AddCSLuaFile filePath
+                for fileName in *files
+                    importPath = "packages/" .. fileName
 
-    --     ok, result = fs_CompileLua( filePath, "LUA" )\SafeAwait!
-    --     unless ok
-    --         Logger\Error "Source '%s' compile failed, %s.", filePath, result
-    --         processed += 1
-    --         return
-
-    --     environment = {
-    --         SOURCE: {
-    --             FilePath: filePath
-    --         }
-    --     }
-
-    --     debug_setfenv( result, environment )
-    --     package_seeall( environment )
-    --     ok, result = pcall( result )
-    --     processed += 1
-
-    --     if ok
-    --         source = environment.SOURCE
-    --         sourceName = source.Name or filePath
-
-    --         if type( source.IsAvalibleFilePath ) ~= "function"
-    --             Logger\Error "Function .IsAvalibleFilePath is missing from source '%s', source loading failed!", sourceName
-    --             return
-
-    --         func = source.GetInfo
-    --         if type( func ) == "function"
-    --             source.GetInfo = promise.Async( func )
-    --         else
-    --             Logger\Error "Function .GetInfo is missing from source '%s', source loading failed!", sourceName
-    --             return
-
-    --         func = source.Install
-    --         if type( func ) == "function"
-    --             source.Install = promise.Async( func )
-    --         else
-    --             Logger\Error "Function .Install is missing from source '%s', source loading failed!", sourceName
-    --             return
-
-    --         func = source.Reload
-    --         if type( func ) == "function"
-    --             source.Reload = promise.Async( func )
-
-    --         sources[ #sources + 1 ] = source
-    --         sources[ sourceName ] = source
-
-    --     else
-    --         Logger\Error result
-    --         return
-
-    --     if processed == total
-    --         files, folders = fs_Find "packages/*", "LUA"
-    --         for folderName in *folders
-    --             importPath = "packages/" .. folderName
-
-    --         for fileName in *files
-    --             importPath = "packages/" .. fileName
-
-    -- )
-
-    -- for index = 1, total
-    --     initSource files[ index ]
-    -- files = nil
-
-return lib
+        ( message ) ->
+            processed += 1
+            ErrorNoHaltWithStack( message )
+    )
