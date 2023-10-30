@@ -1,20 +1,12 @@
-SERVER = SERVER
-if SERVER
-    AddCSLuaFile!
-
-file = file
 gpm = gpm
-util = gpm.util
-paths = gpm.paths
-string = gpm.string
-metaworks = gpm.metaworks
-Logger = gpm.Logger
-
+:util, :paths, :string, :metaworks, :Logger = gpm
 string_GetPathFromFilename = string.GetPathFromFilename
 MENU_DLL = MENU_DLL
+istable = istable
+SERVER = SERVER
 CLIENT = CLIENT
 error = error
-type = type
+file = file
 
 -- https://github.com/Pika-Software/gm_efsw
 if SERVER and not efsw and util.IsBinaryModuleInstalled( "efsw" ) and pcall( require, "efsw" )
@@ -29,7 +21,7 @@ lib_IsMounted = nil
 do
 
     mountedFiles = lib.MountedFiles
-    if type( mountedFiles ) ~= "table"
+    unless istable( mountedFiles )
         string_StartsWith = string.StartsWith
         rawget, rawset = rawget, rawset
         table_insert = table.insert
@@ -169,7 +161,7 @@ do
 
     string_sub = string.sub
     moonloader_PreCacheFile = nil
-    if type( moonloader ) == "table"
+    if istable( moonloader )
         moonloader_PreCacheFile = moonloader.PreCacheFile
 
     lib_IsLuaFile = ( filePath, gamePath, compileMoon ) ->
@@ -311,7 +303,7 @@ if SERVER
                 AddCSLuaFile( paths_ToLua( filePath ) )
     lib.AddCSLuaFolder = lib_AddCSLuaFolder
 
-if type( efsw ) == "table"
+if istable( efsw )
     watchList = gpm.Table( lib, "WatchList" )
 
     do
