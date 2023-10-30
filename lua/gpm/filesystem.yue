@@ -1,7 +1,6 @@
 gpm = gpm
-:util, :paths, :string, :metaworks, :Logger = gpm
+:util, :path, :string, :metaworks, :Logger = gpm
 string_GetPathFromFilename = string.GetPathFromFilename
-MENU_DLL = MENU_DLL
 istable = istable
 SERVER = SERVER
 CLIENT = CLIENT
@@ -20,13 +19,11 @@ string_GetExtensionFromFilename = string.GetExtensionFromFilename
 lib_IsMounted = nil
 do
 
-    mountedFiles = lib.MountedFiles
-    unless istable( mountedFiles )
+    mountedFiles = gpm.Table( lib, "MountedFiles", ->
         string_StartsWith = string.StartsWith
         rawget, rawset = rawget, rawset
         table_insert = table.insert
-
-        mountedFiles = setmetatable( {}, {
+        return setmetatable( {}, {
             __index: ( tbl, key ) ->
                 for value in *tbl
                     if string_StartsWith( value, key )
@@ -37,8 +34,7 @@ do
                     table_insert( tbl, 1, key )
                     rawset( tbl, key, true )
         } )
-
-        lib.MountedFiles = mountedFiles
+    )
 
     lib_IsMounted = ( filePath, gamePath, onlyDir ) ->
         if onlyDir and string_GetExtensionFromFilename( filePath )
@@ -63,7 +59,7 @@ do
         return ok, files
 
 lib_CreateDir, lib_IsFile, lib_IsDir = nil, nil, nil
-paths_Join = paths.Join
+path_Join = path.Join
 lib_Find = file.Find
 lib.Find = lib_Find
 
@@ -98,12 +94,12 @@ do
 
             if lib_IsDir( filePath, gamePath )
                 if force
-                    files, folders = lib_Find( paths_Join( filePath, "*" ), gamePath )
+                    files, folders = lib_Find( path_Join( filePath, "*" ), gamePath )
                     for folderName in *folders
-                        lib_Delete( paths_Join( filePath, folderName ), gamePath, force )
+                        lib_Delete( path_Join( filePath, folderName ), gamePath, force )
 
                     for fileName in *files
-                        file_Delete( paths_Join( filePath, fileName ), gamePath, force )
+                        file_Delete( path_Join( filePath, fileName ), gamePath, force )
 
                 file_Delete( filePath, gamePath )
                 return not lib_IsDir( filePath, gamePath )
@@ -139,12 +135,12 @@ do
             if not lib_IsDir( filePath, gamePath )
                 return file_Size( filePath, gamePath )
 
-            size, files, folders = 0, lib_Find( paths_Join( filePath, "*" ), gamePath )
+            size, files, folders = 0, lib_Find( path_Join( filePath, "*" ), gamePath )
             for fileName in *files
-                size += file_Size( paths_Join( filePath, fileName ), gamePath )
+                size += file_Size( path_Join( filePath, fileName ), gamePath )
 
             for folderName in *folders
-                size += lib_Size( paths_Join( filePath, folderName ), gamePath )
+                size += lib_Size( path_Join( filePath, folderName ), gamePath )
 
             return size
         lib.Size = lib_Size
@@ -156,30 +152,37 @@ lib_BuildFilePath = ( filePath ) ->
     return folderPath
 lib.BuildFilePath = lib_BuildFilePath
 
-lib_IsLuaFile = nil
+lib_IsCompilable = nil
 do
 
+    moonloader = gpm.moonloader
+    moonloader_PreCacheFile = moonloader and moonloader.PreCacheFile or nil
     string_sub = string.sub
-    moonloader_PreCacheFile = nil
-    if istable( moonloader )
-        moonloader_PreCacheFile = moonloader.PreCacheFile
 
-    lib_IsLuaFile = ( filePath, gamePath, compileMoon ) ->
+    compilableExtensions = { "yue", "moon" }
+    codeExtensions = {
+        moon: true
+        yue: true
+        lua: true
+    }
+
+    lib_IsCompilable = ( filePath, gamePath, preCompile ) ->
         extension = string_GetExtensionFromFilename( filePath )
-        if extension and extension ~= "lua" and extension ~= "moon"
-            return false
+        if extension ~= nil
+            unless codeExtensions[ extension ]
+                return false
+            filePath = string_sub( filePath, 1, #filePath - ( #extension + 1 ) )
 
-        filePath = string_sub( filePath, 1, #filePath - ( extension ~= nil and ( #extension + 1 ) or 0 ) )
-
-        if compileMoon and ( SERVER or MENU_DLL ) and moonloader_PreCacheFile
-            moonPath = filePath  .. ".moon"
-            if lib_IsFile( moonPath, gamePath )
-                unless moonloader_PreCacheFile( moonPath )
-                    error( "Compiling Moonscript file '" .. moonPath .. "' into Lua is failed!" )
-                Logger\Debug( "The MoonScript file '%s' was successfully compiled into Lua.", moonPath )
+        if preCompile and moonloader_PreCacheFile ~= nil
+            for extension in *compilableExtensions
+                alternativeFilePath = filePath .. extension
+                if lib_IsFile( alternativeFilePath, gamePath )
+                    unless moonloader_PreCacheFile( alternativeFilePath )
+                        error( "Precompilation of file '" .. alternativeFilePath .. "' in Lua failed." )
+                    Logger\Debug( "Precompilation of file '%s' in Lua is complete.", alternativeFilePath )
                 return true
         return lib_IsFile( filePath .. ".lua", gamePath )
-    lib.IsLuaFile = lib_IsLuaFile
+    lib.IsCompilable = lib_IsCompilable
 
 lib_Read, lib_Write = nil, nil
 do
@@ -261,13 +264,13 @@ lib_Append = ( filePath, content, fastMode ) ->
     return lib_Write( filePath, content, "ab", fastMode )
 lib.Append = lib_Append
 
-paths_Fix = paths.Fix
+path_Fix = path.Fix
 
 if SERVER
+    path_ReplaceExtension = path.ReplaceExtension
     debug_getfpath = debug.getfpath
     gpm_ArgAssert = gpm.ArgAssert
     AddCSLuaFile = AddCSLuaFile
-    paths_ToLua = paths.ToLua
 
     lib.AddCSLuaFile = ( fileName ) ->
         luaPath = debug_getfpath!
@@ -276,31 +279,31 @@ if SERVER
             return
 
         gpm_ArgAssert( fileName, 1, "string" )
-        fileName = paths_ToLua( paths_Fix( fileName ) )
+        fileName = path_ReplaceExtension( path_Fix( fileName ), "lua" )
 
         if luaPath
             folder = string_GetPathFromFilename( luaPath )
             if folder
                 filePath = folder .. fileName
-                if lib_IsLuaFile( filePath, "LUA", true )
+                if lib_IsCompilable( filePath, "LUA", true )
                     AddCSLuaFile( filePath )
                     return
 
-        if lib_IsLuaFile( fileName, "LUA", true )
+        if lib_IsCompilable( fileName, "LUA", true )
             AddCSLuaFile( fileName )
             return
 
         error( "Couldn't AddCSLuaFile file '" .. fileName .. "' - File not found" )
 
     lib_AddCSLuaFolder = ( folder ) ->
-        files, folders = lib_Find( paths_Join( folder, "*" ), "lsv" )
+        files, folders = lib_Find( path_Join( folder, "*" ), "lsv" )
         for folderName in *folders
-            lib_AddCSLuaFolder( paths_Join( folder, folderName ) )
+            lib_AddCSLuaFolder( path_Join( folder, folderName ) )
 
         for fileName in *files
-            filePath = paths_Join( folder, fileName )
-            if lib_IsLuaFile( filePath, "lsv", true )
-                AddCSLuaFile( paths_ToLua( filePath ) )
+            filePath = path_Join( folder, fileName )
+            if lib_IsCompilable( filePath, "lsv", true )
+                AddCSLuaFile( path_ReplaceExtension( filePath, "lua" ) )
     lib.AddCSLuaFolder = lib_AddCSLuaFolder
 
 if istable( efsw )
@@ -309,7 +312,7 @@ if istable( efsw )
     do
         efsw_Watch = efsw.Watch
         lib_Watch = ( filePath, gamePath, recursively ) ->
-            filePath = paths_Fix( filePath )
+            filePath = path_Fix( filePath )
 
             if watchList[ filePath .. ";" .. gamePath ] or ( CLIENT and lib_IsMounted( filePath, gamePath ) )
                 return false
@@ -328,7 +331,7 @@ if istable( efsw )
     do
         efsw_Unwatch = efsw.Unwatch
         lib_UnWatch = ( filePath, gamePath, recursively ) ->
-            filePath = paths_Fix( filePath )
+            filePath = path_Fix( filePath )
 
             watchID = watchList[ filePath .. ";" .. gamePath ]
             if not watchID

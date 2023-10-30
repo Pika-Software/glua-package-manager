@@ -22,7 +22,7 @@ gpm_Table = ( tbl, name, func, ... ) ->
         if func
             result = func( ... )
         else
-            result = { ... }
+            result = {}
         tbl[ name ] = result
     return result
 gpm.Table = gpm_Table
@@ -117,9 +117,17 @@ do
             return true
         return false
 
+string_GetExtensionFromFilename = string.GetExtensionFromFilename
 string_format = string.format
 string_lower = string.lower
 string_sub = string.sub
+
+string_GetFilenameWithoutExtensionFromFilename = ( str ) ->
+    extension = string_GetExtensionFromFilename( str )
+    unless extension
+        return str
+    return string_sub( str, 1, #str - ( #extension + 1 ) )
+string.GetFilenameWithoutExtensionFromFilename = string_GetFilenameWithoutExtensionFromFilename
 
 debug = gpm_Table( gpm, "debug", ->
     return setmetatable( {}, { __index: debug } )
@@ -269,29 +277,37 @@ do
     gpm_AddType( "Color", gpm_IsColor )
     gpm.IsColor = gpm_IsColor
 
-paths = gpm_Table( gpm, "paths" )
+path = gpm_Table( gpm, "path" )
 string_gsub = string.gsub
 
-paths_Fix = ( filePath ) ->
+path_Fix = ( filePath ) ->
     return string_lower( string_gsub( filePath, "[/\\]+", "/" ) )
-paths.Fix = paths_Fix
+path.Fix = path_Fix
 
-paths.Join = ( ... ) ->
+path.Join = ( ... ) ->
     arguments, filePath = { ... }, nil
     length = #arguments
 
     for index = 1, length
         if filePath ~= nil
-            filePath = filePath .. arguments[ index ]
+            filePath ..= arguments[ index ]
         else
             filePath = arguments[ index ]
         if index == length
-            return paths_Fix( filePath )
-        filePath = filePath .. "/"
+            return path_Fix( filePath )
+        filePath ..= "/"
 
-paths_Localize = ( filePath ) ->
+path_Localize = ( filePath ) ->
     return string_gsub( string_gsub( string_gsub( filePath, "^cache/%w+/", "" ), "^addons/[%w%-_]-/", "" ), "^lua/", "" )
-paths.Localize = paths_Localize
+path.Localize = path_Localize
+
+path.ReplaceExtension = ( filePath, newExtension ) ->
+    extension = string_GetExtensionFromFilename( filePath )
+    if extension ~= newExtension
+        if extension
+            filePath = string_sub( filePath, 1, #filePath - ( #extension + 1 ) )
+        filePath ..= "." .. newExtension
+    return filePath
 
 debug.getfpath = ->
     for i = 2, 6
@@ -300,20 +316,7 @@ debug.getfpath = ->
             break
 
         if info.what == "main"
-            return paths_Localize( paths_Fix( info.short_src ) )
-
-do
-
-    string_GetExtensionFromFilename = string.GetExtensionFromFilename
-
-    paths.ToLua = ( filePath ) ->
-        extension = string_GetExtensionFromFilename( filePath )
-        if extension ~= "lua"
-            if extension
-                filePath = string_gsub( filePath, "%..+$", ".lua" )
-            else
-                filePath = filePath .. ".lua"
-        return filePath
+            return path_Localize( path_Fix( info.short_src ) )
 
 math = gpm_Table( gpm, "math", ->
     return setmetatable( {}, { __index: math } )
