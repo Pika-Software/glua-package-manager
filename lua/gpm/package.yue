@@ -5,6 +5,16 @@ istable = istable
 
 packages = Table( gpm, "Packages" )
 
+--[[
+    Packages: {
+        package_name: {
+            1.0.0: Package Object1
+            2.0.0: Package Object2
+            1.1.0: Package Object3
+        }
+    }
+]]
+
 class Package
     new: ( url ) =>
         @url = url
@@ -27,6 +37,29 @@ gpm.Package = Package
 
 sources = Table( gpm, "Sources" )
 table.Empty( sources )
+
+--[[
+
+    file://path/to/file/in/game
+    game://path/to/file/in/game
+    data://path/to/file/in/data
+    lua://path/to/file/in/lua
+
+    Sources: {
+        file: Source Obj1
+        game: Source Obj1
+        data: Source Obj1
+        lua: Source Obj1
+        http: Source Obj2
+        https: Source Obj2
+    }
+
+]]
+
+-- gpm.Install = ( url ) ->
+
+
+Promise_Async = Promise.Async
 
 files = fs.Find( "gpm/sources/*", luaGameDir )
 processed, total = 0, #files
