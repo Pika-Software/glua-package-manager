@@ -10,12 +10,6 @@ ipairs = ipairs
 error = error
 gpm = gpm
 
-util.CompileMoonString = ->
-    error( "Attempt to compile MoonScript failed, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader." )
-
-util.CompileYueString = ->
-    error( "Attempt to compile Yuescript failed, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader." )
-
 gpm_Table = ( tbl, name, func, ... ) ->
     result = tbl[ name ]
     unless istable( result )
@@ -331,8 +325,16 @@ do
         return setmetatable( {}, { __index: util } )
     )
 
+    util.CompileMoonString = ->
+        error( "Attempt to compile MoonScript failed, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader." )
+
+    util.CompileYueString = ->
+        error( "Attempt to compile Yuescript failed, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader." )
+
     do
+
         tonumber = tonumber
+
         util.Version = ( number ) ->
             unless number
                 return "unknown"
@@ -343,7 +345,9 @@ do
             return string_format( "%d.%d.%d", tonumber( string_sub( version, 0, 2 ) ), tonumber( string_sub( version, 3, 4 ) ), tonumber( string_sub( version, 5 ) ) )
 
     do
+
         timer_Simple = timer.Simple
+
         util.NextTick = ( func, a, b, c, d ) ->
             gpm_ArgAssert( func, 1, "function" )
             timer_Simple 0, -> func( a, b, c, d )
