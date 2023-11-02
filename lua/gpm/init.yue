@@ -53,8 +53,8 @@ logger = gpm.Logger
 include( "gpm/moonloader.lua" )
 logger\Info( "metaworks v%s initialized.", include( "libs/metaworks.lua" ).VERSION )
 
-gm_error = include( "gpm/libs/error.lua" )
-gpm.Error, gpm.TypeError = gm_error.Error, gm_error.TypeError
+:Error, :TypeError = include( "gpm/libs/error.lua" )
+gpm.Error, gpm.TypeError = Error, TypeError
 logger\Info( "gm_error initialized." )
 
 Promise = include( "gpm/libs/promise.lua" )
