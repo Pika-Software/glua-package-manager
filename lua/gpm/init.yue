@@ -46,52 +46,34 @@ unless CLIENT and gpm.Developer
         gpm.Developer = tonumber( new ) or 0
     "gLua Package Manager" )
 
-include = include or require
-include( "gpm/util.lua" )
+AddCSLuaFile!
+IncludeShared = (path) ->
+    AddCSLuaFile path
+    include path
+
+IncludeShared( "gpm/util.lua" )
 logger = gpm.Logger
 
-include( "gpm/moonloader.lua" )
-logger\Info( "metaworks v%s initialized.", include( "libs/metaworks.lua" ).VERSION )
+IncludeShared( "gpm/moonloader.lua" )
+logger\Info( "metaworks v%s initialized.", IncludeShared( "libs/metaworks.lua" ).VERSION )
 
-:Error, :TypeError = include( "gpm/libs/error.lua" )
+:Error, :TypeError = IncludeShared( "gpm/libs/error.lua" )
 gpm.Error, gpm.TypeError = Error, TypeError
 logger\Info( "gm_error initialized." )
 
-Promise = include( "gpm/libs/promise.lua" )
+Promise = IncludeShared( "gpm/libs/promise.lua" )
 gpm.Promise = Promise
 logger\Info( "gm_promise v%s initialized.", Promise.VERSION )
 
-logger\Info( "LibDeflate v%s initialized.", include( "gpm/libs/3rd-party/deflate.lua" )._VERSION )
-include( "gpm/filesystem.lua" )
-include( "gpm/http.lua" )
+logger\Info( "LibDeflate v%s initialized.", IncludeShared( "gpm/libs/3rd-party/deflate.lua" )._VERSION )
+IncludeShared( "gpm/filesystem.lua" )
+IncludeShared( "gpm/http.lua" )
 
-GMAD = include( "gpm/libs/gmad.lua" )
+GMAD = IncludeShared( "gpm/libs/gmad.lua" )
 gpm.GMAD = GMAD
 logger\Info( "%s%d v%s initialized.", GMAD.Identity, GMAD.FormatVersion, GMAD.VERSION )
 
-include( "gpm/package.lua" )
-
-if SERVER
-    AddCSLuaFile = AddCSLuaFile
-    AddCSLuaFile!
-
-    clientFiles = {
-        "util.lua"
-        "moonloader.lua"
-        "libs/metaworks.lua"
-        "libs/error.lua"
-        "libs/promise.lua"
-        "libs/3rd-party/deflate.lua"
-        "filesystem.lua"
-        "http.lua"
-        "libs/gmad.lua"
-        "package.lua"
-    }
-
-    for fileName in *clientFiles
-        fileName = "gpm/" .. fileName
-        AddCSLuaFile( fileName )
-        logger\Debug( "File '%s' was sent to the client.", fileName )
+IncludeShared( "gpm/package.lua" )
 
 logger\Info( "Start-up time: %.4f sec.", sysTime! - gpm.StartTime )
 return gpm
