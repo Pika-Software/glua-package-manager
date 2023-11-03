@@ -1,11 +1,10 @@
 SERVER = SERVER
 
-sysTime = SysTime or os.time
 unless istable( gpm )
     global gpm = { VERSION: "2.0.0" }
 
 gpm = gpm
-gpm.StartTime = sysTime!
+gpm.StartTime = SysTime!
 
 do
 
@@ -46,10 +45,13 @@ unless CLIENT and gpm.Developer
         gpm.Developer = tonumber( new ) or 0
     "gLua Package Manager" )
 
-AddCSLuaFile!
-IncludeShared = (path) ->
-    AddCSLuaFile path
-    include path
+if SERVER
+    AddCSLuaFile!
+
+IncludeShared = ( filePath ) ->
+    if SERVER
+        AddCSLuaFile( filePath )
+    return include( filePath )
 
 IncludeShared( "gpm/util.lua" )
 logger = gpm.Logger
@@ -77,5 +79,5 @@ IncludeShared( "gpm/package.lua" )
 
 if SERVER then include "gpm/test.lua"
 
-logger\Info( "Start-up time: %.4f sec.", sysTime! - gpm.StartTime )
+logger\Info( "Start-up time: %.4f sec.", SysTime! - gpm.StartTime )
 return gpm

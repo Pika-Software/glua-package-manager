@@ -24,7 +24,7 @@ FetchPackageInfoFromSource = async (url) ->
 
     return env
 
-once = (field, fn) -> 
+once = (field, fn) ->
     (...) =>
         if @[field] then return @[field]
         @[field] = fn @, ...
@@ -36,7 +36,6 @@ class Package
     GetID: =>
         if @name
             return "#{@name}@#{@version or "unknown"}"
-        
         return tostring @url
 
     __tostring: =>
@@ -44,20 +43,20 @@ class Package
 
     GetInfo: once "info", async =>
         pkg_info = await FetchPackageInfoFromSource @url
-        unless istable pkg_info 
+        unless istable pkg_info
             error PackageParseError "source hasn't found a package info"
 
         info = {}
         info.name = pkg_info.name
-        unless isstring info.name 
+        unless isstring info.name
             error PackageParseError "`name` must be a string"
 
         info.dir = pkg_info.dir
-        unless isstring info.dir 
+        unless isstring info.dir
             error PackageParseError "package directory hasn't been found"
 
         info.init = pkg_info.init or "init.lua"
-        unless isstring info.init 
+        unless isstring info.init
             error PackageParseError "`init` must be a string"
 
         -- Parse other fields
@@ -72,13 +71,13 @@ class Package
 
         entry = info.dir .. info.init -- path.join here
         entry_fn = CompileFile entry
-        unless entry_fn 
+        unless entry_fn
             error SourceError "Failed to compile package entry file: " .. entry
 
         -- setup env here
 
         entry_fn = async entry_fn -- making it asynchronous
-        return entry_fn!        
+        return entry_fn!
 
 
 main = async ->
@@ -87,7 +86,7 @@ main = async ->
     print "--- #{CurTime!} ---"
     print "Getting package info..."
     info = await pkg\GetInfo!
-    
+
     print "Loading package `#{info.name}`..."
     result = await pkg\GetResult!
     print "Result is #{result}"
