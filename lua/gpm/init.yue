@@ -75,5 +75,7 @@ logger\Info( "%s%d v%s initialized.", GMAD.Identity, GMAD.FormatVersion, GMAD.VE
 
 IncludeShared( "gpm/package.lua" )
 
+if SERVER then include "gpm/test.lua"
+
 logger\Info( "Start-up time: %.4f sec.", sysTime! - gpm.StartTime )
 return gpm

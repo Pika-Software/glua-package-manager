@@ -1,0 +1,99 @@
+:Promise, :Error = gpm
+:async, :await = Promise
+
+class SourceError extends Error
+
+class PackageParseError extends Error
+
+FetchPackageInfoFromSource = async (url) ->
+    package_dir = string.gsub url, "lua://", ""
+    package_info_path = package_dir .. "package.lua" -- path.join here
+
+    env = {}
+    func = CompileFile package_info_path
+    unless func then error SourceError "Failed to compile package info file: " .. package_info_path
+
+    await Promise.delay 1
+
+    setfenv func, env
+    unless success, reason = try func!
+        error SourceError reason
+
+    if istable env
+        env.dir = package_dir
+
+    return env
+
+once = (field, fn) -> 
+    (...) =>
+        if @[field] then return @[field]
+        @[field] = fn @, ...
+        return @[field]
+
+class Package
+    new: (@url) =>
+
+    GetID: =>
+        if @name
+            return "#{@name}@#{@version or "unknown"}"
+        
+        return tostring @url
+
+    __tostring: =>
+        return "Package #{@GetID!}"
+
+    GetInfo: once "info", async =>
+        pkg_info = await FetchPackageInfoFromSource @url
+        unless istable pkg_info 
+            error PackageParseError "source hasn't found a package info"
+
+        info = {}
+        info.name = pkg_info.name
+        unless isstring info.name 
+            error PackageParseError "`name` must be a string"
+
+        info.dir = pkg_info.dir
+        unless isstring info.dir 
+            error PackageParseError "package directory hasn't been found"
+
+        info.init = pkg_info.init or "init.lua"
+        unless isstring info.init 
+            error PackageParseError "`init` must be a string"
+
+        -- Parse other fields
+
+        @name = info.name
+        @version = info.version or "0.0.0"
+
+        return info
+
+    GetResult: once "result", async =>
+        info = await @GetInfo!
+
+        entry = info.dir .. info.init -- path.join here
+        entry_fn = CompileFile entry
+        unless entry_fn 
+            error SourceError "Failed to compile package entry file: " .. entry
+
+        -- setup env here
+
+        entry_fn = async entry_fn -- making it asynchronous
+        return entry_fn!        
+
+
+main = async ->
+    pkg = Package "lua://packages/package_v2/"
+
+    print "--- #{CurTime!} ---"
+    print "Getting package info..."
+    info = await pkg\GetInfo!
+    
+    print "Loading package `#{info.name}`..."
+    result = await pkg\GetResult!
+    print "Result is #{result}"
+    print "#{pkg} has been loaded"
+    print "--- #{CurTime!} ---"
+
+
+main!\Catch (err)->
+    ErrorNoHaltWithStack err

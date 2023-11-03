@@ -1,4 +1,4 @@
-name = "package v2"
+name = "package_v2"
 autorun = true
 
 dependencies = {
