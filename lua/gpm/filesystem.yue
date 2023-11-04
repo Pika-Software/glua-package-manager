@@ -504,7 +504,6 @@ do
 
 do
 
-    Promise_Reject = Promise.Reject
     Promise_Async = Promise.Async
 
     do
@@ -517,35 +516,39 @@ do
                 filePath = "lua/" .. filePath
                 gamePath = "GAME"
 
-            ok, result = lib_AsyncRead( filePath, gamePath )\SafeAwait!
-            unless ok
-                return Promise_Reject( result )
-
-            content = result.content
+            :content = lib_AsyncRead( filePath, gamePath )\Await!
             unless content
-                return Promise_Reject( "File compilation '" .. filePath .. "' failed, file cannot be read." )
+                error( "File compilation '" .. filePath .. "' failed, file cannot be read." )
 
             func = CompileString( content, filePath, handleError )
             if not func and ( gamePath == "LUA" or gamePath == "lsv" or gamePath == "lcl" )
                 func = CompileFile( filePath )
 
-            unless func
-                return Promise_Reject( "File compilation '" .. filePath .. "' failed, unknown error." )
-
+            if func
             return func
+            error( "File compilation '" .. filePath .. "' failed, unknown error." )
         )
 
     do
-        util_CompileMoonString = util.CompileMoonString
-        lib.CompileMoon = Promise_Async( ( filePath, gamePath, handleError ) ->
-            ok, result = lib_AsyncRead( filePath, gamePath )\SafeAwait!
-            unless ok
-                return Promise_Reject( result )
 
-            content = result.content
+        util_CompileMoonString = util.CompileMoonString
+
+        lib.CompileMoon = Promise_Async( ( filePath, gamePath, handleError ) ->
+            :content = lib_AsyncRead( filePath, gamePath )\Await!
             unless content
-                return Promise_Reject( "File compilation '" .. filePath .. "' failed, file cannot be read." )
+                error( "File compilation '" .. filePath .. "' failed, file cannot be read." )
             return util_CompileMoonString( content, filePath, handleError )
+        )
+
+    do
+
+        util_CompileYueString = util.CompileYueString
+
+        lib.CompileYue = Promise_Async( ( filePath, gamePath, handleError, yueConfig ) ->
+            :content = lib_AsyncRead( filePath, gamePath )\Await!
+            unless content
+                error( "File compilation '" .. filePath .. "' failed, file cannot be read." )
+            return util_CompileYueString( lib_AsyncRead( filePath, gamePath )\Await!.content, filePath, handleError, yueConfig )
         )
 
 do
