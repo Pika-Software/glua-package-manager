@@ -2,27 +2,54 @@
 :async, :await = Promise
 
 class SourceError extends Error
-
 class PackageParseError extends Error
 
-FetchPackageInfoFromSource = async (url) ->
-    package_dir = string.gsub url, "lua://", ""
-    package_info_path = package_dir .. "package.lua" -- path.join here
+sources = {}
+class Source
+    Register: (protocol, src) =>
+        sources[protocol] = src
 
-    env = {}
-    func = CompileFile package_info_path
-    unless func then error SourceError "Failed to compile package info file: " .. package_info_path
+    @FindSourceByURL: (url) ->
+        protocol = string.match url, "^(.-)://"
+        return protocol and sources[protocol]
 
-    await Promise.delay 1
+    @FetchInfo: (url) ->
+        src = Source.FindSourceByURL url
+        unless src then error SourceError "unknown protocol: " .. protocol
+        unless src.Download then error SourceError "#{src.__name} doesn't support FetchInfo method"
+        return src\FetchInfo url
 
-    setfenv func, env
-    unless success, reason = try func!
-        error SourceError reason
+    @Download: (url, info) ->
+        src = Source.FindSourceByURL url
+        unless src then error SourceError "unknown protocol: " .. protocol
+        unless src.Download then error SourceError "#{src.__name} doesn't support Download method"
+        return src\Download url, info
 
-    if istable env
-        env.dir = package_dir
+    -- more methods?
 
-    return env
+class LocalSource extends Source
+    FetchInfo: async (url) =>
+        dir = string.gsub url, "lua://", ""
+        package_info_path = dir .. "package.lua" -- path.join here
+
+        env = {}
+        env.dir = dir -- We are assigning here, so package.lua can define custom directory
+
+        func = CompileFile package_info_path
+        unless func then error SourceError "Failed to compile package info file: " .. package_info_path
+
+        await Promise.delay 1
+
+        setfenv func, env
+        unless success, reason = try func!
+            error SourceError reason
+
+        return env
+
+    Download: async (url, info) => -- what should i do here?
+
+-- Registering local source!
+Source\Register "lua", LocalSource
 
 --[[
 
@@ -105,7 +132,7 @@ class Package
         return "Package #{@GetID!}"
 
     GetInfo: once "info", async =>
-        pkg_info = await FetchPackageInfoFromSource @url
+        pkg_info = await Source.FetchInfo @url
         unless istable pkg_info
             error PackageParseError "source hasn't found a package info"
 
@@ -131,6 +158,7 @@ class Package
 
     GetResult: once "result", async =>
         info = await @GetInfo!
+        await Source.Download @url, info
 
         entry = info.dir .. info.init -- path.join here
         entry_fn = CompileFile entry
