@@ -84,6 +84,7 @@ HTTP = ( parameters ) ->
 
     parameters.failed = ( msg ) ->
         p\Reject( HTTPError( msg ) )
+        return
 
     if queue ~= nil
         queue[ #queue + 1 ] = -> request( parameters )
