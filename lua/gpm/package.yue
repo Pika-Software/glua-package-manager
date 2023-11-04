@@ -56,8 +56,17 @@ table.Empty( sources )
 
 ]]
 
--- gpm.Install = ( url ) ->
+--[[
 
+    https://github.com/user/repos -> GitHub Type -> https://github.com/user/repos.zip -> HTTP Type -> ...
+
+    gpm.Install = ( url ) ->
+        protocol, filePath = string.match( url, "^(%w+)%:%/%/(%w+)$" )
+        for source in *sources
+            if table.HasIValue( source.Protocols, protocol )
+                return source.Process( protocol, filePath )
+
+--]]
 
 Promise_Async = Promise.Async
 

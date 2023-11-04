@@ -24,6 +24,69 @@ FetchPackageInfoFromSource = async (url) ->
 
     return env
 
+--[[
+
+    http://github.com/pika/repository
+        |
+        |
+    HTTP Source
+        |
+    ( github.com )
+        |
+    github://pika/repository
+        |
+    GitHub Source
+        |
+    https://github.com/pika/repository/archive/refs/heads/master.zip
+        |
+        |
+    HTTP Source
+        |
+        |
+    Downloading `zip` type ( master.zip )
+        |
+        |
+    HTTP Source ( zip type )
+        |
+        |
+    Creating and writing GMA in DATA
+        |
+        |
+    FileSystem Source ( file://data/master.gma )
+        |
+        |
+    Type GMA ( master.gma )
+        |
+        |
+    Mounting GMA to game ( `table` with lua and other ( material, sound, models ) files )
+        |
+        |
+    Filesystem type LUA
+        |
+        |
+    Package
+
+--]]
+
+
+--[[
+
+    FileSystem
+
+    Source.Types = { "gma", "lua", "module", "zip", "package" }
+
+    Source.Handler = ( typeName, filePath, ... ) ->
+        if typeName == "package"
+            typeName = "lua"
+            filePath = "packages/" .. filePath .. ".lua"
+
+        return Source.TypeImport( typeName, filePath, ... )
+
+    require( "package://my_pkg" )
+
+
+]]
+
 once = (field, fn) ->
     (...) =>
         if @[field] then return @[field]
