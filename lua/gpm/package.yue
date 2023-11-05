@@ -35,27 +35,6 @@ class Package
 
 gpm.Package = Package
 
-sources = Table( gpm, "Sources" )
-table.Empty( sources )
-
---[[
-
-    file://path/to/file/in/game
-    game://path/to/file/in/game
-    data://path/to/file/in/data
-    lua://path/to/file/in/lua
-
-    Sources: {
-        file: Source Obj1
-        game: Source Obj1
-        data: Source Obj1
-        lua: Source Obj1
-        http: Source Obj2
-        https: Source Obj2
-    }
-
-]]
-
 --[[
 
     https://github.com/user/repos -> GitHub Type -> https://github.com/user/repos.zip -> HTTP Type -> ...
@@ -67,38 +46,3 @@ table.Empty( sources )
                 return source.Process( protocol, filePath )
 
 --]]
-
-Promise_Async = Promise.Async
-
-files = fs.Find( "gpm/sources/*", luaGameDir )
-processed, total = 0, #files
-
-for index = 1, total
-    filePath = "gpm/sources/" .. files[ index ]
-    if string.GetExtensionFromFilename( filePath ) ~= "lua"
-        continue
-
-    fs.CompileLua( filePath, luaGameDir )\Then(
-        ( func ) ->
-            processed += 1
-
-            environment = {}
-            package.seeall( environment )
-
-            if xpcall( setfenv( func, environment ), ErrorNoHaltWithStack )
-                if SERVER
-                    AddCSLuaFile( filePath )
-                sources[] = environment
-
-            if index == total
-                files, folders = fs.Find( "packages/*", luaGameDir )
-                for folderName in *folders
-                    importPath = "packages/" .. folderName
-
-                for fileName in *files
-                    importPath = "packages/" .. fileName
-
-        ( message ) ->
-            processed += 1
-            ErrorNoHaltWithStack( message )
-    )

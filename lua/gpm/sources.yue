@@ -1,0 +1,59 @@
+gpm = gpm
+:Promise, :Error, :NotImplementedError = gpm
+:async, :await = Promise
+
+class SourceError extends Error
+gpm.SourceError = SourceError
+
+sources = gpm.Table( gpm, "Sources" )
+table.Empty( sources )
+
+--[[
+
+    file://path/to/file/in/game
+    game://path/to/file/in/game
+    data://path/to/file/in/data
+    lua://path/to/file/in/lua
+
+    Sources: {
+        file: Source Obj1
+        game: Source Obj1
+        data: Source Obj1
+        lua: Source Obj1
+        http: Source Obj2
+        https: Source Obj2
+    }
+
+]]
+
+class gpm.BaseSourceHandler
+    ShouldHandle: (url) => false
+    FetchInfo: async (url) => error NotImplementedError "Source:FetchInfo(url)"
+
+class gpm.BaseSource
+    new: =>
+        @handlers = {}
+
+    RegisterHandler: (handler) =>
+        @handlers[] = handler
+
+    CallHandler: (name, url, ...) =>
+        for handler in *@handlers
+            if handler\ShouldHandle url
+                return handler[name] handler, url
+        return Promise.reject SourceError "No handler found for URL #{url} (#{name})"
+
+    FetchInfo: (url) => @CallHandler "FetchInfo", url
+
+gpm.RegisterSource = (protocol, source) ->
+    sources[protocol] = source
+
+gpm.FindSourceByURL = (url) ->
+    protocol = string.match url, "^(.-)://"
+    return protocol and sources[protocol]
+
+gpm.FetchInfo = async (url) ->
+    src = gpm.FindSourceByURL url
+    unless src
+        error SourceError "No source found for URL #{url}"
+    return src\FetchInfo url

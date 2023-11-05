@@ -1,0 +1,70 @@
+gpm = gpm
+:Promise, :BaseSource, :BaseSourceHandler, :SourceError = gpm
+:async, :await = Promise
+
+-- lua://my_lua.lua
+-- lua://my_lua/package.lua
+-- lua://my_lua/
+
+-- lua://packages/pkg1.lua
+
+-- lua://package/pkg2
+--         ||
+--         ||
+--         package.lua
+--             ||
+--             ||
+--             init.lua
+
+class LuaHandler extends BaseSourceHandler
+    ShouldHandle: (url) => string.StartsWith url, "lua://"
+
+    FindPackageLua: (path) ->
+        if string.EndsWith path, "package.lua"
+            return path
+        path = path .. "package.lua" -- path.join here
+        return file.Exists(path) and path
+
+    FetchInfo: async (url) =>
+        path = string.gsub url, "^.-://", ""
+        package_lua_path = LuaHandler.FindPackageLua path
+        if package_lua_path
+            env = {}
+            env.dir = dir -- We are assigning here, so package.lua can define custom directory
+
+            func = CompileFile package_info_path
+            unless func then error SourceError "Failed to compile package info file: #{package_info_path}"
+
+            await Promise.delay 1
+
+            setfenv func, env
+            unless success, reason = try func!
+                error SourceError reason
+
+            return env
+        elseif string.EndsWith path, ".lua"
+            dir = path -- extreact dir from path
+            -- Make stub env
+            env = {}
+            env.name = "unknown" -- get name from path
+            env.dir = dir --
+
+            return env
+        else
+            return @FetchInfo "lua://#{path}.lua"
+
+class PackageHandler extends BaseSourceHandler
+    ShouldHandle: (url) => string.StartsWith url, "package://"
+
+    FetchInfo: async (url) =>
+        url = string.gsub url, "^.-://", ""
+        return gpm.FetchInfo "lua://packages/" .. url
+
+class FilesystemSource extends BaseSource
+
+fs = FilesystemSource!
+fs\RegisterHandler PackageHandler!
+fs\RegisterHandler LuaHandler!
+
+gpm.RegisterSource "package", fs
+gpm.RegisterSource "lua", fs

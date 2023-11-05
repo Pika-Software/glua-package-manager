@@ -1,4 +1,6 @@
 SERVER = SERVER
+if SERVER
+    AddCSLuaFile!
 
 unless istable( gpm )
     global gpm = { VERSION: "2.0.0" }
@@ -45,9 +47,6 @@ unless CLIENT and gpm.Developer
         gpm.Developer = tonumber( new ) or 0
     "gLua Package Manager" )
 
-if SERVER
-    AddCSLuaFile!
-
 IncludeShared = ( filePath ) ->
     if SERVER
         AddCSLuaFile( filePath )
@@ -61,7 +60,9 @@ logger\Info( "metaworks v%s initialized.", IncludeShared( "libs/metaworks.lua" )
 
 :Error, :TypeError = IncludeShared( "gpm/libs/error.lua" )
 gpm.Error, gpm.TypeError = Error, TypeError
+class gpm.NotImplementedError extends Error
 logger\Info( "gm_error initialized." )
+
 
 Promise = IncludeShared( "gpm/libs/promise.lua" )
 gpm.Promise = Promise
@@ -76,8 +77,13 @@ gpm.GMAD = GMAD
 logger\Info( "%s%d v%s initialized.", GMAD.Identity, GMAD.FormatVersion, GMAD.VERSION )
 
 IncludeShared( "gpm/package.lua" )
+IncludeShared( "gpm/sources.lua" )
 
-if SERVER then include "gpm/test.lua"
+for f in *file.Find( "gpm/sources/*.lua", "LUA" )
+    IncludeShared( "gpm/sources/#{f}" )
+
+if SERVER
+    include( "gpm/test.lua" )
 
 logger\Info( "Start-up time: %.4f sec.", SysTime! - gpm.StartTime )
 return gpm

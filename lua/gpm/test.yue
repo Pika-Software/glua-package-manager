@@ -155,7 +155,7 @@ class Package
         @version = info.version or "0.0.0"
 
         return info
-
+ 
     GetResult: once "result", async =>
         info = await @GetInfo!
         await Source.Download @url, info
@@ -172,17 +172,21 @@ class Package
 
 
 main = async ->
-    pkg = Package "lua://packages/package_v2/"
+    print "fetching info..."
+    info = await gpm.FetchInfo "package://package_v2/"
+    print "info: #{info}"
+    PrintTable info
+    -- pkg = Package "lua://packages/package_v2/"
 
-    print "--- #{CurTime!} ---"
-    print "Getting package info..."
-    info = await pkg\GetInfo!
+    -- print "--- #{CurTime!} ---"
+    -- print "Getting package info..."
+    -- info = await pkg\GetInfo!
 
-    print "Loading package `#{info.name}`..."
-    result = await pkg\GetResult!
-    print "Result is #{result}"
-    print "#{pkg} has been loaded"
-    print "--- #{CurTime!} ---"
+    -- print "Loading package `#{info.name}`..."
+    -- result = await pkg\GetResult!
+    -- print "Result is #{result}"
+    -- print "#{pkg} has been loaded"
+    -- print "--- #{CurTime!} ---"
 
 
 main!\Catch (err)->
