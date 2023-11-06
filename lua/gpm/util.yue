@@ -303,6 +303,9 @@ path.ReplaceExtension = ( filePath, newExtension ) ->
         filePath ..= "." .. newExtension
     return filePath
 
+path.RemoveBackslash = ( filePath ) ->
+    return string_gsub( filePath, "[/\\]?$", "" )
+
 debug.getfpath = ->
     for i = 2, 6
         info = debug_getinfo( i, "S" )
