@@ -1,5 +1,5 @@
 gpm = gpm
-:util, :path, :string, :metaworks, :Logger, :Error = gpm
+:util, :path, :string, :metaworks, :Logger, :Error, :ArgAssert = gpm
 string_GetPathFromFilename = string.GetPathFromFilename
 istable = istable
 SERVER = SERVER
@@ -272,23 +272,23 @@ path_Fix = path.Fix
 
 if SERVER
     path_ReplaceExtension = path.ReplaceExtension
+    path_RemoveBackslash = path.RemoveBackslash
     debug_getfpath = debug.getfpath
-    gpm_ArgAssert = gpm.ArgAssert
     AddCSLuaFile = AddCSLuaFile
 
     lib.AddCSLuaFile = ( fileName ) ->
-        luaPath = debug_getfpath!
-        if not fileName and luaPath and lib_IsFile( luaPath, luaGameDir )
-            AddCSLuaFile( luaPath )
+        currentPath = debug_getfpath!
+        if not fileName and currentPath and lib_IsFile( currentPath, luaGameDir )
+            AddCSLuaFile( currentPath )
             return
 
-        gpm_ArgAssert( fileName, 1, "string" )
+        ArgAssert( fileName, 1, "string" )
         fileName = path_ReplaceExtension( path_Fix( fileName ), "lua" )
 
-        if luaPath
-            folder = string_GetPathFromFilename( luaPath )
-            if folder
-                filePath = folder .. fileName
+        if currentPath
+            currentFolder = string_GetPathFromFilename( currentPath )
+            if currentFolder
+                filePath = currentFolder .. fileName
                 if lib_IsCompilable( filePath, true )
                     AddCSLuaFile( filePath )
                     return
@@ -299,13 +299,15 @@ if SERVER
 
         error( "Couldn't AddCSLuaFile file '" .. fileName .. "' - File not found" )
 
-    lib_AddCSLuaFolder = ( folder ) ->
-        files, folders = lib_Find( path_Join( folder, "*" ), "lsv" )
+    lib_AddCSLuaFolder = ( folderPath ) ->
+        folderPath = path_RemoveBackslash( path_Fix( folderPath ) )
+        files, folders = lib_Find( folderPath .. "/*", "lsv" )
+
         for folderName in *folders
-            lib_AddCSLuaFolder( path_Join( folder, folderName ) )
+            lib_AddCSLuaFolder( folderPath .. "/" .. folderName )
 
         for fileName in *files
-            filePath = path_Join( folder, fileName )
+            filePath = folderPath .. "/" .. fileName
             if lib_IsCompilable( filePath, true )
                 AddCSLuaFile( path_ReplaceExtension( filePath, "lua" ) )
     lib.AddCSLuaFolder = lib_AddCSLuaFolder
