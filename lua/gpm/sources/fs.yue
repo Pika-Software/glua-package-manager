@@ -2,19 +2,31 @@ gpm = gpm
 :Promise, :BaseSource, :BaseSourceHandler, :SourceError = gpm
 :async, :await = Promise
 
--- lua://my_lua.lua
--- lua://my_lua/package.lua
--- lua://my_lua/
+--[[
 
--- lua://packages/pkg1.lua
+    Handler List:
+    [  ] file://data/my_gma.gma ( gma, zip, lua, moon, yue )
+    [  ] lua://my_addon/init.lua ( lua, moon, yue )
+    [  ] module://module_name ( binarry or lua modules )
+    [  ] package://package_name ( package from lua/packages folder )
 
--- lua://package/pkg2
---         ||
---         ||
---         package.lua
---             ||
---             ||
---             init.lua
+]]
+
+--[[
+
+    Single File Package:
+        lua://packages/pkg1.lua
+
+    Multi-File Package:
+        lua://packages/pkg2
+            ||
+            ||
+            package.lua
+                ||
+                ||
+                init.lua
+
+]]
 
 class LuaHandler extends BaseSourceHandler
     ShouldHandle: (url) => string.StartsWith url, "lua://"
