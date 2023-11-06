@@ -10,10 +10,6 @@ gpm = gpm
     [  ] module://module_name ( binarry or lua modules )
     [  ] package://package_name ( package from lua/packages folder )
 
-]]
-
---[[
-
     Single File Package:
         lua://packages/pkg1.lua
 
@@ -28,6 +24,39 @@ gpm = gpm
 
 ]]
 
+class FileHandler extends BaseSourceHandler
+    SupportedExtensions: {
+        "moon": true
+        "yue": true
+        "lua": true
+        "zip": true
+        "gma": true
+    }
+
+    ShouldHandle: ( url ) =>
+        if string.StartsWith( url, "file://" )
+            extension = string.GetExtensionFromFilename( url )
+            if extension and @SupportedExtensions[ extension ]
+                return true
+        return false
+
+    FetchInfo: async ( url ) =>
+        filePath = string.gsub( url, "^.-://", "" )
+        extension = string.GetExtensionFromFilename( filePath )
+        switch extension
+            when "gma"
+                return {}
+            when "zip"
+                return {}
+            when "lua"
+                return {}
+            when "zip"
+                return {}
+            when "moon"
+                return {}
+            when "yue"
+                return {}
+
 class LuaHandler extends BaseSourceHandler
     ShouldHandle: (url) => string.StartsWith url, "lua://"
 
@@ -35,7 +64,7 @@ class LuaHandler extends BaseSourceHandler
         if string.EndsWith path, "package.lua"
             return path
         path = path .. "package.lua" -- path.join here
-        return file.Exists(path) and path
+        return file.Exists( path ) and path
 
     FetchInfo: async (url) =>
         path = string.gsub url, "^.-://", ""
@@ -66,11 +95,11 @@ class LuaHandler extends BaseSourceHandler
             return @FetchInfo "lua://#{path}.lua"
 
 class PackageHandler extends BaseSourceHandler
-    ShouldHandle: (url) => string.StartsWith url, "package://"
+    ShouldHandle: (url) =>
+        return string.StartsWith( url, "package://" )
 
-    FetchInfo: async (url) =>
-        url = string.gsub url, "^.-://", ""
-        return gpm.FetchInfo "lua://packages/" .. url
+    FetchInfo: async ( url ) =>
+        return gpm.FetchInfo( "lua://packages/" .. string.gsub( url, "^.-://", "" ) )
 
 class FilesystemSource extends BaseSource
 
