@@ -146,7 +146,7 @@ class GMAD
     Tags: tags
 
     __tostring: =>
-        return "Garry's Mod Addon File \'" .. @title .. "\'"
+        return "Garry's Mod Addon File '#{@Title}'"
 
     new: =>
         @Title = "unknown"
@@ -265,6 +265,7 @@ class GMAD
                 unless value
                     break
                 @Required[ value ] = true
+            fileHandle\Skip( 1 )
 
         @Title = fileHandle\ReadString!
         @Description = fileHandle\ReadString!
