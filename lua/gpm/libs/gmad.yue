@@ -255,7 +255,6 @@ class GMAD
         if version > @FormatVersion
             error( "gma version is unsupported" )
 
-        @FormatVersion = version
         @SteamID = tostring( fileHandle\ReadUInt64! ) or ""
         @Timestamp = fileHandle\ReadUInt64!
 
