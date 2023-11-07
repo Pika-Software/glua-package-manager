@@ -132,7 +132,7 @@ debug.fcall = ( func, ... ) ->
     return func( ... )
 debug_getinfo = debug.getinfo
 
-gpm_ArgAssert = ( value, argNum, expected, errorlevel ) ->
+ArgAssert = ( value, argNum, expected, errorlevel ) ->
     valueType = gpm_type( value )
 
     if istable( expected )
@@ -155,7 +155,7 @@ gpm_ArgAssert = ( value, argNum, expected, errorlevel ) ->
 
     dinfo = debug_getinfo( 2, "n" )
     error( string_format( "bad argument #%d to \'%s\' (%s expected, got %s)", argNum, dinfo and dinfo.name or "func", expected, valueType ), errorlevel or 3 )
-gpm.ArgAssert = gpm_ArgAssert
+gpm.ArgAssert = ArgAssert
 
 table = gpm_Table( gpm, "table", ->
     return setmetatable( {}, { __index: table } )
@@ -234,8 +234,8 @@ table.RemoveByFunction = ( tbl, func ) ->
 table.unpack = unpack
 
 gpm_AddType = ( typeName, func ) ->
-    gpm_ArgAssert( typeName, 1, "string" )
-    gpm_ArgAssert( func, 2, "function" )
+    ArgAssert( typeName, 1, "string" )
+    ArgAssert( func, 2, "function" )
 
     nextIndex = 256
     for key, name in pairs( typeNames )
@@ -324,6 +324,139 @@ math.nan = 0 / 0
 
 do
 
+    string_byte = string.byte
+    string_len = string.len
+    math_abs = math.abs
+
+    class gpm.ByteStream
+        __tostring: =>
+            return string_format( "ByteStream: %p [%d/%d]", @, @Pointer, @Size )
+
+        new: ( data ) =>
+            @Length = string_len( data )
+            @Data = data
+            @Pointer = 0
+
+        Close: =>
+            @Pointer = 0
+            @Length = 0
+            @Data = ""
+
+        Size: =>
+            return @Length
+
+        Tell: =>
+            return @Pointer
+
+        Seek: ( position ) =>
+            if position
+                ArgAssert( position, 2, "number" )
+                if position < 0
+                    position = 0
+            else
+                position = 0
+
+            @Pointer = position
+            return position
+
+        Skip: ( length ) =>
+            if length
+                ArgAssert( length, 2, "number" )
+            else
+                length = 1
+
+            return @Seek( @Pointer + length )
+
+        EndOfFile: =>
+            return @Pointer >= @Length
+
+        ReadByte: =>
+            unless @EndOfFile!
+                return string_byte( @Data, @Skip( 1 ) )
+
+        ReadBool: =>
+            byte = @ReadByte!
+            if byte ~= nil
+                return byte ~= 0
+
+        Read: ( distance ) =>
+            ArgAssert( distance, 2, "number" )
+            if distance == 0 or @EndOfFile!
+                return
+
+            str, data = "", @Data
+            if distance > 0
+                for i = 1, distance, 1
+                    str ..= data[ @Skip( 1 ) ]
+            elseif distance < 0
+                for i = -1, distance, -1
+                    str ..= data[ @Skip( -1 ) ]
+            return str
+
+        ReadUInt: ( distance ) =>
+            ArgAssert( distance, 2, "number" )
+            if distance == 0
+                return
+
+            uint = 0
+            for i = 1, distance
+                byte = @ReadByte!
+                unless byte
+                    return
+
+                uint += byte * 0x100 ^ ( i - 1 )
+            return uint
+
+        ReadUShort: =>
+            return @ReadUInt( 2 )
+
+        ReadULong: =>
+            return @ReadUInt( 4 )
+
+        ReadUInt64: =>
+            return @ReadUInt( 8 )
+
+        ReadInt: ( distance ) =>
+            ArgAssert( distance, 2, "number" )
+            if distance == 0
+                return
+
+            uint = @ReadUInt( distance )
+            unless uint
+                return
+
+            max = 0x100 ^ math_abs( distance )
+            if uint >= ( max / 2 )
+                return uint - max
+            return uint
+
+        ReadShort: =>
+            return @ReadInt( 2 )
+
+        ReadLong: =>
+            return @ReadInt( 4 )
+
+        ReadInt64: =>
+            return @ReadInt( 8 )
+
+        ReadString: =>
+            pointer, length = @Pointer, @Length
+            if pointer >= length
+                return
+
+            len, data = 0, @Data
+            for index = pointer, length
+                if string_byte( data, index + 1 ) == 0
+                    break
+                len += 1
+
+            if len == 0
+                return
+
+            return @Read( len ), @Skip( 1 )
+
+do
+
     util = gpm_Table( gpm, "util", ->
         return setmetatable( {}, { __index: util } )
     )
@@ -352,7 +485,7 @@ do
         timer_Simple = timer.Simple
 
         util.NextTick = ( func, a, b, c, d ) ->
-            gpm_ArgAssert( func, 1, "function" )
+            ArgAssert( func, 1, "function" )
             timer_Simple 0, -> func( a, b, c, d )
 
     do
@@ -369,108 +502,12 @@ do
         fmt = "lua/bin/gm" .. ( ( CLIENT and not MENU_DLL ) and "cl" or "sv" ) .. "_%s_%s.dll"
 
         util.IsBinaryModuleInstalled = ( name ) ->
-            gpm_ArgAssert( name, 1, "string" )
+            ArgAssert( name, 1, "string" )
             if file_Exists( string_format( fmt, name, suffix ), "GAME" )
                 return true
             elseif jit_versionnum ~= 20004 and jit_arch == "x86" and isLinux
                 return file_Exists( string_format( fmt, name, "linux32" ), "GAME" )
             return false
-
-    do
-
-        string_byte = string.byte
-        string_len = string.len
-        math_max = math.max
-        math_min = math.min
-
-        class ByteStream
-            __tostring: =>
-                return string_format( "ByteStream: %p [%d/%d]", @, @Pointer, @Size )
-
-            new: ( data ) =>
-                @Length = string_len( data ) - 1
-                @Data = data
-                @Pointer = 0
-
-            Close: =>
-                @Pointer = 0
-                @Length = 0
-                @Data = ""
-
-            Size: =>
-                return @Length
-
-            Tell: =>
-                return @Pointer
-
-            Seek: ( position ) =>
-                position = math_max( position or 0, 0 )
-                @Pointer = position
-                return position
-
-            Skip: ( length ) =>
-                @Seek( @Pointer + ( length or 1 ) )
-
-            EndOfFile: =>
-                return @Pointer >= @Length
-
-            ReadByte: =>
-                pointer, length = @Pointer, @Length
-                if pointer < length
-                    @Skip!
-                if pointer > length
-                    return
-                return string_byte( @Data, pointer + 1 )
-
-            ReadBool: =>
-                byte = @ReadByte!
-                unless byte
-                    return
-                return byte ~= 0
-
-            Read: ( distance ) =>
-                pointer, length, data = @Pointer, @Length, @Data
-                distance = math_min( pointer + ( distance or length ), length )
-                @Seek( distance )
-                result = ""
-
-                for index = pointer, distance - 1
-                    result ..= data[ index + 1 ]
-                return result
-
-            ReadUInt: ( distance ) =>
-                pointer, length, data = @Pointer, @Length, @Data
-                distance = math_min( pointer + ( distance or length ), length )
-                @Seek( distance )
-                result = 0
-
-                counter = 1
-                for index = pointer, distance - 1
-                    result += string_byte( data, index + 1 ) * 0x100 ^ ( counter - 1 )
-                    counter += 1
-                return result
-
-            ReadUShort: =>
-                return @ReadUInt( 2 )
-
-            ReadULong: =>
-                return @ReadUInt( 4 )
-
-            ReadUInt64: =>
-                return @ReadUInt( 8 )
-
-            ReadString: =>
-                pointer, data = @Pointer, @Data
-
-                length = 0
-                for index = pointer, @Length
-                    if string_byte( data, index + 1 ) == 0
-                        break
-                    length += 1
-
-                if length > 0
-                    return @Read( length ), @Skip!
-        util.ByteStream = ByteStream
 
     do
 
@@ -524,27 +561,27 @@ do
 
             GetName: => @Name
             SetName: ( str ) =>
-                gpm_ArgAssert( str, 1, "string" )
+                ArgAssert( str, 1, "string" )
                 @Name = str
 
             GetColor: => @Color
             SetColor: ( color ) =>
-                gpm_ArgAssert( color, 1, "Color" )
+                ArgAssert( color, 1, "Color" )
                 @Color = color
 
             GetTextColor: => @TextColor
             SetTextColor: ( color ) =>
-                gpm_ArgAssert( color, 1, "Color" )
+                ArgAssert( color, 1, "Color" )
                 @TextColor = color
 
             GetDebugFilter: => @DebugFilter
             SetDebugFilter: ( func ) =>
-                gpm_ArgAssert( func, 1, "function" )
+                ArgAssert( func, 1, "function" )
                 @DebugFilter = func
 
             Log: ( color, level, str, ... ) =>
-                gpm_ArgAssert( color, 1, "Color" )
-                gpm_ArgAssert( level, 2, "string" )
+                ArgAssert( color, 1, "Color" )
+                ArgAssert( level, 2, "string" )
 
                 if select( "#", ... ) > 0
                     str = string_format( str, ... )
