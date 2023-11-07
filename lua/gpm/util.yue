@@ -292,7 +292,7 @@ path.Join = ( ... ) ->
         filePath ..= "/"
 
 path_Localize = ( filePath ) ->
-    return string_gsub( string_gsub( string_gsub( filePath, "^cache/%w+/", "" ), "^addons/[%w%-_]-/", "" ), "^lua/", "" )
+    return string_gsub( string_gsub( string_gsub( filePath, "^cache/[%w%-_]/", "" ), "^addons/[%w%-_]-/", "" ), "^lua/", "" )
 path.Localize = path_Localize
 
 path.ReplaceExtension = ( filePath, newExtension ) ->
