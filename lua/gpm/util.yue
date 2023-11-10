@@ -324,9 +324,13 @@ math.nan = 0 / 0
 
 do
 
+    table_concat = table.concat
     string_byte = string.byte
+    string_char = string.char
     string_len = string.len
+    math_floor = math.floor
     math_abs = math.abs
+    math_min = math.min
 
     class gpm.ByteStream
         __tostring: =>
@@ -381,17 +385,21 @@ do
 
         Read: ( distance ) =>
             ArgAssert( distance, 2, "number" )
-            if distance == 0 or @EndOfFile!
+            if distance <= 0 or @EndOfFile!
                 return
 
-            str, data = "", @Data
-            if distance > 0
-                for i = 1, distance, 1
-                    str ..= data[ @Skip( 1 ) ]
-            elseif distance < 0
-                for i = -1, distance, -1
-                    str ..= data[ @Skip( -1 ) ]
-            return str
+            start, finish = @Pointer, nil
+            data, output = @Data, {}
+            remaining = distance
+
+            for i = 1, math_floor( ( distance / 8000 ) + 1 )
+                size = math_min( remaining, 8000 )
+                remaining -= size
+                finish = start + size
+                output[] = string_char( string_byte( data, start + 1, finish ) )
+                start = finish
+            @Skip( distance )
+            return table_concat( output )
 
         ReadUInt: ( distance ) =>
             ArgAssert( distance, 2, "number" )
