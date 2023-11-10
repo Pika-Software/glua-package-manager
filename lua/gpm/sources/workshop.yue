@@ -5,3 +5,5 @@
     [  ] collection://workshop_id
 
 ]]
+
+print()
