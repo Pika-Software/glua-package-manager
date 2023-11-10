@@ -130,6 +130,7 @@ isstring = isstring
 util_CRC = util.CRC
 tostring = tostring
 tonumber = tonumber
+istable = istable
 error = error
 
 isFilePathAllowed = ( filePath ) ->
@@ -310,7 +311,14 @@ class GMAD
         table_Empty( @Required )
         table_Empty( @Files )
 
-        @Open( filePath, gamePath, "rb" )
+        if istable( filePath )
+            @Close!
+            doCRCs = readFiles
+            readFiles = gamePath
+            @File = filePath
+        else
+            @Open( filePath, gamePath, "rb" )
+
         @Parse( doCRCs )
 
         if readFiles
