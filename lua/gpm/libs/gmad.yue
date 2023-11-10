@@ -247,7 +247,7 @@ class GMAD
             error( "file read handler is missing, parsing is impossible" )
 
         fileHandle\Seek( 0 )
-        doCRCs = doCRCs ~= false
+        doCRCs = doCRCs ~= true
 
         if fileHandle\Read( 4 ) ~= @Identity
             error( "File is not a gma" )
@@ -404,7 +404,6 @@ class GMAD
             unless isstring( content )
                 error( "file content must be a string (" .. data.FilePath .. ")" )
             fileHandle\Write( content )
-        @Close!
 
         if doCRCs
             fileHandle = @Open( filePath, gamePath, "rb" )
@@ -419,9 +418,9 @@ class GMAD
             unless fileHandle
                 error( "file read handler is missing, opening is impossible" )
             fileHandle\WriteULong( crc )
-            @Close!
         else
             fileHandle\WriteULong( 0 )
+        @Close!
 
         return true
 
