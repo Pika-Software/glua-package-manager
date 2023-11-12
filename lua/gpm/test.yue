@@ -155,7 +155,7 @@ class Package
         @version = info.version or "0.0.0"
 
         return info
- 
+
     GetResult: once "result", async =>
         info = await @GetInfo!
         await Source.Download @url, info
@@ -175,7 +175,7 @@ main = async ->
     print "fetching info..."
     info = await gpm.FetchInfo "package://package_v2/"
     print "info: #{info}"
-    PrintTable info
+    if istable info then PrintTable info
     -- pkg = Package "lua://packages/package_v2/"
 
     -- print "--- #{CurTime!} ---"

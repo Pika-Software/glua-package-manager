@@ -1,5 +1,5 @@
 gpm = gpm
-:Promise, :Error, :NotImplementedError = gpm
+:Promise, :Error, :NotImplementedError, :string = gpm
 :async, :await = Promise
 
 class SourceError extends Error
@@ -52,8 +52,22 @@ gpm.FindSourceByURL = (url) ->
     protocol = string.match url, "^(.-)://"
     return protocol and sources[protocol]
 
-gpm.FetchInfo = async (url) ->
-    src = gpm.FindSourceByURL url
+gpm.ParsePackageURL = (url) ->
+    if isstable url and url.__name == "URL" then return url
+    if isstring url
+        if not string.IsURL url
+            url = "package://" .. url
+            if not string.IsURL then return
+        return gpm.URL url
+
+gpm.FetchInfo = async (_url) ->
+    url = gpm.ParsePackageURL _url
+    unless url
+        error SourceError "Invalid url: #{_url}"
+    unless url.protocol
+        error SourceError "Invalid protocol for url: #{_url}"
+    src = sources[url.protocol]
     unless src
-        error SourceError "No source found for URL #{url}"
+        error SourceError "No source found for URL #{_url}"
+
     return src\FetchInfo url

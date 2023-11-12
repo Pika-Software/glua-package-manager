@@ -1,5 +1,5 @@
 gpm = gpm
-:Promise, :BaseSource, :BaseSourceHandler, :SourceError, :GMAD, :ByteStream, :util, :fs = gpm
+:Promise, :BaseSource, :BaseSourceHandler, :SourceError, :GMAD, :ByteStream, :util, :fs, :path = gpm
 :async, :await = Promise
 
 --[[
@@ -44,7 +44,17 @@ class FileHandler extends BaseSourceHandler
         filePath = string.gsub( url, "^.-://", "" )
         switch string.GetExtensionFromFilename( filePath )
             when "gma"
-                return {}
+                result = await fs.AsyncRead( filePath, "GAME" )
+
+                gma = GMAD!
+                gma.File = ByteStream( result.content )
+                gma\Parse( true )
+                gma\ReadFiles( true )
+
+
+                return {
+
+                }
             when "zip"
                 return {}
             when "lua"
@@ -68,7 +78,7 @@ class ModuleHandler extends BaseSourceHandler
 
 
 class LuaHandler extends BaseSourceHandler
-    ShouldHandle: (url) => string.StartsWith url, "lua://"
+    ShouldHandle: (url) => url.protocol == "lua"
 
     FindPackageLua: (path) ->
         if string.EndsWith path, "package.lua"
@@ -77,7 +87,7 @@ class LuaHandler extends BaseSourceHandler
         return file.Exists( path ) and path
 
     FetchInfo: async (url) =>
-        path = string.gsub url, "^.-://", ""
+        path = url.path
         package_lua_path = LuaHandler.FindPackageLua path
         if package_lua_path
             env = {}
@@ -105,8 +115,11 @@ class LuaHandler extends BaseSourceHandler
             return @FetchInfo "lua://#{path}.lua"
 
 class PackageHandler extends BaseSourceHandler
-    ShouldHandle: (url) => string.StartsWith( url, "package://" )
-    FetchInfo: async ( url ) => gpm.FetchInfo( "lua://packages/" .. string.gsub( url, "^.-://", "" ) )
+    ShouldHandle: (url) => url.protocol == "package" -- string.StartsWith( url, "package://" )
+    FetchInfo: async ( url ) =>
+        url.protocol = "lua"
+        url.path = path.Join "packages", url.path
+        gpm.FetchInfo( url )
 
 class FilesystemSource extends BaseSource
 

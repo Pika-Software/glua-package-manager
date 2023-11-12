@@ -1,0 +1,10 @@
+-- https://developer.mozilla.org/en-US/docs/Web/API/URL
+
+export default class URL
+    new: ( url, base ) =>
+        url = string.match url, "[a-z]+://[^ >,;]+"
+        @protocol = string.match url, "^(.-)://"
+        @path = string.match url, "://(.+)"
+
+    __tostring: =>
+        return "#{@protocol}://#{@path}"
