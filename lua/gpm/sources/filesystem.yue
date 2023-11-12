@@ -1,5 +1,5 @@
 gpm = gpm
-:Promise, :BaseSource, :BaseSourceHandler, :SourceError, :GMAD, :ByteStream, :util, :fs, :path = gpm
+:Promise, :BaseSource, :BaseSourceHandler, :SourceError, :GMAD, :ByteStream, :util, :fs = gpm
 :async, :await = Promise
 
 --[[
@@ -34,8 +34,8 @@ class FileHandler extends BaseSourceHandler
     }
 
     ShouldHandle: ( url ) =>
-        if string.StartsWith( url, "file://" )
-            extension = string.GetExtensionFromFilename( url )
+        if url.protocol == "file"
+            extension = string.GetExtensionFromFilename( url.path )
             if extension and @SupportedExtensions[ extension ]
                 return true
         return false
@@ -67,7 +67,7 @@ class FileHandler extends BaseSourceHandler
                 return {}
 
 class ModuleHandler extends BaseSourceHandler
-    ShouldHandle: ( url ) => string.StartsWith( url, "module://" )
+    ShouldHandle: ( url ) => url.protocol == "module"
 
     FetchInfo: async ( url ) =>
         moduleName = string.gsub( url, "^.-://", "" )
@@ -84,7 +84,7 @@ class LuaHandler extends BaseSourceHandler
         if string.EndsWith path, "package.lua"
             return path
         path ..= "package.lua" -- path.join here
-        return file.Exists( path ) and path
+        return file.Exists( path, "LUA" ) and path
 
     FetchInfo: async (url) =>
         path = url.path
@@ -93,8 +93,8 @@ class LuaHandler extends BaseSourceHandler
             env = {}
             env.dir = dir -- We are assigning here, so package.lua can define custom directory
 
-            func = CompileFile package_info_path
-            unless func then error SourceError "Failed to compile package info file: #{package_info_path}"
+            func = CompileFile package_lua_path
+            unless func then error SourceError "Failed to compile package info file: #{package_lua_path}"
 
             await Promise.delay 1
 
@@ -118,7 +118,7 @@ class PackageHandler extends BaseSourceHandler
     ShouldHandle: (url) => url.protocol == "package" -- string.StartsWith( url, "package://" )
     FetchInfo: async ( url ) =>
         url.protocol = "lua"
-        url.path = path.Join "packages", url.path
+        url.path = gpm.path.Join "packages", url.path
         gpm.FetchInfo( url )
 
 class FilesystemSource extends BaseSource

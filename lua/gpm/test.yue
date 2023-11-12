@@ -1,55 +1,55 @@
 :Promise, :Error = gpm
 :async, :await = Promise
 
-class SourceError extends Error
-class PackageParseError extends Error
+-- class SourceError extends Error
+-- class PackageParseError extends Error
 
-sources = {}
-class Source
-    Register: (protocol, src) =>
-        sources[protocol] = src
+-- sources = {}
+-- class Source
+--     Register: (protocol, src) =>
+--         sources[protocol] = src
 
-    @FindSourceByURL: (url) ->
-        protocol = string.match url, "^(.-)://"
-        return protocol and sources[protocol]
+--     @FindSourceByURL: (url) ->
+--         protocol = string.match url, "^(.-)://"
+--         return protocol and sources[protocol]
 
-    @FetchInfo: (url) ->
-        src = Source.FindSourceByURL url
-        unless src then error SourceError "unknown protocol: " .. protocol
-        unless src.Download then error SourceError "#{src.__name} doesn't support FetchInfo method"
-        return src\FetchInfo url
+--     @FetchInfo: (url) ->
+--         src = Source.FindSourceByURL url
+--         unless src then error SourceError "unknown protocol: " .. protocol
+--         unless src.Download then error SourceError "#{src.__name} doesn't support FetchInfo method"
+--         return src\FetchInfo url
 
-    @Download: (url, info) ->
-        src = Source.FindSourceByURL url
-        unless src then error SourceError "unknown protocol: " .. protocol
-        unless src.Download then error SourceError "#{src.__name} doesn't support Download method"
-        return src\Download url, info
+--     @Download: (url, info) ->
+--         src = Source.FindSourceByURL url
+--         unless src then error SourceError "unknown protocol: " .. protocol
+--         unless src.Download then error SourceError "#{src.__name} doesn't support Download method"
+--         return src\Download url, info
 
-    -- more methods?
+--     -- more methods?
 
-class LocalSource extends Source
-    FetchInfo: async (url) =>
-        dir = string.gsub url, "lua://", ""
-        package_info_path = dir .. "package.lua" -- path.join here
+-- class LocalSource extends Source
+--     FetchInfo: async (url) =>
+--         dir = string.gsub url, "lua://", ""
+--         package_info_path = dir .. "package.lua" -- path.join here
 
-        env = {}
-        env.dir = dir -- We are assigning here, so package.lua can define custom directory
+--         env = {}
+--         env.dir = dir -- We are assigning here, so package.lua can define custom directory
 
-        func = CompileFile package_info_path
-        unless func then error SourceError "Failed to compile package info file: " .. package_info_path
+--         func = CompileFile package_info_path
+--         unless func then error SourceError "Failed to compile package info file: " .. package_info_path
 
-        await Promise.delay 1
+--         await Promise.delay 1
 
-        setfenv func, env
-        unless success, reason = try func!
-            error SourceError reason
+--         setfenv func, env
+--         unless success, reason = try func!
+--             error SourceError reason
 
-        return env
+--         return env
 
-    Download: async (url, info) => -- what should i do here?
+--     Download: async (url, info) => -- what should i do here?
 
--- Registering local source!
-Source\Register "lua", LocalSource
+-- -- Registering local source!
+-- Source\Register "lua", LocalSource
 
 --[[
 
@@ -114,66 +114,66 @@ Source\Register "lua", LocalSource
 
 ]]
 
-once = (field, fn) ->
-    (...) =>
-        if @[field] then return @[field]
-        @[field] = fn @, ...
-        return @[field]
+-- once = (field, fn) ->
+--     (...) =>
+--         if @[field] then return @[field]
+--         @[field] = fn @, ...
+--         return @[field]
 
-class Package
-    new: (@url) =>
+-- class Package
+--     new: (@url) =>
 
-    GetID: =>
-        if @name
-            return "#{@name}@#{@version or "unknown"}"
-        return tostring @url
+--     GetID: =>
+--         if @name
+--             return "#{@name}@#{@version or "unknown"}"
+--         return tostring @url
 
-    __tostring: =>
-        return "Package #{@GetID!}"
+--     __tostring: =>
+--         return "Package #{@GetID!}"
 
-    GetInfo: once "info", async =>
-        pkg_info = await Source.FetchInfo @url
-        unless istable pkg_info
-            error PackageParseError "source hasn't found a package info"
+--     GetInfo: once "info", async =>
+--         pkg_info = await Source.FetchInfo @url
+--         unless istable pkg_info
+--             error PackageParseError "source hasn't found a package info"
 
-        info = {}
-        info.name = pkg_info.name
-        unless isstring info.name
-            error PackageParseError "`name` must be a string"
+--         info = {}
+--         info.name = pkg_info.name
+--         unless isstring info.name
+--             error PackageParseError "`name` must be a string"
 
-        info.dir = pkg_info.dir
-        unless isstring info.dir
-            error PackageParseError "package directory hasn't been found"
+--         info.dir = pkg_info.dir
+--         unless isstring info.dir
+--             error PackageParseError "package directory hasn't been found"
 
-        info.init = pkg_info.init or "init.lua"
-        unless isstring info.init
-            error PackageParseError "`init` must be a string"
+--         info.init = pkg_info.init or "init.lua"
+--         unless isstring info.init
+--             error PackageParseError "`init` must be a string"
 
-        -- Parse other fields
+--         -- Parse other fields
 
-        @name = info.name
-        @version = info.version or "0.0.0"
+--         @name = info.name
+--         @version = info.version or "0.0.0"
 
-        return info
+--         return info
 
-    GetResult: once "result", async =>
-        info = await @GetInfo!
-        await Source.Download @url, info
+--     GetResult: once "result", async =>
+--         info = await @GetInfo!
+--         await Source.Download @url, info
 
-        entry = info.dir .. info.init -- path.join here
-        entry_fn = CompileFile entry
-        unless entry_fn
-            error SourceError "Failed to compile package entry file: " .. entry
+--         entry = info.dir .. info.init -- path.join here
+--         entry_fn = CompileFile entry
+--         unless entry_fn
+--             error SourceError "Failed to compile package entry file: " .. entry
 
-        -- setup env here
+--         -- setup env here
 
-        entry_fn = async entry_fn -- making it asynchronous
-        return entry_fn!
+--         entry_fn = async entry_fn -- making it asynchronous
+--         return entry_fn!
 
 
 main = async ->
     print "fetching info..."
-    info = await gpm.FetchInfo "package://package_v2/"
+    info = await gpm.FetchInfo "package_v2"
     print "info: #{info}"
     if istable info then PrintTable info
     -- pkg = Package "lua://packages/package_v2/"
@@ -187,7 +187,6 @@ main = async ->
     -- print "Result is #{result}"
     -- print "#{pkg} has been loaded"
     -- print "--- #{CurTime!} ---"
-
 
 main!\Catch (err)->
     ErrorNoHaltWithStack err

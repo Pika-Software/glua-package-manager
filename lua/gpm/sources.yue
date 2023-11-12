@@ -6,7 +6,6 @@ class SourceError extends Error
 gpm.SourceError = SourceError
 
 sources = gpm.Table( gpm, "Sources" )
-table.Empty( sources )
 
 --[[
 
@@ -53,11 +52,11 @@ gpm.FindSourceByURL = (url) ->
     return protocol and sources[protocol]
 
 gpm.ParsePackageURL = (url) ->
-    if isstable url and url.__name == "URL" then return url
+    if istable(url) and url.__class == gpm.URL then return url
     if isstring url
-        if not string.IsURL url
+        unless string.IsURL url
             url = "package://" .. url
-            if not string.IsURL then return
+            unless string.IsURL then return
         return gpm.URL url
 
 gpm.FetchInfo = async (_url) ->
