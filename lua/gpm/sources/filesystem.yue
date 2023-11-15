@@ -41,6 +41,7 @@ class FileHandler extends BaseSourceHandler
         return false
 
     FetchInfo: async ( url ) =>
+        error SourceError "file:// protocol is not supported yet"
         filePath = string.gsub( url, "^.-://", "" )
         switch string.GetExtensionFromFilename( filePath )
             when "gma"
@@ -70,6 +71,7 @@ class ModuleHandler extends BaseSourceHandler
     ShouldHandle: ( url ) => url.protocol == "module"
 
     FetchInfo: async ( url ) =>
+        error SourceError "module:// protocol is not supported yet"
         moduleName = string.gsub( url, "^.-://", "" )
         return {
             "name": moduleName
@@ -83,7 +85,7 @@ class LuaHandler extends BaseSourceHandler
     FindPackageLua: (path) ->
         if string.EndsWith path, "package.lua"
             return path
-        path ..= "package.lua" -- path.join here
+        path = gpm.path.Join path, "package.lua"
         return file.Exists( path, "LUA" ) and path
 
     FetchInfo: async (url) =>
@@ -96,19 +98,16 @@ class LuaHandler extends BaseSourceHandler
             func = CompileFile package_lua_path
             unless func then error SourceError "Failed to compile package info file: #{package_lua_path}"
 
-            await Promise.delay 1
-
             setfenv func, env
             unless success, reason = try func!
                 error SourceError reason
 
             return env
         elseif string.EndsWith path, ".lua"
-            dir = path -- extreact dir from path
             -- Make stub env
             env = {}
-            env.name = "unknown" -- get name from path
-            env.dir = dir --
+            env.dir = string.GetPathFromFilename(path)
+            env.main = string.GetFileFromFilename(path)
 
             return env
         else
