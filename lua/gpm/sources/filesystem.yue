@@ -112,13 +112,18 @@ class LuaHandler extends BaseSourceHandler
             return env
         else
             return @FetchInfo "lua://#{path}.lua"
+        
+    Install: (url) =>
+        -- No need to install anything
 
 class PackageHandler extends BaseSourceHandler
     ShouldHandle: (url) => url.protocol == "package" -- string.StartsWith( url, "package://" )
-    FetchInfo: async ( url ) =>
+    FetchInfo: ( url ) =>
         url.protocol = "lua"
         url.path = gpm.path.Join "packages", url.path
         gpm.FetchInfo( url )
+    Install: (url, info) =>
+        -- No need to install anything
 
 class FilesystemSource extends BaseSource
 
