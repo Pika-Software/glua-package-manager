@@ -307,7 +307,7 @@ path.RemoveBackslash = ( filePath ) ->
     return string_gsub( filePath, "[/\\]?$", "" )
 
 debug.getfpath = ->
-    for i = 2, 6
+    for i = 2, 16
         info = debug_getinfo( i, "S" )
         unless info
             break
@@ -332,6 +332,7 @@ do
     math_abs = math.abs
     math_min = math.min
 
+    -- TODO: Maybe move this to a separate file?
     class gpm.ByteStream
         __tostring: =>
             return string_format( "ByteStream: %p [%d/%d]", @, @Pointer, @Size )
