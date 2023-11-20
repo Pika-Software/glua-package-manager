@@ -161,6 +161,8 @@ table = gpm_Table( gpm, "table", ->
     return setmetatable( {}, { __index: table } )
 )
 
+table_concat = table.concat
+
 table.HasIValue = ( tbl, any ) ->
     for value in *tbl
         if value == any
@@ -305,6 +307,17 @@ path.ReplaceExtension = ( filePath, newExtension ) ->
 
 path.RemoveBackslash = ( filePath ) ->
     return string_gsub( filePath, "[/\\]?$", "" )
+
+path.Normalize = ( filePath ) ->
+    filePath = path_Fix filePath
+    segments = string.Split filePath, "/"
+    result = {}
+    for segment in *segments
+        if segment == ".."
+            table_remove result
+        elseif segment ~= "." and segment ~= ""
+            result[] = segment
+    return table_concat result, "/"
 
 debug.getfpath = ->
     for i = 2, 16
