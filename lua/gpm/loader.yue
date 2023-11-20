@@ -1,5 +1,5 @@
 gpm = gpm
-:Promise, :Error, :path = gpm
+:Promise, :Error, :path, :string = gpm
 :async, :await = Promise
 
 class ModuleURLResolutionError extends Error
@@ -8,10 +8,18 @@ gpm.ModuleURLResolutionError = ModuleURLResolutionError
 class ModuleLoadError extends Error
 gpm.ModuleLoadError = ModuleLoadError
 
-resolveURL = (url) ->
+-- https://nodejs.org/api/esm.html#resolution-algorithm-specification
+-- Yeah, this loader tries to mimic ESM loader procedure
+
+packageResolve = (url) ->
+
+
+resolveURL = (specifier, parentURL) ->
     -- https://nodejs.org/api/esm.html#resolution-algorithm-specification
     -- should first check if url is a valid url
-    -- ...
+    if string.IsURL url
+        return url
+
     -- check if url is a relative path
     if string.StartsWith(url, "./") or string.StartsWith(url, "../")
         filePath = url
@@ -21,6 +29,9 @@ resolveURL = (url) ->
         
         filePath = path.Normalize filePath
         return "lua://" .. filePath
+
+    if resolved_url = packageResolve url
+        return resolved_url
 
 asyncImport = async (url) ->
     unless url.protocol == "lua"
