@@ -1,0 +1,44 @@
+gpm = gpm
+:Promise, :Error, :path = gpm
+:async, :await = Promise
+
+class ModuleURLResolutionError extends Error
+gpm.ModuleURLResolutionError = ModuleURLResolutionError
+
+class ModuleLoadError extends Error
+gpm.ModuleLoadError = ModuleLoadError
+
+resolveURL = (url) ->
+    -- https://nodejs.org/api/esm.html#resolution-algorithm-specification
+    -- should first check if url is a valid url
+    -- ...
+    -- check if url is a relative path
+    if string.StartsWith(url, "./") or string.StartsWith(url, "../")
+        filePath = url
+        if current_dir = gpm.debug.getfpath!
+            current_dir = string.GetPathFromFilename current_dir
+            if current_dir != "" then filePath = path.Join current_dir, filePath
+        
+        filePath = path.Normalize filePath
+        return "lua://" .. filePath
+
+asyncImport = async (url) ->
+    unless url.protocol == "lua"
+        error ModuleURLResolutionError "cannot resolve url: #{url}"
+
+    entry_fn = CompileFile url.path
+    unless entry_fn
+        error ModuleLoadError "failed to compile file #{url.path}"
+    
+    entry_fn = async entry_fn
+    return entry_fn!
+
+gpm.Import = (url, should_await = true) ->
+    url = gpm.URL resolveURL url
+    result = asyncImport url
+    if should_await then return result\await!
+    else return result
+    
+if SERVER
+    gpm.Import("./test2.lua", false)\Then (result) -> print("import result is #{result}"),
+        (err) -> print "import error is #{err}"

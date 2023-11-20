@@ -44,7 +44,7 @@ class gpm.BaseSource
         return Promise.reject SourceError "No handler found for URL #{url} (#{name})"
 
     FetchInfo: (url) => @CallHandler "FetchInfo", url
-    Install: (url, info) => @CallHandler "Install" url, info
+    Install: (url, info) => @CallHandler "Install", url, info
 
 gpm.RegisterSource = (protocol, source) ->
     sources[protocol] = source

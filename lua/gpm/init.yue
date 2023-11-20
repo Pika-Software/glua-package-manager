@@ -79,6 +79,7 @@ logger\Info( "%s%d v%s initialized.", GMAD.Identity, GMAD.FormatVersion, GMAD.VE
 
 IncludeShared( "gpm/package.lua" )
 IncludeShared( "gpm/sources.lua" )
+IncludeShared( "gpm/loader.lua" )
 
 for f in *file.Find( "gpm/sources/*.lua", "LUA" )
     IncludeShared( "gpm/sources/#{f}" )
