@@ -1,0 +1,55 @@
+gpm = gpm
+:Promise, :Error, :path, :string = gpm
+:async, :await = Promise
+
+class ModuleURLResolutionError extends Error
+gpm.ModuleURLResolutionError = ModuleURLResolutionError
+
+class ModuleLoadError extends Error
+gpm.ModuleLoadError = ModuleLoadError
+
+-- https://nodejs.org/api/esm.html#resolution-algorithm-specification
+-- Yeah, this loader tries to mimic ESM loader procedure
+
+packageResolve = (url) ->
+
+
+resolveURL = (specifier, parentURL) ->
+    -- https://nodejs.org/api/esm.html#resolution-algorithm-specification
+    -- should first check if url is a valid url
+    if string.IsURL url
+        return url
+
+    -- check if url is a relative path
+    if string.StartsWith(url, "./") or string.StartsWith(url, "../")
+        filePath = url
+        if current_dir = gpm.debug.getfpath!
+            current_dir = string.GetPathFromFilename current_dir
+            if current_dir != "" then filePath = path.Join current_dir, filePath
+        
+        filePath = path.Normalize filePath
+        return "lua://" .. filePath
+
+    if resolved_url = packageResolve url
+        return resolved_url
+
+asyncImport = async (url) ->
+    unless url.protocol == "lua"
+        error ModuleURLResolutionError "cannot resolve url: #{url}"
+
+    entry_fn = CompileFile url.path
+    unless entry_fn
+        error ModuleLoadError "failed to compile file #{url.path}"
+    
+    entry_fn = async entry_fn
+    return entry_fn!
+
+gpm.Import = (url, should_await = true) ->
+    url = gpm.URL resolveURL url
+    result = asyncImport url
+    if should_await then return result\await!
+    else return result
+    
+if SERVER
+    gpm.Import("./test2.lua", false)\Then (result) -> print("import result is #{result}"),
+        (err) -> print "import error is #{err}"

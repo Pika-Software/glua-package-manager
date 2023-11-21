@@ -172,10 +172,10 @@
 
 
 main = async ->
-    print "fetching info..."
-    info = await gpm.FetchInfo "package_v2"
-    print "info: #{info}"
-    if istable info then PrintTable info
+    -- print "fetching info..."
+    -- info = await gpm.FetchInfo "package_v2"
+    -- print "info: #{info}"
+    -- if istable info then PrintTable info
     -- pkg = Package "lua://packages/package_v2/"
 
     -- print "--- #{CurTime!} ---"

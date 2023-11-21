@@ -194,6 +194,8 @@ table = gpm_Table( gpm, "table", ->
     return setmetatable( {}, { __index: table } )
 )
 
+table_concat = table.concat
+
 table.HasIValue = ( tbl, any ) ->
     for value in *tbl
         if value == any
@@ -339,8 +341,19 @@ path.ReplaceExtension = ( filePath, newExtension ) ->
 path.RemoveBackslash = ( filePath ) ->
     return string_gsub( filePath, "[/\\]?$", "" )
 
+path.Normalize = ( filePath ) ->
+    filePath = path_Fix filePath
+    segments = string.Split filePath, "/"
+    result = {}
+    for segment in *segments
+        if segment == ".."
+            table_remove result
+        elseif segment ~= "." and segment ~= ""
+            result[] = segment
+    return table_concat result, "/"
+
 debug.getfpath = ->
-    for i = 2, 6
+    for i = 2, 16
         info = debug_getinfo( i, "S" )
         unless info
             break
@@ -365,6 +378,7 @@ do
     math_abs = math.abs
     math_min = math.min
 
+    -- TODO: Maybe move this to a separate file?
     class gpm.ByteStream
         __tostring: =>
             return string_format( "ByteStream: %p [%d/%d]", @, @Pointer, @Size )

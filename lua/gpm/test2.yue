@@ -1,0 +1,10 @@
+AddCSLuaFile!
+
+:Promise = gpm
+:await, :async = Promise
+
+print "hello world"
+await Promise.delay 1
+print ":)"
+
+return "return from test2"
