@@ -1,4 +1,4 @@
---[[--
+--[[
 LibDeflate 1.0.2-release <br>
 Pure Lua compressor and decompressor with high compression ratio using
 DEFLATE/zlib format.
@@ -23,7 +23,7 @@ This file "deflate.lua" is the only source file of
 the library. <br>
 Submit suggestions or report bugs to
 https://github.com/safeteeWow/LibDeflate/issues
-]] --[[
+
 zlib License
 
 (C) 2018-2021 Haoqian He
@@ -72,12 +72,6 @@ Their original licenses shall be comply when used.
     https://github.com/WeakAuras/WeakAuras2
     Licensed under GPLv2.
     For the 6bit encoding and decoding.
-]] --[[
-    Curseforge auto-packaging replacements:
-
-    Project Date: @project-date-iso@
-    Project Hash: @project-hash@
-    Project Version: @project-version@
 --]]
 
 local gpm = gpm

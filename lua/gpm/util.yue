@@ -157,6 +157,39 @@ ArgAssert = ( value, argNum, expected, errorlevel ) ->
     error( string_format( "bad argument #%d to \'%s\' (%s expected, got %s)", argNum, dinfo and dinfo.name or "func", expected, valueType ), errorlevel or 3 )
 gpm.ArgAssert = ArgAssert
 
+class Stack
+    __tostring: =>
+        return string_format( "Stack: %p [%d/%d]", @, @Pointer, @Length )
+
+    new: ( length ) =>
+        @Length = isnumber( length ) and length or -1
+        @Pointer = 0
+
+    isEmpty: =>
+        return @Pointer == 0
+
+    isFull: =>
+        return @Pointer == @Length
+
+    peek: =>
+        return @[ @Pointer ]
+
+    push: ( value ) =>
+        pointer = @Pointer
+        if pointer ~= @Length
+            pointer += 1
+            @[ pointer ] = value
+            @Pointer = pointer
+        return pointer
+
+    pop: =>
+        pointer = @Pointer
+        if pointer ~= 0
+            @Pointer = pointer - 1
+            value = @[ pointer ]
+            @[ pointer ] = nil
+            return value
+
 table = gpm_Table( gpm, "table", ->
     return setmetatable( {}, { __index: table } )
 )
