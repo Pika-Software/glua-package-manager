@@ -157,9 +157,9 @@ class GMAD
         @Timestamp = 0
         @Required = {}
         @SteamID = ""
-        @RealCRC = 0
+        @FileCRC = 0
         @Files = {}
-        @CRC = 0
+        @StoredCRC = 0
 
     @IsFilePathAllowed: isFilePathAllowed
 
@@ -288,7 +288,7 @@ class GMAD
             data.Size = size
             offset += size
 
-            data.CRC = fileHandle\ReadULong!
+            data.StoredCRC = fileHandle\ReadULong!
             files[ index ] = data
 
         files.Pointer = fileHandle\Tell!
@@ -299,13 +299,10 @@ class GMAD
         contentSize = fileHandle\Size! - 4
         fileHandle\Seek( contentSize )
 
-        crc = fileHandle\ReadULong!
-        unless crc
-            return
+        @StoredCRC = fileHandle\ReadULong! or 0
 
-        @CRC = crc
         fileHandle\Seek( 0 )
-        @RealCRC = tonumber( util_CRC( fileHandle\Read( contentSize ) ) )
+        @FileCRC = tonumber( util_CRC( fileHandle\Read( contentSize ) ) )
 
     Read: ( filePath, gamePath, readFiles, doCRCs ) =>
         table_Empty( @Required )
@@ -326,25 +323,22 @@ class GMAD
         @Close!
 
     VerifyCRC: =>
-        crc = @CRC
-        if crc == 0
-            return true
-        return crc == @RealCRC
+        return @StoredCRC == @FileCRC
 
     VerifyFilesCRC: =>
         for data in *@Files
-            crc = data.CRC
-            unless crc
-                continue
+            storedCRC = data.StoredCRC
+            unless storedCRC
+                return false, data
 
-            realCRC = data.RealCRC
-            unless realCRC
+            fileCRC = data.FileCRC
+            unless fileCRC
                 content = data.Content
                 if content
-                    realCRC = tonumber( util_CRC( content ) )
-                    data.RealCRC = realCRC
+                    fileCRC = tonumber( util_CRC( content ) )
+                    data.FileCRC = fileCRC
 
-            if crc ~= realCRC
+            if storedCRC ~= fileCRC
                 return false, data
         return true
 
@@ -410,9 +404,9 @@ class GMAD
             unless fileHandle
                 error( "file read handler is missing, opening is impossible" )
 
-            crc = tonumber( util_CRC( fileHandle\Read! ) )
-            @RealCRC = crc
-            @CRC = crc
+            fileCRC = tonumber( util_CRC( fileHandle\Read! ) )
+            @StoredCRC = fileCRC
+            @FileCRC = fileCRC
 
             fileHandle = @Open( filePath, gamePath, "ab" )
             unless fileHandle
@@ -452,7 +446,7 @@ class GMAD
             content = fileHandle\Read( data.Size )
             data.Content = content
             if doCRCs
-                data.RealCRC = tonumber( util_CRC( content ) )
+                data.FileCRC = tonumber( util_CRC( content ) )
 
         return files
 
@@ -477,9 +471,9 @@ class GMAD
         }
 
         if doCRCs
-            crc = tonumber( util_CRC( content ) )
-            data.RealCRC = crc
-            data.CRC = crc
+            fileCRC = tonumber( util_CRC( content ) )
+            data.StoredCRC = fileCRC
+            data.FileCRC = fileCRC
         files[] = data
 
     ClearFiles: =>

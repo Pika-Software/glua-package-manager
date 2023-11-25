@@ -162,7 +162,7 @@ class Stack
         return string_format( "Stack: %p [%d/%d]", @, @Pointer, @Length )
 
     new: ( length ) =>
-        @Length = isnumber( length ) and length or -1
+        @Length = ( isnumber( length ) and length > 0 ) and length or -1
         @Pointer = 0
 
     isEmpty: =>
@@ -370,15 +370,13 @@ math.nan = 0 / 0
 
 do
 
-    table_concat = table.concat
     string_byte = string.byte
-    string_char = string.char
     string_len = string.len
-    math_floor = math.floor
     math_abs = math.abs
-    math_min = math.min
 
     -- TODO: Maybe move this to a separate file?
+    -- : I'm not sure, a single file for a single class?
+
     class gpm.ByteStream
         __tostring: =>
             return string_format( "ByteStream: %p [%d/%d]", @, @Pointer, @Size )
@@ -435,18 +433,9 @@ do
             if distance <= 0 or @EndOfFile!
                 return
 
-            start, finish = @Pointer, nil
-            data, output = @Data, {}
-            remaining = distance
-
-            for i = 1, math_floor( ( distance / 8000 ) + 1 )
-                size = math_min( remaining, 8000 )
-                remaining -= size
-                finish = start + size
-                output[] = string_char( string_byte( data, start + 1, finish ) )
-                start = finish
+            startPos = @Pointer
             @Skip( distance )
-            return table_concat( output )
+            return string_sub( @Data, startPos + 1, startPos + distance )
 
         ReadUInt: ( distance ) =>
             ArgAssert( distance, 2, "number" )
