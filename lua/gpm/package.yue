@@ -1,9 +1,12 @@
 gpm = gpm
-:fs, :path, :metaworks, :Logger, :Promise, :Table = gpm
+:fs, :path, :metaworks, :Logger, :Promise, :Table, :Error = gpm
 luaGameDir = fs.LuaGameDir
 istable = istable
 
 packages = Table( gpm, "Packages" )
+
+class InvalidPackageConfigurationError extends Error
+gpm.InvalidPackageConfigurationError = InvalidPackageConfigurationError
 
 --[[
     Packages: {
@@ -15,25 +18,25 @@ packages = Table( gpm, "Packages" )
     }
 ]]
 
-class Package
-    new: ( url ) =>
-        @url = url
-        @name = "unknown"
-        @version = "unknown"
-        @dependencies = {}
-        @environment = {}
+-- class Package
+--     new: ( url ) =>
+--         @url = url
+--         @name = "unknown"
+--         @version = "unknown"
+--         @dependencies = {}
+--         @environment = {}
 
-    GetInfo: =>
-        p = @info
-        if p ~= nil
-            return p
-        p = @source\GetInfo( @ )
-        @info = p
-        return p
+--     GetInfo: =>
+--         p = @info
+--         if p ~= nil
+--             return p
+--         p = @source\GetInfo( @ )
+--         @info = p
+--         return p
 
-    Install: =>
+--     Install: =>
 
-gpm.Package = Package
+-- gpm.Package = Package
 
 --[[
 
@@ -46,3 +49,33 @@ gpm.Package = Package
                 return source.Process( protocol, filePath )
 
 --]]
+
+-- Maybe gpm.Package must be a just metadata from package.lua
+class gpm.Package
+    new: ( metadata ) =>
+        table.Merge @, metadata
+
+readMetadataFromLua = (path) ->
+    meta = {}
+    entry = CompileFile path
+    unless entry
+        return nil
+    setfenv entry, meta
+    unless success, reason = try entry!
+        error InvalidPackageConfigurationError reason
+
+    if SERVER then AddCSLuaFile path
+    return meta
+
+gpm.LoadMetadataFromDir = (dir) ->
+    pmeta_path = path.Join dir, "package.lua"
+    unless file.Exists pmeta_path, "LUA"
+        return nil
+
+    meta = readMetadataFromLua pmeta_path
+    unless meta
+        error InvalidPackageConfigurationError "failed to parse #{pmeta_path}"
+
+    meta.dir = dir
+    meta.main or= "init.lua"
+    return gpm.Package meta

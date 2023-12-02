@@ -5,35 +5,84 @@ gpm = gpm
 class ModuleURLResolutionError extends Error
 gpm.ModuleURLResolutionError = ModuleURLResolutionError
 
+class InvalidModuleSpecifierError extends Error
+gpm.InvalidModuleSpecifierError = InvalidModuleSpecifierError
+
 class ModuleLoadError extends Error
 gpm.ModuleLoadError = ModuleLoadError
+
+class ModuleNotFoundError extends Error
+gpm.ModuleNotFoundError = ModuleNotFoundError
 
 -- https://nodejs.org/api/esm.html#resolution-algorithm-specification
 -- Yeah, this loader tries to mimic ESM loader procedure
 
-packageResolve = (url) ->
+packageSelfResolve = (package_name, package_subpath, parent_url) -> nil
+
+packageResolve = (specifier, parent_url) ->
+    package_name = nil
+    if specifier == ""
+        error InvalidModuleSpecifierError specifier
+
+    unless string.StartsWith specifier, "@"
+        package_name = string.match specifier, "([^/]*)"
+    else
+        unless string.match specifier, "/" -- check if specifier even has /
+            error InvalidModuleSpecifierError specifier
+        package_name = string.match specifier, "(@[^/]*/[^/]*)"
+    
+    if string.StartsWith(package_name, ".") or string.match(package_name, "[\\%%]")
+        error InvalidModuleSpecifierError specifier
+    
+    package_subpath = "." .. string.sub(specifier, #package_name + 1)
+    if string.EndsWith package_subpath, "/"
+        error InvalidModuleSpecifierError specifier
+    
+    if self_url = packageSelfResolve package_name, package_subpath, parent_url
+        return self_url
+    
+    parent_url = gpm.URL parent_url
+    while parent_url.path != ""
+        parent_url.path = string.sub string.GetPathFromFilename(parent_url.path), 1, -2
+        package_url = path.Normalize path.Join parent_url.path, "packages", specifier
+        if file.IsDir package_url, "LUA"
+            pmeta = gpm.LoadMetadataFromDir package_url
+            -- TODO If pjson is not null and pjson.exports is not null or undefined, then
+            if package_subpath == "."
+                if isstring pmeta.main
+                    return "lua://" .. path.Join package_url, pmeta.main
+            else
+                return "lua://" .. path.Normalize path.Join package_url, package_subpath 
+
+    error ModuleNotFoundError specifier
 
 
-resolveURL = (specifier, parentURL) ->
+resolveURL = (specifier, parent_url) ->
+    resolved = nil
+    format = nil
+
     -- https://nodejs.org/api/esm.html#resolution-algorithm-specification
     -- should first check if url is a valid url
-    if string.IsURL url
-        return url
-
+    if string.IsURL specifier
+        resolved = specifier
     -- check if url is a relative path
-    if string.StartsWith(url, "./") or string.StartsWith(url, "../")
-        filePath = url
-        if current_dir = gpm.debug.getfpath!
-            current_dir = string.GetPathFromFilename current_dir
-            if current_dir != "" then filePath = path.Join current_dir, filePath
+    else if string.StartsWith(specifier, "./") or string.StartsWith(specifier, "../") or string.StartsWith(specifier, "/")
+        filePath = specifier
+        if parent_url
+            parent_path = gpm.URL parent_url
+            if parent_path = parent_path.protocol == "lua" and string.GetPathFromFilename parent_path.path
+                filePath = path.Join parent_path, filePath
         
-        filePath = path.Normalize filePath
-        return "lua://" .. filePath
+        resolved = "lua://" .. path.Normalize filePath
+    -- it is a bare specifier, run package resolve
+    else 
+        resolved = packageResolve specifier, parent_url
 
-    if resolved_url = packageResolve url
-        return resolved_url
+    return resolved, format
 
-asyncImport = async (url) ->
+asyncImport = async (specifier, parent_url) ->
+    url, format = resolveURL specifier, parent_url
+    url = gpm.URL url
     unless url.protocol == "lua"
         error ModuleURLResolutionError "cannot resolve url: #{url}"
 
@@ -44,12 +93,17 @@ asyncImport = async (url) ->
     entry_fn = async entry_fn
     return entry_fn!
 
+getParentURL = ->
+    -- get url from something like gpm.meta.url
+    if current_dir = gpm.debug.getfpath!
+        return "lua://" .. current_dir
+
 gpm.Import = (url, should_await = true) ->
-    url = gpm.URL resolveURL url
-    result = asyncImport url
+    parent_url = getParentURL!
+    result = asyncImport url, parent_url
     if should_await then return result\await!
     else return result
     
-if SERVER
-    gpm.Import("./test2.lua", false)\Then (result) -> print("import result is #{result}"),
-        (err) -> print "import error is #{err}"
+
+gpm.Import("package_v2", false)\Then (result) -> print("import result is #{result}"),
+    (err) -> ErrorNoHaltWithStack err
