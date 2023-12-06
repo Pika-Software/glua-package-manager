@@ -3,6 +3,8 @@
 export default class URL
     new: ( url, base ) =>
         url = string.match url, "[a-z]+://[^ >,;]+"
+        unless url then error gpm.TypeError "URL constructor: #{url} is not a valid URL"
+
         @protocol = string.match url, "^(.-)://"
         @path = string.match url, "://(.+)"
 

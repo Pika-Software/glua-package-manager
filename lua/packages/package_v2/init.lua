@@ -1,7 +1,9 @@
+local submodule = require "./submodule.lua"
 local Promise = gpm.Promise
 
-print "Hello world from my package!"
-
+print("Got from submodule:", submodule)
 Promise.delay(1):await()
+
+require "b"
 
 return "this package is da best"

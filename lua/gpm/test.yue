@@ -172,6 +172,8 @@
 
 
 main = async ->
+    print "package return:", gpm.Import "package_v2"
+    return
     -- print "fetching info..."
     -- info = await gpm.FetchInfo "package_v2"
     -- print "info: #{info}"
@@ -189,4 +191,8 @@ main = async ->
     -- print "--- #{CurTime!} ---"
 
 main!\Catch (err)->
-    ErrorNoHaltWithStack err
+    try Error.display err
+    catch err
+        ErrorNoHaltWithStack err
+        return
+    return

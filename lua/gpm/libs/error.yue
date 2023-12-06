@@ -46,4 +46,15 @@ export class Error
         else
             return "#{@name}: #{@message}"
 
+    display: =>
+        if isstring @
+            return ErrorNoHaltWithStack @
+
+        lines = {}
+        lines[] = "\n[ERROR] #{@}"
+        for i, info in ipairs @stack
+            lines[] = "#{string.rep(" ", i)} #{i}. #{info.name or "unknown"} - #{info.short_src}:#{info.currentline}"
+        lines[] = "\n"
+        ErrorNoHalt table.concat lines, "\n"
+
 export class TypeError extends Error

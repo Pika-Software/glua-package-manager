@@ -42,7 +42,7 @@ packageResolve = (specifier, parent_url) ->
         return self_url
     
     parent_url = gpm.URL parent_url
-    while parent_url.path != ""
+    while parent_url.path and parent_url.path != ""
         parent_url.path = string.sub string.GetPathFromFilename(parent_url.path), 1, -2
         package_url = path.Normalize path.Join parent_url.path, "packages", specifier
         if file.IsDir package_url, "LUA"
@@ -55,7 +55,6 @@ packageResolve = (specifier, parent_url) ->
                 return "lua://" .. path.Normalize path.Join package_url, package_subpath 
 
     error ModuleNotFoundError specifier
-
 
 resolveURL = (specifier, parent_url) ->
     resolved = nil
@@ -90,6 +89,13 @@ asyncImport = async (specifier, parent_url) ->
     unless entry_fn
         error ModuleLoadError "failed to compile file #{url.path}"
     
+    env = setmetatable {}, { __index: _G, __newindex: _G }
+    env.require = gpm.Import
+    env.Promise = gpm.Promise
+    env.await = env.Promise.await
+    env.async = env.Promise.async
+    setfenv entry_fn, env
+
     entry_fn = async entry_fn
     return entry_fn!
 
@@ -97,13 +103,10 @@ getParentURL = ->
     -- get url from something like gpm.meta.url
     if current_dir = gpm.debug.getfpath!
         return "lua://" .. current_dir
+    return "lua:///" -- default fallback
 
 gpm.Import = (url, should_await = true) ->
     parent_url = getParentURL!
     result = asyncImport url, parent_url
     if should_await then return result\await!
     else return result
-    
-
-gpm.Import("package_v2", false)\Then (result) -> print("import result is #{result}"),
-    (err) -> ErrorNoHaltWithStack err
