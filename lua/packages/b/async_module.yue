@@ -1,2 +1,2 @@
 await Promise.delay 1
-export default "async data"
+export data = "async data"
