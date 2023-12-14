@@ -89,12 +89,13 @@ asyncImport = async (specifier, parent_url) ->
     unless entry_fn
         error ModuleLoadError "failed to compile file #{url.path}"
     
-    env = setmetatable {}, { __index: _G, __newindex: _G }
-    env.require = gpm.Import
-    env.Promise = gpm.Promise
-    env.await = env.Promise.await
-    env.async = env.Promise.async
-    setfenv entry_fn, env
+
+    setfenv entry_fn, setmetatable {
+        require: gpm.Import
+        Promise: gpm.Promise
+        await: gpm.Promise.await
+        async: gpm.Promise.async
+    }, { __index: _G, __newindex: _G }
 
     entry_fn = async entry_fn
     return entry_fn!
