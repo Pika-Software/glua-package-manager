@@ -40,9 +40,9 @@ if istable( moonloader )
 
         return func
 
-    Logger\Info( "MoonScript: ✔" )
+    Logger\Info( "MoonScript: Found" )
 else
-    Logger\Info( "MoonScript: ✖" )
+    Logger\Info( "MoonScript: Missing" )
 
 -- Yuescript
 yue = moonloader and moonloader.yue
@@ -68,6 +68,6 @@ if istable( yue )
 
         return func
 
-    Logger\Info( "Yuescript: ✔" )
+    Logger\Info( "Yuescript: Found" )
 else
-    Logger\Info( "Yuescript: ✖" )
+    Logger\Info( "Yuescript: Missing" )
