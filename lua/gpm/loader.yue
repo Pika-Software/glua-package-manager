@@ -79,26 +79,41 @@ resolveURL = (specifier, parent_url) ->
 
     return resolved, format
 
-asyncImport = async (specifier, parent_url) ->
-    url, format = resolveURL specifier, parent_url
-    url = gpm.URL url
-    unless url.protocol == "lua"
-        error ModuleURLResolutionError "cannot resolve url: #{url}"
-
-    entry_fn = CompileFile url.path
-    unless entry_fn
-        error ModuleLoadError "failed to compile file #{url.path}"
-    
-
-    setfenv entry_fn, setmetatable {
+setupEnv = (func) ->
+    setfenv func, setmetatable {
         require: gpm.Import
         Promise: gpm.Promise
         await: gpm.Promise.await
         async: gpm.Promise.async
     }, { __index: _G, __newindex: _G }
 
-    entry_fn = async entry_fn
-    return entry_fn!
+asyncImport = async (specifier, parent_url) ->
+    url, format = resolveURL specifier, parent_url
+    url = gpm.URL url
+    if url.protocol == "lua"
+        entry_fn = CompileFile url.path
+        unless entry_fn
+            error ModuleLoadError "failed to compile file #{url.path}"
+
+        entry_fn = async setupEnv entry_fn
+        return entry_fn!
+    elseif url.protocol == "http" or url.protocol == "https"
+        ext = string.GetExtensionFromFilename url.path
+        if ext == "lua"
+            req = await gpm.http.Fetch tostring url
+            unless req and req.code == 200 and req.body
+                error ModuleLoadError "failed to fetch #{url}"
+            
+            entry_fn = CompileString req.body
+            unless entry_fn
+                error ModuleLoadError "failed to compile file #{url.path}"
+
+            entry_fn = async setupEnv entry_fn
+            return entry_fn!
+        else
+            error ModuleLoadError "unsupported https url: #{url}"
+    else
+        error ModuleURLResolutionError "cannot resolve url: #{url}"
 
 getParentURL = ->
     -- get url from something like gpm.meta.url
