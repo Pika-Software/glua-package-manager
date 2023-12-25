@@ -87,6 +87,82 @@ setupEnv = (func) ->
         async: gpm.Promise.async
     }, { __index: _G, __newindex: _G }
 
+--[[
+
+    tasks = {}
+    for package in packages
+        tasks[] = asyncImport package, parent_url
+
+    for task in tasks
+        task\Catch (err) ->
+            print err
+
+    PKG.name
+    PKG.metadata.name
+    PKG.env == getfenv(1)
+    PARENT_URL
+
+    PKG == gpm.Package!
+
+    PKG.Tasks = {
+        metadata: Promise 1
+        download: Primise 2
+    }
+
+    Packages = { }
+
+    -- package://PackageA/module1 -> lua://packages/PackageA/module1/package.lua
+    -- lua://niknaks/package.lua
+
+    lua://my_package/init.lua   - single file package
+    lua://my_package            - multi file package ( package.lua and other files )
+
+    NewPackage = ( url ) ->
+        -- example1: url = "package://PackageA"
+        -- example1: url = "lua://my_package"
+        url = resolveURL( url )
+
+        -- example1: url = "lua://packages/PackageA"
+        -- example2: url = "lua://my_package"
+
+        package = Packages[ url ]
+        unless package
+            package = gpm.Package( url )
+            Packages[ url ] = package
+
+        return package
+
+    Package A:
+        Code:
+            ents.MyFunc = ->
+                print( "FUnc!" )
+
+            print COLLISION_GROUP_CUSTOM
+
+        Depends:
+            Package B:
+                Globals: 
+                    markers = {}
+
+    Package C:
+        Code:
+            print COLLISION_GROUP_CUSTOM
+            ents.MyFunc!
+
+        Depends:
+            Package D:
+                Globals: 
+                    markers = {}
+            
+            Package B:
+
+    Output:
+            FUnc!
+            1
+            2
+
+]]
+
 asyncImport = async (specifier, parent_url) ->
     url, format = resolveURL specifier, parent_url
     url = gpm.URL url
@@ -116,7 +192,7 @@ asyncImport = async (specifier, parent_url) ->
         error ModuleURLResolutionError "cannot resolve url: #{url}"
 
 getParentURL = ->
-    -- get url from something like gpm.meta.url
+    -- get url from something like gpm.meta.url or PARENT_URL
     if current_dir = gpm.debug.getfpath!
         return "lua://" .. current_dir
     return "lua:///" -- default fallback

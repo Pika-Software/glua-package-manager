@@ -50,10 +50,32 @@ gpm.InvalidPackageConfigurationError = InvalidPackageConfigurationError
 
 --]]
 
+setupEnv = (func) ->
+    setfenv func, setmetatable {
+        require: gpm.Import
+        Promise: gpm.Promise
+        await: gpm.Promise.await
+        async: gpm.Promise.async
+    }, { __index: _G, __newindex: _G }
+
 -- Maybe gpm.Package must be a just metadata from package.lua
 class gpm.Package
-    new: ( metadata ) =>
-        table.Merge @, metadata
+    METADATA_KEYS: {
+        "name": true
+        "version": true
+        "description": true
+        "main": true
+        "dependencies": true
+    }
+
+    new: ( data ) =>
+        @metadata = data or {}
+        @env = {}
+
+    __index: ( key ) =>
+        if @METADATA_KEYS[key]
+            return @metadata[key]
+
 
 readMetadataFromLua = (path) ->
     meta = {}
@@ -79,3 +101,15 @@ gpm.LoadMetadataFromDir = (dir) ->
     meta.dir = dir
     meta.main or= "init.lua"
     return gpm.Package meta
+
+--[[
+    gpm.PACKAGE_LOAD_TASKS = {}
+
+    loadAsyncDataInner = async () ->
+        -- ...
+
+    gpm.LoadAsyncData = (url) ->
+        if not gpm.PACKAGE_LOAD_TASKS[url]
+            gpm.PACKAGE_LOAD_TASKS[url] = loadAsyncDataInner url
+        return gpm.PACKAGE_LOAD_TASKS[url]
+]]
