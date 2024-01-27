@@ -1,7 +1,7 @@
 gpm = gpm
 :ArgAssert, :metaworks, :Promise, :Logger, :util = gpm
 
-lib = gpm.Table( gpm, "http", metaworks.CreateLink, http, true )
+lib = gpm.Table gpm, "http", metaworks.CreateLink, http, true
 client, clientName = nil, nil
 do
 

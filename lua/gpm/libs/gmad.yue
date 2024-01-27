@@ -80,6 +80,14 @@ wildcard = {
     "data_static/*.ogg"
 }
 
+-- Formatting wildcard to lua patterns
+do
+
+    :Replace = string
+
+    for index, value in ipairs( wildcard )
+        wildcard[ index ] = Replace( Replace( value, ".", "%." ), "*", ".+" )
+
 types = {
     "gamemode",
     "map",
@@ -105,39 +113,28 @@ tags = {
     "build"
 }
 
-string_Replace, string_lower, string_find, string_len = nil, nil, nil, nil
-do
-    string = string
-    string_Replace = string.Replace
-    string_lower = string.lower
-    string_find = string.find
-    string_len = string.len
-
--- Formatting wildcard to lua patterns
-for index, value in ipairs( wildcard )
-    wildcard[ index ] = string_Replace( string_Replace( value, ".", "%." ), "*", ".+" )
-
-table_RemoveByFunction, table_HasIValue, table_Empty = nil, nil, nil
-do
-    table = gpm.table
-    table_RemoveByFunction = table.RemoveByFunction
-    table_HasIValue = table.HasIValue
-    table_Empty = table.Empty
-
-ArgAssert = gpm.ArgAssert
-file_Open = file.Open
+:RemoveByFunction, :HasIValue, :Empty = gpm.table
 isstring = isstring
 util_CRC = util.CRC
 tostring = tostring
 tonumber = tonumber
 istable = istable
+:ArgAssert = gpm
+:Open = gpm.file
+:lower = string
 error = error
 
-isFilePathAllowed = ( filePath ) ->
-    for pattern in *wildcard
-        if string_find( filePath, pattern )
-            return true
-    return false
+isFilePathAllowed = nil
+do
+
+    :find = string
+
+    isFilePathAllowed = ( filePath ) ->
+        for pattern in *wildcard
+            if find( filePath, pattern )
+                return true
+
+        return false
 
 class GMAD
     VERSION: "1.0.0"
@@ -164,10 +161,10 @@ class GMAD
     @IsFilePathAllowed: isFilePathAllowed
 
     @TypeExists: ( any ) ->
-        return table_HasIValue( types, any )
+        return HasIValue( types, any )
 
     @TagExists: ( any ) ->
-        return table_HasIValue( tags, any )
+        return HasIValue( tags, any )
 
     GetTitle: =>
         return @Title
@@ -223,7 +220,7 @@ class GMAD
         ArgAssert( filePath, 1, "string" )
         ArgAssert( gamePath, 2, "string" )
 
-        fileHandle = file_Open( filePath, fileMode or "rb", gamePath )
+        fileHandle = Open( filePath, fileMode or "rb", gamePath )
         unless fileHandle
             error( "file read handler is missing, opening is impossible" )
 
@@ -305,8 +302,8 @@ class GMAD
         @FileCRC = tonumber( util_CRC( fileHandle\Read( contentSize ) ) )
 
     Read: ( filePath, gamePath, readFiles, doCRCs ) =>
-        table_Empty( @Required )
-        table_Empty( @Files )
+        Empty( @Required )
+        Empty( @Files )
 
         if istable( filePath )
             @Close!
@@ -384,7 +381,7 @@ class GMAD
             fileHandle\WriteULong( index )
             data = files[ index ]
 
-            fileHandle\WriteString( string_lower( data.FilePath ) )
+            fileHandle\WriteString( lower( data.FilePath ) )
             fileHandle\WriteUInt64( data.Size )
 
             if doCRCs
@@ -459,15 +456,15 @@ class GMAD
         doCRCs = doCRCs ~= false
         files = @Files
 
-        filePath = string_lower( filePath )
-        table_RemoveByFunction( files, ( _, data ) ->
+        filePath = lower( filePath )
+        RemoveByFunction( files, ( _, data ) ->
             return data.FilePath == filePath
         )
 
         data = {
-            Size: string_len( content )
             FilePath: filePath
             Content: content
+            Size: #content
         }
 
         if doCRCs
@@ -477,7 +474,7 @@ class GMAD
         files[] = data
 
     ClearFiles: =>
-        table_Empty( @files )
+        Empty( @files )
 
     AddRequiredContent: ( value ) =>
         ArgAssert( value, 1, "string" )
@@ -488,6 +485,6 @@ class GMAD
         @requiredContent[ value ] = nil
 
     ClearRequiredContent: =>
-        table_Empty( @requiredContent )
+        Empty( @requiredContent )
 
 export default GMAD

@@ -1,6 +1,5 @@
 gpm = gpm
-:fs, :path, :metaworks, :Logger, :Promise, :Table, :Error = gpm
-luaGameDir = fs.LuaGameDir
+:file, :path, :metaworks, :Logger, :Promise, :Table, :Error = gpm
 istable = istable
 
 packages = Table( gpm, "Packages" )
@@ -50,7 +49,23 @@ gpm.InvalidPackageConfigurationError = InvalidPackageConfigurationError
 
 --]]
 
-setupEnv = (func) ->
+gpm.Environment = setmetatable( {
+    metaworks: gpm.metaworks
+    await: Promise.await
+    async: Promise.async
+    string: gpm.string
+    Promise: Promise
+    table: gpm.table
+    debug: gpm.debug
+    math: gpm.math
+    path: gpm.path
+    file: gpm.file
+    http: gpm.http
+    util: gpm.util
+}, { __index: _G } )
+
+-- TODO: Make smart metatable
+setupEnv = ( func ) ->
     setfenv func, setmetatable {
         require: gpm.Import
         Promise: gpm.Promise
@@ -60,34 +75,28 @@ setupEnv = (func) ->
 
 -- Maybe gpm.Package must be a just metadata from package.lua
 class gpm.Package
-    METADATA_KEYS: {
-        "name": true
-        "version": true
-        "description": true
-        "main": true
-        "dependencies": true
-    }
-
     new: ( data ) =>
-        @metadata = data or {}
+        @meta = data or {}
         @env = {}
-
-    __index: ( key ) =>
-        if @METADATA_KEYS[key]
-            return @metadata[key]
-
 
 readMetadataFromLua = (path) ->
     meta = {}
+
     entry = CompileFile path
     unless entry
         return nil
+
     setfenv entry, meta
     unless success, reason = try entry!
         error InvalidPackageConfigurationError reason
 
-    if SERVER then AddCSLuaFile path
+    if SERVER
+        AddCSLuaFile path
+
     return meta
+
+gpm.ParsePackage = (path) ->
+
 
 gpm.LoadMetadataFromDir = (dir) ->
     pmeta_path = path.Join dir, "package.lua"

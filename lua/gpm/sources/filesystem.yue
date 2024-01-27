@@ -1,5 +1,5 @@
 gpm = gpm
-:Promise, :BaseSource, :BaseSourceHandler, :SourceError, :GMAD, :ByteStream, :util, :fs = gpm
+:Promise, :BaseSource, :BaseSourceHandler, :SourceError, :GMAD, :ByteStream, :util, :file = gpm
 :async, :await = Promise
 
 --[[
@@ -45,7 +45,7 @@ class FileHandler extends BaseSourceHandler
         filePath = string.gsub( url, "^.-://", "" )
         switch string.GetExtensionFromFilename( filePath )
             when "gma"
-                result = await fs.AsyncRead( filePath, "GAME" )
+                result = await file.AsyncRead( filePath, "GAME" )
 
                 gma = GMAD!
                 gma.File = ByteStream( result.content )
@@ -80,11 +80,13 @@ class ModuleHandler extends BaseSourceHandler
 
 
 class LuaHandler extends BaseSourceHandler
-    ShouldHandle: (url) => url.protocol == "lua"
+    ShouldHandle: (url) =>
+        return url.protocol == "lua"
 
     FindPackageLua: (path) ->
         if string.EndsWith path, "package.lua"
             return path
+
         path = gpm.path.Join path, "package.lua"
         return file.Exists( path, "LUA" ) and path
 
@@ -112,7 +114,7 @@ class LuaHandler extends BaseSourceHandler
             return env
         else
             return @FetchInfo "lua://#{path}.lua"
-        
+
     Install: (url) =>
         -- No need to install anything
 

@@ -170,9 +170,15 @@
 --         entry_fn = async entry_fn -- making it asynchronous
 --         return entry_fn!
 
+getPackages = () ->
+    local files, folders = file.Find "packages/*", "LUA"
+    -- for folder in folders
+    --     print "hello"
+
 
 main = async ->
-    print "package return:", gpm.Import "package_v2"
+
+
     return
     -- print "fetching info..."
     -- info = await gpm.FetchInfo "package_v2"

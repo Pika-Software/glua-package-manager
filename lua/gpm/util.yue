@@ -190,9 +190,8 @@ class Stack
             @[ pointer ] = nil
             return value
 
-table = gpm_Table( gpm, "table", ->
+table = gpm_Table gpm, "table", ->
     return setmetatable( {}, { __index: table } )
-)
 
 table_concat = table.concat
 
@@ -501,9 +500,8 @@ do
 
 do
 
-    util = gpm_Table( gpm, "util", ->
+    util = gpm_Table gpm, "util", ->
         return setmetatable( {}, { __index: util } )
-    )
 
     util.CompileMoonString = ->
         error( "Attempt to compile MoonScript failed, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader." )
@@ -534,10 +532,10 @@ do
 
     do
 
-        file_Exists = file.Exists
+        :Exists = file
 
         util.IsLuaModuleInstalled = ( name ) ->
-            return file_Exists( "includes/modules/" .. name .. ".lua", "LUA" )
+            return Exists( "includes/modules/" .. name .. ".lua", "LUA" )
 
         isWindows, isLinux = system.IsWindows!, system.IsLinux!
         jit_versionnum, jit_arch = jit.versionnum, jit.arch
@@ -547,17 +545,18 @@ do
 
         util.IsBinaryModuleInstalled = ( name ) ->
             ArgAssert( name, 1, "string" )
-            if file_Exists( string_format( fmt, name, suffix ), "GAME" )
+            if Exists( string_format( fmt, name, suffix ), "GAME" )
                 return true
             elseif jit_versionnum ~= 20004 and jit_arch == "x86" and isLinux
-                return file_Exists( string_format( fmt, name, "linux32" ), "GAME" )
+                return Exists( string_format( fmt, name, "linux32" ), "GAME" )
+
             return false
 
     do
 
         Color = Color
 
-        colors = gpm_Table( gpm, "Colors", ->
+        colors = gpm_Table gpm, "Colors", ->
             return {
                 SecondaryText: Color( 150, 150, 150 )
                 PrimaryText: Color( 200, 200, 200 )
@@ -567,7 +566,7 @@ do
                 Error: Color( 250, 55, 40 )
                 Debug: Color( 0, 200, 150 )
                 gpm: Color( 180, 180, 255 )
-            } )
+            }
 
         state, stateColor, whiteColor = gpm.State, colors.State, colors.White
         unless isstring( state )

@@ -1,6 +1,6 @@
 gpm = gpm
 :util, :path, :string, :metaworks, :Logger, :Error, :ArgAssert = gpm
-string_GetPathFromFilename = string.GetPathFromFilename
+:GetPathFromFilename = string
 istable = istable
 SERVER = SERVER
 CLIENT = CLIENT
@@ -11,7 +11,7 @@ file = file
 if SERVER and not efsw and util.IsBinaryModuleInstalled( "efsw" ) and pcall( require, "efsw" )
     Logger\Info( "gm_efsw is initialized, package auto-reloading are available." )
 
-lib = gpm.Table( gpm, "fs", metaworks.CreateLink, file, true )
+lib = gpm.Table gpm, "file", metaworks.CreateLink, file, true
 
 luaGameDir = SERVER and "lsv" or "LUA"
 lib.LuaGameDir = luaGameDir
@@ -19,29 +19,31 @@ lib.LuaGameDir = luaGameDir
 lib.Move = file.Rename
 lib.Time = file.Time
 
-string_GetExtensionFromFilename = string.GetExtensionFromFilename
+:GetExtensionFromFilename = string
 lib_IsMounted = nil
 do
 
-    mountedFiles = gpm.Table( lib, "MountedFiles", ->
-        string_StartsWith = string.StartsWith
+    mountedFiles = gpm.Table lib, "MountedFiles", ->
+        :StartsWith = string
         rawget, rawset = rawget, rawset
         table_insert = table.insert
-        return setmetatable( {}, {
+
+        return setmetatable {}, {
             __index: ( tbl, key ) ->
                 for value in *tbl
-                    if string_StartsWith( value, key )
+                    if StartsWith( value, key )
                         return true
+
                 return false
+
             __newindex: ( tbl, key ) ->
                 unless rawget( tbl, key )
                     table_insert( tbl, 1, key )
                     rawset( tbl, key, true )
-        } )
-    )
+        }
 
     lib_IsMounted = ( filePath, gamePath, onlyDir ) ->
-        if onlyDir and string_GetExtensionFromFilename( filePath )
+        if onlyDir and GetExtensionFromFilename( filePath )
             return
 
         if gamePath == "LUA" or gamePath == "lsv" or gamePath == "lcl"
@@ -50,9 +52,9 @@ do
         return mountedFiles[ filePath ]
     lib.IsMounted = lib_IsMounted
 
-    game_MountGMA = game.MountGMA
+    :MountGMA = game
     lib.MountGMA = ( gmaPath ) ->
-        ok, files = game_MountGMA( gmaPath )
+        ok, files = MountGMA( gmaPath )
         unless ok
             return false
 
@@ -150,7 +152,7 @@ do
         lib.Size = lib_Size
 
 lib_BuildFilePath = ( filePath ) ->
-    folderPath = string_GetPathFromFilename( filePath )
+    folderPath = GetPathFromFilename( filePath )
     if folderPath
         lib_CreateDir( folderPath )
     return folderPath
@@ -171,7 +173,7 @@ do
     }
 
     lib_IsCompilable = ( filePath, preCompile ) ->
-        extension = string_GetExtensionFromFilename( filePath )
+        extension = GetExtensionFromFilename( filePath )
         if extension ~= nil
             unless codeExtensions[ extension ]
                 return false
@@ -286,7 +288,7 @@ if SERVER
         fileName = path_ReplaceExtension( path_Fix( fileName ), "lua" )
 
         if currentPath
-            currentFolder = string_GetPathFromFilename( currentPath )
+            currentFolder = GetPathFromFilename( currentPath )
             if currentFolder
                 filePath = currentFolder .. fileName
                 if lib_IsCompilable( filePath, true )

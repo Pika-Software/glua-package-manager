@@ -30,17 +30,17 @@ packageResolve = (specifier, parent_url) ->
         unless string.match specifier, "/" -- check if specifier even has /
             error InvalidModuleSpecifierError specifier
         package_name = string.match specifier, "(@[^/]*/[^/]*)"
-    
+
     if string.StartsWith(package_name, ".") or string.match(package_name, "[\\%%]")
         error InvalidModuleSpecifierError specifier
-    
+
     package_subpath = "." .. string.sub(specifier, #package_name + 1)
     if string.EndsWith package_subpath, "/"
         error InvalidModuleSpecifierError specifier
-    
+
     if self_url = packageSelfResolve package_name, package_subpath, parent_url
         return self_url
-    
+
     parent_url = gpm.URL parent_url
     while parent_url.path and parent_url.path != ""
         parent_url.path = string.sub string.GetPathFromFilename(parent_url.path), 1, -2
@@ -52,7 +52,7 @@ packageResolve = (specifier, parent_url) ->
                 if isstring pmeta.main
                     return "lua://" .. path.Join package_url, pmeta.main
             else
-                return "lua://" .. path.Normalize path.Join package_url, package_subpath 
+                return "lua://" .. path.Normalize path.Join package_url, package_subpath
 
     error ModuleNotFoundError specifier
 
@@ -71,10 +71,10 @@ resolveURL = (specifier, parent_url) ->
             parent_path = gpm.URL parent_url
             if parent_path = parent_path.protocol == "lua" and string.GetPathFromFilename parent_path.path
                 filePath = path.Join parent_path, filePath
-        
+
         resolved = "lua://" .. path.Normalize filePath
     -- it is a bare specifier, run package resolve
-    else 
+    else
         resolved = packageResolve specifier, parent_url
 
     return resolved, format
@@ -141,7 +141,7 @@ setupEnv = (func) ->
 
         Depends:
             Package B:
-                Globals: 
+                Globals:
                     markers = {}
 
     Package C:
@@ -151,9 +151,9 @@ setupEnv = (func) ->
 
         Depends:
             Package D:
-                Globals: 
+                Globals:
                     markers = {}
-            
+
             Package B:
 
     Output:
@@ -175,19 +175,20 @@ asyncImport = async (specifier, parent_url) ->
         return entry_fn!
     elseif url.protocol == "http" or url.protocol == "https"
         ext = string.GetExtensionFromFilename url.path
-        if ext == "lua"
-            req = await gpm.http.Fetch tostring url
-            unless req and req.code == 200 and req.body
-                error ModuleLoadError "failed to fetch #{url}"
-            
-            entry_fn = CompileString req.body
-            unless entry_fn
-                error ModuleLoadError "failed to compile file #{url.path}"
-
-            entry_fn = async setupEnv entry_fn
-            return entry_fn!
-        else
+        if ext ~= "lua"
             error ModuleLoadError "unsupported https url: #{url}"
+
+        req = await gpm.http.Fetch tostring url
+        unless req and req.code == 200 and req.body
+            error ModuleLoadError "failed to fetch #{url}"
+
+        entry_fn = CompileString req.body
+        unless entry_fn
+            error ModuleLoadError "failed to compile file #{url.path}"
+
+        entry_fn = async setupEnv entry_fn
+        return entry_fn!
+
     else
         error ModuleURLResolutionError "cannot resolve url: #{url}"
 
@@ -195,10 +196,14 @@ getParentURL = ->
     -- get url from something like gpm.meta.url or PARENT_URL
     if current_dir = gpm.debug.getfpath!
         return "lua://" .. current_dir
+
     return "lua:///" -- default fallback
 
 gpm.Import = (url, should_await = true) ->
     parent_url = getParentURL!
     result = asyncImport url, parent_url
-    if should_await then return result\await!
-    else return result
+
+    if should_await
+        return result\await!
+
+    return result
