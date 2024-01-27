@@ -34,8 +34,8 @@ export class Error
     @__inherited: (child) =>
         child.__base.name = child.__name or @name
 
-    new: (@message, @fileName, @lineNumber) =>
-        @stack = capture_stack 4
+    new: (@message, @fileName, @lineNumber, stackPos = 4) =>
+        @stack = capture_stack stackPos
         if @stack[1]
             @fileName or= @stack[1].short_src
             @lineNumber or= @stack[1].currentline
@@ -58,3 +58,4 @@ export class Error
         ErrorNoHalt table.concat lines, "\n"
 
 export class TypeError extends Error
+export class RuntimeError extends Error

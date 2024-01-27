@@ -22,7 +22,7 @@
     SOFTWARE.
 --]]
 timer_Simple = timer.Simple
-:Error, :TypeError = gpm
+:Error, :TypeError, :RuntimeError = gpm
 isfunction = isfunction
 istable = istable
 iscallable = (obj) ->
@@ -258,6 +258,10 @@ class Promise
             if success, result = try fn ...
             catch err
                     -- TODO save stacktrace and pass it to reject
+                    if isstring err
+                        file, line, message = string.match err, "^([A-Za-z0-9%-_/.]+):(%d+): (.*)"
+                        if file and line
+                            err = RuntimeError message, file, line, 5
                     p\Reject err
                 p\Resolve result
 

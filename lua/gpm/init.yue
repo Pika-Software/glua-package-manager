@@ -60,8 +60,8 @@ gpm.URL = IncludeShared( "gpm/libs/url.lua" )
 IncludeShared( "gpm/moonloader.lua" )
 logger\Info( "metaworks v%s initialized.", IncludeShared( "libs/metaworks.lua" ).VERSION )
 
-:Error, :TypeError = IncludeShared( "gpm/libs/error.lua" )
-gpm.Error, gpm.TypeError = Error, TypeError
+import Error, TypeError, RuntimeError from IncludeShared( "gpm/libs/error.lua" )
+gpm.Error, gpm.TypeError, gpm.RuntimeError = Error, TypeError, RuntimeError
 class gpm.NotImplementedError extends Error
 logger\Info( "gm_error initialized." )
 
