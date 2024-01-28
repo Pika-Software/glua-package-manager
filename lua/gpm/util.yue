@@ -303,8 +303,13 @@ do
     path = gpm_Table( gpm, "path" )
     :gsub = string
 
+    path_RemoveBackslash = ( filePath ) ->
+        return gsub( filePath, "[/\\]?$", "" )
+
+    path.RemoveBackslash = path_RemoveBackslash
+
     path_Fix = ( filePath ) ->
-        return lower( gsub( filePath, "[/\\]+", "/" ) )
+        return lower( path_RemoveBackslash( gsub( filePath, "[/\\]+", "/" ) ) )
 
     path.Fix = path_Fix
 
@@ -315,9 +320,6 @@ do
 
     path.Join = ( ... ) ->
         return path_Fix( concat( { ... }, "/" ) )
-
-    path.RemoveBackslash = ( filePath ) ->
-        return gsub( filePath, "[/\\]?$", "" )
 
     do
 
