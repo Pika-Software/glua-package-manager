@@ -1,28 +1,29 @@
-MENU_DLL = MENU_DLL
-CLIENT = CLIENT
-
 setmetatable = setmetatable
 isfunction = isfunction
 isstring = isstring
 isnumber = isnumber
 istable = istable
-ipairs = ipairs
 error = error
 gpm = gpm
 
 gpm_Table = ( tbl, name, func, ... ) ->
     result = tbl[ name ]
     unless istable( result )
-        if func
+        if isfunction( func )
             result = func( ... )
         else
             result = {}
+
         tbl[ name ] = result
+
     return result
+
 gpm.Table = gpm_Table
 
-types = gpm_Table( gpm, "Types", ->
-    return {
+Names, Indexes = nil, nil
+do
+
+    types = gpm_Table gpm, "Types", -> {
         Indexes: {}
         Names: {
             [-1]: "unknown"
@@ -71,95 +72,295 @@ types = gpm_Table( gpm, "Types", ->
             [43]: "SurfaceInfo"
             [255]: "Color"
         }
-    } )
+    }
 
-typeNames = types.Names
-indexes = types.Indexes
+    :Names, :Indexes = types
 
-gpm_type = nil
 do
 
     TYPE_USERDATA = TYPE_USERDATA
     TYPE_TABLE = TYPE_TABLE
     TypeID = TypeID
 
+    data = nil
+
     gpm_TypeID = ( any ) ->
-        id = TypeID any
-        if id == TYPE_TABLE or id == TYPE_USERDATA
-            for data in *indexes
-                unless data[ 1 ]( any )
-                    continue
-                return data[ 2 ]
-        return id
+        index = TypeID( any )
+        if index == TYPE_TABLE or index == TYPE_USERDATA
+            for index = 1, #Indexes
+                data = Indexes[ index ]
+                if data ~= nil and data[ 1 ]( any )
+                    return data[ 2 ]
+
+        return index
+
     gpm.TypeID = gpm_TypeID
 
-    gpm_type = ( any ) ->
-        return typeNames[ gpm_TypeID( any ) ] or "unknown"
-    gpm.type = gpm_type
+    gpm.type = ( any ) ->
+        return Names[ gpm_TypeID( any ) ] or "unknown"
 
-string = gpm_Table( gpm, "string", ->
+string = gpm_Table gpm, "string", ->
     return setmetatable( {}, { __index: string } )
-)
+
+table = gpm_Table gpm, "table", ->
+    return setmetatable( {}, { __index: table } )
+
+math = gpm_Table gpm, "math", ->
+    return setmetatable( {}, { __index: math } )
+
+debug = gpm_Table gpm, "debug", ->
+    return setmetatable( {}, { __index: debug } )
+
+util = gpm_Table gpm, "util", ->
+    return setmetatable( {}, { __index: util } )
 
 string.StartsWith = string.StartsWith or string.StartWith
-string.GetPathFromFilename = string.GetPathFromFilename
 
-do
-    string_match = string.match
-    string.IsURL = ( str ) ->
-        if string_match( str, "[a-z]+://[^ >,;]+" ) ~= nil
-            return true
-        return false
+table.unpack = unpack
 
-string_GetExtensionFromFilename = string.GetExtensionFromFilename
-string_format = string.format
-string_lower = string.lower
-string_sub = string.sub
-
-string_GetFilenameWithoutExtensionFromFilename = ( str ) ->
-    extension = string_GetExtensionFromFilename( str )
-    unless extension
-        return str
-    return string_sub( str, 1, #str - ( #extension + 1 ) )
-string.GetFilenameWithoutExtensionFromFilename = string_GetFilenameWithoutExtensionFromFilename
-
-debug = gpm_Table( gpm, "debug", ->
-    return setmetatable( {}, { __index: debug } )
-)
+math.inf = 1 / 0
+math.nan = 0 / 0
 
 debug.fempty = ->
+
 debug.fcall = ( func, ... ) ->
     return func( ... )
-debug_getinfo = debug.getinfo
 
-ArgAssert = ( value, argNum, expected, errorlevel ) ->
-    valueType = gpm_type( value )
+util.CompileMoonString = ->
+    error( "Attempt to compile MoonScript failed, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader." )
 
-    if istable( expected )
-        str, len = "[ ", #expected
-        for index = 1, len
-            typeName = expected[ index ]
+util.CompileYueString = ->
+    error( "Attempt to compile Yuescript failed, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader." )
 
-            if valueType == typeName
-                return value
-            elseif index ~= len
-                str = str .. typeName .. ", "
+do
 
-        expected = str .. " ]"
-    elseif isfunction( expected )
-        expected = expected( value, argNum )
-        unless isstring( expected )
+    :match = string
+
+    string.IsURL = ( str ) ->
+        return match( str, "[a-z]+://[^ >,;]+" ) ~= nil
+
+:sub, :format, :lower, :GetExtensionFromFilename, :Split = string
+:concat, :remove = table
+:getinfo = debug
+
+ArgAssert = nil
+do
+
+    :type = gpm
+
+    ArgAssert = ( value, argNum, expected, errorlevel ) ->
+        valueType = type( value )
+
+        if valueType == expected
             return value
-    elseif valueType == expected
-        return value
 
-    dinfo = debug_getinfo( 2, "n" )
-    error( string_format( "bad argument #%d to \'%s\' (%s expected, got %s)", argNum, dinfo and dinfo.name or "func", expected, valueType ), errorlevel or 3 )
-gpm.ArgAssert = ArgAssert
+        elseif isfunction( expected )
+            expected = expected( value, argNum, valueType )
+            unless isstring( expected )
+                return value
 
-class Stack
+        elseif istable( expected )
+            for index = 1, #expected
+                if valueType == expected[ index ]
+                    return value
+
+            expected = "[ " .. concat( expected, ", " ) .. " ]"
+
+        error( format( "bad argument #%d to \'%s\' (%s expected, got %s)", argNum, getinfo( 2, "n" ).name or "unknown", expected, valueType ), errorlevel or 3 )
+
+    gpm.ArgAssert = ArgAssert
+
+table.HasIValue = ( tbl, any ) ->
+    for value in *tbl
+        if value == any
+            return true
+
+    return false
+
+table.RemoveByIValue = ( tbl, any ) ->
+    for index = 1, #tbl
+        if tbl[ index ] == any
+            return remove( tbl, index )
+
+table.GetValue = ( tbl, str, default ) ->
+    for key in *Split( str, "." )
+        tbl = tbl[ key ]
+        unless tbl
+            return default
+
+    return tbl
+
+table.SetValue = ( tbl, str, value, ifEmpty ) ->
+    keys = Split( str, "." )
+    length = #keys
+
+    for index = 1, length
+        key = keys[ index ]
+        if index == length then
+            oldValue = tbl[ key ]
+            if oldValue ~= nil and ifEmpty
+                return oldValue
+
+            tbl[ key ] = value
+            return value
+
+        nextValue = tbl[ key ]
+        if nextValue == nil
+            tbl[ key ] = {}
+        elseif not istable( nextValue )
+            return
+
+        tbl = tbl[ key ]
+
+do
+
+    table_Lower = ( tbl ) ->
+        for key, value in pairs( tbl )
+            if istable( value )
+                value = table_Lower( value )
+
+            if isstring( key )
+                tbl[ lower( key ) ] = value
+                tbl[ key ] = nil
+            elseif istable( key )
+                tbl[ table_Lower( key ) ] = value
+                tbl[ key ] = nil
+
+        return tbl
+
+    table.Lower = table_Lower
+
+do
+
+    length, fulfilled = 0, false
+
+    table.RemoveByFunction = ( tbl, func ) ->
+        result, length, fulfilled = {}, 0, false
+        while fulfilled == false
+            fulfilled = true
+
+            for index = 1, #tbl
+                if func( index, tbl[ index ] )
+                    length += 1
+                    fulfilled = false
+                    result[ length ] = remove( tbl, index )
+                    break
+
+        return result, length
+
+addType = nil
+do
+
+    data = nil
+
+    addType = ( typeName, func ) ->
+        ArgAssert( typeName, 1, "string" )
+        ArgAssert( func, 2, "function" )
+
+        nextIndex = 256
+        for key, value in pairs( Names )
+            if typeName == value
+                nextIndex = key
+                break
+            elseif key >= nextIndex
+                nextIndex = key + 1
+
+        Names[ nextIndex ] = typeName
+
+        length = #Indexes
+        for index = 1, length
+            data = Indexes[ index ]
+            if data ~= nil and data[ 2 ] == nextIndex
+                remove( Indexes, index )
+                length -= 1
+                break
+
+        Indexes[ length + 1 ] = { func, nextIndex }
+        return nextIndex
+
+    gpm.AddType = addType
+
+iscolor = nil
+do
+
+    getmetatable = getmetatable
+    metatable = getmetatable( color_white )
+
+    iscolor = ( value ) ->
+        if getmetatable( value ) == metatable
+            return true
+
+        if istable( value )
+            return isnumber( value.r ) and isnumber( value.g ) and isnumber( value.b )
+
+        return false
+
+    addType( "Color", iscolor )
+    gpm.iscolor = iscolor
+
+do
+
+    path = gpm_Table( gpm, "path" )
+    :gsub = string
+
+    path_Fix = ( filePath ) ->
+        return lower( gsub( filePath, "[/\\]+", "/" ) )
+
+    path.Fix = path_Fix
+
+    path_Localize = ( filePath ) ->
+        return gsub( gsub( gsub( filePath, "^cache/[%w%-_]/", "" ), "^addons/[%w%-_]-/", "" ), "^lua/", "" )
+
+    path.Localize = path_Localize
+
+    path.Join = ( ... ) ->
+        return path_Fix( concat( { ... }, "/" ) )
+
+    path.RemoveBackslash = ( filePath ) ->
+        return gsub( filePath, "[/\\]?$", "" )
+
+    do
+
+        :StripExtension = string
+
+        path.ReplaceExtension = ( filePath, newExtension ) ->
+            return StripExtension( filePath ) .. "." .. newExtension
+
+    do
+
+        result, length = {}, 0
+
+        path.Resolve = ( filePath ) ->
+            for index = 1, length
+                result[ index ] = nil
+            length = 0
+
+            for segment in *Split( filePath, "/" )
+                if #segment == 0 or segment == "."
+                    continue
+
+                if segment == ".."
+                    remove( result )
+                    length -= 1
+                    continue
+
+                length += 1
+                result[ length ] = segment
+
+            return concat( result, "/" )
+
+    debug.getfpath = ->
+        for i = 2, 16
+            info = getinfo( i, "S" )
+            unless info
+                break
+
+            if info.what == "main"
+                return path_Localize( path_Fix( info.short_src ) )
+
+class util.Stack
     __tostring: =>
-        return string_format( "Stack: %p [%d/%d]", @, @Pointer, @Length )
+        return format( "Stack: %p [%d/%d]", @, @Pointer, @Length )
 
     new: ( length ) =>
         @Length = ( isnumber( length ) and length > 0 ) and length or -1
@@ -180,6 +381,7 @@ class Stack
             pointer += 1
             @[ pointer ] = value
             @Pointer = pointer
+
         return pointer
 
     pop: =>
@@ -190,198 +392,23 @@ class Stack
             @[ pointer ] = nil
             return value
 
-table = gpm_Table gpm, "table", ->
-    return setmetatable( {}, { __index: table } )
+    empty: =>
+        for index = 1, @Pointer
+            @[ index ] = nil
 
-table_concat = table.concat
-
-table.HasIValue = ( tbl, any ) ->
-    for value in *tbl
-        if value == any
-            return true
-    return false
-
-table_remove = table.remove
-table.RemoveByIValue = ( tbl, any ) ->
-    for index, value in ipairs( tbl )
-        if value == any
-            return table_remove( tbl, index )
-
-string_Split = string.Split
-table.Lookup = ( tbl, str, default ) ->
-    for key in *string_Split( str, "." )
-        tbl = tbl[ key ]
-        unless tbl
-            return default
-    return tbl
-
-table.SetValue = ( tbl, str, value, ifEmpty ) ->
-    keys = string_Split( str, "." )
-    len = #keys
-
-    for index = 1, len
-        key = keys[ index ]
-        if index == len then
-            oldValue = tbl[ key ]
-            if oldValue ~= nil and ifEmpty
-                return oldValue
-
-            tbl[ key ] = value
-            return value
-
-        nextValue = tbl[ key ]
-        if nextValue == nil
-            tbl[ key ] = {}
-        elseif not istable( nextValue )
-            return
-
-        tbl = tbl[ key ]
-
-table_Lower = ( tbl ) ->
-    for key, value in pairs( tbl )
-        if istable( value )
-            value = table_Lower( value )
-
-        if isstring( key )
-            tbl[ string_lower( key ) ] = value
-            tbl[ key ] = nil
-        elseif istable( key )
-            tbl[ table_Lower( key ) ] = value
-            tbl[ key ] = nil
-
-    return tbl
-table.Lower = table_Lower
-
-table.RemoveByFunction = ( tbl, func ) ->
-    result, fulfilled = {}, false
-    while not fulfilled
-        fulfilled = true
-
-        for index, value in ipairs( tbl )
-            if func( index, value )
-                result[ #result + 1 ] = table.remove( tbl, index )
-                fulfilled = false
-                break
-
-    return result
-
-table.unpack = unpack
-
-gpm_AddType = ( typeName, func ) ->
-    ArgAssert( typeName, 1, "string" )
-    ArgAssert( func, 2, "function" )
-
-    nextIndex = 256
-    for key, name in pairs( typeNames )
-        if typeName == name
-            nextIndex = key
-            break
-        elseif key >= nextIndex
-            nextIndex = key + 1
-    typeNames[ nextIndex ] = typeName
-
-    for index, data in ipairs( indexes )
-        if nextIndex == data[ 2 ]
-            table_remove( indexes, index )
-            break
-
-    indexes[] = { func, nextIndex }
-    return nextIndex
-gpm.AddType = gpm_AddType
-
-getmetatable = getmetatable
-
-gpm_IsColor = nil
-do
-
-    meta = FindMetaTable( "Color" )
-
-    gpm_IsColor = ( any ) ->
-        if getmetatable( any ) == meta
-            return true
-        elseif istable( any )
-            return isnumber( any.r ) and isnumber( any.g ) and isnumber( any.b )
-        return false
-    gpm_AddType( "Color", gpm_IsColor )
-    gpm.IsColor = gpm_IsColor
-
-path = gpm_Table( gpm, "path" )
-string_gsub = string.gsub
-
-path_Fix = ( filePath ) ->
-    return string_lower( string_gsub( filePath, "[/\\]+", "/" ) )
-path.Fix = path_Fix
-
-path.Join = ( ... ) ->
-    arguments, filePath = { ... }, nil
-    length = #arguments
-
-    for index = 1, length
-        if filePath ~= nil
-            filePath ..= arguments[ index ]
-        else
-            filePath = arguments[ index ]
-        if index == length
-            return path_Fix( filePath )
-        filePath ..= "/"
-
-path_Localize = ( filePath ) ->
-    return string_gsub( string_gsub( string_gsub( filePath, "^cache/[%w%-_]/", "" ), "^addons/[%w%-_]-/", "" ), "^lua/", "" )
-path.Localize = path_Localize
-
-path.ReplaceExtension = ( filePath, newExtension ) ->
-    extension = string_GetExtensionFromFilename( filePath )
-    if extension ~= newExtension
-        if extension
-            filePath = string_sub( filePath, 1, #filePath - ( #extension + 1 ) )
-        filePath ..= "." .. newExtension
-    return filePath
-
-path.RemoveBackslash = ( filePath ) ->
-    return string_gsub( filePath, "[/\\]?$", "" )
-
-path.Normalize = ( filePath ) ->
-    filePath = path_Fix filePath
-    segments = string.Split filePath, "/"
-    result = {}
-    for segment in *segments
-        if segment == ".."
-            table_remove result
-        elseif segment ~= "." and segment ~= ""
-            result[] = segment
-    return table_concat result, "/"
-
-debug.getfpath = ->
-    for i = 2, 16
-        info = debug_getinfo( i, "S" )
-        unless info
-            break
-
-        if info.what == "main"
-            return path_Localize( path_Fix( info.short_src ) )
-
-math = gpm_Table( gpm, "math", ->
-    return setmetatable( {}, { __index: math } )
-)
-
-math.inf = 1 / 0
-math.nan = 0 / 0
+        @Pointer = 0
 
 do
 
-    string_byte = string.byte
-    string_len = string.len
-    math_abs = math.abs
+    :byte = string
+    :abs = math
 
-    -- TODO: Maybe move this to a separate file?
-    -- : I'm not sure, a single file for a single class?
-
-    class gpm.ByteStream
+    class util.ByteStream
         __tostring: =>
-            return string_format( "ByteStream: %p [%d/%d]", @, @Pointer, @Size )
+            return format( "ByteStream: %p [%d/%d]", @, @Pointer, @Size )
 
         new: ( data ) =>
-            @Length = string_len( data )
+            @Length = #data
             @Data = data
             @Pointer = 0
 
@@ -401,6 +428,7 @@ do
                 ArgAssert( position, 2, "number" )
                 if position < 0
                     position = 0
+
             else
                 position = 0
 
@@ -420,12 +448,12 @@ do
 
         ReadByte: =>
             unless @EndOfFile!
-                return string_byte( @Data, @Skip( 1 ) )
+                return byte( @Data, @Skip( 1 ) )
 
         ReadBool: =>
-            byte = @ReadByte!
-            if byte ~= nil
-                return byte ~= 0
+            int = @ReadByte!
+            if int ~= nil
+                return int ~= 0
 
         Read: ( distance ) =>
             ArgAssert( distance, 2, "number" )
@@ -434,7 +462,8 @@ do
 
             startPos = @Pointer
             @Skip( distance )
-            return string_sub( @Data, startPos + 1, startPos + distance )
+
+            return sub( @Data, startPos + 1, startPos + distance )
 
         ReadUInt: ( distance ) =>
             ArgAssert( distance, 2, "number" )
@@ -443,11 +472,12 @@ do
 
             uint = 0
             for i = 1, distance
-                byte = @ReadByte!
-                unless byte
+                int = @ReadByte!
+                unless int
                     return
 
-                uint += byte * 0x100 ^ ( i - 1 )
+                uint += int * 0x100 ^ ( i - 1 )
+
             return uint
 
         ReadUShort: =>
@@ -468,9 +498,10 @@ do
             unless uint
                 return
 
-            max = 0x100 ^ math_abs( distance )
+            max = 0x100 ^ abs( distance )
             if uint >= ( max / 2 )
                 return uint - max
+
             return uint
 
         ReadShort: =>
@@ -489,8 +520,9 @@ do
 
             len, data = 0, @Data
             for index = pointer, length
-                if string_byte( data, index + 1 ) == 0
+                if byte( data, index + 1 ) == 0
                     break
+
                 len += 1
 
             if len == 0
@@ -500,148 +532,159 @@ do
 
 do
 
-    util = gpm_Table gpm, "util", ->
-        return setmetatable( {}, { __index: util } )
+    tonumber = tonumber
 
-    util.CompileMoonString = ->
-        error( "Attempt to compile MoonScript failed, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader." )
+    util.Version = ( number ) ->
+        if isstring( number )
+            return number
 
-    util.CompileYueString = ->
-        error( "Attempt to compile Yuescript failed, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader." )
+        if isnumber( number )
+            version = format( "%06d", number )
+            return format( "%d.%d.%d", tonumber( sub( version, 0, 2 ) ), tonumber( sub( version, 3, 4 ) ), tonumber( sub( version, 5 ) ) )
 
+        return "unknown"
+
+do
+
+    :Simple = timer
+
+    util.NextTick = ( func, a, b, c, d, e, f ) ->
+        ArgAssert( func, 1, "function" )
+        Simple 0, ->
+            func( a, b, c, d, e, f )
+
+do
+
+    :Exists = file
+
+    util.IsLuaModuleInstalled = ( name ) ->
+        return Exists( "includes/modules/" .. name .. ".lua", "LUA" )
+
+    isWindows, isLinux = system.IsWindows!, system.IsLinux!
+    jit_versionnum, jit_arch = jit.versionnum, jit.arch
+
+    suffix = ( { "osx64", "osx", "linux64", "linux", "win64", "win32" } )[ ( isWindows and 4 or 0 ) + ( isLinux and 2 or 0 ) + ( jit_arch == "x86" and 1 or 0 ) + 1 ]
+    fmt = "lua/bin/gm" .. ( ( CLIENT and not MENU_DLL ) and "cl" or "sv" ) .. "_%s_%s.dll"
+
+    util.IsBinaryModuleInstalled = ( name ) ->
+        ArgAssert( name, 1, "string" )
+
+        if Exists( format( fmt, name, suffix ), "GAME" )
+            return true
+
+        if jit_versionnum ~= 20004 and jit_arch == "x86" and isLinux
+            return Exists( format( fmt, name, "linux32" ), "GAME" )
+
+        return false
+
+do
+
+    Color = Color
+
+    colors = gpm_Table gpm, "Colors", ->
+        return {
+            SecondaryText: Color( 150, 150, 150 )
+            PrimaryText: Color( 200, 200, 200 )
+            White: Color( 255, 255, 255 )
+            Info: Color( 70, 135, 255 )
+            Warn: Color( 255, 130, 90 )
+            Error: Color( 250, 55, 40 )
+            Debug: Color( 0, 200, 150 )
+            gpm: Color( 180, 180, 255 )
+        }
+
+    :PrimaryText, :SecondaryText, :Info, :Warn, :Error, :Debug, :Realm, :White = colors
+    :RealmName = gpm
+
+    unless isstring( RealmName )
+        RealmName, Realm = "Unknown", White
+
+        if MENU_DLL
+            RealmName, Realm = "Menu", Color( 75, 175, 80 )
+        elseif CLIENT
+            RealmName, Realm = "Client", Color( 225, 170, 10 )
+        elseif SERVER
+            RealmName, Realm = "Server", Color( 5, 170, 250 )
+
+        gpm.RealmName, colors.Realm = RealmName, Realm
+
+    log = nil
     do
 
-        tonumber = tonumber
-
-        util.Version = ( number ) ->
-            unless number
-                return "unknown"
-            elseif isstring( number )
-                return number
-
-            version = string_format( "%06d", number )
-            return string_format( "%d.%d.%d", tonumber( string_sub( version, 0, 2 ) ), tonumber( string_sub( version, 3, 4 ) ), tonumber( string_sub( version, 5 ) ) )
-
-    do
-
-        timer_Simple = timer.Simple
-
-        util.NextTick = ( func, a, b, c, d ) ->
-            ArgAssert( func, 1, "function" )
-            timer_Simple 0, -> func( a, b, c, d )
-
-    do
-
-        :Exists = file
-
-        util.IsLuaModuleInstalled = ( name ) ->
-            return Exists( "includes/modules/" .. name .. ".lua", "LUA" )
-
-        isWindows, isLinux = system.IsWindows!, system.IsLinux!
-        jit_versionnum, jit_arch = jit.versionnum, jit.arch
-
-        suffix = ( { "osx64", "osx", "linux64", "linux", "win64", "win32" } )[ ( isWindows and 4 or 0 ) + ( isLinux and 2 or 0 ) + ( jit_arch == "x86" and 1 or 0 ) + 1 ]
-        fmt = "lua/bin/gm" .. ( ( CLIENT and not MENU_DLL ) and "cl" or "sv" ) .. "_%s_%s.dll"
-
-        util.IsBinaryModuleInstalled = ( name ) ->
-            ArgAssert( name, 1, "string" )
-            if Exists( string_format( fmt, name, suffix ), "GAME" )
-                return true
-            elseif jit_versionnum ~= 20004 and jit_arch == "x86" and isLinux
-                return Exists( string_format( fmt, name, "linux32" ), "GAME" )
-
-            return false
-
-    do
-
-        Color = Color
-
-        colors = gpm_Table gpm, "Colors", ->
-            return {
-                SecondaryText: Color( 150, 150, 150 )
-                PrimaryText: Color( 200, 200, 200 )
-                White: Color( 255, 255, 255 )
-                Info: Color( 70, 135, 255 )
-                Warn: Color( 255, 130, 90 )
-                Error: Color( 250, 55, 40 )
-                Debug: Color( 0, 200, 150 )
-                gpm: Color( 180, 180, 255 )
-            }
-
-        state, stateColor, whiteColor = gpm.State, colors.State, colors.White
-        unless isstring( state )
-            if MENU_DLL
-                state, stateColor = "Menu", Color( 75, 175, 80 )
-            elseif CLIENT
-                state, stateColor = "Client", Color( 225, 170, 10 )
-            elseif SERVER
-                state, stateColor = "Server", Color( 5, 170, 250 )
-            gpm.State, colors.State = state or "unknown", stateColor or whiteColor
-
-        debugFilter = -> gpm.Developer > 0
-
-        primaryTextColor = colors.PrimaryText
-        secondaryTextColor = colors.SecondaryText
-        state = string.upper( state )
-        os_date = os.date
+        RealmName = "[" .. string.upper( RealmName ) .. "] "
         select = select
         MsgC = MsgC
+        :date = os
 
-        infoColor = colors.Info
-        warnColor = colors.Warn
-        errorColor = colors.Error
-        debugColor = colors.Debug
+        log = ( color, level, str, ... ) =>
+            ArgAssert( color, 1, "Color" )
+            ArgAssert( level, 2, "string" )
 
-        class Logger
-            __tostring: () =>
-                return string_format( "Logger: %p [%s]", @, @GetName! )
+            if select( "#", ... ) > 0
+                str = format( str, ... )
 
-            new: ( name, color, func ) =>
-                @DebugFilter = isfunction( func ) and func or debugFilter
-                @Name = isstring( name ) and name or "unknown"
-                @Color = gpm_IsColor( color ) and color or whiteColor
-                @TextColor = primaryTextColor
+            MsgC( SecondaryText, date( "%d-%m-%Y %H:%M:%S " ), Realm, RealmName, color, level, SecondaryText, " --> ", @Color, @Name, SecondaryText, " : ", @TextColor, str, "\n" )
 
-            GetName: => @Name
-            SetName: ( str ) =>
-                ArgAssert( str, 1, "string" )
-                @Name = str
+    debugFilter = ->
+        return gpm.Developer > 0
 
-            GetColor: => @Color
-            SetColor: ( color ) =>
-                ArgAssert( color, 1, "Color" )
-                @Color = color
+    class Logger
+        __tostring: =>
+            return format( "Logger: %p [%s]", @, @Name )
 
-            GetTextColor: => @TextColor
-            SetTextColor: ( color ) =>
-                ArgAssert( color, 1, "Color" )
-                @TextColor = color
+        new: ( name, color, func ) =>
+            @Name = isstring( name ) and name or "unknown"
+            @Color = iscolor( color ) and color or White
+            @DebugFilter = isfunction( func ) and func or debugFilter
+            @TextColor = PrimaryText
 
-            GetDebugFilter: => @DebugFilter
-            SetDebugFilter: ( func ) =>
-                ArgAssert( func, 1, "function" )
-                @DebugFilter = func
+        -- Logger Name
+        GetName: =>
+            return @Name
 
-            Log: ( color, level, str, ... ) =>
-                ArgAssert( color, 1, "Color" )
-                ArgAssert( level, 2, "string" )
+        SetName: ( str ) =>
+            ArgAssert( str, 1, "string" )
+            @Name = str
 
-                if select( "#", ... ) > 0
-                    str = string_format( str, ... )
-                MsgC( secondaryTextColor, os_date( "%d-%m-%Y %H:%M:%S " ), stateColor, "[" .. state .. "] ", color, level, secondaryTextColor, " --> ", @Color, @Name, secondaryTextColor, " : ", @TextColor, str, "\n" )
+        -- Logger Color
+        GetColor: =>
+            return @Color
 
-            Info: ( str, ... ) =>
-                @Log( infoColor, "INFO ", str, ... )
+        SetColor: ( color ) =>
+            ArgAssert( color, 1, "Color" )
+            @Color = color
 
-            Warn: ( str, ... ) =>
-                @Log( warnColor, "WARN ", str, ... )
+        -- Logger Text Color
+        GetTextColor: =>
+            return @TextColor
 
-            Error: ( str, ... ) =>
-                @Log( errorColor, "ERROR", str, ... )
+        SetTextColor: ( color ) =>
+            ArgAssert( color, 1, "Color" )
+            @TextColor = color
 
-            Debug: ( str, ... ) =>
-                if @DebugFilter( str, ... ) then
-                    @Log( debugColor, "DEBUG", str, ... )
+        -- Logger Debug Filter
+        GetDebugFilter: =>
+            return @DebugFilter
 
-        gpm.Logger = Logger( "gpm@" .. gpm.VERSION, colors.gpm )
-        util.Logger = Logger
+        SetDebugFilter: ( func ) =>
+            ArgAssert( func, 1, "function" )
+            @DebugFilter = func
+
+        -- Logger Functions
+        Log: log
+
+        Info: ( ... ) =>
+            log( @, Info, "INFO ", ... )
+
+        Warn: ( ... ) =>
+            log( @, Warn, "WARN ", ... )
+
+        Error: ( ... ) =>
+            log( @, Error, "ERROR", ... )
+
+        Debug: ( ... ) =>
+            if @DebugFilter( ... )
+                log( @, Debug, "DEBUG", ... )
+
+    gpm.Logger = Logger( "gpm@" .. gpm.VERSION, colors.gpm )
+    util.Logger = Logger
