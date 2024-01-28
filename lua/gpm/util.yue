@@ -82,17 +82,17 @@ do
     TYPE_TABLE = TYPE_TABLE
     TypeID = TypeID
 
-    data = nil
+    id, data = nil, nil
 
     gpm_TypeID = ( any ) ->
-        index = TypeID( any )
-        if index == TYPE_TABLE or index == TYPE_USERDATA
+        id = TypeID( any )
+        if id == TYPE_TABLE or id == TYPE_USERDATA
             for index = 1, #Indexes
                 data = Indexes[ index ]
                 if data ~= nil and data[ 1 ]( any )
                     return data[ 2 ]
 
-        return index
+        return id
 
     gpm.TypeID = gpm_TypeID
 
@@ -139,7 +139,7 @@ do
     string.IsURL = ( str ) ->
         return match( str, "[a-z]+://[^ >,;]+" ) ~= nil
 
-:sub, :format, :lower, :GetExtensionFromFilename, :Split = string
+:sub, :format, :lower, :Split = string
 :concat, :remove = table
 :getinfo = debug
 
