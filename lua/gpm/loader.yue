@@ -44,17 +44,17 @@ packageResolve = (specifier, parent_url) ->
     parent_url = gpm.URL parent_url
     while parent_url.path and parent_url.path != ""
         parent_url.path = string.sub string.GetPathFromFilename(parent_url.path), 1, -2
-        package_url = path.Normalize path.Join parent_url.path, "packages", specifier
-        if file.IsDir package_url, "LUA"
+        package_url = path.Resolve( path.Join( parent_url.path, "packages", specifier ) )
+        if file.IsDir( package_url, "LUA" )
             pmeta = gpm.LoadMetadataFromDir package_url
             -- TODO If pjson is not null and pjson.exports is not null or undefined, then
             if package_subpath == "."
                 if isstring pmeta.main
-                    return "lua://" .. path.Join package_url, pmeta.main
+                    return "lua://" .. path.Join( package_url, pmeta.main )
             else
-                return "lua://" .. path.Normalize path.Join package_url, package_subpath
+                return "lua://" .. path.Resolve( path.Join( package_url, package_subpath ) )
 
-    error ModuleNotFoundError specifier
+    error( ModuleNotFoundError specifier )
 
 resolveURL = (specifier, parent_url) ->
     resolved = nil
@@ -70,9 +70,9 @@ resolveURL = (specifier, parent_url) ->
         if parent_url
             parent_path = gpm.URL parent_url
             if parent_path = parent_path.protocol == "lua" and string.GetPathFromFilename parent_path.path
-                filePath = path.Join parent_path, filePath
+                filePath = path.Join( parent_path, filePath )
 
-        resolved = "lua://" .. path.Normalize filePath
+        resolved = "lua://" .. path.Resolve( filePath )
     -- it is a bare specifier, run package resolve
     else
         resolved = packageResolve specifier, parent_url

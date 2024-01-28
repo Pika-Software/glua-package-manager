@@ -1,6 +1,7 @@
 gpm = gpm
-:Promise, :BaseSource, :BaseSourceHandler, :SourceError, :GMAD, :ByteStream, :util, :file = gpm
+:Promise, :BaseSource, :BaseSourceHandler, :SourceError, :GMAD, :util, :file = gpm
 :async, :await = Promise
+:ByteStream = util
 
 --[[
 

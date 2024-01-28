@@ -2,6 +2,5 @@ name = "package_v2"
 autorun = true
 
 dependencies = {
-    -- ["package_name"] = {"url1", "url2"}
-    b = "packages://b"
+    ["package_name"] = ">= 0.1.1"
 }
