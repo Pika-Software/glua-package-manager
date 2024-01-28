@@ -1,18 +1,17 @@
-debug_setmetatable = debug.setmetatable
-isfunction = isfunction
-istable = istable
+setmetatable = debug.setmetatable or setmetatable
 table = gpm.table
 rawget = rawget
 error = error
 
-lib = gpm.Table( gpm, "metaworks", -> {
+lib = gpm.Table gpm, "metaworks", -> {
     VERSION: "1.0.0"
-} )
+}
 
-lib.GetValue = table.Lookup
+lib.GetValue = table.GetValue
 
 do
 
+    isfunction = isfunction
     :SetValue = table
     :setfenv = debug
 
@@ -22,57 +21,57 @@ do
 
         SetValue( tbl, keyPath, value )
 
-GetLinks = ( tbl ) ->
+lib_GetLinks = ( tbl ) ->
     return rawget( tbl, "__indexes" )
 
-lib.GetLinks = GetLinks
+lib.GetLinks = lib_GetLinks
 
-UnLink = nil
+lib_UnLink = nil
 do
 
     :RemoveByIValue = table
 
-    UnLink = ( table1, table2 ) ->
-        RemoveByIValue( GetLinks( table1 ), table2 )
+    lib_UnLink = ( table1, table2 ) ->
+        RemoveByIValue( lib_GetLinks( table1 ), table2 )
         return table1
 
-    lib.UnLink = UnLink
+    lib.UnLink = lib_UnLink
 
-Link = nil
+lib_Link = nil
 do
 
     :insert = table
 
-    Link = ( table1, table2 ) ->
-        UnLink( table1, table2 )
-        insert( GetLinks( table1 ), 1, table2 )
+    lib_Link = ( table1, table2 ) ->
+        lib_UnLink( table1, table2 )
+        insert( lib_GetLinks( table1 ), 1, table2 )
         return table1
 
-    lib.Link = Link
+    lib.Link = lib_Link
 
 do
 
-    meta = {
-        __index: ( tbl, key ) ->
-            value = nil
-            for link in *GetLinks( tbl ) 
-                value = link[ key ]
+    meta = {}
+
+    do
+
+        links, value = nil, nil
+
+        meta.__index = ( key ) =>
+            links, value = lib_GetLinks( @ ), nil
+            for index = 1, #links
+                value = links[ index ][ key ]
                 if value ~= nil
                     break
 
             return value
 
-    }
+    lib.Create = ( otherObject ) ->
+        object = { __indexes: {} }
+        setmetatable( object, meta )
 
-    lib.Create = ( tbl ) ->
-        object = {
-            __indexes: {}
-        }
-
-        debug_setmetatable( object, meta )
-
-        if tbl ~= nil
-            Link( @, tbl )
+        if otherObject ~= nil
+            lib_Link( object, otherObject )
 
         return object
 
@@ -85,7 +84,7 @@ lib.CreateLink = ( object, read, write ) ->
         meta.__newindex = object
 
     result = {}
-    if debug_setmetatable( result, meta )
+    if setmetatable( result, meta )
         return result, meta
 
     error( "Unable to create a link to a given object." )
