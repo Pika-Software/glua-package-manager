@@ -1,103 +1,120 @@
 gpm = gpm
-:ArgAssert, :metaworks, :Promise, :Logger, :util = gpm
 
-lib = gpm.Table gpm, "http", metaworks.CreateLink, http, true
+:ArgAssert, :Promise, :Logger, :util = gpm
+:HTTPError = Promise
+isstring = isstring
+isnumber = isnumber
+istable = istable
+
+lib = gpm.Table( gpm, "http", gpm.metaworks.CreateLink, http, true )
+
 client, clientName = nil, nil
 do
 
     clients = {
         {
-            Name: "Garry's Mod",
-            Client: "HTTP",
+            Name: "Garry's Mod"
+            Client: "HTTP"
             Installed: true
         }
     }
 
     if SERVER
-        table_insert = table.insert
 
-        table_insert( clients, 1, {
-            Client: "CHTTP",
+        :insert = table
+
+        insert clients, 1, {
+            Client: "CHTTP"
             Name: "chttp"
-        } )
+        }
 
-        table_insert( clients, 1, {
-            Client: "reqwest",
+        insert clients, 1, {
+            Client: "reqwest"
             Name: "reqwest"
-        } )
-
-    util_IsBinaryModuleInstalled = util.IsBinaryModuleInstalled
-    require = require
-    pcall = pcall
+        }
 
     for item in *clients
-        if item.Installed or ( util_IsBinaryModuleInstalled( item.Name ) and pcall( require, item.Name ) )
+        if item.Installed or ( util.IsBinaryModuleInstalled( item.Name ) and pcall( require, item.Name ) )
             client, clientName = _G[ item.Client ], item.Name
             Logger\Info( "'%s' was connected as HTTP client.", item.Name )
             break
 
-queue = {}
-util.NextTick ->
-    for func in *queue
-        func!
-    queue = nil
+HTTP = nil
+do
 
-http_timeout = CreateConVar( "http_timeout", "10", FCVAR_ARCHIVE, "Default http timeout for gpm http library.", 3, 300 )\GetInt!
-cvars.AddChangeCallback( "http_timeout"
-    ( _, __, int ) ->
-        http_timeout = tonumber( int ) or 10
-"gLua Package Manager" )
+    http_timeout = CreateConVar( "http_timeout", "10", FCVAR_ARCHIVE, "Default http timeout for gpm http library.", 3, 300 )
 
-:HTTPError = Promise
-request = ( parameters, p ) ->
-    if client( parameters ) or clientName ~= "Garry's Mod"
-        Logger\Debug( "%s HTTP request to '%s', using '%s', with timeout %d seconds.", parameters.method, parameters.url, clientName, parameters.timeout )
-    else
-        p\Reject( HTTPError( "failed to make http request" ) )
+    request = ( parameters, p ) ->
+        if client( parameters ) or clientName ~= "Garry's Mod"
+            Logger\Debug( "%s HTTP request to '%s', using '%s', with timeout %d seconds.", parameters.method, parameters.url, clientName, parameters.timeout )
+        else
+            p\Reject( HTTPError "failed to make http request" )
 
-isstring = isstring
-isnumber = isnumber
-istable = istable
+    queue = {}
+    util.NextTick ->
+        for func in *queue
+            func!
 
-HTTP = ( parameters ) ->
-    ArgAssert( parameters, 1, "table" )
-    p = Promise!
+        queue = nil
 
-    unless isstring( parameters.method )
-        parameters.method = "GET"
+    HTTP = ( parameters ) ->
+        ArgAssert( parameters, 1, "table" )
+        p = Promise!
 
-    unless isnumber( parameters.timeout )
-        parameters.timeout = http_timeout
+        unless isstring( parameters.method )
+            parameters.method = "GET"
 
-    unless istable( parameters.headers )
-        parameters.headers = {}
+        unless isnumber( parameters.timeout )
+            parameters.timeout = http_timeout\GetInt!
 
-    if clientName == "reqwest"
-        userAgent = lib.UserAgent
-        unless userAgent
-            userAgent = string.format( "GLua Package Manager/%s - Garry's Mod/%s", gpm.VERSION, VERSIONSTR )
-            lib.UserAgent = userAgent
-        parameters.headers["User-Agent"] = userAgent
+        unless istable( parameters.headers )
+            parameters.headers = {}
 
-    parameters.success = ( code, body, headers ) ->
-        p\Resolve( { :code, :body, :headers } )
+        if clientName == "reqwest"
+            userAgent = lib.UserAgent
+            unless userAgent
+                userAgent = string.format( "GLua Package Manager/%s - Garry's Mod/%s", gpm.VERSION, VERSIONSTR )
+                lib.UserAgent = userAgent
 
-    parameters.failed = ( msg ) ->
-        p\Reject( HTTPError( msg ) )
-        return
+            parameters.headers["User-Agent"] = userAgent
 
-    if queue ~= nil
-        queue[ #queue + 1 ] = -> request( parameters )
-    else
-        request( parameters )
-    return p
-gpm.HTTP = HTTP
+        parameters.success = ( code, body, headers ) ->
+            p\Resolve( { :code, :body, :headers } )
 
-lib.Fetch = ( url, headers, timeout ) ->
-    return HTTP( { :url, :headers, :timeout, method: "GET" } )
+        parameters.failed = ( msg ) ->
+            p\Reject( HTTPError msg )
+            return
 
-lib.Post = ( url, parameters, headers, timeout ) ->
-    return HTTP( { :url, :parameters, :headers, :timeout, method: "POST" } )
+        if queue ~= nil
+            queue[ #queue + 1 ] = ->
+                return request( parameters )
+
+        else
+            request( parameters )
+
+        return p
+
+    gpm.HTTP = HTTP
+
+do
+
+    tbl = setmetatable( {}, { __mode: "v" } )
+
+    lib.Fetch = ( url, headers, timeout ) ->
+        tbl.url = url
+        tbl.method = "GET"
+        tbl.headers = headers
+        tbl.timeout = timeout
+        tbl.parameters = nil
+        return HTTP( tbl )
+
+    lib.Post = ( url, parameters, headers, timeout ) ->
+        tbl.url = url
+        tbl.method = "POST"
+        tbl.headers = headers
+        tbl.timeout = timeout
+        tbl.parameters = parameters
+        return HTTP( tbl )
 
 do
 
@@ -148,7 +165,8 @@ do
     }
 
     lib.Codes = codes
+
     lib.GetStatusDescription = ( code ) ->
         tbl = codes[ code ]
-        if tbl
+        if tbl ~= nil
             return tbl[ 1 ], tbl[ 2 ]
