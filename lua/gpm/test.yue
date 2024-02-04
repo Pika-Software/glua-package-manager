@@ -171,13 +171,18 @@
 --         return entry_fn!
 
 getPackages = () ->
+    pkgs = {}
     local files, folders = file.Find "packages/*", "LUA"
-    -- for folder in folders
-    --     print "hello"
+    for folder in *folders
+        pkgs[] = gpm.ParsePackage gpm.path.Join "packages", folder, "package.lua"
+    return pkgs
 
 
 main = async ->
-
+    pkgs = getPackages!
+    for pkg in *pkgs
+        gpm.Logger\Info "Loading package `#{pkg}`..."
+        gpm.Import "lua://" .. pkg.dir .. pkg.entry
 
     return
     -- print "fetching info..."

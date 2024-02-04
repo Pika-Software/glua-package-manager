@@ -75,9 +75,15 @@ setupEnv = ( func ) ->
 
 -- Maybe gpm.Package must be a just metadata from package.lua
 class gpm.Package
-    new: ( data ) =>
-        @meta = data or {}
+    new: ( @meta = {}, @path ) =>
         @env = {}
+        @name = @meta.name or @path or "unknown"
+        @version = @meta.version or "0.0.1"
+        @dir = string.GetPathFromFilename @path
+        @entry = @meta.entry or "init.lua"
+
+    __tostring: => return "Package #{@name}@#{@version}"
+
 
 readMetadataFromLua = (path) ->
     meta = {}
@@ -95,9 +101,8 @@ readMetadataFromLua = (path) ->
 
     return meta
 
-gpm.ParsePackage = (path) ->
-
-
+gpm.ParsePackage = (path) -> gpm.Package readMetadataFromLua(path), path
+    
 gpm.LoadMetadataFromDir = (dir) ->
     pmeta_path = path.Join dir, "package.lua"
     unless file.Exists pmeta_path, "LUA"
@@ -109,7 +114,7 @@ gpm.LoadMetadataFromDir = (dir) ->
 
     meta.dir = dir
     meta.main or= "init.lua"
-    return gpm.Package meta
+    return gpm.Package meta, pmeta_path
 
 --[[
     gpm.PACKAGE_LOAD_TASKS = {}
