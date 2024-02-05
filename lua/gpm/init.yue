@@ -57,6 +57,7 @@ IncludeShared( "gpm/util.lua" )
 logger = gpm.Logger
 
 gpm.URL = IncludeShared( "gpm/libs/url.lua" )
+gpm.url = IncludeShared( "gpm/libs/3rd-party/url.lua" )
 
 IncludeShared( "gpm/moonloader.lua" )
 logger\Info( "metaworks v%s initialized.", IncludeShared( "libs/metaworks.lua" ).VERSION )
