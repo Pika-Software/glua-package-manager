@@ -179,10 +179,11 @@ getPackages = () ->
 
 
 main = async ->
-    pkgs = getPackages!
-    for pkg in *pkgs
-        gpm.Logger\Info "Loading package `#{pkg}`..."
-        gpm.Import "lua://" .. pkg.dir .. pkg.entry
+    gpm.Import "package_v2"
+    -- pkgs = getPackages!
+    -- for pkg in *pkgs
+    --     gpm.Logger\Info "Loading package `#{pkg}`..."
+    --     gpm.Import "lua://" .. pkg.dir .. pkg.entry
 
     return
     -- print "fetching info..."

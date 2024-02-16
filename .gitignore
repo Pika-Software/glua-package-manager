@@ -1,3 +1,4 @@
 *.lua
 !lua/packages/**/*.lua
 !lua/autorun/!gpm.lua
+!lua/gpm/libs/3rd-party/*.lua
