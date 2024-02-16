@@ -1,12 +1,60 @@
-setmetatable = debug.setmetatable or setmetatable
+do
+
+    :getmetatable, :setmetatable = debug
+    _R = debug.getregistry!
+
+    object = nil
+    metatable = getmetatable( object )
+    if metatable == nil
+        metatable = {}
+        setmetatable( object, metatable )
+
+    _R.Nil = metatable
+
+    object = 0
+    metatable = getmetatable( object )
+    if metatable == nil
+        metatable = {}
+        setmetatable( object, metatable )
+
+    _R.Number = metatable
+
+    object = ""
+    metatable = getmetatable( object )
+    if metatable == nil
+        metatable = {}
+        setmetatable( object, metatable )
+
+    _R.String = metatable
+
+    object = false
+    metatable = getmetatable( object )
+    if metatable == nil
+        metatable = {}
+        setmetatable( object, metatable )
+
+    _R.Boolean = metatable
+
+    object = ->
+    metatable = getmetatable( object )
+    if getmetatable( object ) == nil
+        metatable = {}
+        setmetatable( object, metatable )
+
+    _R.Function = metatable
+
+    object = coroutine.create( object )
+    metatable = getmetatable( object )
+    if metatable == nil
+        metatable = {}
+        setmetatable( object, metatable )
+
+    _R.Thread = metatable
+
 table = gpm.table
 rawget = rawget
-error = error
 
-lib = gpm.Table gpm, "metaworks", -> {
-    VERSION: "1.0.0"
-}
-
+lib = gpm.Table( gpm, "metaworks" )
 lib.GetValue = table.GetValue
 
 do
@@ -21,72 +69,75 @@ do
 
         SetValue( tbl, keyPath, value )
 
-lib_GetLinks = ( tbl ) ->
+CreateLink = nil
+do
+
+    setmetatable = setmetatable
+
+    CreateLink = ( object, read, write ) ->
+        metatable = {
+            "__index": read == true and object or nil
+            "__newindex": write == true and object or nil
+        }
+
+        return setmetatable( {}, metatable ), metatable
+
+    lib.CreateLink = CreateLink
+
+GetLinks = ( tbl ) ->
     return rawget( tbl, "__indexes" )
 
-lib.GetLinks = lib_GetLinks
+lib.GetLinks = GetLinks
 
-lib_UnLink = nil
+UnLink = nil
 do
 
     :RemoveByIValue = table
 
-    lib_UnLink = ( table1, table2 ) ->
-        RemoveByIValue( lib_GetLinks( table1 ), table2 )
+    UnLink = ( table1, table2 ) ->
+        RemoveByIValue( GetLinks( table1 ), table2 )
         return table1
 
-    lib.UnLink = lib_UnLink
+    lib.UnLink = UnLink
 
-lib_Link = nil
+Link = nil
 do
 
     :insert = table
 
-    lib_Link = ( table1, table2 ) ->
-        lib_UnLink( table1, table2 )
-        insert( lib_GetLinks( table1 ), 1, table2 )
+    Link = ( table1, table2 ) ->
+        UnLink( table1, table2 )
+        insert( GetLinks( table1 ), 1, table2 )
         return table1
 
-    lib.Link = lib_Link
+    lib.Link = Link
 
 do
 
+    setmetatable = debug.setmetatable or setmetatable
+    getmetatable = getmetatable
+    rawset = rawset
     meta = {}
 
-    do
+    meta.__index = ( tbl, key ) ->
+        links = GetLinks( tbl )
+        for index = 1, #links
+            value = links[ index ][ key ]
+            if value ~= nil
+                if getmetatable( value ) == nil
+                    value = CreateLink( value, true )
+                    rawset( tbl, key, value )
+                    return value
 
-        links, value = nil, nil
-
-        meta.__index = ( key ) =>
-            links, value = lib_GetLinks( @ ), nil
-            for index = 1, #links
-                value = links[ index ][ key ]
-                if value ~= nil
-                    break
-
-            return value
+                return value
 
     lib.Create = ( otherObject ) ->
         object = { __indexes: {} }
         setmetatable( object, meta )
 
         if otherObject ~= nil
-            lib_Link( object, otherObject )
+            Link( object, otherObject )
 
         return object
-
-lib.CreateLink = ( object, read, write ) ->
-    meta = {}
-    if read
-        meta.__index = object
-
-    if write
-        meta.__newindex = object
-
-    result = {}
-    if setmetatable( result, meta )
-        return result, meta
-
-    error( "Unable to create a link to a given object." )
 
 export default lib
