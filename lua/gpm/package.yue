@@ -53,6 +53,7 @@ gpm.Environment = setmetatable( {
     metaworks: gpm.metaworks
     await: Promise.await
     async: Promise.async
+    require: (...) -> gpm.Import ...
     string: gpm.string
     Promise: Promise
     table: gpm.table
@@ -64,28 +65,28 @@ gpm.Environment = setmetatable( {
     util: gpm.util
 }, { __index: _G } )
 
--- TODO: Make smart metatable
-setupEnv = ( func ) ->
-    setfenv func, setmetatable {
-        require: gpm.Import
-        Promise: gpm.Promise
-        await: gpm.Promise.await
-        async: gpm.Promise.async
-    }, { __index: _G, __newindex: _G }
-
 -- Maybe gpm.Package must be a just metadata from package.lua
 class gpm.Package
     new: ( @meta = {}, @path ) =>
-        @env = {}
+        if not istable @meta
+            error InvalidPackageConfigurationError "metadata is #{type @meta}, expected table"
+
+        @env = @@CreateEnvironment!
+        @parse!
+
+    -- TODO: Make smart metatable
+    CreateEnvironment: -> setmetatable {}, { __index: gpm.Environment }
+    GetEntry: (meta) -> entry or "init.lua"
+
+    parse: =>
         @name = @meta.name or @path or "unknown"
         @version = @meta.version or "0.0.1"
         @dir = string.GetPathFromFilename @path
-        @entry = @meta.entry or "init.lua"
+        @entry = @@GetEntry @meta
 
-    __tostring: => return "Package #{@name}@#{@version}"
+    __tostring: => "Package #{@name}@#{@version}"
 
-
-readMetadataFromLua = (path) ->
+gpm.ParsePackageMeta = (path) ->
     meta = {}
 
     entry = CompileFile path
@@ -101,20 +102,7 @@ readMetadataFromLua = (path) ->
 
     return meta
 
-gpm.ParsePackage = (path) -> gpm.Package readMetadataFromLua(path), path
-    
-gpm.LoadMetadataFromDir = (dir) ->
-    pmeta_path = path.Join dir, "package.lua"
-    unless file.Exists pmeta_path, "LUA"
-        return nil
-
-    meta = readMetadataFromLua pmeta_path
-    unless meta
-        error InvalidPackageConfigurationError "failed to parse #{pmeta_path}"
-
-    meta.dir = dir
-    meta.main or= "init.lua"
-    return gpm.Package meta, pmeta_path
+gpm.ParsePackage = (path) -> gpm.Package gpm.ParsePackageMeta(path), path
 
 --[[
     gpm.PACKAGE_LOAD_TASKS = {}
