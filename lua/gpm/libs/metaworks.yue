@@ -9,7 +9,7 @@ do
         metatable = {}
         setmetatable( object, metatable )
 
-    _R.Nil = metatable
+    _R[ "nil" ] = metatable
 
     object = 0
     metatable = getmetatable( object )
@@ -17,7 +17,7 @@ do
         metatable = {}
         setmetatable( object, metatable )
 
-    _R.Number = metatable
+    _R[ "number" ] = metatable
 
     object = ""
     metatable = getmetatable( object )
@@ -25,7 +25,7 @@ do
         metatable = {}
         setmetatable( object, metatable )
 
-    _R.String = metatable
+    _R[ "string" ] = metatable
 
     object = false
     metatable = getmetatable( object )
@@ -33,7 +33,7 @@ do
         metatable = {}
         setmetatable( object, metatable )
 
-    _R.Boolean = metatable
+    _R[ "boolean" ] = metatable
 
     object = ->
     metatable = getmetatable( object )
@@ -41,7 +41,7 @@ do
         metatable = {}
         setmetatable( object, metatable )
 
-    _R.Function = metatable
+    _R[ "function" ] = metatable
 
     object = coroutine.create( object )
     metatable = getmetatable( object )
@@ -49,7 +49,7 @@ do
         metatable = {}
         setmetatable( object, metatable )
 
-    _R.Thread = metatable
+    _R[ "thread" ] = metatable
 
 table = gpm.table
 rawget = rawget
