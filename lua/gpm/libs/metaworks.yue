@@ -69,21 +69,6 @@ do
 
         SetValue( tbl, keyPath, value )
 
-CreateLink = nil
-do
-
-    setmetatable = setmetatable
-
-    CreateLink = ( object, read, write ) ->
-        metatable = {
-            "__index": read == true and object or nil
-            "__newindex": write == true and object or nil
-        }
-
-        return setmetatable( {}, metatable ), metatable
-
-    lib.CreateLink = CreateLink
-
 GetLinks = ( tbl ) ->
     return rawget( tbl, "__indexes" )
 
@@ -114,30 +99,41 @@ do
 
 do
 
-    setmetatable = debug.setmetatable or setmetatable
     getmetatable = getmetatable
+    setmetatable = setmetatable
     rawset = rawset
-    meta = {}
 
-    meta.__index = ( tbl, key ) ->
-        links = GetLinks( tbl )
-        for index = 1, #links
-            value = links[ index ][ key ]
-            if value ~= nil
-                if getmetatable( value ) == nil
-                    value = CreateLink( value, true )
-                    rawset( tbl, key, value )
+    CreateLink = ( object, read, write ) ->
+        metatable = {
+            "__index": read == true and object or nil
+            "__newindex": write == true and object or nil
+        }
+
+        return setmetatable( {}, metatable ), metatable
+
+    lib.CreateLink = CreateLink
+
+    meta = {
+        __index: ( tbl, key ) ->
+            links = GetLinks( tbl )
+            for index = 1, #links
+                value = links[ index ][ key ]
+                if value ~= nil
+                    if getmetatable( value ) == nil
+                        value = CreateLink( value, true )
+                        rawset( tbl, key, value )
+                        return value
+
                     return value
+    }
 
-                return value
+    lib.Create = ( child ) ->
+        tbl = { __indexes: {} }
+        setmetatable( tbl, meta )
 
-    lib.Create = ( otherObject ) ->
-        object = { __indexes: {} }
-        setmetatable( object, meta )
+        if child ~= nil
+            Link( tbl, child )
 
-        if otherObject ~= nil
-            Link( object, otherObject )
-
-        return object
+        return tbl
 
 export default lib
