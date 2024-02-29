@@ -44,7 +44,7 @@ gpm.InvalidPackageConfigurationError = InvalidPackageConfigurationError
     gpm.Install = ( url ) ->
         protocol, filePath = string.match( url, "^(%w+)%:%/%/(%w+)$" )
         for source in *sources
-            if table.HasIValue( source.Protocols, protocol )
+            if table.HasValue( source.Protocols, protocol, true )
                 return source.Process( protocol, filePath )
 
 --]]

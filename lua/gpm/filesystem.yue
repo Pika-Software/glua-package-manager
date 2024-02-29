@@ -27,7 +27,7 @@ do
 
     mountedFiles = gpm.Table lib, "MountedFiles", ->
         :StartsWith = string
-        :insert = table
+        :insert = gpm.table
         rawset = rawset
 
         return setmetatable {}, {
@@ -82,7 +82,7 @@ do
 
     do
 
-        :HasIValue = table
+        :HasValue = gpm.table
 
         lib_IsDir = ( filePath, gamePath ) ->
             if lib_IsMounted( filePath, gamePath, true ) or IsDir( filePath, gamePath )
@@ -93,7 +93,7 @@ do
                 return false
 
             splits = Split( filePath, "/" )
-            return HasIValue( folders, splits[ #splits ] )
+            return HasValue( folders, splits[ #splits ], true )
 
         lib.IsDir = lib_IsDir
 

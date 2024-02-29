@@ -4,6 +4,7 @@ isstring = isstring
 isnumber = isnumber
 istable = istable
 error = error
+pairs = pairs
 gpm = gpm
 
 gpm_Table = ( tbl, name, func, ... ) ->
@@ -170,12 +171,19 @@ do
 
     gpm.ArgAssert = ArgAssert
 
-table.HasIValue = ( tbl, any ) ->
-    for value in *tbl
-        if value == any
-            return true
+table.HasValue = ( tbl, any, isSequential ) ->
+	if isSequential
+		for index = 1, #tbl
+			if tbl[ index ] == any
+                return true
 
-    return false
+	else
+
+		for _, value in pairs( tbl )
+			if value == any
+                return true
+
+	return false
 
 table.RemoveByIValue = ( tbl, any ) ->
     for index = 1, #tbl

@@ -113,7 +113,7 @@ tags = {
     "build"
 }
 
-:RemoveByFunction, :HasIValue, :Empty = gpm.table
+:RemoveByFunction, :HasValue, :Empty = gpm.table
 isstring = isstring
 util_CRC = util.CRC
 tostring = tostring
@@ -161,10 +161,10 @@ class GMAD
     @IsFilePathAllowed: isFilePathAllowed
 
     @TypeExists: ( any ) ->
-        return HasIValue( types, any )
+        return HasValue( types, any, true )
 
     @TagExists: ( any ) ->
-        return HasIValue( tags, any )
+        return HasValue( tags, any, true )
 
     GetTitle: =>
         return @Title
