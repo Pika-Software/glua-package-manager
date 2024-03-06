@@ -1,5 +1,5 @@
-:Promise, :Error = gpm
-:async, :await = Promise
+import Promise, Error, debug from gpm
+import async, await from Promise
 
 -- class SourceError extends Error
 -- class PackageParseError extends Error
@@ -177,9 +177,15 @@ getPackages = () ->
         pkgs[] = gpm.ParsePackage gpm.path.Join "packages", folder, "package.lua"
     return pkgs
 
-
 main = async ->
-    gpm.Import "package_v2"
+    specifier = "https://gist.githubusercontent.com/dankmolot/edbab85edb6281a72082f53b98232caf/raw/c0ff1c7287503ea5decdd91b2e0b2b2bfa8d2038/example.lua"
+    print "=== Loading #{specifier} #{CurTime()} ==="
+
+    entry = await gpm.loader.Resolve specifier
+    print "Entry is #{entry} (#{entry and debug.getfpathi(entry) or "???"})"
+    if entry
+        print "return:", entry! or nil
+
     -- pkgs = getPackages!
     -- for pkg in *pkgs
     --     gpm.Logger\Info "Loading package `#{pkg}`..."

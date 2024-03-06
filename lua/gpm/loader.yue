@@ -84,11 +84,20 @@ resolveURL = (specifier, parent_url) ->
 setupEnv = (func) ->
     setfenv func, gpm.Package.CreateEnvironment!
 
+-- Checks if given lua file exists
+checkFileExists = (path) ->
+    if moonloader
+        path = string.gsub path, "%.lua$", ".*"
+        return file.Find("lua/" .. path, "GAME")[1] != nil
+    else
+        return file.Exists "lua/" .. path, "GAME"
+
 CompileFile = (path) ->
     if string.StartsWith path, "/"
         path = string.sub path, 2
-    _G.CompileFile path
-
+    if checkFileExists path
+        return _G.CompileFile path
+    
 --[[
 
     tasks = {}
@@ -165,6 +174,72 @@ CompileFile = (path) ->
 
 ]]
 
+-- Simple module loader that takes url and tries to get module entry
+gpm.loader.LoadURL = async (url, parent_package) ->
+    if parent_package
+        return parent_package\LoadURL url
+
+    url = gpm.url.parse url
+    if url.scheme == "lua"
+        entry_fn = CompileFile url.path
+        unless entry_fn
+            error ModuleLoadError "failed to compile file #{url.path}"
+        return entry_fn
+    elseif url.scheme == "http" or url.scheme == "https"
+        ext = string.GetExtensionFromFilename url.path
+        if ext ~= "lua"
+            error ModuleLoadError "unsupported web url: #{url}"
+
+        req = await gpm.http.Fetch tostring url
+        unless req and req.code == 200 and req.body
+            error ModuleLoadError "failed to fetch #{url}"
+
+        entry_fn = CompileString req.body, url\build!
+        unless entry_fn
+            error ModuleLoadError "failed to compile file #{url.path}"
+        return entry_fn
+
+-- Simple URL resolver based on https://nodejs.org/api/esm.html#resolution-algorithm-specification
+-- without packageResolve since it is more advanced and not needed for now
+gpm.loader.ResolveURL = (specifier, parent_url = "lua:/") ->
+    url = gpm.url.parse specifier
+    if url.scheme
+        -- If specifier is url then just return it
+        return url\build!
+    else if string.StartsWith(url.path, "./") or string.StartsWith(url.path, "../") or string.StartsWith(url.path, "/")
+        -- If specifier is relative path then resolve it against parent_url
+        return gpm.url.parse(parent_url)\resolve(url.path)\build!
+
+-- Simplest vanilla lua `require` implementation
+-- Not uses package or any other fancy stuff
+-- package.path is hardcoded into it :p
+gpm.loader.RequireResolve = async (specifier, parent_url = "lua:/", parent_package) ->
+    parent_url = gpm.url.parse parent_url
+    specifier = string.gsub specifier, "%.", "/"
+    -- yup, it is hard coded for now
+    for template in string.gmatch "?.lua;?/init.lua", "[^;]+"
+        resolved = parent_url\resolve string.gsub template, "?", specifier
+        
+        -- TODO If package is given, then try to resolve it through package
+        if success, entry = try await gpm.loader.LoadURL resolved, parent_package
+            if entry
+                return entry
+
+-- Resolves specifier and returns a promise with entry function
+gpm.loader.Resolve = async (specifier, parent_url, parent_package) ->
+    -- First lets try to resolve as URL
+    if resolved = gpm.loader.ResolveURL specifier, parent_url
+        return gpm.loader.LoadURL resolved, parent_package
+
+    -- Try to resolve as vanilla `require`
+    if entry = await gpm.loader.RequireResolve specifier, parent_url, parent_package
+        return entry
+
+    -- Try to resolve as package
+    -- TODO make PackageResolve
+    error ModuleNotFoundError specifier
+
+
 gpm.loader.AsyncImport = async (specifier, parent_url) ->
     resolved, format = resolveURL specifier, parent_url
     url = gpm.url.parse resolved
@@ -197,7 +272,9 @@ gpm.loader.AsyncImport = async (specifier, parent_url) ->
 getParentURL = ->
     -- get url from something like gpm.meta.url or PARENT_URL
     if current_dir = gpm.debug.getfpath!
-        return "lua:/" .. current_dir
+        current_dir = gpm.url.parse current_dir
+        current_dir.scheme or= "lua"
+        return current_dir\build!
 
     return "lua:/" -- default fallback
 
