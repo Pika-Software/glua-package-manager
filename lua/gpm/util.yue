@@ -359,19 +359,24 @@ do
 
             return concat( result, "/" )
 
+    debug.getfmain = ->
+        for i = 2, 16
+            info = getinfo( i, "fS" )
+            unless info
+                break
+            if info.what == "main"
+                return info.func
+
     debug.getfpathi = (i) ->
         info = getinfo( i, "S" )
         if info.what == "main"
             return path_Localize( path_Fix( string.sub info.source, 2 ) )
 
     debug.getfpath = ->
-        for i = 2, 16
-            info = getinfo( i, "S" )
-            unless info
-                break
-
-            if info.what == "main"
-                return path_Localize( path_Fix( string.sub info.source, 2 ) )
+        main = debug.getfmain!
+        if main
+            return debug.getfpathi main
+                
 
 class util.Stack
     __tostring: =>
