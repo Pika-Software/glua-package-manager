@@ -86,6 +86,8 @@ class gpm.Package
 
     __tostring: => "Package #{@name}@#{@version}"
 
+    -- TODO make LoadURL and Import
+
 gpm.ParsePackageMeta = (path) ->
     meta = {}
 

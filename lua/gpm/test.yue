@@ -178,13 +178,13 @@ getPackages = () ->
     return pkgs
 
 main = async ->
-    specifier = "https://gist.githubusercontent.com/dankmolot/edbab85edb6281a72082f53b98232caf/raw/c0ff1c7287503ea5decdd91b2e0b2b2bfa8d2038/example.lua"
+    specifier = "packages.b"
     print "=== Loading #{specifier} #{CurTime()} ==="
 
     entry = await gpm.loader.Resolve specifier
     print "Entry is #{entry} (#{entry and debug.getfpathi(entry) or "???"})"
     if entry
-        print "return:", entry! or nil
+        print "return:", await entry!
 
     -- pkgs = getPackages!
     -- for pkg in *pkgs
