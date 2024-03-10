@@ -80,7 +80,7 @@ class gpm.Package
     GetEntry: (meta) -> meta.entry or "init.lua"
 
     parse: =>
-        @name = @meta.name or @path or "unknown"
+        @name = @meta.name or string.gsub(@path, "/", "_") or "unknown"
         @version = @meta.version or "0.0.1"
         @dir = string.GetPathFromFilename @path
         @entry = @@GetEntry @meta
