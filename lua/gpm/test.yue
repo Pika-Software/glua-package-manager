@@ -178,8 +178,8 @@ getPackages = () ->
     return pkgs
 
 main = async ->
-    specifier = "packages.b"
-    print "=== Loading #{specifier} #{CurTime()} ==="
+    specifier = "b"
+    print "=== Loading `#{specifier}` #{CurTime()} ==="
 
     entry = await gpm.loader.Resolve specifier
     print "Entry is #{entry} (#{entry and debug.getfpathi(entry) or "???"})"

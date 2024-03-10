@@ -3,6 +3,8 @@ require "https://gist.githubusercontent.com/dankmolot/edbab85edb6281a72082f53b98
 
 print "data:", data
 print "url:", URL
+print "pkg:", PKG
+print "abc:", abc, "_G.abc:", _G.abc
 
 nil
 

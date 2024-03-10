@@ -1,5 +1,5 @@
 gpm = gpm
-import Promise, Error, path, string from gpm
+import Promise, Error, path, string, debug from gpm
 import async, await from Promise
 
 gpm.loader or= {}
@@ -108,9 +108,6 @@ CompileFile = (path) ->
 
 -- Simple module loader that takes url and tries to get module entry
 gpm.loader.LoadURL = async (url, parent_package) ->
-    if parent_package
-        return parent_package\LoadURL url
-
     entry_fn = nil
     url = gpm.url.parse url
     if url.scheme == "lua"
@@ -132,10 +129,12 @@ gpm.loader.LoadURL = async (url, parent_package) ->
     else
         error ModuleLoadError "unsupported url: #{url}"
 
+    genv = parent_package and parent_package.env or gpm.Package.CreateEnvironment!
     env = setmetatable {
         URL: url\build!
-    }, { __index: gpm.Package.CreateEnvironment!, __newindex: _G }
-    return async setfenv entry_fn, env
+        PKG: parent_package
+    }, { __index: genv, __newindex: genv }
+    return setfenv entry_fn, env
 
 -- Simple URL resolver based on https://nodejs.org/api/esm.html#resolution-algorithm-specification
 -- without packageResolve since it is more advanced and not needed for now
@@ -153,7 +152,7 @@ gpm.loader.ResolveURL = (specifier, parent_url = "lua:/") ->
 -- package.path is hardcoded into it :p
 gpm.loader.RequireResolve = async (specifier, parent_url = "lua:/", parent_package) ->
     parent_url = gpm.url.parse parent_url
-    specifier = string.gsub specifier, "%.", "/"
+    specifier = string.gsub specifier, "%.", "/" -- replace all dots with slashes
     -- yup, it is hard coded for now
     for template in string.gmatch "?.lua;?/init.lua", "[^;]+"
         resolved = parent_url\resolve string.gsub template, "?", specifier
@@ -161,6 +160,49 @@ gpm.loader.RequireResolve = async (specifier, parent_url = "lua:/", parent_packa
         if success, entry = try await gpm.loader.LoadURL resolved, parent_package
             if entry
                 return entry
+
+-- Resolves specifier as it is package specifier
+-- See https://nodejs.org/api/esm.html#resolution-algorithm-specification PACKAGE_RESOLVE
+gpm.loader.PackageResolve = async (specifier, parent_url = "lua:/", parent_package) ->
+    package_name = nil
+    if url == ""
+        error InvalidModuleSpecifierError specifier
+
+    unless string.StartsWith specifier, "@"
+        package_name = string.match specifier, "([^/]*)"
+    else
+        unless string.match specifier, "/" -- check if specifier even has /
+            error InvalidModuleSpecifierError specifier
+        package_name = string.match specifier, "(@[^/]*/[^/]*)"
+
+    if string.StartsWith(package_name, ".") or string.match(package_name, "[\\%%]")
+        error InvalidModuleSpecifierError specifier
+
+    package_subpath = "." .. string.sub(specifier, #package_name + 1)
+    if string.EndsWith package_subpath, "/"
+        error InvalidModuleSpecifierError specifier
+
+    -- TODO make PACKAGE_SELF_RESOLVE
+    -- if self_url = packageSelfResolve package_name, package_subpath, parent_url
+    --     return self_url
+
+    parent_url = gpm.url.parse parent_url
+    while parent_url.path and parent_url.path != ""
+        parent_url.path = string.sub string.GetPathFromFilename(parent_url.path), 1, -2
+        package_url = path.Resolve path.Join parent_url.path, "packages", specifier
+        if not file.Exists package_url, "LUA"
+            continue
+        
+        pkg = gpm.ParsePackage path.Join package_url, "package.lua" -- TODO lookup package in global table
+        -- TODO If pmeta is not null and pmeta.exports is not null or undefined, then
+        -- Return the result of PACKAGE_EXPORTS_RESOLVE(packageURL, packageSubpath, pjson.exports, defaultConditions).
+        if package_subpath == "."
+            if pkg.entry
+                return pkg\LoadURL "lua:/" .. path.Join( pkg.dir, pkg.entry )
+        else
+            return pkg\LoadURL "lua:/" .. path.Join( pkg.dir, pkg.entry )
+
+    error ModuleNotFoundError specifier
 
 -- Resolves specifier and returns a promise with entry function
 gpm.loader.Resolve = async (specifier, parent_url, parent_package) ->
@@ -173,27 +215,37 @@ gpm.loader.Resolve = async (specifier, parent_url, parent_package) ->
         return entry
 
     -- Try to resolve as package
-    -- TODO make PackageResolve
-    error ModuleNotFoundError specifier
+    return gpm.loader.PackageResolve specifier, parent_url, parent_package
 
-gpm.loader.AsyncImport = async (specifier, parent_url) ->
-    entry_fn = await gpm.loader.Resolve specifier, parent_url
+gpm.loader.AsyncImport = async (specifier, parent_url, parent_package) ->
+    entry_fn = await gpm.loader.Resolve specifier, parent_url, parent_package
+    entry_fn = async entry_fn -- convert entry to async function
     return entry_fn!
 
-getParentURL = ->
-    -- get url from something like gpm.meta.url or PARENT_URL
-    if current_dir = gpm.debug.getfpath!
-        current_dir = gpm.url.parse current_dir
-        current_dir.scheme or= "lua"
-        return current_dir\build!
+gpm.loader.GetParentURL = ->
+    if entry = debug.getfmain!
+        -- Get URL from entry env
+        entry_env = getfenv entry
+        if value = entry_env and rawget entry_env, "URL"
+            return value
+        -- Try to resolve URL from entry source
+        if current_dir = debug.getfpathi entry
+            current_dir = gpm.url.parse current_dir
+            current_dir.scheme or= "lua"
+            return current_dir\build!
 
     return "lua:/" -- default fallback
 
+gpm.loader.GetPackage = ->
+    if entry = debug.getfmain!
+        entry_env = getfenv entry
+        return entry_env and rawget entry_env, "PKG"
+
 gpm.Import = (url, should_await = true) ->
-    parent_url = getParentURL!
-    result = gpm.loader.AsyncImport url, parent_url
+    parent_url = gpm.loader.GetParentURL!
+    parent_pkg = gpm.loader.GetPackage!
+    result = gpm.loader.AsyncImport url, parent_url, parent_pkg
 
     if should_await
         return result\await!
-
     return result

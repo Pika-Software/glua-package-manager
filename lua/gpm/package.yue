@@ -1,5 +1,6 @@
 gpm = gpm
-:file, :path, :metaworks, :Logger, :Promise, :Table, :Error = gpm
+import file, path, metaworks, Logger, Promise, Table, Error from gpm
+import async, await from Promise
 istable = istable
 
 packages = Table( gpm, "Packages" )
@@ -76,7 +77,7 @@ class gpm.Package
 
     -- TODO: Make smart metatable
     CreateEnvironment: -> setmetatable {}, { __index: gpm.Environment }
-    GetEntry: (meta) -> entry or "init.lua"
+    GetEntry: (meta) -> meta.entry or "init.lua"
 
     parse: =>
         @name = @meta.name or @path or "unknown"
@@ -86,7 +87,14 @@ class gpm.Package
 
     __tostring: => "Package #{@name}@#{@version}"
 
-    -- TODO make LoadURL and Import
+    LoadURL: (url) => gpm.loader.LoadURL url, @
+    Import: (url, should_await = true) =>
+        parent_url = gpm.loader.GetParentURL!
+        result = gpm.loader.AsyncImport url, parent_url, @
+
+        if should_await
+            return result\await!
+        return result
 
 gpm.ParsePackageMeta = (path) ->
     meta = {}
