@@ -7,7 +7,7 @@ error = error
 pairs = pairs
 gpm = gpm
 
-gpm_Table = ( tbl, name, func, ... ) ->
+Table = ( tbl, name, func, ... ) ->
     result = tbl[ name ]
     unless istable( result )
         if isfunction( func )
@@ -19,12 +19,12 @@ gpm_Table = ( tbl, name, func, ... ) ->
 
     return result
 
-gpm.Table = gpm_Table
+gpm.Table = Table
 
 Names, Indexes = nil, nil
 do
 
-    types = gpm_Table gpm, "Types", -> {
+    types = Table gpm, "Types", -> {
         Indexes: {}
         Names: {
             [-1]: "unknown"
@@ -100,19 +100,19 @@ do
     gpm.type = ( any ) ->
         return Names[ gpm_TypeID( any ) ] or "unknown"
 
-string = gpm_Table gpm, "string", ->
+string = Table gpm, "string", ->
     return setmetatable( {}, { __index: string } )
 
-table = gpm_Table gpm, "table", ->
+table = Table gpm, "table", ->
     return setmetatable( {}, { __index: table } )
 
-math = gpm_Table gpm, "math", ->
+math = Table gpm, "math", ->
     return setmetatable( {}, { __index: math } )
 
-debug = gpm_Table gpm, "debug", ->
+debug = Table gpm, "debug", ->
     return setmetatable( {}, { __index: debug } )
 
-util = gpm_Table gpm, "util", ->
+util = Table gpm, "util", ->
     return setmetatable( {}, { __index: util } )
 
 string.StartsWith = string.StartsWith or string.StartWith
@@ -308,7 +308,7 @@ do
 
 do
 
-    path = gpm_Table( gpm, "path" )
+    path = Table( gpm, "path" )
     :gsub = string
 
     path_RemoveBackslash = ( filePath ) ->
@@ -376,7 +376,6 @@ do
         main = debug.getfmain!
         if main
             return debug.getfpathi main
-                
 
 class util.Stack
     __tostring: =>
@@ -580,28 +579,11 @@ do
     util.IsLuaModuleInstalled = ( name ) ->
         return Exists( "includes/modules/" .. name .. ".lua", "LUA" )
 
-    isWindows, isLinux = system.IsWindows!, system.IsLinux!
-    jit_versionnum, jit_arch = jit.versionnum, jit.arch
-
-    suffix = ( { "osx64", "osx", "linux64", "linux", "win64", "win32" } )[ ( isWindows and 4 or 0 ) + ( isLinux and 2 or 0 ) + ( jit_arch == "x86" and 1 or 0 ) + 1 ]
-    fmt = "lua/bin/gm" .. ( ( CLIENT and not MENU_DLL ) and "cl" or "sv" ) .. "_%s_%s.dll"
-
-    util.IsBinaryModuleInstalled = ( name ) ->
-        ArgAssert( name, 1, "string" )
-
-        if Exists( format( fmt, name, suffix ), "GAME" )
-            return true
-
-        if jit_versionnum ~= 20004 and jit_arch == "x86" and isLinux
-            return Exists( format( fmt, name, "linux32" ), "GAME" )
-
-        return false
-
 do
 
     Color = Color
 
-    colors = gpm_Table gpm, "Colors", ->
+    colors = Table gpm, "Colors", ->
         return {
             SecondaryText: Color( 150, 150, 150 )
             PrimaryText: Color( 200, 200, 200 )
