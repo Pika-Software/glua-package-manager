@@ -442,6 +442,9 @@ do
 
         Close: =>
             @Pointer = 0
+
+        Flush: =>
+            @Pointer = 0
             @Length = 0
             @Data = ""
 
