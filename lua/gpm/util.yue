@@ -419,16 +419,25 @@ class util.Stack
 
 do
 
-    :byte = string
-    :abs = math
+    :byte, :char = string
+    :band, :rshift = bit
+    :abs, :floor = math
+
+    buffer = setmetatable( {}, { __mode: "v" } )
+    boolean = { [ 0 ]: false, [ 1 ]: true }
 
     class util.ByteStream
         __tostring: =>
-            return format( "ByteStream: %p [%d/%d]", @, @Pointer, @Size )
+            return format( "ByteStream: %p [%d/%d]", @, @Pointer, @Length )
 
         new: ( data ) =>
-            @Length = #data
-            @Data = data
+            if isstring( data )
+                @Length = #data
+                @Data = data
+            else
+                @Length = 0
+                @Data = ""
+
             @Pointer = 0
 
         Close: =>
@@ -442,96 +451,159 @@ do
         Tell: =>
             return @Pointer
 
-        Seek: ( position ) =>
-            if position
-                ArgAssert( position, 2, "number" )
-                if position < 0
-                    position = 0
+        Seek: ( pointer ) =>
+            if pointer
+                ArgAssert( pointer, 2, "number" )
+
+                if pointer < 0
+                    pointer = 0
+                elseif pointer > @Length
+                    pointer = @Length
 
             else
-                position = 0
+                pointer = 0
 
-            @Pointer = position
-            return position
+            @Pointer = pointer
+            return pointer
 
-        Skip: ( length ) =>
-            if length
-                ArgAssert( length, 2, "number" )
+        Skip: ( bytes ) =>
+            if bytes
+                ArgAssert( bytes, 2, "number" )
             else
-                length = 1
+                bytes = 1
 
-            return @Seek( @Pointer + length )
+            return @Seek( @Pointer + bytes )
 
         EndOfFile: =>
             return @Pointer >= @Length
 
-        ReadByte: =>
-            unless @EndOfFile!
-                return byte( @Data, @Skip( 1 ) )
-
-        ReadBool: =>
-            int = @ReadByte!
-            if int ~= nil
-                return int ~= 0
-
-        Read: ( distance ) =>
-            ArgAssert( distance, 2, "number" )
-            if distance <= 0 or @EndOfFile!
+        -- Binary data
+        Read: ( bytes ) =>
+            ArgAssert( bytes, 2, "number" )
+            if bytes <= 0 or @EndOfFile!
                 return
 
-            startPos = @Pointer
-            @Skip( distance )
+            pointer = @Pointer
+            @Skip( bytes )
 
-            return sub( @Data, startPos + 1, startPos + distance )
+            return sub( @Data, pointer + 1, pointer + bytes )
 
-        ReadUInt: ( distance ) =>
-            ArgAssert( distance, 2, "number" )
-            if distance == 0
+        Write: ( data ) =>
+            length, size = @Length, #data
+            @Data = sub( @Data, 1, @Pointer ) .. data .. sub( @Data, @Pointer + 1, length )
+            @Length = length + size
+            return @Skip( size )
+
+        -- Byte
+        ReadByte: =>
+            if @EndOfFile!
+                return
+
+            return byte( @Data, @Skip( 1 ) )
+
+        WriteByte: ( number ) =>
+            return @Write( char( number ) )
+
+        -- Boolean
+        ReadBool: =>
+            return boolean[ @ReadByte! or -1 ]
+
+        WriteBool: ( bool ) =>
+            @WriteByte( bool and 1 or 0 )
+
+        -- UInt
+        ReadUInt: ( bytes ) =>
+            ArgAssert( bytes, 2, "number" )
+            if bytes == 0
                 return
 
             uint = 0
-            for i = 1, distance
-                int = @ReadByte!
-                unless int
+            for i = 1, bytes
+                number = @ReadByte!
+                if number == nil
                     return
 
-                uint += int * 0x100 ^ ( i - 1 )
+                uint += number * 0x100 ^ ( i - 1 )
 
             return uint
 
+        WriteUInt: ( number, bytes ) =>
+            ArgAssert( bytes, 2, "number" )
+            if bytes == 0
+                return @Pointer
+
+            for i = 1, bytes
+                buffer[ i ] = char( band( number, 0xFF ) )
+                number = rshift( number, 8 )
+
+            return @Write( concat( buffer, "", 1, bytes ) )
+
+        -- UShort
         ReadUShort: =>
             return @ReadUInt( 2 )
 
+        WriteUShort: ( number ) =>
+            return @WriteUInt( number, 2 )
+
+        -- ULong
         ReadULong: =>
             return @ReadUInt( 4 )
 
+        WriteULong: ( number ) =>
+            return @WriteUInt( number, 4 )
+
+        -- UInt64
         ReadUInt64: =>
             return @ReadUInt( 8 )
 
-        ReadInt: ( distance ) =>
-            ArgAssert( distance, 2, "number" )
-            if distance == 0
+        WriteUInt64: ( number ) =>
+            @WriteUInt( number, 8 )
+
+        -- Int
+        ReadInt: ( bytes ) =>
+            ArgAssert( bytes, 2, "number" )
+            if bytes == 0
                 return
 
-            uint = @ReadUInt( distance )
-            unless uint
+            uint = @ReadUInt( bytes )
+            if uint == nil
                 return
 
-            max = 0x100 ^ abs( distance )
+            max = 0x100 ^ abs( bytes )
             if uint >= ( max / 2 )
                 return uint - max
 
             return uint
 
+        WriteInt: ( number, bytes ) =>
+            for i = 1, bytes
+                buffer[ i ] = char( number % 0x100 )
+                number = floor( number / 0x100 )
+
+            return @Write( concat( buffer, "", 1, bytes ) )
+
+        -- Short
         ReadShort: =>
             return @ReadInt( 2 )
 
+        WriteShort: ( number ) =>
+            return @WriteInt( number, 2 )
+
+        -- Long
         ReadLong: =>
             return @ReadInt( 4 )
 
+        WriteLong: ( number ) =>
+            return @WriteInt( number, 4 )
+
+        -- Int64
         ReadInt64: =>
             return @ReadInt( 8 )
 
+        WriteInt64: ( number ) =>
+            return @WriteInt( number, 8 )
+
+        -- String
         ReadString: =>
             pointer, length = @Pointer, @Length
             if pointer >= length
@@ -548,6 +620,9 @@ do
                 return
 
             return @Read( len ), @Skip( 1 )
+
+        WriteString: ( str ) =>
+            return @Write( str .. "\0" )
 
 do
 
