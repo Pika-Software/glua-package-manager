@@ -61,14 +61,17 @@ gpm.ValidatePackageURL = (original_url) ->
     url = gpm.ParsePackageURL original_url
     unless url
         error SourceError "Invalid url: #{original_url}"
+
     unless url.protocol
         error SourceError "Invalid protocol for url: #{original_url}"
+
     return url
 
 gpm.FindSourceByURL = (url) ->
     src = sources[url.protocol]
     unless src
         error SourceError "No source found for URL #{url}"
+
     return src
 
 gpm.FetchInfo = async (url) ->
@@ -81,4 +84,5 @@ gpm.Install = async (url, info) ->
     src = gpm.FindSourceByURL url
     unless info
         info = await gpm.FetchInfo url
+
     return src\Install url, info

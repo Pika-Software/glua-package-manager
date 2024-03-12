@@ -21,15 +21,16 @@ checkFileExists = (path) ->
     if moonloader
         path = string.gsub path, "%.lua$", ".*"
         return file.Find("lua/" .. path, "GAME")[1] != nil
-    else
-        return file.Exists "lua/" .. path, "GAME"
+
+    return file.Exists "lua/" .. path, "GAME"
 
 CompileFile = (path) ->
     if string.StartsWith path, "/"
         path = string.sub path, 2
+
     if checkFileExists path
         return _G.CompileFile path
-    
+
 --[[
 
     tasks = {}
@@ -114,6 +115,7 @@ gpm.loader.LoadURL = async (url, parent_package) ->
         entry_fn = CompileFile url.path
         unless entry_fn
             error ModuleLoadError "failed to compile file #{url.path}"
+
     elseif url.scheme == "http" or url.scheme == "https"
         ext = string.GetExtensionFromFilename url.path
         if ext ~= "lua"
@@ -126,6 +128,7 @@ gpm.loader.LoadURL = async (url, parent_package) ->
         entry_fn = CompileString req.body, url\build!
         unless entry_fn
             error ModuleLoadError "failed to compile file #{url}"
+
     else
         error ModuleLoadError "unsupported url: #{url}"
 
@@ -134,6 +137,7 @@ gpm.loader.LoadURL = async (url, parent_package) ->
         URL: url\build!
         PKG: parent_package
     }, { __index: genv, __newindex: genv }
+
     return setfenv entry_fn, env
 
 -- Simple URL resolver based on https://nodejs.org/api/esm.html#resolution-algorithm-specification
@@ -143,7 +147,8 @@ gpm.loader.ResolveURL = (specifier, parent_url = "lua:/") ->
     if url.scheme
         -- If specifier is url then just return it
         return url\build!
-    else if string.StartsWith(url.path, "./") or string.StartsWith(url.path, "../") or string.StartsWith(url.path, "/")
+
+    if string.StartsWith(url.path, "./") or string.StartsWith(url.path, "../") or string.StartsWith(url.path, "/")
         -- If specifier is relative path then resolve it against parent_url
         return gpm.url.parse(parent_url)\resolve(url.path)\build!
 
@@ -156,10 +161,10 @@ gpm.loader.RequireResolve = async (specifier, parent_url = "lua:/", parent_packa
     -- yup, it is hard coded for now
     for template in string.gmatch "?.lua;?/init.lua", "[^;]+"
         resolved = parent_url\resolve string.gsub template, "?", specifier
-        
-        if success, entry := try await gpm.loader.LoadURL resolved, parent_package
-            if entry
-                return entry
+
+        success, entry = try await gpm.loader.LoadURL resolved, parent_package
+        if success and entry
+            return entry
 
 -- Resolves specifier as it is package specifier
 -- See https://nodejs.org/api/esm.html#resolution-algorithm-specification PACKAGE_RESOLVE
@@ -168,12 +173,13 @@ gpm.loader.PackageResolve = async (specifier, parent_url = "lua:/", parent_packa
     if url == ""
         error InvalidModuleSpecifierError specifier
 
-    unless string.StartsWith specifier, "@"
-        package_name = string.match specifier, "([^/]*)"
-    else
+    if string.StartsWith specifier, "@"
         unless string.match specifier, "/" -- check if specifier even has /
             error InvalidModuleSpecifierError specifier
+
         package_name = string.match specifier, "(@[^/]*/[^/]*)"
+    else
+        package_name = string.match specifier, "([^/]*)"
 
     if string.StartsWith(package_name, ".") or string.match(package_name, "[\\%%]")
         error InvalidModuleSpecifierError specifier
@@ -192,14 +198,17 @@ gpm.loader.PackageResolve = async (specifier, parent_url = "lua:/", parent_packa
         package_url = path.Resolve path.Join parent_url.path, "packages", specifier
         if not file.Exists package_url, "LUA"
             continue
-        
+
         pkg = gpm.ParsePackage path.Join package_url, "package.lua" -- TODO lookup package in global table
+
         -- TODO If pmeta is not null and pmeta.exports is not null or undefined, then
         -- Return the result of PACKAGE_EXPORTS_RESOLVE(packageURL, packageSubpath, pjson.exports, defaultConditions).
         if package_subpath == "."
             if pkg.entry
                 return pkg\LoadURL "lua:/" .. path.Join( pkg.dir, pkg.entry )
+
         else
+
             return pkg\LoadURL "lua:/" .. path.Join( pkg.dir, pkg.entry )
 
     error ModuleNotFoundError specifier
@@ -228,6 +237,7 @@ gpm.loader.GetParentURL = ->
         entry_env = getfenv entry
         if value := entry_env and rawget entry_env, "URL"
             return value
+
         -- Try to resolve URL from entry source
         if current_dir := debug.getfpathi entry
             current_dir = gpm.url.parse current_dir
@@ -248,4 +258,5 @@ gpm.Import = (url, should_await = true) ->
 
     if should_await
         return result\await!
+
     return result

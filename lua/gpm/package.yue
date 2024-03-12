@@ -1,9 +1,9 @@
 gpm = gpm
-import file, path, metaworks, Logger, Promise, Table, Error from gpm
+import file, path, metaworks, Logger, Promise, Error from gpm
 import async, await from Promise
 istable = istable
 
-packages = Table( gpm, "Packages" )
+packages = gpm.Table( gpm, "Packages" )
 
 class InvalidPackageConfigurationError extends Error
 gpm.InvalidPackageConfigurationError = InvalidPackageConfigurationError
@@ -69,7 +69,7 @@ gpm.Environment = setmetatable( {
 -- Maybe gpm.Package must be a just metadata from package.lua
 class gpm.Package
     new: ( @meta = {}, @path ) =>
-        if not istable @meta
+        unless istable( @meta )
             error InvalidPackageConfigurationError "metadata is #{type @meta}, expected table"
 
         @env = @@CreateEnvironment!
@@ -94,6 +94,7 @@ class gpm.Package
 
         if should_await
             return result\await!
+
         return result
 
 gpm.ParsePackageMeta = (path) ->

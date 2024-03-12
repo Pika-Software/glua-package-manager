@@ -71,10 +71,10 @@ do
             parameters.headers = {}
 
         if clientName == "reqwest"
-            userAgent = lib.UserAgent
+            userAgent = lib["User-Agent"]
             unless userAgent
                 userAgent = string.format( "GLua Package Manager/%s - Garry's Mod/%s", gpm.VERSION, VERSIONSTR )
-                lib.UserAgent = userAgent
+                lib["User-Agent"] = userAgent
 
             parameters.headers["User-Agent"] = userAgent
 
@@ -85,12 +85,10 @@ do
             p\Reject( HTTPError msg )
             return
 
-        if queue ~= nil
-            queue[ #queue + 1 ] = ->
-                return request( parameters )
-
-        else
+        if queue == nil
             request( parameters )
+        else
+            queue[] = -> request( parameters )
 
         return p
 

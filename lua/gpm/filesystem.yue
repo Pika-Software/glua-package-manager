@@ -99,6 +99,7 @@ do
 
     lib_IsFile = ( filePath, gamePath ) ->
         return lib_IsMounted( filePath, gamePath ) or ( Exists( filePath, gamePath ) and not lib_IsDir( filePath, gamePath ) )
+
     lib.IsFile = lib_IsFile
 
     lib_Delete = ( filePath, gamePath, force ) ->

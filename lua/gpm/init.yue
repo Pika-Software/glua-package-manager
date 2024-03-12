@@ -13,6 +13,7 @@ do
     username = "unknown"
     if cvars.String
         username = cvars.String( SERVER and "hostname" or "name", username )
+
     gpm.UserName = username
 
     splash = {
