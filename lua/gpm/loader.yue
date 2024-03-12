@@ -157,7 +157,7 @@ gpm.loader.RequireResolve = async (specifier, parent_url = "lua:/", parent_packa
     for template in string.gmatch "?.lua;?/init.lua", "[^;]+"
         resolved = parent_url\resolve string.gsub template, "?", specifier
         
-        if success, entry = try await gpm.loader.LoadURL resolved, parent_package
+        if success, entry := try await gpm.loader.LoadURL resolved, parent_package
             if entry
                 return entry
 
@@ -183,7 +183,7 @@ gpm.loader.PackageResolve = async (specifier, parent_url = "lua:/", parent_packa
         error InvalidModuleSpecifierError specifier
 
     -- TODO make PACKAGE_SELF_RESOLVE
-    -- if self_url = packageSelfResolve package_name, package_subpath, parent_url
+    -- if self_url := packageSelfResolve package_name, package_subpath, parent_url
     --     return self_url
 
     parent_url = gpm.url.parse parent_url
@@ -207,11 +207,11 @@ gpm.loader.PackageResolve = async (specifier, parent_url = "lua:/", parent_packa
 -- Resolves specifier and returns a promise with entry function
 gpm.loader.Resolve = async (specifier, parent_url, parent_package) ->
     -- First lets try to resolve as URL
-    if resolved = gpm.loader.ResolveURL specifier, parent_url
+    if resolved := gpm.loader.ResolveURL specifier, parent_url
         return gpm.loader.LoadURL resolved, parent_package
 
     -- Try to resolve as vanilla `require`
-    if entry = await gpm.loader.RequireResolve specifier, parent_url, parent_package
+    if entry := await gpm.loader.RequireResolve specifier, parent_url, parent_package
         return entry
 
     -- Try to resolve as package
@@ -223,13 +223,13 @@ gpm.loader.AsyncImport = async (specifier, parent_url, parent_package) ->
     return entry_fn!
 
 gpm.loader.GetParentURL = ->
-    if entry = debug.getfmain!
+    if entry := debug.getfmain!
         -- Get URL from entry env
         entry_env = getfenv entry
-        if value = entry_env and rawget entry_env, "URL"
+        if value := entry_env and rawget entry_env, "URL"
             return value
         -- Try to resolve URL from entry source
-        if current_dir = debug.getfpathi entry
+        if current_dir := debug.getfpathi entry
             current_dir = gpm.url.parse current_dir
             current_dir.scheme or= "lua"
             return current_dir\build!
@@ -237,7 +237,7 @@ gpm.loader.GetParentURL = ->
     return "lua:/" -- default fallback
 
 gpm.loader.GetPackage = ->
-    if entry = debug.getfmain!
+    if entry := debug.getfmain!
         entry_env = getfenv entry
         return entry_env and rawget entry_env, "PKG"
 
