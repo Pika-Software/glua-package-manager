@@ -102,7 +102,7 @@ class LuaHandler extends BaseSourceHandler
             unless func then error SourceError "Failed to compile package info file: #{package_lua_path}"
 
             setfenv func, env
-            unless success, reason = try func!
+            unless success, reason := try func!
                 error SourceError reason
 
             return env

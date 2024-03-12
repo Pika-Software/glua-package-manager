@@ -104,7 +104,7 @@ gpm.ParsePackageMeta = (path) ->
         return nil
 
     setfenv entry, meta
-    unless success, reason = try entry!
+    unless success, reason := try entry!
         error InvalidPackageConfigurationError reason
 
     if SERVER

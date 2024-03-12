@@ -41,7 +41,7 @@ import async, await from Promise
 --         await Promise.delay 1
 
 --         setfenv func, env
---         unless success, reason = try func!
+--         unless success, reason := try func!
 --             error SourceError reason
 
 --         return env

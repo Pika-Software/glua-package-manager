@@ -183,7 +183,7 @@ gpm.loader.PackageResolve = async (specifier, parent_url = "lua:/", parent_packa
         error InvalidModuleSpecifierError specifier
 
     -- TODO make PACKAGE_SELF_RESOLVE
-    -- if self_url = packageSelfResolve package_name, package_subpath, parent_url
+    -- if self_url := packageSelfResolve package_name, package_subpath, parent_url
     --     return self_url
 
     parent_url = gpm.url.parse parent_url
@@ -229,7 +229,7 @@ gpm.loader.GetParentURL = ->
         if value := entry_env and rawget entry_env, "URL"
             return value
         -- Try to resolve URL from entry source
-        if current_dir = debug.getfpathi entry
+        if current_dir := debug.getfpathi entry
             current_dir = gpm.url.parse current_dir
             current_dir.scheme or= "lua"
             return current_dir\build!
