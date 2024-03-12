@@ -1,3 +1,8 @@
+global cprint = cprint or print
+
+global print = ( ... ) ->
+    cprint( "[b]", ... )
+
 import data from "async_module"
 require "https://gist.githubusercontent.com/dankmolot/edbab85edb6281a72082f53b98232caf/raw/c0ff1c7287503ea5decdd91b2e0b2b2bfa8d2038/example.lua"
 

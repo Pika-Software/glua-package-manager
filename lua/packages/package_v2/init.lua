@@ -1,3 +1,9 @@
+cprint = cprint or print
+
+function print( ... )
+    cprint( "[v2]", ... )
+end
+
 local submodule = require "./submodule.lua"
 local Promise = gpm.Promise
 

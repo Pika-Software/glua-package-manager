@@ -170,6 +170,9 @@ import async, await from Promise
 --         entry_fn = async entry_fn -- making it asynchronous
 --         return entry_fn!
 
+concommand.Add "gpm_test", ->
+    include( "gpm/test.lua" )
+
 getPackages = () ->
     pkgs = {}
     local files, folders = file.Find "packages/*", "LUA"
