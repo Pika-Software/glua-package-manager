@@ -343,6 +343,7 @@ do
         path.Resolve = ( filePath ) ->
             for index = 1, length
                 result[ index ] = nil
+
             length = 0
 
             for segment in *Split( filePath, "/" )
@@ -359,23 +360,28 @@ do
 
             return concat( result, "/" )
 
-    debug.getfmain = ->
+    getfmain = ->
         for i = 2, 16
             info = getinfo( i, "fS" )
             unless info
                 break
+
             if info.what == "main"
                 return info.func
 
-    debug.getfpathi = (i) ->
+    debug.getfmain = getfmain
+
+    getfpathi = ( i ) ->
         info = getinfo( i, "S" )
         if info.what == "main"
-            return path_Localize( path_Fix( string.sub info.source, 2 ) )
+            return path_Localize( path_Fix( sub( info.source, 2 ) ) )
+
+    debug.getfpathi = getfpathi
 
     debug.getfpath = ->
-        main = debug.getfmain!
+        main = getfmain!
         if main
-            return debug.getfpathi main
+            return getfpathi( main )
 
 class util.Stack
     __tostring: =>
