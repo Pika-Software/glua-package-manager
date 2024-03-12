@@ -134,7 +134,7 @@ class Promise
         once_wrapper = once!
         onFulfill = once_wrapper (value) -> @_Resolve value
         onReject = once_wrapper (reason) -> @_Reject reason
-        unless ok, err = try thenable obj, onFulfill, onReject
+        unless ok, err := try thenable obj, onFulfill, onReject
             onReject err
 
     _Resolve: (value) =>
@@ -255,7 +255,7 @@ class Promise
     @Async: (fn) -> (...) ->
         p = Promise!
         co = coroutine.create (...) ->
-            if success, result = try fn ...
+            if success, result := try fn ...
             catch err
                     -- TODO save stacktrace and pass it to reject
                     if isstring err
@@ -285,7 +285,7 @@ class Promise
                 else
                     p\Then onResolve, onReject
                     return coroutine.yield!
-        elseif thenable = istable(p) and get_thenable p
+        elseif thenable := istable(p) and get_thenable p
             if iscallable thenable
                 try thenable p, onResolve, onReject
                 return coroutine.yield!
@@ -315,7 +315,7 @@ class Promise
         options.failed = (err) ->
             p\Reject HTTPError err
             return -- for better stacktrace
-        unless ok = HTTP options
+        unless ok := HTTP options
             p\Reject HTTPError "failed to make http request"
         return p
 
