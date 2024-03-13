@@ -1,13 +1,15 @@
+file = file
 gpm = gpm
 
 :util, :path, :string, :Logger, :Error, :ArgAssert, :Promise = gpm
-:GetPathFromFilename = string
+:GetPathFromFilename, :GetExtensionFromFilename = string
 :async, :await = Promise
 SERVER = SERVER
 CLIENT = CLIENT
 select = select
 error = error
-file = file
+:Find = file
+:Join = path
 
 -- https://github.com/Pika-Software/gm_efsw
 if SERVER and not efsw and util.IsBinaryModuleInstalled( "efsw" ) and pcall( require, "efsw" )
@@ -15,35 +17,43 @@ if SERVER and not efsw and util.IsBinaryModuleInstalled( "efsw" ) and pcall( req
 
 lib = gpm.Table( gpm, "file", gpm.metaworks.CreateLink, file, true )
 
-RealmGameDir = SERVER and "lsv" or "LUA"
-lib.RealmGameDir = RealmGameDir
-
+-- file.Move( filePath, newFilePath ) - moves file to new path
 lib.Move = file.Rename
+
+-- file.Time( filePath, gamePath ) - returns file creation time as number
 lib.Time = file.Time
 
-:GetExtensionFromFilename = string
-lib_IsMounted = nil
+-- file.Find( filePath, gamePath, sorting ) - returns list of found files and folders
+lib.Find = Find
+
+-- file.LuaPath - "LUA" or "lsv"
+luaPath = SERVER and "lsv" or "LUA"
+lib.LuaPath = luaPath
+
+isMounted = nil
 do
 
+    -- file.MountedFiles - table of mounted files
     mountedFiles = gpm.Table lib, "MountedFiles", ->
         :StartsWith = string
         :insert = gpm.table
         rawset = rawset
 
-        return setmetatable {}, {
-            __index: ( tbl, key ) ->
+        return setmetatable( {}, {
+            "__index": ( tbl, key ) ->
                 for value in *tbl
                     if StartsWith( value, key )
                         return true
 
                 return false
 
-            __newindex: ( tbl, key ) ->
+            "__newindex": ( tbl, key ) ->
                 rawset( tbl, key, true )
                 insert( tbl, 1, key )
-        }
+        } )
 
-    lib_IsMounted = ( filePath, gamePath, onlyDir ) ->
+    -- file.IsMounted( filePath, gamePath, onlyDir ) - returns true if file was mounted
+    isMounted = ( filePath, gamePath, onlyDir ) ->
         if onlyDir and GetExtensionFromFilename( filePath )
             return
 
@@ -52,108 +62,116 @@ do
 
         return mountedFiles[ filePath ]
 
-    lib.IsMounted = lib_IsMounted
+    lib.IsMounted = isMounted
 
-    :MountGMA = game
+    -- file.MountGMA( filePath ) - mounts gma file to game filesystem and returns state and list of files
+    do
 
-    lib.MountGMA = ( gmaPath ) ->
-        ok, files = MountGMA( gmaPath )
-        unless ok
+        ok, length = false, 0
+        :MountGMA = game
+
+        lib.MountGMA = ( filePath ) ->
+            ok, files = MountGMA( filePath )
+            if ok
+                length = #files
+                for index = 1, length
+                    mountedFiles[ files[ index ] ] = true
+
+                Logger\Debug( "GMA file '%s' was mounted to GAME with %d files.", filePath, length )
+                return ok, files
+
             return false
 
-        for filePath in *files
-            mountedFiles[ filePath ] = true
-
-        Logger\Debug( "GMA file '%s' was mounted to GAME with %d files.", gmaPath, #files )
-        return ok, files
-
-:Join = path
-:Find = file
-lib.Find = Find
-
-lib_CreateDir, lib_IsFile, lib_IsDir = nil, nil, nil
+isDir, isFile, createDir = nil, nil, nil
 do
 
-    :Exists, :IsDir, :Delete = file
+    :Delete, :Exists, :IsDir = file
     :Split = string
 
+    -- file.Exists( filePath, gamePath ) - check if the path exists
     lib.Exists = ( filePath, gamePath ) ->
-        return lib_IsMounted( filePath, gamePath ) or Exists( filePath, gamePath )
+        return isMounted( filePath, gamePath ) or Exists( filePath, gamePath )
 
+    -- file.IsDir( filePath, gamePath ) - check if the path is a directory
     do
 
         :HasValue = gpm.table
 
-        lib_IsDir = ( filePath, gamePath ) ->
-            if lib_IsMounted( filePath, gamePath, true ) or IsDir( filePath, gamePath )
+        isDir = ( filePath, gamePath ) ->
+            if isMounted( filePath, gamePath, true ) or IsDir( filePath, gamePath )
                 return true
 
-            _, folders = Find( filePath .. "*", gamePath )
+            folders = select( 2, Find( filePath .. "*", gamePath ) )
             if folders == nil or #folders == 0
                 return false
 
             splits = Split( filePath, "/" )
             return HasValue( folders, splits[ #splits ], true )
 
-        lib.IsDir = lib_IsDir
+        lib.IsDir = isDir
 
-    lib_IsFile = ( filePath, gamePath ) ->
-        return lib_IsMounted( filePath, gamePath ) or ( Exists( filePath, gamePath ) and not lib_IsDir( filePath, gamePath ) )
+    -- file.IsFile( filePath, gamePath ) - check if the path is a file
+    isFile = ( filePath, gamePath ) ->
+        return isMounted( filePath, gamePath ) or ( Exists( filePath, gamePath ) and not isDir( filePath, gamePath ) )
 
-    lib.IsFile = lib_IsFile
+    lib.IsFile = isFile
 
-    lib_Delete = ( filePath, gamePath, force ) ->
+    -- file.Delete( filePath, gamePath ) - delete the file or folder
+    do
+
+        delete = ( filePath, gamePath ) ->
             gamePath = gamePath or "DATA"
 
-            if lib_IsDir( filePath, gamePath )
-                if force
-                    files, folders = Find( Join( filePath, "*" ), gamePath )
-                    for folderName in *folders
-                        lib_Delete( Join( filePath, folderName ), gamePath, force )
+            if isDir( filePath, gamePath )
+                files, folders = Find( Join( filePath, "*" ), gamePath )
+                for folderName in *folders
+                    delete( Join( filePath, folderName ), gamePath )
 
-                    for fileName in *files
-                        Delete( Join( filePath, fileName ), gamePath, force )
+                for fileName in *files
+                    Delete( Join( filePath, fileName ), gamePath )
 
-                Delete( filePath, gamePath )
-                return not lib_IsDir( filePath, gamePath )
+                return Delete( filePath, gamePath )
 
-            Delete( filePath, gamePath )
-            return not lib_IsFile( filePath, gamePath )
+            return Delete( filePath, gamePath )
 
-    lib.Delete = lib_Delete
+        lib.Delete = delete
 
+    -- file.CreateDir( folderPath, force ) - create the folders by the path
     do
 
         :CreateDir = file
 
-        lib_CreateDir = ( folderPath, force ) ->
-            unless force
-                CreateDir( folderPath )
-                return folderPath
+        createDir = ( folderPath, force ) ->
+            if force
+                currentPath = nil
+                for folderName in *Split( folderPath, "/" )
+                    if folderName
+                        if currentPath
+                            currentPath ..= "/" .. folderName
+                        else
+                            currentPath = folderName
 
-            currentPath = nil
-            for folderName in *Split( folderPath, "/" )
-                if folderName
-                    unless currentPath
-                        currentPath = folderName
-                    else
-                        currentPath ..= "/" .. folderName
+                        if IsDir( currentPath, "DATA" )
+                            continue
 
-                    unless IsDir( currentPath, "DATA" )
                         Delete( currentPath, "DATA" )
                         CreateDir( currentPath )
 
-            return currentPath
+                return currentPath
 
-        lib.CreateDir = lib_CreateDir
+            CreateDir( folderPath )
+            return folderPath
 
+        lib.CreateDir = createDir
+
+    -- file.Size( filePath, gamePath ) - return the size of the file or folder in bytes as a number
     do
 
         :Size = file
         result = 0
 
-        lib_Size = ( filePath, gamePath ) ->
-            unless lib_IsDir( filePath, gamePath )
+        size = ( filePath, gamePath ) ->
+            unless isDir( filePath, gamePath )
                 return Size( filePath, gamePath )
 
             result = 0
@@ -163,74 +181,74 @@ do
                 result += Size( Join( filePath, fileName ), gamePath )
 
             for folderName in *folders
-                result += lib_Size( Join( filePath, folderName ), gamePath )
+                result += size( Join( filePath, folderName ), gamePath )
 
             return result
 
-        lib.Size = lib_Size
+        lib.Size = size
 
-lib_BuildFilePath = ( filePath ) ->
+-- file.BuildFilePath( filePath, force ) - build the file path
+buildFilePath = ( filePath, force ) ->
     folderPath = GetPathFromFilename( filePath )
     if folderPath
-        lib_CreateDir( folderPath )
+        createDir( folderPath, force )
 
     return folderPath
 
-lib.BuildFilePath = lib_BuildFilePath
+lib.BuildFilePath = buildFilePath
 
-lib_IsCompilable = nil
+-- file.IsCompilable( filePath, doPreCache ) - check if the file can be compiled
+isCompilable = nil
 do
 
     :moonloader = gpm
     :sub = string
 
-    PreCacheFile = moonloader and moonloader.PreCacheFile or nil
+    preCacheFunc = moonloader and moonloader.PreCacheFile or nil
+    supportedExtensions = { moon: true, yue: true, lua: true }
     preCacheableExtensions = { "moon", "yue" }
-    supportedExtensions = {
-        moon: true
-        yue: true
-        lua: true
-    }
 
-    lib_IsCompilable = ( filePath, preCompile ) ->
+    isCompilable = ( filePath, doPreCache ) ->
         extension = GetExtensionFromFilename( filePath )
-        if extension ~= nil
-            unless supportedExtensions[ extension ]
+        if extension
+            if supportedExtensions[ extension ]
+                filePath = sub( filePath, 1, #filePath - ( #extension + 1 ) )
+            else
                 return false
 
-            filePath = sub( filePath, 1, #filePath - ( #extension + 1 ) )
-
-        if preCompile and PreCacheFile ~= nil
-            for i = 1, 2
-                preCachePath = filePath .. preCacheableExtensions[ i ]
-                if lib_IsFile( preCachePath, RealmGameDir )
-                    unless PreCacheFile( preCachePath )
+        for index = 1, 2
+            preCachePath = filePath .. "." .. preCacheableExtensions[ index ]
+            if isFile( preCachePath, luaPath )
+                if doPreCache and preCacheFunc
+                    if preCacheFunc( preCachePath )
+                        Logger\Debug( "Pre-compiling '%s' into Lua completed successfully.", preCachePath )
+                    else
                         error( "Pre-compiling '" .. preCachePath .. "' file in Lua failed." )
-
-                    Logger\Debug( "Pre-compiling '%s' into Lua completed successfully.", preCachePath )
 
                 return true
 
-        return lib_IsFile( filePath .. ".lua", RealmGameDir )
+        return isFile( filePath .. ".lua", luaPath )
 
-    lib.IsCompilable = lib_IsCompilable
+    lib.IsCompilable = isCompilable
 
-lib_Read, lib_Write = nil, nil
 do
 
     File = FindMetaTable( "File" )
-    :Read, :Close, :Write = File
+    :Close, :Read, :Write = File
+    :Open = file
 
     do
 
         :ReadULong, :WriteULong, :ReadByte, :WriteByte, :EndOfFile, :Seek, :Skip, :Tell = File
 
+        -- File::SkipEmpty() - skips empty bytes
         File.SkipEmpty = ( fileHandle ) ->
             while not EndOfFile( fileHandle )
                 if ReadByte( fileHandle ) ~= 0
                     Skip( fileHandle, -1 )
                     break
 
+        -- File::ReadString() - reads string to first empty byte
         File.ReadString = ( fileHandle ) ->
             startPos, len = Tell( fileHandle ), 0
             while not EndOfFile( fileHandle ) and ReadByte( fileHandle ) ~= 0
@@ -241,197 +259,211 @@ do
             Skip( fileHandle, 1 )
             return data
 
+        -- File::WriteString( str ) - writes string and empty byte
         File.WriteString = ( fileHandle, str ) ->
             Write( fileHandle, str )
             WriteByte( fileHandle, 0 )
 
+        -- File::ReadUInt64() - reads 4 bytes as number and skips 4 bytes
         if File.ReadUInt64 == nil
             File.ReadUInt64 = ( fileHandle ) ->
                 number = ReadULong( fileHandle )
                 Skip( fileHandle, 4 )
                 return number
 
+        -- File::WriteUInt64( number ) - writes 4 bytes as number and 4 empty bytes
         if File.WriteUInt64 == nil
             File.WriteUInt64 = ( fileHandle, number ) ->
                 WriteULong( fileHandle, number )
                 WriteULong( fileHandle, 0 )
 
-    :Open = file
+    -- file.Open( filePath, mode, gamePath ) - opens file and returns file handler
     lib.Open = Open
 
-    lib_Read = ( filePath, gamePath, length ) ->
+    -- file.Append( filePath, content, force ) - appends content to file
+    lib.Append = ( filePath, content, force ) ->
+        if force
+            buildFilePath( filePath, true )
+
+        fileHandle = Open( filePath, "ab", "DATA" )
+        if fileHandle
+            Write( fileHandle, content )
+            Close( fileHandle )
+            return true
+
+        return false
+
+    -- file.Read( filePath, gamePath, length ) - returns file content as string
+    lib.Read = ( filePath, gamePath, length ) ->
         fileHandle = Open( filePath, "rb", gamePath )
-        unless fileHandle
-            return false
+        if fileHandle
+            return Read( fileHandle, length ), Close( fileHandle )
 
-        content = Read( fileHandle, length )
-        Close( fileHandle )
-        return true, content
+    -- file.Write( filePath, content, force ) - writes content to file
+    lib.Write = ( filePath, content, force ) ->
+        if force
+            buildFilePath( filePath, true )
 
-    lib.Read = lib_Read
+        fileHandle = Open( filePath, "wb", "DATA" )
+        if fileHandle
+            Write( fileHandle, content )
+            Close( fileHandle )
+            return true
 
-    lib_Write = ( filePath, content, fileMode, fastMode ) ->
-        unless fastMode
-            lib_BuildFilePath( filePath )
-
-        fileHandle = Open( filePath, fileMode or "wb", "DATA" )
-        unless fileHandle
-            return false
-
-        Write( fileHandle, content )
-        Close( fileHandle )
-        return true
-
-    lib.Write = lib_Write
-
-lib_Append = ( filePath, content, fastMode ) ->
-    return lib_Write( filePath, content, "ab", fastMode )
-
-lib.Append = lib_Append
-
-:Fix = path
+        return false
 
 if SERVER
 
-    :ReplaceExtension = path
+    :ReplaceExtension, :RemoveBackslash = path
     AddCSLuaFile = AddCSLuaFile
     :getfpath = debug
 
+    -- file.AddCSLuaFile( filePath )
     lib.AddCSLuaFile = ( fileName ) ->
         currentPath = getfpath!
-        if not fileName and currentPath and lib_IsFile( currentPath, RealmGameDir )
+        if not fileName and currentPath and isFile( currentPath, luaPath )
             AddCSLuaFile( currentPath )
             return
 
         ArgAssert( fileName, 1, "string" )
-        fileName = ReplaceExtension( Fix( fileName ), "lua" )
+        fileName = ReplaceExtension( fileName, "lua" )
 
         if currentPath
             currentFolder = GetPathFromFilename( currentPath )
             if currentFolder
                 filePath = currentFolder .. fileName
-                if lib_IsCompilable( filePath, true )
+                if isCompilable( filePath, true )
                     AddCSLuaFile( filePath )
                     return
 
-        if lib_IsCompilable( fileName, true )
+        if isCompilable( fileName, true )
             AddCSLuaFile( fileName )
             return
 
         error( "Couldn't AddCSLuaFile file '" .. fileName .. "' - File not found" )
 
-    lib_AddCSLuaFolder = ( folderPath ) ->
-        folderPath = Fix( folderPath )
+    -- file.AddCSLuaFolder( folderPath )
+    addCSLuaFolder = ( folderPath ) ->
+        folderPath = RemoveBackslash( folderPath )
         files, folders = Find( folderPath .. "/*", "lsv" )
 
         for folderName in *folders
-            lib_AddCSLuaFolder( folderPath .. "/" .. folderName )
+            addCSLuaFolder( folderPath .. "/" .. folderName )
 
         for fileName in *files
             filePath = folderPath .. "/" .. fileName
-            if lib_IsCompilable( filePath, true )
+            if isCompilable( filePath, true )
                 AddCSLuaFile( ReplaceExtension( filePath, "lua" ) )
 
-    lib.AddCSLuaFolder = lib_AddCSLuaFolder
+    lib.AddCSLuaFolder = addCSLuaFolder
 
 if istable( efsw )
-    watchList = gpm.Table( lib, "WatchList" )
+
     :Watch, :Unwatch = efsw
 
-    lib_Watch = ( filePath, gamePath, recursively ) ->
-        filePath = Fix( filePath )
+    -- file.WatchList
+    watchList = gpm.Table( lib, "WatchList" )
 
-        if watchList[ filePath .. ";" .. gamePath ] or ( CLIENT and lib_IsMounted( filePath, gamePath ) )
+    -- file.Watch( filePath, gamePath )
+    watch = ( filePath, gamePath ) ->
+        if watchList[ filePath .. ";" .. gamePath ] or ( CLIENT and isMounted( filePath, gamePath ) )
             return false
 
-        if lib_IsDir( filePath, gamePath )
-            filePath = filePath .. "/"
-            if recursively
-                for folderName in *select( 2, Find( filePath .. "*", gamePath ) )
-                    lib_Watch( filePath .. folderName, gamePath, recursively )
+        if isDir( filePath, gamePath )
+            filePath ..= "/"
+
+            for folderName in *select( 2, Find( filePath .. "*", gamePath ) )
+                watch( filePath .. folderName, gamePath )
 
         watchList[ filePath .. ";" .. gamePath ] = Watch( filePath, gamePath )
         return true
 
-    lib.Watch = lib_Watch
+    lib.Watch = watch
 
-    lib_UnWatch = ( filePath, gamePath, recursively ) ->
-        filePath = Fix( filePath )
-
+    -- file.UnWatch( filePath, gamePath ) - stops file watching
+    unWatch = ( filePath, gamePath ) ->
         watchID = watchList[ filePath .. ";" .. gamePath ]
-        if not watchID
-            return false
+        if watchID
+            if isDir( filePath, gamePath )
+                filePath ..= "/"
 
-        if lib_IsDir( filePath, gamePath )
-            filePath = filePath .. "/"
-            if recursively
                 for folderName in *select( 2, Find( filePath .. "*", gamePath ) )
-                    lib_UnWatch( filePath .. folderName, gamePath, recursively )
+                    unWatch( filePath .. folderName, gamePath )
 
-        Unwatch( watchID )
-        watchList[ filePath .. ";" .. gamePath ] = nil
-        return true
+            watchList[ filePath .. ";" .. gamePath ] = nil
+            Unwatch( watchID )
+            return true
 
-    lib.UnWatch = lib_UnWatch
+        return false
 
-lib_AsyncRead = nil
+    lib.UnWatch = unWatch
+
+else
+
+    lib.Watch = ->
+        return false
+
+    lib.Unwatch = ->
+        return false
+
+asyncRead = nil
 do
 
-    asyncFunctions = {
-        Append: false,
-        Write: false,
-        Read: false
-    }
+    asyncFunctions = { "Append": false, "Write": false, "Read": false }
 
     do
 
         sources = {
             {
-                Name: "gm_asyncio"
-                Available: util.IsBinaryModuleInstalled( "asyncio" )
-                Get: ->
+                "Name": "gm_asyncio"
+                "Available": util.IsBinaryModuleInstalled( "asyncio" )
+                "Get": ->
                     require( "asyncio" )
                     return {
-                        Append: asyncio.AsyncAppend
-                        Write: asyncio.AsyncWrite
-                        Read: asyncio.AsyncRead
+                        "Append": asyncio.AsyncAppend
+                        "Read": asyncio.AsyncRead
+                        "Write": asyncio.AsyncWrite
                     }
             },
             {
-                Name: "async_write"
-                Available: util.IsBinaryModuleInstalled( "async_write" )
-                Get: ->
+                "Name": "async_write"
+                "Available": util.IsBinaryModuleInstalled( "async_write" )
+                "Get": ->
                     require( "async_write" )
                     return {
-                        Append: file.AsyncAppen
-                        Write: file.AsyncWrite
+                        "Append": file.AsyncAppen
+                        "Write": file.AsyncWrite
                     }
             },
             {
-                Name: "Garry's Mod Async"
-                Available: not MENU_DLL
-                Get: ->
+                "Name": "Garry's Mod Async"
+                "Available": not MENU_DLL
+                "Get": ->
                     return {
-                        Read: file.AsyncRead
+                        "Read": file.AsyncRead
                     }
             },
             {
-                Name: "Garry's Mod"
-                Available: true
-                Get: ->
+                "Name": "Garry's Mod"
+                "Available": true
+                "Get": ->
+                    :Append, :Read, :Write = lib
+
                     return {
-                        Append: ( fileName, content, func ) ->
-                            state = lib_Append( fileName, content, true ) and 0 or -1
+                        "Append": ( fileName, content, func ) ->
+                            state = Append( fileName, content, true ) and 0 or -1
                             func( fileName, "DATA", state )
                             return state
-                        Write: ( fileName, content, func ) ->
-                            state = lib_Write( fileName, content, "wb", true ) and 0 or -1
-                            func( fileName, "DATA", state )
-                            return state
-                        Read: ( fileName, gamePath, func ) ->
-                            ok, content = lib_Read( fileName, gamePath )
-                            state = ok and 0 or -1
+
+                        "Read": ( fileName, gamePath, func ) ->
+                            content = Read( fileName, gamePath )
+                            state = content == nil and -1 or 0
                             func( fileName, gamePath, state, content )
+                            return state
+
+                        "Write": ( fileName, content, func ) ->
+                            state = Write( fileName, content, "wb", true ) and 0 or -1
+                            func( fileName, "DATA", state )
                             return state
                     }
             }
@@ -439,28 +471,29 @@ do
 
         count = 0
         for source in *sources
-            unless source.Available
-                continue
+            if source.Available
+                functions = source.Get!
+                installed = 0
 
-            functions = source.Get!
-            installed = 0
+                for funcName, func in pairs( asyncFunctions )
+                    if func == false
+                        func = functions[ funcName ]
+                        if func
+                            asyncFunctions[ funcName ] = func
+                            installed += 1
+                            count += 1
 
-            for funcName, func in pairs( asyncFunctions )
-                if func == false
-                    func = functions[ funcName ]
-                    if func ~= nil
-                        asyncFunctions[ funcName ] = func
-                        installed += 1
-                        count += 1
+                if installed > 0
+                    Logger\Info "'%s' was connected as filesystem API.", source.Name
 
-            if installed > 0
-                Logger\Info "'%s' was connected as filesystem API.", source.Name
+                if count > 2
+                    break
 
-            if count > 2
-                break
-
+    -- file.FileSystemAsyncError - async error
     class FileSystemAsyncError extends Error
+    lib.FileSystemAsyncError = FileSystemAsyncError
 
+    -- file.FSASYNC - async error messages table
     FSASYNC = {
         [ -8 ]: "Filename not part of the specified file system, try a different one."
         [ -7 ]: "Failure for a reason that might be temporary, you might retry, but not immediately."
@@ -477,88 +510,93 @@ do
         [  4 ]: "File is not yet queued."
     }
 
-    lib.FileSystemAsyncError = FileSystemAsyncError
     lib.FSASYNC = FSASYNC
 
-    do
-
-        :Read = asyncFunctions
-
-        lib_AsyncRead = ( filePath, gameDir ) ->
-            p = Promise!
-
-            code = Read filePath, gameDir, ( fileName, gamePath, code, content ) ->
-                if code == 0
-                    return p\Resolve( { :fileName, :gamePath, :content } )
-
-                p\Reject( FileSystemAsyncError( FSASYNC[ code ] ) )
-
-            if code ~= 0
-                p\Reject( FileSystemAsyncError( FSASYNC[ code ] ) )
-
-            return p
-
-        lib.AsyncRead = lib_AsyncRead
-
-    do
-
-        :Write = asyncFunctions
-
-        lib.AsyncWrite = ( filePath, content, fastMode ) ->
-            unless fastMode
-                lib_BuildFilePath( filePath )
-
-            p = Promise!
-
-            code = Write filePath, content, ( fileName, gamePath, code ) ->
-                if code == 0
-                    return p\Resolve( { :fileName, :gamePath } )
-
-                p\Reject( FileSystemAsyncError( FSASYNC[ code ] ) )
-
-            if code ~= 0
-                p\Reject( FileSystemAsyncError( FSASYNC[ code ] ) )
-
-            return p
-
+    -- file.AsyncAppend( filePath, content, force ) - async append function that returns promise
     do
 
         :Append = asyncFunctions
 
-        lib.AsyncAppend = ( filePath, content, fastMode ) ->
-            unless fastMode
-                lib_BuildFilePath( filePath )
+        lib.AsyncAppend = ( filePath, content, force ) ->
+            if force
+                buildFilePath( filePath, true )
 
             p = Promise!
 
-            code = Append filePath, content, ( fileName, gamePath, code ) ->
+            state = Append filePath, content, ( fileName, gamePath, code ) ->
                 if code == 0
                     return p\Resolve( { :fileName, :gamePath } )
 
-                p\Reject( FileSystemAsyncError( FSASYNC[ code ] ) )
+                p\Reject( FileSystemAsyncError FSASYNC[ code ] )
 
-            if code ~= 0
-                p\Reject( FileSystemAsyncError( FSASYNC[ code ] ) )
+            if state ~= 0
+                p\Reject( FileSystemAsyncError FSASYNC[ state ] )
+
+            return p
+
+    -- file.AsyncRead( filePath, gameDir ) - async read function that returns promise
+    do
+
+        :Read = asyncFunctions
+
+        asyncRead = ( filePath, gameDir ) ->
+            p = Promise!
+
+            state = Read filePath, gameDir, ( fileName, gamePath, code, content ) ->
+                if code == 0
+                    return p\Resolve( { :fileName, :gamePath, :content } )
+
+                p\Reject( FileSystemAsyncError FSASYNC[ code ] )
+
+            if state ~= 0
+                p\Reject( FileSystemAsyncError FSASYNC[ state ] )
+
+            return p
+
+        lib.AsyncRead = asyncRead
+
+    -- file.AsyncWrite( filePath, content, force ) - async write function that returns promise
+    do
+
+        :Write = asyncFunctions
+
+        lib.AsyncWrite = ( filePath, content, force ) ->
+            if force
+                buildFilePath( filePath, true )
+
+            p = Promise!
+
+            state = Write filePath, content, ( fileName, gamePath, code ) ->
+                if code == 0
+                    return p\Resolve( { :fileName, :gamePath } )
+
+                p\Reject( FileSystemAsyncError FSASYNC[ code ] )
+
+            if state ~= 0
+                p\Reject( FileSystemAsyncError FSASYNC[ state ] )
 
             return p
 
 do
 
+    -- file.FileSystemCompileError - compile error
     class FileSystemCompileError extends Error
     lib.FileSystemCompileError = FileSystemCompileError
 
+    -- file.CompileLua( filePath, gamePath, handleError ) - async lua file compile function that returns promise
+    compileLua = nil
     do
 
         CompileString, CompileFile = CompileString, CompileFile
 
-        lib.CompileLua = async ( filePath, gamePath, handleError ) ->
-            if CLIENT and lib_IsMounted( filePath, gamePath )
+        compileLua = async ( filePath, gamePath, handleError ) ->
+            if CLIENT and isMounted( filePath, gamePath )
                 filePath = "lua/" .. filePath
                 gamePath = "GAME"
 
-            :content = await lib_AsyncRead( filePath, gamePath )
+            :content = await asyncRead( filePath, gamePath )
             unless content
-                error FileSystemCompileError "File #{filePath} cannot be read."
+                error FileSystemCompileError "File '" .. filePath .. "' cannot be read."
 
             func = CompileString( content, filePath, handleError )
             if not func and ( gamePath == "LUA" or gamePath == "lsv" or gamePath == "lcl" )
@@ -567,30 +605,63 @@ do
             if func
                 return func
 
-            error FileSystemCompileError "File '#{filePath}' is missing in file system."
+            error FileSystemCompileError "File '" .. filePath .. "' is missing in file system."
 
+        lib.CompileLua = compileLua
+
+    -- file.CompileMoon( filePath, gamePath, handleError ) - async moon file compile function that returns promise
+    compileMoon = nil
     do
 
         :CompileMoonString = util
 
-        lib.CompileMoon = async ( filePath, gamePath, handleError ) ->
-            :content = await lib_AsyncRead( filePath, gamePath )
+        compileMoon = async ( filePath, gamePath, handleError ) ->
+            :content = await asyncRead( filePath, gamePath )
             unless content
-                error FileSystemCompileError "File #{filePath} cannot be read."
+                error FileSystemCompileError "File '" .. filePath .. "' cannot be read."
 
             return CompileMoonString( content, filePath, handleError )
 
+        lib.CompileMoon = compileMoon
+
+    -- file.CompileYue( filePath, gamePath, handleError, yueConfig ) - async yue file compile function that returns promise
+    compileYue = nil
     do
 
         :CompileYueString = util
 
-        lib.CompileYue = async ( filePath, gamePath, handleError, yueConfig ) ->
-            :content = await lib_AsyncRead( filePath, gamePath )
+        compileYue = async ( filePath, gamePath, handleError, yueConfig ) ->
+            :content = await asyncRead( filePath, gamePath )
             unless content
-                error FileSystemCompileError "File #{filePath} cannot be read."
+                error FileSystemCompileError "File '" .. filePath .. "' cannot be read."
 
             return CompileYueString( content, filePath, handleError, yueConfig )
 
+        lib.CompileYue = compileYue
+
+    -- file.Compile( filePath, gamePath, handleError, yueConfig ) - async file compile function that returns promise
+    do
+
+        :StripExtension = string
+
+        lib.Compile = ( filePath, gamePath, handleError, yueConfig ) ->
+            fileName = StripExtension( filePath )
+
+            compilePath = fileName .. ".lua"
+            if isFile( compilePath, gamePath )
+                return compileLua( compilePath, gamePath, handleError )
+
+            compilePath = fileName .. ".moon"
+            if isFile( compilePath, gamePath )
+                return compileMoon( compilePath, gamePath, handleError )
+
+            compilePath = fileName .. ".yue"
+            if isFile( compilePath, gamePath )
+                return compileYue( compilePath, gamePath, handleError, yueConfig )
+
+            error FileSystemCompileError "File '" .. filePath .. "' cannot be found."
+
+-- file.DecompressDeflate( fileHandle, doCRC ) - zip files iterator
 do
 
     :DecompressDeflate = gpm.deflate
