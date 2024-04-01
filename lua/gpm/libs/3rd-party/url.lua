@@ -1,12 +1,27 @@
--- https://github.com/golgote/neturl/
 -- net/url.lua - a robust url parser and builder
---
 -- Bertrand Mansion, 2011-2021; License MIT
--- @module net.url
--- @alias	M
+-- https://github.com/golgote/neturl
 
-local M = {}
-M.version = "1.1.0"
+local string = string
+local sub = string.sub
+local find = string.find
+local gsub = string.gsub
+local match = string.match
+local lower = string.lower
+local format = string.format
+
+local concat = table.concat
+
+local setmetatable = setmetatable
+local tonumber = tonumber
+local tostring = tostring
+local isstring = isstring
+local istable = istable
+local ipairs = ipairs
+local pairs = pairs
+
+local META = {}
+META.version = "1.2.0"
 
 --- url options
 -- - `separator` is set to `&` by default but could be anything like `&amp;amp;` or `;`
@@ -17,8 +32,8 @@ M.version = "1.1.0"
 -- @todo Add option to limit the size of the argument table
 -- @todo Add option to limit the depth of the argument table
 -- @todo Add option to process dots in parameter names, ie. `param.filter=1`
-M.options = {
-	separator = '&',
+META.options = {
+	separator = "&",
 	cumulative_parameters = false,
 	legal_in_path = {
 		[":"] = true, ["-"] = true, ["_"] = true, ["."] = true,
@@ -38,118 +53,137 @@ M.options = {
 
 --- list of known and common scheme ports
 -- as documented in <a href="http://www.iana.org/assignments/uri-schemes.html">IANA URI scheme list</a>
-M.services = {
-	acap     = 674,
-	cap      = 1026,
-	dict     = 2628,
-	ftp      = 21,
-	gopher   = 70,
-	http     = 80,
-	https    = 443,
-	iax      = 4569,
-	icap     = 1344,
-	imap     = 143,
-	ipp      = 631,
-	ldap     = 389,
-	mtqp     = 1038,
-	mupdate  = 3905,
-	news     = 2009,
-	nfs      = 2049,
-	nntp     = 119,
-	rtsp     = 554,
-	sip      = 5060,
-	snmp     = 161,
-	telnet   = 23,
-	tftp     = 69,
-	vemmi    = 575,
-	afs      = 1483,
-	jms      = 5673,
-	rsync    = 873,
+META.services = {
+	ftp = 21,
+	ssh = 22,
+	sftp = 22,
+	telnet = 23,
+	smtp = 25,
+	tftp = 69,
+	gopher = 70,
+	http = 80,
+	nntp = 119,
+	snmp = 161,
+	imap = 143,
 	prospero = 191,
-	videotex = 516
+	ldap = 389,
+	https = 443,
+	smtps = 465,
+	videotex = 516,
+	rtsp = 554,
+	vemmi = 575,
+	starttls = 587,
+	ipp = 631,
+	acap = 674,
+	rsync = 873,
+	cap = 1026,
+	mtqp = 1038,
+	icap = 1344,
+	afs = 1483,
+	news = 2009,
+	nfs = 2049,
+	dict = 2628,
+	mupdate = 3905,
+	iax = 4569,
+	sip = 5060,
+	jms = 5673
 }
 
-local function decode(str)
-	return (str:gsub("%%(%x%x)", function(c)
-		return string.char(tonumber(c, 16))
-	end))
+local decode
+do
+
+	local char = string.char
+
+	function decode( str )
+		return gsub( str, "%%(%x%x)", function( value )
+			return char( tonumber( value, 16 ) )
+		end )
+	end
+
 end
 
-local function encode(str, legal)
-	return (str:gsub("([^%w])", function(v)
-		if legal[v] then
-			return v
-		end
-		return string.upper(string.format("%%%02x", string.byte(v)))
-	end))
+local encode
+do
+
+	local upper = string.upper
+	local byte = string.byte
+
+	function encode( str, legal )
+		return gsub( str, "([^%w])", function( value )
+			if legal[ value ] then
+				return value
+			end
+
+			return upper( format( "%%%02x", byte( value ) ) )
+		end )
+	end
+
 end
 
 -- for query values, + can mean space if configured as such
-local function decodeValue(str)
-	if M.options.query_plus_is_space then
-		str = str:gsub('+', ' ')
+local function decodeValue( str )
+	if META.options.query_plus_is_space then
+		str = gsub( str, "+", " " )
 	end
-	return decode(str)
+
+	return decode( str )
 end
 
-local function concat(a, b)
-	if type(a) == 'table' then
-		return a:build() .. b
-	else
-		return a .. b:build()
+function META:addSegment( path )
+	if isstring( path ) then
+		self.path = self.path .. "/" .. encode( gsub( path, "^/+", "" ), META.options.legal_in_path )
 	end
-end
 
-function M:addSegment(path)
-	if type(path) == 'string' then
-		self.path = self.path .. '/' .. encode(path:gsub("^/+", ""), M.options.legal_in_path)
-	end
 	return self
 end
 
 --- builds the url
 -- @return a string representing the built url
-function M:build()
-	local url = ''
+function META:build()
+	local url = ""
 	if self.path then
 		local path = self.path
-		url = url .. tostring(path)
+		url = url .. tostring( path )
 	end
+
 	if self.query then
-		local qstring = tostring(self.query)
-		if qstring ~= "" then
-			url = url .. '?' .. qstring
+		local qstring = tostring( self.query )
+		if #qstring ~= 0 then
+			url = url .. "?" .. qstring
 		end
 	end
+
 	if self.host then
 		local authority = self.host
-		if self.port and self.scheme and M.services[self.scheme] ~= self.port then
-			authority = authority .. ':' .. self.port
+		if self.port and self.scheme and META.services[self.scheme] ~= self.port then
+			authority = authority .. ":" .. self.port
 		end
+
 		local userinfo
-		if self.user and self.user ~= "" then
+		if self.user and #self.user ~= 0 then
 			userinfo = self.user
 			if self.password then
-				userinfo = userinfo .. ':' .. self.password
+				userinfo = userinfo .. ":" .. self.password
 			end
 		end
-		if userinfo and userinfo ~= "" then
-			authority = userinfo .. '@' .. authority
+
+		if userinfo and #userinfo ~= 0 then
+			authority = userinfo .. "@" .. authority
 		end
+
 		if authority then
-			if url ~= "" then
-				url = '//' .. authority .. '/' .. url:gsub('^/+', '')
-			else
-				url = '//' .. authority
-			end
+			url = "//" .. ( ( #url == 0 ) and authority or ( authority .. "/" .. gsub( url, "^/+", "" ) ) )
 		end
 	end
+
 	if self.scheme then
-		url = self.scheme .. ':' .. url
+		url = self.scheme .. ":" .. url
 	end
+
 	if self.fragment then
-		url = url .. '#' .. self.fragment
+		url = url .. "#" .. self.fragment
 	end
+
 	return url
 end
 
@@ -158,41 +192,65 @@ end
 -- @param sep The separator to use (optional)
 -- @param key The parent key if the value is multi-dimensional (optional)
 -- @return a string representing the built querystring
-function M.buildQuery(tab, sep, key)
-	local query = {}
-	if not sep then
-		sep = M.options.separator or '&'
+do
+
+	local sort = table.sort
+
+	local function padnum( number, rest )
+		return format( "%03d" .. rest, tonumber( number ) )
 	end
-	local keys = {}
-	for k in pairs(tab) do
-		keys[#keys+1] = k
-	end
-	table.sort(keys, function (a, b)
-  		local function padnum(n, rest) return ("%03d"..rest):format(tonumber(n)) end
-  		return tostring(a):gsub("(%d+)(%.)",padnum) < tostring(b):gsub("(%d+)(%.)",padnum)
-	end)
-	for _,name in ipairs(keys) do
-		local value = tab[name]
-		name = encode(tostring(name), {["-"] = true, ["_"] = true, ["."] = true})
-		if key then
-			if M.options.cumulative_parameters and string.find(name, '^%d+$') then
-				name = tostring(key)
+
+	function META.buildQuery( tab, sep, key )
+		local query, queryLength = {}, 0
+		if not sep then
+			sep = META.options.separator or "&"
+		end
+
+		local keys, keysLength = {}, 0
+		for value in pairs( tab ) do
+			keysLength = keysLength + 1
+			keys[ keysLength ] = value
+		end
+
+		sort( keys, function( a, b )
+			return gsub( tostring( a ), "(%d+)(%.)", padnum ) < gsub( tostring( b ), "(%d+)(%.)", padnum )
+		end )
+
+		for index = 1, keysLength do
+			local name = keys[ index ]
+			local value = tab[ name ]
+
+			name = encode( tostring( name ), {
+				["-"] = true,
+				["_"] = true,
+				["."] = true
+			} )
+
+			if key then
+				if META.options.cumulative_parameters and find( name, "^%d+$" ) then
+					name = tostring( key )
+				else
+					name = format( "%s[%s]", tostring( key ), tostring( name ) )
+				end
+			end
+
+			queryLength = queryLength + 1
+
+			if istable( value ) then
+				query[ queryLength ] = META.buildQuery( value, sep, name )
 			else
-				name = string.format('%s[%s]', tostring(key), tostring(name))
+				value = encode( tostring( value ), META.options.legal_in_query )
+				if #value == 0 then
+					query[ queryLength ] = name
+				else
+					query[ queryLength ] = format( "%s=%s", name, value )
+				end
 			end
 		end
-		if type(value) == 'table' then
-			query[#query+1] = M.buildQuery(value, sep, name)
-		else
-			local value = encode(tostring(value), M.options.legal_in_query)
-			if value ~= "" then
-				query[#query+1] = string.format('%s=%s', name, value)
-			else
-				query[#query+1] = name
-			end
-		end
+
+		return concat( query, sep )
 	end
-	return table.concat(query, sep)
+
 end
 
 --- Parses the querystring to a table
@@ -200,75 +258,91 @@ end
 -- with PHP usage of brackets in key names like ?param[key]=value
 -- @param str The querystring to parse
 -- @param sep The separator between key/value pairs, defaults to `&`
--- @todo limit the max number of parameters with M.options.max_parameters
+-- @todo limit the max number of parameters with META.options.max_parameters
 -- @return a table representing the query key/value pairs
-function M.parseQuery(str, sep)
-	if not sep then
-		sep = M.options.separator or '&'
-	end
+do
 
-	local values = {}
-	for key,val in str:gmatch(string.format('([^%q=]+)(=*[^%q=]*)', sep, sep)) do
-		local key = decodeValue(key)
-		local keys = {}
-		key = key:gsub('%[([^%]]*)%]', function(v)
+	local gmatch = string.gmatch
+
+	function META.parseQuery( query, sep )
+		if not sep then
+			sep = META.options.separator or "&"
+		end
+
+		local values = {}
+		for key, srt in gmatch( query, format( "([^%q=]+)(=*[^%q=]*)", sep, sep ) ) do
+			local keys, keysLength = {}, 0
+			key = gsub( decodeValue( key ), "%[([^%]]*)%]", function( value )
 				-- extract keys between balanced brackets
-				if string.find(v, "^-?%d+$") then
-					v = tonumber(v)
+				if find( value, "^-?%d+$" ) then
+					value = tonumber( value )
 				else
-					v = decodeValue(v)
+					value = decodeValue( value )
 				end
-				table.insert(keys, v)
+
+				keysLength = keysLength + 1
+				keys[ keysLength ] = value
 				return "="
-		end)
-		key = key:gsub('=+.*$', "")
-		key = key:gsub('%s', "_") -- remove spaces in parameter name
-		val = val:gsub('^=+', "")
+			end )
 
-		if not values[key] then
-			values[key] = {}
-		end
-		if #keys > 0 and type(values[key]) ~= 'table' then
-			values[key] = {}
-		elseif #keys == 0 and type(values[key]) == 'table' then
-			values[key] = decodeValue(val)
-		elseif M.options.cumulative_parameters
-			and type(values[key]) == 'string' then
-			values[key] = { values[key] }
-			table.insert(values[key], decodeValue(val))
+			key = gsub( key, "=+.*$", "" )
+			key = gsub( key, "%s", "_" ) -- remove spaces in parameter name
+
+			srt = gsub( key, "^=+", "" )
+
+			if not values[key] then
+				values[key] = {}
+			end
+			if keysLength > 0 and not istable( values[ key ] ) then
+				values[ key ] = {}
+			elseif keysLength == 0 and istable( values[ key ] ) then
+				values[ key ] = decodeValue( srt )
+			elseif META.options.cumulative_parameters and isstring( values[ key ] ) then
+				if values[ key ] then
+					values[ key ] = { values[ key ], decodeValue( srt ) }
+				else
+					values[ key ] = { decodeValue( srt ) }
+				end
+			end
+
+			local t = values[ key ]
+			for i, k in ipairs( keys ) do
+				if not istable( t ) then
+					t = {}
+				end
+
+				if #k == 0 then
+					k = #t + 1
+				end
+
+				if not t[ k ] then
+					t[ k ] = {}
+				end
+
+				if i == #keys then
+					t[ k ] = srt
+				end
+
+				t = t[ k ]
+			end
+
 		end
 
-		local t = values[key]
-		for i,k in ipairs(keys) do
-			if type(t) ~= 'table' then
-				t = {}
-			end
-			if k == "" then
-				k = #t+1
-			end
-			if not t[k] then
-				t[k] = {}
-			end
-			if i == #keys then
-				t[k] = val
-			end
-			t = t[k]
-		end
-
+		setmetatable( values, { __tostring = META.buildQuery } )
+		return values
 	end
-	setmetatable(values, { __tostring = M.buildQuery })
-	return values
+
 end
 
 --- set the url query
 -- @param query Can be a string to parse or a table of key/value pairs
 -- @return a table representing the query key/value pairs
-function M:setQuery(query)
-	local query = query
-	if type(query) == 'table' then
-		query = M.buildQuery(query)
+function META:setQuery( query )
+	if istable( query ) then
+		query = META.buildQuery( query )
 	end
-	self.query = M.parseQuery(query)
+
+	self.query = META.parseQuery( query )
 	return query
 end
 
@@ -276,82 +350,89 @@ end
 -- The authority is parsed to find the user, password, port and host if available.
 -- @param authority The string representing the authority
 -- @return a string with what remains after the authority was parsed
-function M:setAuthority(authority)
-	self.authority = authority
-	self.port = nil
-	self.host = nil
-	self.userinfo = nil
-	self.user = nil
-	self.password = nil
+do
 
-	authority = authority:gsub('^([^@]*)@', function(v)
-		self.userinfo = v
-		return ''
-	end)
+	local rep = string.rep
 
-	authority = authority:gsub(':(%d+)$', function(v)
-		self.port = tonumber(v)
-		return ''
-	end)
+	function META:setAuthority( authority )
+		self.authority = authority
+		self.port = nil
+		self.host = nil
+		self.userinfo = nil
+		self.user = nil
+		self.password = nil
 
-	local function getIP(str)
-		-- ipv4
-		local chunks = { str:match("^(%d+)%.(%d+)%.(%d+)%.(%d+)$") }
-		if #chunks == 4 then
-			for _, v in pairs(chunks) do
-				if tonumber(v) > 255 then
-					return false
+		authority = gsub( authority, "^([^@]*)@", function( value )
+			self.userinfo = value
+			return ""
+		end )
+
+		authority = gsub( authority, ":(%d+)$", function( value )
+			self.port = tonumber( value )
+			return ""
+		end )
+
+		local function getIP( str )
+			-- ipv4
+			local chunks = { match( str, "^(%d+)%.(%d+)%.(%d+)%.(%d+)$" ) }
+			if #chunks == 4 then
+				for _, value in pairs( chunks ) do
+					if tonumber( value ) > 255 then
+						return false
+					end
+				end
+
+				return str
+			end
+
+			-- ipv6
+			chunks = { match( str, "^%[" .. gsub( rep( "([a-fA-F0-9]*):", 8 ), ":$","%%]$" ) ) }
+			if #chunks == 8 or #chunks < 8 and match( str, "::" ) and not match( gsub( str, "::", "", 1 ), "::" ) then
+				for _, value in pairs( chunks ) do
+					if #value > 0 and tonumber( value, 16 ) > 65535 then
+						return false
+					end
+				end
+
+				return str
+			end
+
+			return
+		end
+
+		local ip = getIP( authority )
+		if ip then
+			self.host = ip
+		elseif ip == nil then
+			-- domain
+			if #authority ~= 0 and not self.host then
+				local host = lower( authority )
+				if match( host, "^[%d%a%-%.]+$") ~= nil and sub( host, 0, 1) ~= "." and sub( host, -1) ~= "." and find( host, "%.%.") == nil then
+					self.host = host
 				end
 			end
-			return str
 		end
-		-- ipv6
-		local chunks = { str:match("^%["..(("([a-fA-F0-9]*):"):rep(8):gsub(":$","%%]$"))) }
-		if #chunks == 8 or #chunks < 8 and
-			str:match('::') and not str:gsub("::", "", 1):match('::') then
-			for _,v in pairs(chunks) do
-				if #v > 0 and tonumber(v, 16) > 65535 then
-					return false
-				end
-			end
-			return str
-		end
-		return nil
-	end
 
-	local ip = getIP(authority)
-	if ip then
-		self.host = ip
-	elseif type(ip) == 'nil' then
-		-- domain
-		if authority ~= '' and not self.host then
-			local host = authority:lower()
-			if  string.match(host, '^[%d%a%-%.]+$') ~= nil and
-				string.sub(host, 0, 1) ~= '.' and
-				string.sub(host, -1) ~= '.' and
-				string.find(host, '%.%.') == nil then
-				self.host = host
+		if self.userinfo then
+			local userinfo = self.userinfo
+			userinfo = gsub( userinfo, ":([^:]*)$", function( value )
+				self.password = value
+				return ""
+			end )
+
+			if find( userinfo, "^[%w%+%.]+$" ) then
+				self.user = userinfo
+			else
+				-- incorrect userinfo
+				self.userinfo = nil
+				self.user = nil
+				self.password = nil
 			end
 		end
+
+		return authority
 	end
 
-	if self.userinfo then
-		local userinfo = self.userinfo
-		userinfo = userinfo:gsub(':([^:]*)$', function(v)
-				self.password = v
-				return ''
-		end)
-		if string.find(userinfo, "^[%w%+%.]+$") then
-			self.user = userinfo
-		else
-			-- incorrect userinfo
-			self.userinfo = nil
-			self.user = nil
-			self.password = nil
-		end
-	end
-
-	return authority
 end
 
 --- Parse the url into the designated parts.
@@ -360,165 +441,229 @@ end
 -- query, fragment
 -- @param url Url string
 -- @return a table with the different parts and a few other functions
-function M.parse(url)
-	local comp = {}
-	M.setAuthority(comp, "")
-	M.setQuery(comp, "")
 
-	local url = tostring(url or '')
-	url = url:gsub('#(.*)$', function(v)
-		comp.fragment = v
-		return ''
-	end)
-	url =url:gsub('^([%w][%w%+%-%.]*)%:', function(v)
-		comp.scheme = v:lower()
-		return ''
-	end)
-	url = url:gsub('%?(.*)', function(v)
-		M.setQuery(comp, v)
-		return ''
-	end)
-	url = url:gsub('^//([^/]*)', function(v)
-		M.setAuthority(comp, v)
-		return ''
-	end)
+do
 
-	comp.path = url:gsub("([^/]+)", function (s) return encode(decode(s), M.options.legal_in_path) end)
+	local function concatFunc( a, b )
+		if istable( a ) then
+			return a:build() .. b
+		end
 
-	setmetatable(comp, {
-		__index = M,
-		__tostring = M.build,
-		__concat = concat,
-		__div = M.addSegment
-	})
-	return comp
+		return a .. b:build()
+	end
+
+	function META.parse( url )
+		local comp = {}
+		META.setAuthority( comp, "" )
+		META.setQuery( comp, "" )
+
+		url = tostring( url or "" )
+		url = gsub( url, "#(.*)$", function( value )
+			comp.fragment = value
+			return ""
+		end)
+
+		url = gsub( url, "^([%w][%w%+%-%.]*)%:", function( value )
+			comp.scheme = lower( value )
+			return ""
+		end )
+
+		url = gsub( url, "%?(.*)", function( value )
+			META.setQuery( comp, value )
+			return ""
+		end)
+
+		url = gsub( url, "^//([^/]*)", function( value )
+			META.setAuthority( comp, value )
+			return ""
+		end )
+
+		comp.path = gsub( url, "([^/]+)", function( value )
+			return encode( decode( value ), META.options.legal_in_path )
+		end )
+
+		setmetatable( comp, {
+			__index = META,
+			__tostring = META.build,
+			__concat = concatFunc,
+			__div = META.addSegment
+		} )
+
+		return comp
+	end
+
 end
 
 --- removes dots and slashes in urls when possible
 -- This function will also remove multiple slashes
 -- @param path The string representing the path to clean
 -- @return a string of the path without unnecessary dots and segments
-function M.removeDotSegments(path)
-	local fields = {}
-	if string.len(path) == 0 then
-		return ""
-	end
-	local startslash = false
-	local endslash = false
-	if string.sub(path, 1, 1) == "/" then
-		startslash = true
-	end
-	if (string.len(path) > 1 or startslash == false) and string.sub(path, -1) == "/" then
-		endslash = true
+function META.removeDotSegments( path )
+	if #path == 0 then
+		return path
 	end
 
-	path:gsub('[^/]+', function(c) table.insert(fields, c) end)
+	local startSlash = false
+	local endSlash = false
 
-	local new = {}
-	local j = 0
+	if sub( path, 1, 1 ) == "/" then
+		startSlash = true
+	end
 
-	for i,c in ipairs(fields) do
-		if c == '..' then
-			if j > 0 then
-				j = j - 1
+	if ( #path > 1 or startSlash == false ) and sub( path, -1 ) == "/" then
+		endSlash = true
+	end
+
+	local fields, fieldsLength = {}, 0
+
+	gsub( path, "[^/]+", function( value )
+		if value ~= "." then
+			fieldsLength = fieldsLength + 1
+			fields[ fieldsLength ] = value
+		end
+	end )
+
+	local result, resultLength = {}, 0
+
+	for index = 1, fieldsLength do
+		local value = fields[ index ]
+		if value == ".." then
+			if resultLength > 0 then
+				resultLength = resultLength - 1
 			end
-		elseif c ~= "." then
-			j = j + 1
-			new[j] = c
+		else
+			resultLength = resultLength + 1
+			result[ resultLength ] = value
 		end
 	end
-	local ret = ""
-	if #new > 0 and j > 0 then
-		ret = table.concat(new, '/', 1, j)
+
+	local ret
+	if resultLength > 0 then
+		ret = concat( result, "/", 1, resultLength )
 	else
 		ret = ""
 	end
-	if startslash then
-		ret = '/'..ret
+
+	if startSlash then
+		ret = "/" .. ret
 	end
-	if endslash then
-		ret = ret..'/'
+
+	if endSlash then
+		ret = ret .. "/"
 	end
+
 	return ret
 end
 
-local function reducePath(base_path, relative_path)
-	if string.sub(relative_path, 1, 1) == "/" then
-		return '/' .. string.gsub(relative_path, '^[%./]+', '')
+local function reducePath( base_path, relative_path )
+	if sub( relative_path, 1, 1 ) == "/" then
+		return "/" .. gsub( relative_path, "^[%./]+", "" )
 	end
+
 	local path = base_path
-	local startslash = string.sub(path, 1, 1) ~= "/";
-	if relative_path ~= "" then
-		path = (startslash and '' or '/') .. path:gsub("[^/]*$", "")
+	local startSlash = sub( path, 1, 1 ) ~= "/"
+	if #relative_path ~= 0 then
+		path = ( startSlash and "" or "/" ) .. gsub( path, "[^/]*$", "" )
 	end
+
 	path = path .. relative_path
-	path = path:gsub("([^/]*%./)", function (s)
-		if s ~= "./" then return s else return "" end
-	end)
-	path = string.gsub(path, "/%.$", "/")
-	local reduced
+	path = gsub( path, "([^/]*%./)", function( value )
+		if value == "./" then
+			return ""
+		end
+
+		return value
+	end )
+
+	path = gsub( path, "/%.$", "/" )
+	local reduced = nil
+
 	while reduced ~= path do
 		reduced = path
-		path = string.gsub(reduced, "([^/]*/%.%./)", function (s)
-			if s ~= "../../" then return "" else return s end
-		end)
+
+		path = gsub( reduced, "([^/]*/%.%./)", function( value )
+			if value ~= "../../" then
+				return ""
+			end
+
+			return value
+		end )
 	end
-	path = string.gsub(path, "([^/]*/%.%.?)$", function (s)
-		if s ~= "../.." then return "" else return s end
-	end)
-	local reduced
+
+	path = gsub( path, "([^/]*/%.%.?)$", function( value )
+		if value ~= "../.." then
+			return ""
+		end
+
+		return value
+	end )
+
+	reduced = nil
 	while reduced ~= path do
 		reduced = path
-		path = string.gsub(reduced, '^/?%.%./', '')
+		path = gsub( reduced, "^/?%.%./", "" )
 	end
-	return (startslash and '' or '/') .. path
+
+	return ( startSlash and "" or "/" ) .. path
 end
 
 --- builds a new url by using the one given as parameter and resolving paths
 -- @param other A string or a table representing a url
 -- @return a new url table
-function M:resolve(other)
-	if type(self) == "string" then
-		self = M.parse(self)
-	end
-	if type(other) == "string" then
-		other = M.parse(other)
-	end
-	if other.scheme then
-		return other
-	else
+
+do
+
+	local next = next
+
+	function META:resolve(other)
+		if isstring( self ) then
+			self = META.parse( self )
+		end
+
+		if isstring( other ) then
+			other = META.parse( other )
+		end
+
+		if other.scheme then
+			return other
+		end
+
 		other.scheme = self.scheme
-		if not other.authority or other.authority == "" then
-			other:setAuthority(self.authority)
-			if not other.path or other.path == "" then
+
+		if not other.authority or #other.authority == 0 then
+			other:setAuthority( self.authority )
+
+			if not other.path or #other.path == 0 then
 				other.path = self.path
+
 				local query = other.query
-				if not query or not next(query) then
+				if not query or not next( query ) then
 					other.query = self.query
 				end
 			else
-				other.path = reducePath(self.path, other.path)
+				other.path = reducePath( self.path, other.path )
 			end
 		end
+
 		return other
 	end
+
 end
 
 --- normalize a url path following some common normalization rules
 -- described on <a href="http://en.wikipedia.org/wiki/URL_normalization">The URL normalization page of Wikipedia</a>
 -- @return the normalized path
-function M:normalize()
-	if type(self) == 'string' then
-		self = M.parse(self)
+function META:normalize()
+	if isstring( self ) then
+		self = META.parse( self )
 	end
+
 	if self.path then
-		local path = self.path
-		path = reducePath(path, "")
 		-- normalize multiple slashes
-		path = string.gsub(path, "//+", "/")
-		self.path = path
+		self.path = gsub( reducePath( self.path, "" ), "//+", "/" )
 	end
+
 	return self
 end
 
-return M
+return META
