@@ -20,8 +20,9 @@ local istable = istable
 local ipairs = ipairs
 local pairs = pairs
 
-local META = {}
-META.version = "1.2.0"
+local META = {
+	version = "1.2.0"
+}
 
 --- url options
 -- - `separator` is set to `&` by default but could be anything like `&amp;amp;` or `;`
@@ -32,7 +33,7 @@ META.version = "1.2.0"
 -- @todo Add option to limit the size of the argument table
 -- @todo Add option to limit the depth of the argument table
 -- @todo Add option to process dots in parameter names, ie. `param.filter=1`
-META.options = {
+local options = {
 	separator = "&",
 	cumulative_parameters = false,
 	legal_in_path = {
@@ -51,9 +52,11 @@ META.options = {
 	query_plus_is_space = true
 }
 
+META.options = options
+
 --- list of known and common scheme ports
 -- as documented in <a href="http://www.iana.org/assignments/uri-schemes.html">IANA URI scheme list</a>
-META.services = {
+local services = {
 	ftp = 21,
 	ssh = 22,
 	sftp = 22,
@@ -89,6 +92,8 @@ META.services = {
 	jms = 5673
 }
 
+META.services = services
+
 local decode
 do
 
@@ -122,7 +127,7 @@ end
 
 -- for query values, + can mean space if configured as such
 local function decodeValue( str )
-	if META.options.query_plus_is_space then
+	if options.query_plus_is_space then
 		str = gsub( str, "+", " " )
 	end
 
@@ -131,7 +136,7 @@ end
 
 function META:addSegment( path )
 	if isstring( path ) then
-		self.path = self.path .. "/" .. encode( gsub( path, "^/+", "" ), META.options.legal_in_path )
+		self.path = self.path .. "/" .. encode( gsub( path, "^/+", "" ), options.legal_in_path )
 	end
 
 	return self
@@ -155,7 +160,7 @@ function META:build()
 
 	if self.host then
 		local authority = self.host
-		if self.port and self.scheme and META.services[self.scheme] ~= self.port then
+		if self.port and self.scheme and services[ self.scheme ] ~= self.port then
 			authority = authority .. ":" .. self.port
 		end
 
@@ -203,7 +208,7 @@ do
 	function META.buildQuery( tab, sep, key )
 		local query, queryLength = {}, 0
 		if not sep then
-			sep = META.options.separator or "&"
+			sep = options.separator or "&"
 		end
 
 		local keys, keysLength = {}, 0
@@ -227,7 +232,7 @@ do
 			} )
 
 			if key then
-				if META.options.cumulative_parameters and find( name, "^%d+$" ) then
+				if options.cumulative_parameters and find( name, "^%d+$" ) then
 					name = tostring( key )
 				else
 					name = format( "%s[%s]", tostring( key ), tostring( name ) )
@@ -239,7 +244,7 @@ do
 			if istable( value ) then
 				query[ queryLength ] = META.buildQuery( value, sep, name )
 			else
-				value = encode( tostring( value ), META.options.legal_in_query )
+				value = encode( tostring( value ), options.legal_in_query )
 				if #value == 0 then
 					query[ queryLength ] = name
 				else
@@ -258,7 +263,7 @@ end
 -- with PHP usage of brackets in key names like ?param[key]=value
 -- @param str The querystring to parse
 -- @param sep The separator between key/value pairs, defaults to `&`
--- @todo limit the max number of parameters with META.options.max_parameters
+-- @todo limit the max number of parameters with options.max_parameters
 -- @return a table representing the query key/value pairs
 do
 
@@ -266,7 +271,7 @@ do
 
 	function META.parseQuery( query, sep )
 		if not sep then
-			sep = META.options.separator or "&"
+			sep = options.separator or "&"
 		end
 
 		local values = {}
@@ -297,7 +302,7 @@ do
 				values[ key ] = {}
 			elseif keysLength == 0 and istable( values[ key ] ) then
 				values[ key ] = decodeValue( srt )
-			elseif META.options.cumulative_parameters and isstring( values[ key ] ) then
+			elseif options.cumulative_parameters and isstring( values[ key ] ) then
 				if values[ key ] then
 					values[ key ] = { values[ key ], decodeValue( srt ) }
 				else
@@ -479,7 +484,7 @@ do
 		end )
 
 		comp.path = gsub( url, "([^/]+)", function( value )
-			return encode( decode( value ), META.options.legal_in_path )
+			return encode( decode( value ), options.legal_in_path )
 		end )
 
 		setmetatable( comp, {

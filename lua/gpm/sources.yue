@@ -49,15 +49,19 @@ class gpm.BaseSource
 gpm.RegisterSource = (protocol, source) ->
     sources[protocol] = source
 
-gpm.ParsePackageURL = (url) ->
-    if istable(url) and url.__class == gpm.URL then return url
-    if isstring url
-        unless string.IsURL url
-            url = "package://" .. url
-            unless string.IsURL then return
-        return gpm.URL url
+gpm.ParsePackageURL = ( url ) ->
+    if istable( url ) and url.__class == gpm.URL
+        return url
 
-gpm.ValidatePackageURL = (original_url) ->
+    if isstring( url )
+        unless string.IsURL( url )
+            url = "package://" .. url
+            unless string.IsURL( url )
+                return
+
+        return gpm.URL( url )
+
+gpm.ValidatePackageURL = ( original_url ) ->
     url = gpm.ParsePackageURL original_url
     unless url
         error SourceError "Invalid url: #{original_url}"
