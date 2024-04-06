@@ -366,6 +366,33 @@ do
 
 	local rep = string.rep
 
+	local function getIP( str )
+		-- ipv4
+		local chunks = { match( str, "^(%d+)%.(%d+)%.(%d+)%.(%d+)$" ) }
+		if #chunks == 4 then
+			for index = 1, 4 do
+				if tonumber( chunks[ index ] ) > 255 then
+					return false
+				end
+			end
+
+			return str
+		end
+
+		-- ipv6
+		chunks = { match( str, "^%[" .. gsub( rep( "([a-fA-F0-9]*):", 8 ), ":$","%%]$" ) ) }
+		if #chunks == 8 or #chunks < 8 and match( str, "::" ) and not match( gsub( str, "::", "", 1 ), "::" ) then
+			for index = 1, #chunks do
+				local chunk = chunks[ index ]
+				if #chunk > 0 and tonumber( chunk, 16 ) > 65535 then
+					return false
+				end
+			end
+
+			return str
+		end
+	end
+
 	function META:setAuthority( authority )
 		self.authority = authority
 		self.port = nil
@@ -383,34 +410,6 @@ do
 			self.port = tonumber( value )
 			return ""
 		end )
-
-		local function getIP( str )
-			-- ipv4
-			local chunks = { match( str, "^(%d+)%.(%d+)%.(%d+)%.(%d+)$" ) }
-			if #chunks == 4 then
-				for _, value in pairs( chunks ) do
-					if tonumber( value ) > 255 then
-						return false
-					end
-				end
-
-				return str
-			end
-
-			-- ipv6
-			chunks = { match( str, "^%[" .. gsub( rep( "([a-fA-F0-9]*):", 8 ), ":$","%%]$" ) ) }
-			if #chunks == 8 or #chunks < 8 and match( str, "::" ) and not match( gsub( str, "::", "", 1 ), "::" ) then
-				for _, value in pairs( chunks ) do
-					if #value > 0 and tonumber( value, 16 ) > 65535 then
-						return false
-					end
-				end
-
-				return str
-			end
-
-			return
-		end
 
 		local ip = getIP( authority )
 		if ip then
