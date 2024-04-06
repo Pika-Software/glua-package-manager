@@ -140,9 +140,45 @@ do
     string.IsURL = ( str ) ->
         return match( str, "[a-z]+://[^ >,;]+" ) ~= nil
 
-:sub, :format, :lower, :Split = string
+:sub, :format, :lower, :len = string
 :concat, :remove = table
 :getinfo = debug
+
+split = nil
+do
+
+    :find = string
+
+    explode = ( str, separator = " ", withPattern ) ->
+        withPattern = withPattern ~= true
+        result, length = {}, 0
+
+        if len( separator ) == 0
+            for index = 1, len( str )
+                length += 1
+                result[ length ] = sub( str, index, index )
+
+            return result, length
+
+        pointer = 1
+
+        for index = 1, len( str )
+            startPos, endPos = find( str, separator, pointer, withPattern )
+            unless startPos
+                break
+
+            length += 1
+            result[ length ] = sub( str, pointer, startPos - 1 )
+            pointer = endPos + 1
+
+        length += 1
+        result[ length ] = sub( str, pointer )
+
+        return result, length
+
+    string.Explode = explode
+    string.Split = explode
+    split = explode
 
 ArgAssert = nil
 do
@@ -177,11 +213,11 @@ table.HasValue = ( tbl, any, isSequential ) ->
 			if tbl[ index ] == any
                 return true
 
-	else
+        return false
 
-		for _, value in pairs( tbl )
-			if value == any
-                return true
+    for _, value in pairs( tbl )
+        if value == any
+            return true
 
 	return false
 
@@ -191,17 +227,16 @@ table.RemoveByIValue = ( tbl, any ) ->
             return remove( tbl, index )
 
 table.GetValue = ( tbl, str, default ) ->
-    for key in *Split( str, "." )
-        tbl = tbl[ key ]
+    keys, length = split( str, "." )
+    for index = 1, length
+        tbl = tbl[ keys[ index ] ]
         unless tbl
             return default
 
     return tbl
 
 table.SetValue = ( tbl, str, value, ifEmpty ) ->
-    keys = Split( str, "." )
-    length = #keys
-
+    keys, length = split( str, "." )
     for index = 1, length
         key = keys[ index ]
         if index == length
@@ -222,77 +257,66 @@ table.SetValue = ( tbl, str, value, ifEmpty ) ->
 
 do
 
-    table_Lower = ( tbl ) ->
+    Lower = ( tbl ) ->
         for key, value in pairs( tbl )
             if istable( value )
-                value = table_Lower( value )
+                value = Lower( value )
 
             if isstring( key )
                 tbl[ lower( key ) ] = value
                 tbl[ key ] = nil
             elseif istable( key )
-                tbl[ table_Lower( key ) ] = value
+                tbl[ Lower( key ) ] = value
                 tbl[ key ] = nil
 
         return tbl
 
-    table.Lower = table_Lower
+    table.Lower = Lower
 
-do
+table.RemoveByFunction = ( tbl, func ) ->
+    result, length, fulfilled = {}, 0, false
+    while fulfilled == false
+        fulfilled = true
 
-    length, fulfilled = 0, false
-
-    table.RemoveByFunction = ( tbl, func ) ->
-        result, length, fulfilled = {}, 0, false
-        while fulfilled == false
-            fulfilled = true
-
-            for index = 1, #tbl
-                if func( index, tbl[ index ] )
-                    length += 1
-                    fulfilled = false
-                    result[ length ] = remove( tbl, index )
-                    break
-
-        return result, length
-
-addType = nil
-do
-
-    data = nil
-
-    addType = ( typeName, func ) ->
-        ArgAssert( typeName, 1, "string" )
-        ArgAssert( func, 2, "function" )
-
-        nextIndex = 256
-        for key, value in pairs( Names )
-            if typeName == value
-                nextIndex = key
-                break
-            elseif key >= nextIndex
-                nextIndex = key + 1
-
-        Names[ nextIndex ] = typeName
-
-        length = #Indexes
-        for index = 1, length
-            data = Indexes[ index ]
-            if data ~= nil and data[ 2 ] == nextIndex
-                remove( Indexes, index )
-                length -= 1
+        for index = 1, #tbl
+            if func( index, tbl[ index ] )
+                length += 1
+                fulfilled = false
+                result[ length ] = remove( tbl, index )
                 break
 
-        Indexes[ length + 1 ] = { func, nextIndex }
-        return nextIndex
+    return result, length
 
-    gpm.AddType = addType
+gpm.AddType = ( typeName, func ) ->
+    ArgAssert( typeName, 1, "string" )
+    ArgAssert( func, 2, "function" )
+
+    nextIndex = 256
+    for key, value in pairs( Names )
+        if typeName == value
+            nextIndex = key
+            break
+        elseif key >= nextIndex
+            nextIndex = key + 1
+
+    Names[ nextIndex ] = typeName
+
+    length = #Indexes
+    for index = 1, length
+        data = Indexes[ index ]
+        if data ~= nil and data[ 2 ] == nextIndex
+            remove( Indexes, index )
+            length -= 1
+            break
+
+    Indexes[ length + 1 ] = { func, nextIndex }
+    return nextIndex
 
 iscolor = nil
 do
 
     getmetatable = getmetatable
-    metatable = getmetatable( color_white )
+    metatable = FindMetaTable( "Color" )
 
     iscolor = ( value ) ->
         if getmetatable( value ) == metatable
@@ -303,7 +327,7 @@ do
 
         return false
 
-    addType( "Color", iscolor )
+    gpm.AddType( "Color", iscolor )
     gpm.iscolor = iscolor
 
 do
@@ -336,29 +360,29 @@ do
         path.ReplaceExtension = ( filePath, newExtension ) ->
             return StripExtension( filePath ) .. "." .. newExtension
 
-    do
-
+    path.Resolve = ( filePath ) ->
+        segments, segmentsCount = split( filePath, "[/\\]+", true )
         result, length = {}, 0
 
-        path.Resolve = ( filePath ) ->
-            for index = 1, length
-                result[ index ] = nil
+        for index = 1, segmentsCount
+            segment = segments[ index ]
+            if segment == "."
+                continue
 
-            length = 0
-
-            for segment in *Split( filePath, "/" )
-                if #segment == 0 or segment == "."
-                    continue
-
-                if segment == ".."
+            if segment == ".."
+                if length ~= 0
                     remove( result )
                     length -= 1
-                    continue
 
-                length += 1
-                result[ length ] = segment
+                continue
 
-            return concat( result, "/" )
+            length += 1
+            result[ length ] = segment
+
+        if length == 0
+            return ""
+
+        return concat( result, "/" )
 
     getfmain = ->
         for level = 2, 16
@@ -438,7 +462,7 @@ do
 
         new: ( data ) =>
             if isstring( data )
-                @Length = #data
+                @Length = len( data )
                 @Data = data
             else
                 @Length = 0
@@ -498,7 +522,7 @@ do
             return sub( @Data, pointer + 1, pointer + bytes )
 
         Write: ( data ) =>
-            length, size = @Length, #data
+            length, size = @Length, len( data )
             @Data = sub( @Data, 1, @Pointer ) .. data .. sub( @Data, @Pointer + 1, length )
             @Length = length + size
             return @Skip( size )
@@ -636,7 +660,7 @@ do
         -- Float
         ReadFloat: =>
             binary = @Read( 4 )
-            if not binary or #binary ~= 4
+            if not binary or len( binary ) ~= 4
                 return
 
             byte1, byte2, byte3, byte4 = byte( binary, 1, 4 )
