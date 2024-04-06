@@ -197,6 +197,7 @@ end
 -- @param sep The separator to use (optional)
 -- @param key The parent key if the value is multi-dimensional (optional)
 -- @return a string representing the built querystring
+local buildQuery
 do
 
 	local sort = table.sort
@@ -205,7 +206,11 @@ do
 		return format( "%03d" .. rest, tonumber( number ) )
 	end
 
-	function META.buildQuery( tab, sep, key )
+	local function sortFunc( a, b )
+		return gsub( tostring( a ), "(%d+)(%.)", padnum ) < gsub( tostring( b ), "(%d+)(%.)", padnum )
+	end
+
+	function buildQuery( tab, sep, key )
 		local query, queryLength = {}, 0
 		if not sep then
 			sep = options.separator or "&"
@@ -217,9 +222,7 @@ do
 			keys[ keysLength ] = value
 		end
 
-		sort( keys, function( a, b )
-			return gsub( tostring( a ), "(%d+)(%.)", padnum ) < gsub( tostring( b ), "(%d+)(%.)", padnum )
-		end )
+		sort( keys, sortFunc )
 
 		for index = 1, keysLength do
 			local name = keys[ index ]
@@ -242,7 +245,7 @@ do
 			queryLength = queryLength + 1
 
 			if istable( value ) then
-				query[ queryLength ] = META.buildQuery( value, sep, name )
+				query[ queryLength ] = buildQuery( value, sep, name )
 			else
 				value = encode( tostring( value ), options.legal_in_query )
 				if #value == 0 then
@@ -256,6 +259,8 @@ do
 		return concat( query, sep )
 	end
 
+	META.buildQuery = buildQuery
+
 end
 
 --- Parses the querystring to a table
@@ -265,11 +270,12 @@ end
 -- @param sep The separator between key/value pairs, defaults to `&`
 -- @todo limit the max number of parameters with options.max_parameters
 -- @return a table representing the query key/value pairs
+local parseQuery
 do
 
 	local gmatch = string.gmatch
 
-	function META.parseQuery( query, sep )
+	function parseQuery( query, sep )
 		if not sep then
 			sep = options.separator or "&"
 		end
@@ -330,12 +336,13 @@ do
 
 				t = t[ k ]
 			end
-
 		end
 
-		setmetatable( values, { __tostring = META.buildQuery } )
+		setmetatable( values, { __tostring = buildQuery } )
 		return values
 	end
+
+	META.parseQuery = parseQuery
 
 end
 
@@ -344,10 +351,10 @@ end
 -- @return a table representing the query key/value pairs
 function META:setQuery( query )
 	if istable( query ) then
-		query = META.buildQuery( query )
+		query = buildQuery( query )
 	end
 
-	self.query = META.parseQuery( query )
+	self.query = parseQuery( query )
 	return query
 end
 
