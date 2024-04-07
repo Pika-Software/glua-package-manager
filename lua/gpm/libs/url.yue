@@ -1,12 +1,294 @@
 -- https://developer.mozilla.org/en-US/docs/Web/API/URL
+gpm = gpm
+import valid from gpm.ip
+import Resolve from gpm.path
+import string, table, ArgAssert from gpm
 
-export default class URL
+:sub, :find, :format, :len, :IsURL, :Split, :Trim = string
+:concat = table
+
+tostring = tostring
+rawset = rawset
+error = error
+
+defaultPorts = {
+    ftp: "21"
+    ssh: "22"
+    sftp: "22"
+    telnet: "23"
+    smtp: "25"
+    tftp: "69"
+    gopher: "70"
+    http: "80"
+    ws: "80"
+    nntp: "119"
+    snmp: "161"
+    imap: "143"
+    prospero: "191"
+    ldap: "389"
+    https: "443"
+    wss: "443"
+    smtps: "465"
+    videotex: "516"
+    rtsp: "554"
+    vemmi: "575"
+    starttls: "587"
+    ipp: "631"
+    acap: "674"
+    rsync: "873"
+    cap: "1026"
+    mtqp: "1038"
+    icap: "1344"
+    afs: "1483"
+    news: "2009"
+    nfs: "2049"
+    dict: "2628"
+    mupdate: "3905"
+    iax: "4569"
+    sip: "5060"
+    jms: "5673"
+}
+
+keyWhiteList = {
+    "protocol": true
+    "blob": true
+    "username": true
+    "password": true
+    "auth": true
+    "host": true
+    "hostname": true
+    "port": true
+    "pathname": true
+    "search": true
+    "query": true
+    "hash": true
+    "path": true
+}
+
+build = ( data ) ->
+    url = ""
+
+    protocol = data.protocol
+    url ..= protocol .. "://"
+
+    auth = ""
+
+    username = data.username
+    if username and len( username ) ~= 0
+        auth ..= username
+
+    password = data.password
+    if password and len( password ) ~= 0
+        auth ..= ":" .. password
+
+    if len( auth ) ~= 0
+        url ..= auth .. "@"
+        data.auth = auth
+
+    host = data.hostname
+    port = data.port
+    if port and len( port ) ~= 0 and port ~= defaultPorts[ protocol ]
+        host ..= ":" .. port
+
+    data.origin = protocol .. "://" .. host
+    data.host = host
+    url ..= host
+
+    path = ""
+
+    pathname = data.pathname
+    if pathname and len( pathname ) ~= 0
+        path ..= pathname
+    else
+        path ..= "/"
+
+    query = data.query
+    if query and len( query ) ~= 0
+        path ..= "?" .. query
+
+    data.path = path
+    url ..= path
+
+    hash = data.hash
+    if hash and len( hash ) ~= 0
+        url ..= "#" .. hash
+
+    return url
+
+parse = ( url, data ) ->
+    url = Trim( url )
+    unless IsURL( url )
+        error format( "Invalid URL: \"%s\"", url ), 4
+
+    _, protocolEnd, protocol = find( url, "^(.-)://" )
+    unless protocol
+        error "Missing URL protocol", 4
+
+    _, blobEnd, blob = find( protocol, "(.+):" )
+    if blob
+        protocol = sub( protocol, blobEnd + 1 )
+        data.protocol = blob
+        data.href = url
+
+        pathname = sub( url, protocolEnd + 1 )
+        data.pathname = pathname
+
+        slashStart = find( pathname, "/" )
+        if slashStart
+            data.origin = sub( pathname, 1, slashStart - 1 )
+        else
+            data.origin = pathname
+
+        return
+
+    unless find( protocol, "^[a-z].*%w$" )
+        error format( "Invalid URL protocol: \"%s\"", protocol ), 4
+
+    data.protocol = protocol
+
+    url = sub( url, protocolEnd + 1 )
+
+    _, authEnd, auth = find( url, "(.+)@" )
+    if auth
+        _, usernameStart, username = find( auth, "(%w+):" )
+        if usernameStart
+            data.username = username
+            data.password = sub( auth, usernameStart + 1 )
+        else
+            data.username = auth
+
+        url = sub( url, authEnd + 1 )
+        data.auth = auth
+
+    hostEnd = find( url, "/" )
+    if hostEnd
+        hostEnd -= 1
+    else
+        hostEnd = #url
+
+    host = sub( url, 1, hostEnd )
+    if len( host ) == 0
+        error format( "Invalid URL host: \"%s\"", host ), 4
+
+    data.origin = protocol .. "://" .. host
+    data.host = host
+
+    hostname, port = nil, nil
+
+    portStart, portEnd = find( host, ":%d+$" )
+    if portStart
+        port = sub( host, portStart + 1, portEnd )
+        unless find( port, "^[0-9]+$" )
+            error format( "Invalid URL port: %s", port ), 4
+
+        hostname = sub( host, 1, portStart - 1 )
+        url = sub( url, portEnd + 1 )
+    else
+        port = defaultPorts[ protocol ]
+        url = sub( url, #host + 1 )
+        hostname = host
+
+    unless valid( hostname ) or find( hostname, "^[a-z].*%w$" )
+       error format( "Invalid URL hostname: \"%s\"", hostname ), 4
+
+    data.hostname = hostname
+    data.port = port
+
+    hashStart = find( url, "#" )
+    if hashStart
+        data.hash = sub( url, hashStart + 1 )
+        url = sub( url, 1, hashStart - 1 )
+
+    searchStart = find( url, "?" )
+    if searchStart
+        data.query = sub( url, searchStart + 1 )
+
+        pathname = Resolve( sub( url, 1, searchStart - 1 ) )
+        data.pathname = pathname
+
+        search = sub( url, searchStart )
+        data.search = search
+
+        data.path = pathname .. search
+    else
+        pathname = Resolve( url )
+        data.pathname = pathname
+        data.path = pathname
+
+    data.href = build( data )
+    return
+
+class URL
+    Version: "1.0.0"
+    DefaultPorts: defaultPorts
+    KeyWhiteList: keyWhiteList
+
     new: ( url, base ) =>
-        url = string.match url, "[a-z]+://[^ >,;]+"
-        unless url then error gpm.TypeError "URL constructor: #{url} is not a valid URL"
+        data = {}
 
-        @protocol = string.match url, "^(.-)://"
-        @path = string.match url, "://(.+)"
+        if base
+            ArgAssert( base, 2, "string" )
+            parse( base, data )
+
+            unless data.host
+                error "Invalid URL", 4
+
+            segments, segmentsCount = Split( url, "[/\\]+", true )
+            if segmentsCount ~= 0
+                firstSegment = segments[ 1 ]
+                if #firstSegment == 0
+                    data.pathname = url
+                else
+                    result = Split( data.pathname, "[/\\]+", true )
+                    length = #result
+
+                    result[ length ] = firstSegment
+
+                    for index = 2, segmentsCount
+                        length += 1
+                        result[ length ] = segments[ index ]
+
+                    data.pathname = concat( result, "/" )
+
+                parse( build( data ), data )
+        else
+            parse( url, data )
+
+        rawset( @, "__data", data )
+        return
+
+    __index: ( key ) =>
+        return @__data[ key ] or ""
+
+    __newindex: ( key, value ) =>
+        if key == "href"
+            parse( value, @__data )
+            return
+
+        if keyWhiteList[ key ]
+            data = @__data
+            unless data.host
+                return
+
+            rawset( data, key, tostring( value ) )
+            parse( build( data ), data )
+            return
+
+        rawset( @, key, value )
+        return
 
     __tostring: =>
-        return "#{@protocol}://#{@path}"
+        return @href
+
+    __eq: ( other ) =>
+        return other and @href == other.href
+
+    __lt: ( other ) =>
+        return @href < other.href
+
+    __le: ( other ) =>
+        return @href <= other.href
+
+-- TODO: Make URLSearchParams
+
+export default URL
