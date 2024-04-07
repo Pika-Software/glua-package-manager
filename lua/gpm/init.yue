@@ -58,6 +58,7 @@ IncludeShared( "gpm/util.lua" )
 logger = gpm.Logger
 
 gpm.URL = IncludeShared( "gpm/libs/url.lua" )
+gpm.ip = IncludeShared( "gpm/libs/3rd-party/ip.lua" )
 gpm.url = IncludeShared( "gpm/libs/3rd-party/url.lua" )
 
 IncludeShared( "gpm/moonloader.lua" )
