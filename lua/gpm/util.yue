@@ -144,45 +144,39 @@ do
     string.IsURL = ( str ) ->
         return match( str, "[a-z]+://[^ >,;]+" ) ~= nil
 
-import byte, char, sub, gsub, format, lower, len from string
+import byte, char, sub, gsub, format, lower, len, find from string
 import concat, remove from table
 import getinfo from debug
 
-split = nil
-do
+split = ( str, separator = " ", withPattern ) ->
+    withPattern = withPattern ~= true
+    result, length = {}, 0
 
-    import find from string
-
-    explode = ( str, separator = " ", withPattern ) ->
-        withPattern = withPattern ~= true
-        result, length = {}, 0
-
-        if len( separator ) == 0
-            for index = 1, len( str )
-                length += 1
-                result[ length ] = sub( str, index, index )
-
-            return result, length
-
-        pointer = 1
-
+    if len( separator ) == 0
         for index = 1, len( str )
-            startPos, endPos = find( str, separator, pointer, withPattern )
-            unless startPos
-                break
-
             length += 1
-            result[ length ] = sub( str, pointer, startPos - 1 )
-            pointer = endPos + 1
-
-        length += 1
-        result[ length ] = sub( str, pointer )
+            result[ length ] = sub( str, index, index )
 
         return result, length
 
-    string.Explode = explode
-    string.Split = explode
-    split = explode
+    pointer = 1
+
+    for index = 1, len( str )
+        startPos, endPos = find( str, separator, pointer, withPattern )
+        unless startPos
+            break
+
+        length += 1
+        result[ length ] = sub( str, pointer, startPos - 1 )
+        pointer = endPos + 1
+
+    length += 1
+    result[ length ] = sub( str, pointer )
+
+    return result, length
+
+string.Explode = split
+string.Split = split
 
 ArgAssert = nil
 do
@@ -336,7 +330,7 @@ do
 
 do
 
-    import find, StripExtension from string
+    import StripExtension from string
     import Empty from table
 
     path = Table( gpm, "path" )
@@ -484,8 +478,8 @@ do
     encodeChar = ( str ) ->
         return format( "%%%02X", byte( str ) )
 
-    encode = ( str, pattern = "" ) ->
-        return gsub str, "([^%w" .. pattern .. "])", encodeChar
+    encode = ( str, pattern ) ->
+        return gsub( str, "[^%w" .. ( pattern or "%-%._~+" ) .. "]", encodeChar ), nil
 
     http.Encode = encode
 
@@ -493,14 +487,24 @@ do
         return char( tonumber( str, 16 ) )
 
     decode = ( str ) ->
-        return gsub( gsub( str, "+", " " ), "%%(%x%x)", decodeChar )
+        return gsub( str, "%%(%x%x)", decodeChar ), nil
 
     http.Decode = decode
 
-    http.ParseQuery = ( query ) ->
+    http.ParseQuery = ( str ) ->
         result = {}
-        for key, value in gmatch( query, "([^&=?]-)=([^&=?]+)" )
-            result[ decode( key ) ] = decode( value )
+        for key, value in gmatch( str, "([^&=?]-)=([^&=?]+)" )
+            if find( value, "^%[.+%]$" )
+                tbl, length = {}, 0
+                for var in gmatch( value, "\"(.-)\"" )
+                    length += 1
+                    tbl[ length ] = decode( var )
+
+                value = tbl
+            else
+                value = decode( value )
+
+            result[ decode( key ) ] = value
 
         return result
 
@@ -510,8 +514,19 @@ do
     http.Query = ( tbl ) ->
         result, length = {}, 0
         for key, value in pairs( tbl )
+            if istable( value )
+                if #value == 0
+                    continue
+
+                for index = 1, #value
+                    value[ index ] = "\"" .. encode( value[ index ], queryValueSymbols ) .. "\""
+
+                value = "[" .. concat( value, "," ) .. "]"
+            else
+                value = encode( value, queryValueSymbols )
+
             length += 1
-            result[ length ] = encode( key, queryKeySymbols ) .. "=" .. encode( value, queryValueSymbols )
+            result[ length ] = encode( key, queryKeySymbols ) .. "=" .. value
 
         if length == 0
             return "", length

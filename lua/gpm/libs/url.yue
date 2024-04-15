@@ -277,10 +277,10 @@ parse = ( data, url, ... ) ->
         host = gsub host, "^([^@]*)@", ( auth ) ->
             usernameEnd = find( auth, ":" )
             if usernameEnd
-                data.username = Decode( sub( auth, 1, usernameEnd - 1 ) )
-                data.password = Decode( sub( auth, usernameEnd + 1 ) )
+                data.username = Encode( Decode( sub( auth, 1, usernameEnd - 1 ) ) )
+                data.password = Encode( Decode( sub( auth, usernameEnd + 1 ) ) )
             else
-                data.username = Decode( auth )
+                data.username = Encode( Decode( auth ) )
 
             return ""
 
@@ -477,6 +477,8 @@ class URL
 
 -- url.searchParams\merge { c: 3, d: 4 }
 -- print url.searchParams\get "a"
+
+-- url.searchParams\set "a", { 1, 2, 3, 4 }
 
 -- PrintTable url
 
