@@ -1,6 +1,6 @@
 import gsub, sub, find, format, len, lower, match from gpm.string
 import Encode, Decode, ParseQuery, Query from gpm.http
-import insert, Merge, Empty from gpm.table
+import insert, Merge from gpm.table
 import isv4, isv6 from gpm.ip
 import Resolve from gpm.path
 
@@ -9,6 +9,7 @@ tostring = tostring
 rawget = rawget
 rawset = rawset
 error = error
+pairs = pairs
 
 --[[
 
@@ -68,36 +69,45 @@ rebuild = ( data ) ->
     return
 
 class URLSearchParams
-    __index: ( key ) =>
-        return URLSearchParams.__base[ key ] or @__query[ key ]
-
-    new: ( query, data ) =>
-        rawset( @, "__query", ParseQuery( query ) )
-        rawset( @, "__data", data )
-        @update( true )
-
-    __newindex: ( key, value ) =>
-        @__query[ key ] = value
-        @update!
+    new: ( str, data ) =>
+        rawset( @, "__query", {} )
+        @parse( str, data, true )
 
     __tostring: =>
         return Query( @__query )
 
+    toString: =>
+        return Query( rawget( @, "__query" ) )
+
+    parse: ( str, data, ignoreData ) =>
+        query = rawget( @, "__query" )
+        for key in pairs( query )
+            rawset( query, key, nil )
+
+        for key, value in pairs( ParseQuery( str ) )
+            rawset( query, key, value )
+
+        if data
+            rawset( @, "__data", data )
+
+        @update( ignoreData )
+        return
+
     update: ( ignoreData ) =>
         unless ignoreData
-            data = @__data
+            data = rawget( @, "__data" )
             if data
                 rebuild( data )
 
         size = 0
-        for _ in pairs( @__query )
+        for _ in pairs( rawget( @, "__query" ) )
             size += 1
 
         rawset( @, "size", size )
         return
 
     has: ( ... ) =>
-        query = @__query
+        query = rawget( @, "__query" )
         for key in *{ ... }
             unless query[ key ]
                 return false
@@ -105,36 +115,50 @@ class URLSearchParams
         return true
 
     keys: =>
-        query, key = @__query, nil
+        query, key = rawget( @, "__query" ), nil
         return ->
             key = next( query, key )
             return key
 
     values: =>
-        query, key = @__query, nil
+        query, key = rawget( @, "__query" ), nil
         return ->
             key, value = next( query, key )
             return value
 
     entries: =>
-        return next, @__query
+        return next, rawget( @, "__query" )
 
     get: ( key ) =>
-        return @__query[ key ]
+        return rawget( rawget( @, "__query" ), key )
 
     set: ( key, value ) =>
-        @__query[ key ] = value
+        rawset( rawget( @, "__query" ), key, value )
+        @update!
+
+    merge: ( tbl ) =>
+        Merge( rawget( @, "__query" ), tbl )
+        @update!
+
+    replace: ( tbl ) =>
+        query = rawget( @, "__query" )
+        for key in pairs( tbl )
+            rawset( query, key, nil )
+
+        for key, value in pairs( tbl )
+            rawset( query, key, value )
+
         @update!
 
     getAll: ( key ) =>
-        query = @__query
+        query = rawget( @, "__query" )
         if istable( query[ key ] )
             return query[ key ]
 
         return { query[ key ] }
 
     append: ( key, value ) =>
-        query = @__query
+        query = rawget( @, "__query" )
         tbl = query[ key ]
         unless istable( tbl )
             query[ key ] = { tbl }
@@ -147,15 +171,15 @@ class URLSearchParams
         @update!
 
     delete: ( key ) =>
-        @__query[ key ] = nil
+        rawset( rawget( @, "__query" ), key, nil )
         @update!
 
     clear: =>
-        Empty( @__query )
-        @update!
+        query = rawget( @, "__query" )
+        for key in pairs( query )
+            rawset( query, key, nil )
 
-    toString: =>
-        return Query( @__query )
+        @update!
 
 build = ( data ) ->
     url = data.protocol .. "//"
@@ -190,7 +214,9 @@ build = ( data ) ->
     return url
 
 parse = ( data, url, ... ) ->
-    Empty( data )
+    for key in pairs( data )
+        if key ~= "searchParams"
+            data[ key ] = nil
 
     -- protocol & scheme
     local protocol, scheme
@@ -216,10 +242,17 @@ parse = ( data, url, ... ) ->
         return ""
 
     -- search & searchParams
+    unless data.searchParams
+        data.searchParams = URLSearchParams( "", data )
+
     url = gsub url, "(%?.*)$", ( str ) ->
-        data.searchParams = URLSearchParams( sub( str, 2 ), data )
         data.search = str
         return ""
+
+    if data.search
+        data.searchParams\parse( sub( data.search, 2 ), data, true )
+    else
+        data.searchParams\parse( "", data, true )
 
     -- specific schemes
     if services[ scheme ]
@@ -329,7 +362,7 @@ class URL
         return
 
     __index: ( key ) =>
-        return @__data[ key ] or ""
+        return rawget( rawget( @, "__data" ), key ) or ( changeableValues[ key ] and "" )
 
     __newindex: ( key, value ) =>
         unless changeableValues[ key ]
@@ -353,7 +386,7 @@ class URL
 
             when "search"
                 value = "?" .. match( value, "%??(.*)" )
-                data.searchParams = URLSearchParams( sub( value, 2 ), data )
+                data.searchParams\parse( sub( value, 2 ), data, true )
 
             when "username"
                 value = Encode( value )
@@ -437,6 +470,13 @@ class URL
 -- url.pathname = "garrysmod/lua/autorun/../init.lua"
 
 -- url.href = "http://localhost:27015/garrysmod/lua/autorun/../init.lua"
+
+-- url.searchParams\replace( { a: 1, b: 2 } )
+-- url.searchParams\delete "a"
+-- url.searchParams\set "a", 5
+
+-- url.searchParams\merge { c: 3, d: 4 }
+-- print url.searchParams\get "a"
 
 -- PrintTable url
 

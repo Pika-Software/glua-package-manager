@@ -86,7 +86,7 @@ do
 
     id, data = nil, nil
 
-    gpm_TypeID = ( any ) ->
+    typeID = ( any ) ->
         id = TypeID( any )
         if id == TYPE_TABLE or id == TYPE_USERDATA
             for index = 1, #Indexes
@@ -96,10 +96,10 @@ do
 
         return id
 
-    gpm.TypeID = gpm_TypeID
+    gpm.TypeID = typeID
 
     gpm.type = ( any ) ->
-        return Names[ gpm_TypeID( any ) ] or "unknown"
+        return Names[ typeID( any ) ] or "unknown"
 
 string = Table gpm, "string", ->
     return setmetatable( {}, { __index: string } )
