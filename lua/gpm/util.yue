@@ -2,6 +2,7 @@ setmetatable = setmetatable
 isfunction = isfunction
 isstring = isstring
 isnumber = isnumber
+tonumber = tonumber
 istable = istable
 error = error
 pairs = pairs
@@ -112,6 +113,9 @@ math = Table gpm, "math", ->
 debug = Table gpm, "debug", ->
     return setmetatable( {}, { __index: debug } )
 
+http = Table gpm, "http", ->
+    return setmetatable( {}, { __index: http } )
+
 util = Table gpm, "util", ->
     return setmetatable( {}, { __index: util } )
 
@@ -135,19 +139,19 @@ util.CompileYueString = ->
 
 do
 
-    :match = string
+    import match from string
 
     string.IsURL = ( str ) ->
         return match( str, "[a-z]+://[^ >,;]+" ) ~= nil
 
-:sub, :format, :lower, :len = string
-:concat, :remove = table
-:getinfo = debug
+import byte, char, sub, gsub, format, lower, len from string
+import concat, remove from table
+import getinfo from debug
 
 split = nil
 do
 
-    :find = string
+    import find from string
 
     explode = ( str, separator = " ", withPattern ) ->
         withPattern = withPattern ~= true
@@ -183,7 +187,7 @@ do
 ArgAssert = nil
 do
 
-    :type = gpm
+    import type from gpm
 
     ArgAssert = ( value, argNum, expected, errorlevel ) ->
         valueType = type( value )
@@ -332,8 +336,10 @@ do
 
 do
 
+    import find, StripExtension from string
+    import Empty from table
+
     path = Table( gpm, "path" )
-    :gsub = string
 
     path_RemoveBackslash = ( filePath ) ->
         return gsub( filePath, "[/\\]?$", "" )
@@ -353,31 +359,44 @@ do
     path.Join = ( ... ) ->
         return path_Fix( concat( { ... }, "/" ) )
 
-    do
+    path.ReplaceExtension = ( filePath, newExtension ) ->
+        return StripExtension( filePath ) .. "." .. newExtension
 
-        :StripExtension = string
+    path.Resolve = ( ... ) ->
+        filePath, args = "", { ... }
+        argsCount = #args
 
-        path.ReplaceExtension = ( filePath, newExtension ) ->
-            return StripExtension( filePath ) .. "." .. newExtension
+        for index = 1, argsCount
+            arg = args[ index ]
+            unless isstring( arg )
+                arg = tostring( arg )
 
-    path.Resolve = ( filePath ) ->
+            if find( arg, "^[/\\]" )
+                if sub( filePath, 1, 1 ) ~= "/"
+                    arg = sub( arg, 2 )
+                filePath = ""
+
+            if index ~= argsCount
+                arg ..= "/"
+
+            filePath ..= arg
+
         segments, segmentsCount = split( filePath, "[/\\]+", true )
+        if segmentsCount == 0
+            return filePath
+
         result, length = {}, 0
 
         for index = 1, segmentsCount
             segment = segments[ index ]
-            if segment == "."
-                continue
-
-            if segment == ".."
-                if length ~= 0
-                    remove( result )
-                    length -= 1
-
-                continue
-
-            length += 1
-            result[ length ] = segment
+            if segment ~= "."
+                if segment == ".."
+                    if length ~= 0
+                        remove( result )
+                        length -= 1
+                else
+                    length += 1
+                    result[ length ] = segment
 
         if length == 0
             return ""
@@ -406,6 +425,81 @@ do
         main = getfmain!
         if main
             return getfpathi( main )
+
+do
+
+    -- https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
+    -- https://en.wikipedia.org/wiki/List_of_HTTP_status_codes
+    codes = {
+
+        --[[--------------------
+            Successful 2XX
+        --------------------]]--
+        [ 200 ]: { "OK", "The resource has been obtained" }
+        [ 201 ]: { "Created", "The request succeeded, and a new resource was created as a result" }
+        [ 202 ]: { "Accepted", "The request has been received but not yet acted upon" }
+        [ 203 ]: { "Non-Authoritative Information", "This response code means the returned metadata is not exactly the same as is available from the origin server" }
+        [ 204 ]: { "No Content", "The request has been send with no errors also there is no content to send for this request, but the headers may be useful" }
+        [ 205 ]: { "Reset Content", "This response tells the client to reset the document view, so for example to clear the content of a form, reset a canvas state, or to refresh the UI" }
+        [ 206 ]: { "Partial Content", "The request has succeeded and the body contains the requested ranges of data, as described in the Range header of the request" }
+        [ 207 ]: { "Multi-Status", "This response code indicates that there might be a mixture of responses" }
+        [ 208 ]: { "Already Reported", "This response code is used in a 207 (207 Multi-Status) response to save space and avoid conflicts" }
+
+        --[[--------------------
+            Client Error 4XX
+        --------------------]]--
+        [ 400 ]: { "Bad Request", "The server was unable to interpret the request given invalid syntax" }
+        [ 401 ]: { "Unauthorized", "Authentication is required to get the requested response" }
+        [ 403 ]: { "Forbidden", "You don't have the necessary permissions for certain content, so the server is refusing to grant an appropriate response" }
+        [ 404 ]: { "Not Found", "The server was unable to find the requested content" }
+        [ 405 ]: { "Method Not Allowed", "The requested method is known to the server but it has been disabled and cannot be used" }
+        [ 408 ]: { "Request Timeout", "A timeout has occurred while processing an HTTP request" }
+        [ 409 ]: { "Conflict", "The server encountered a conflict with the request sent with the current state of the server" }
+        [ 410 ]: { "Gone", "The requested content has been deleted from the server" }
+        [ 411 ]: { "Length Required", "The server rejected the request because the Content-Length is not defined" }
+        [ 418 ]: { "I'm a teapot", "This client error response code indicates that the server refuses to brew coffee because it is, permanently, a teapot." }
+        [ 429 ]: { "Rate limit reached for requests", "This error message indicates that you have hit your assigned rate limit for the API" }
+
+        --[[--------------------
+            Server Error 5XX
+        --------------------]]--
+        [ 500 ]: { "Internal Server Error", "This response means that the server encountered an unexpected condition that prevented it from fulfilling the request" }
+        [ 501 ]: { "Not Implemented", "This response means that the server does not support the functionality required to fulfill the request" }
+        [ 502 ]: { "Bad Gateway", "This response means that the server, while acting as a gateway or proxy, received an invalid response from the upstream server" }
+        [ 503 ]: { "Service Unavailable", "This response means that the server is not ready to handle the request" }
+        [ 504 ]: { "Gateway Timeout", "This response means that the server, while acting as a gateway or proxy, did not get a response in time from the upstream server that it needed in order to complete the request" }
+        [ 505 ]: { "HTTP Version Not Supported", "This response status code indicates that the HTTP version used in the request is not supported by the server" }
+        [ 507 ]: { "Insufficient Storage", "This operation couldn't succeed, maybe because the request it's too large to fit on a disk" }
+        [ 508 ]: { "Loop Detected", "This status indicates that the entire operation failed, the server terminated an operation because it encountered an infinite loop" }
+
+    }
+
+    http.Codes = codes
+
+    http.GetStatusDescription = ( code ) ->
+        data = codes[ code ]
+        if data
+            return data[ 1 ], data[ 2 ]
+
+do
+
+    import gmatch from string
+
+    encodeChar = ( str ) ->
+        return format( "%%%02X", byte( str ) )
+
+    encode = ( str, pattern = "" ) ->
+        return gsub str, "([^%w" .. pattern .. "])", encodeChar
+
+    http.Encode = encode
+
+    decodeChar = ( str ) ->
+        return char( tonumber( str, 16 ) )
+
+    decode = ( str ) ->
+        return gsub( gsub( str, "+", " " ), "%%(%x%x)", decodeChar )
+
+    http.Decode = decode
 
 class util.Stack
     __tostring: =>
@@ -450,7 +544,6 @@ class util.Stack
 do
 
     :abs, :floor, :ldexp = math
-    :byte, :char = string
     :band, :rshift = bit
 
     buffer = setmetatable( {}, { __mode: "v" } )
@@ -533,17 +626,17 @@ do
             if pointer >= length
                 return
 
-            len, data = 0, @Data
+            bytes, data = 0, @Data
             for index = pointer, length
                 if byte( data, index + 1 ) == 0
                     break
 
-                len += 1
+                bytes += 1
 
-            if len == 0
+            if bytes == 0
                 return
 
-            return @Read( len ), @Skip( 1 )
+            return @Read( bytes ), @Skip( 1 )
 
         WriteString: ( str ) =>
             return @Write( str .. "\0" )
@@ -670,19 +763,15 @@ do
 
             return ldexp( ldexp( byte3 % 0x80 * 0x10000 + byte2 * 0x100 + byte1, -23 ) + 1, exponent ) * ( byte4 < 0x80 and 1 or -1 )
 
-do
+util.Version = ( number ) ->
+    if isstring( number )
+        return number
 
-    tonumber = tonumber
+    if isnumber( number )
+        version = format( "%06d", number )
+        return format( "%d.%d.%d", tonumber( sub( version, 0, 2 ) ), tonumber( sub( version, 3, 4 ) ), tonumber( sub( version, 5 ) ) )
 
-    util.Version = ( number ) ->
-        if isstring( number )
-            return number
-
-        if isnumber( number )
-            version = format( "%06d", number )
-            return format( "%d.%d.%d", tonumber( sub( version, 0, 2 ) ), tonumber( sub( version, 3, 4 ) ), tonumber( sub( version, 5 ) ) )
-
-        return "unknown"
+    return "unknown"
 
 do
 

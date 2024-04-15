@@ -1,11 +1,12 @@
+import util, path, string, Logger, Error, ArgAssert, Promise from gpm
+import GetPathFromFilename, GetExtensionFromFilename from string
+import async, await from Promise
+
+SERVER = SERVER
+CLIENT = CLIENT
 file = file
 gpm = gpm
 
-:util, :path, :string, :Logger, :Error, :ArgAssert, :Promise = gpm
-:GetPathFromFilename, :GetExtensionFromFilename = string
-:async, :await = Promise
-SERVER = SERVER
-CLIENT = CLIENT
 select = select
 error = error
 :Find = file
@@ -15,7 +16,8 @@ error = error
 if SERVER and not efsw and util.IsBinaryModuleInstalled( "efsw" ) and pcall( require, "efsw" )
     Logger\Info( "gm_efsw is initialized, package auto-reloading are available." )
 
-lib = gpm.Table( gpm, "file", gpm.metaworks.CreateLink, file, true )
+lib = gpm.Table gpm, "file", ->
+    return setmetatable( {}, { __index: file } )
 
 -- file.Move( filePath, newFilePath ) - moves file to new path
 lib.Move = file.Rename

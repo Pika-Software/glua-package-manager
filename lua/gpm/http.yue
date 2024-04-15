@@ -1,51 +1,43 @@
-gpm = gpm
-
-:ArgAssert, :Promise, :Logger, :util = gpm
-:HTTPError = Promise
+import ArgAssert, Promise, Logger, http, util from gpm
+import HTTPError from Promise
 isstring = isstring
 isnumber = isnumber
-istable = istable
 
-lib = gpm.Table( gpm, "http", gpm.metaworks.CreateLink, http, true )
+http.UserAgent = string.format( "GLua Package Manager/%s - Garry's Mod/%s", gpm.VERSION, VERSIONSTR )
 
-client, clientName = nil, nil
+client, clientName, returnsState, userAgentKey = HTTP, "Garry's Mod", true, nil
 do
 
     clients = {
         {
-            Name: "Garry's Mod"
-            Client: "HTTP"
-            Installed: true
+            Name: "reqwest"
+            Client: "reqwest"
+            Available: SERVER
+            ReturnsState: false
+            UserAgentKey: "User-Agent"
+        },
+        {
+            Name: "chttp"
+            Client: "CHTTP"
+            Available: CLIENT or SERVER
+            ReturnsState: false
         }
     }
 
-    if SERVER
-
-        :insert = table
-
-        insert clients, 1, {
-            Client: "CHTTP"
-            Name: "chttp"
-        }
-
-        insert clients, 1, {
-            Client: "reqwest"
-            Name: "reqwest"
-        }
-
     for item in *clients
-        if item.Installed or ( util.IsBinaryModuleInstalled( item.Name ) and pcall( require, item.Name ) )
-            client, clientName = _G[ item.Client ], item.Name
-            Logger\Info( "'%s' was connected as HTTP client.", item.Name )
+        if item.Available and ( util.IsBinaryModuleInstalled( item.Name ) and pcall( require, item.Name ) )
+            client, clientName, returnsState, userAgentKey = _G[ item.Client ], item.Name, item.ReturnsState, item.UserAgentKey
             break
 
-HTTP = nil
+    Logger\Info( "'%s' was connected as HTTP client.", clientName )
+
+local HTTP
 do
 
     http_timeout = CreateConVar( "http_timeout", "10", FCVAR_ARCHIVE, "Default http timeout for gpm http library.", 3, 300 )
 
     request = ( parameters, p ) ->
-        if client( parameters ) or clientName ~= "Garry's Mod"
+        if client( parameters ) or not returnsState
             Logger\Debug( "%s HTTP request to '%s', using '%s', with timeout %d seconds.", parameters.method, parameters.url, clientName, parameters.timeout )
         else
             p\Reject( HTTPError "failed to make http request" )
@@ -67,16 +59,8 @@ do
         unless isnumber( parameters.timeout )
             parameters.timeout = http_timeout\GetInt!
 
-        unless istable( parameters.headers )
-            parameters.headers = {}
-
-        if clientName == "reqwest"
-            userAgent = lib["User-Agent"]
-            unless userAgent
-                userAgent = string.format( "GLua Package Manager/%s - Garry's Mod/%s", gpm.VERSION, VERSIONSTR )
-                lib["User-Agent"] = userAgent
-
-            parameters.headers["User-Agent"] = userAgent
+        if userAgentKey
+            parameters.headers[ userAgentKey ] = http.UserAgent
 
         parameters.success = ( code, body, headers ) ->
             p\Resolve( { :code, :body, :headers } )
@@ -85,10 +69,11 @@ do
             p\Reject( HTTPError msg )
             return
 
-        if queue == nil
-            request( parameters )
+        if queue
+            queue[] = ->
+                request( parameters )
         else
-            queue[] = -> request( parameters )
+            request( parameters )
 
         return p
 
@@ -98,7 +83,7 @@ do
 
     tbl = setmetatable( {}, { __mode: "v" } )
 
-    lib.Fetch = ( url, headers, timeout ) ->
+    http.Fetch = ( url, headers, timeout ) ->
         tbl.url = url
         tbl.method = "GET"
         tbl.headers = headers
@@ -106,65 +91,10 @@ do
         tbl.parameters = nil
         return HTTP( tbl )
 
-    lib.Post = ( url, parameters, headers, timeout ) ->
+    http.Post = ( url, parameters, headers, timeout ) ->
         tbl.url = url
         tbl.method = "POST"
         tbl.headers = headers
         tbl.timeout = timeout
         tbl.parameters = parameters
         return HTTP( tbl )
-
-do
-
-    -- https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
-    -- https://en.wikipedia.org/wiki/List_of_HTTP_status_codes
-    codes = {
-
-        --[[--------------------
-            Successful 2XX
-        --------------------]]--
-        [ 200 ]: { "OK", "The resource has been obtained" }
-        [ 201 ]: { "Created", "The request succeeded, and a new resource was created as a result" }
-        [ 202 ]: { "Accepted", "The request has been received but not yet acted upon" }
-        [ 203 ]: { "Non-Authoritative Information", "This response code means the returned metadata is not exactly the same as is available from the origin server" }
-        [ 204 ]: { "No Content", "The request has been send with no errors also there is no content to send for this request, but the headers may be useful" }
-        [ 205 ]: { "Reset Content", "This response tells the client to reset the document view, so for example to clear the content of a form, reset a canvas state, or to refresh the UI" }
-        [ 206 ]: { "Partial Content", "The request has succeeded and the body contains the requested ranges of data, as described in the Range header of the request" }
-        [ 207 ]: { "Multi-Status", "This response code indicates that there might be a mixture of responses" }
-        [ 208 ]: { "Already Reported", "This response code is used in a 207 (207 Multi-Status) response to save space and avoid conflicts" }
-
-        --[[--------------------
-            Client Error 4XX
-        --------------------]]--
-        [ 400 ]: { "Bad Request", "The server was unable to interpret the request given invalid syntax" }
-        [ 401 ]: { "Unauthorized", "Authentication is required to get the requested response" }
-        [ 403 ]: { "Forbidden", "You don't have the necessary permissions for certain content, so the server is refusing to grant an appropriate response" }
-        [ 404 ]: { "Not Found", "The server was unable to find the requested content" }
-        [ 405 ]: { "Method Not Allowed", "The requested method is known to the server but it has been disabled and cannot be used" }
-        [ 408 ]: { "Request Timeout", "A timeout has occurred while processing an HTTP request" }
-        [ 409 ]: { "Conflict", "The server encountered a conflict with the request sent with the current state of the server" }
-        [ 410 ]: { "Gone", "The requested content has been deleted from the server" }
-        [ 411 ]: { "Length Required", "The server rejected the request because the Content-Length is not defined" }
-        [ 418 ]: { "I'm a teapot", "This client error response code indicates that the server refuses to brew coffee because it is, permanently, a teapot." }
-        [ 429 ]: { "Rate limit reached for requests", "This error message indicates that you have hit your assigned rate limit for the API" }
-
-        --[[--------------------
-            Server Error 5XX
-        --------------------]]--
-        [ 500 ]: { "Internal Server Error", "This response means that the server encountered an unexpected condition that prevented it from fulfilling the request" }
-        [ 501 ]: { "Not Implemented", "This response means that the server does not support the functionality required to fulfill the request" }
-        [ 502 ]: { "Bad Gateway", "This response means that the server, while acting as a gateway or proxy, received an invalid response from the upstream server" }
-        [ 503 ]: { "Service Unavailable", "This response means that the server is not ready to handle the request" }
-        [ 504 ]: { "Gateway Timeout", "This response means that the server, while acting as a gateway or proxy, did not get a response in time from the upstream server that it needed in order to complete the request" }
-        [ 505 ]: { "HTTP Version Not Supported", "This response status code indicates that the HTTP version used in the request is not supported by the server" }
-        [ 507 ]: { "Insufficient Storage", "This operation couldn't succeed, maybe because the request it's too large to fit on a disk" }
-        [ 508 ]: { "Loop Detected", "This status indicates that the entire operation failed, the server terminated an operation because it encountered an infinite loop" }
-
-    }
-
-    lib.Codes = codes
-
-    lib.GetStatusDescription = ( code ) ->
-        tbl = codes[ code ]
-        if tbl ~= nil
-            return tbl[ 1 ], tbl[ 2 ]

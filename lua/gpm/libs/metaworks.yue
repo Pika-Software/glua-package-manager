@@ -1,4 +1,4 @@
-debug = debug
+import table, debug from gpm
 
 do
 
@@ -6,6 +6,7 @@ do
     _R = debug.getregistry!
 
     object = nil
+
     metatable = getmetatable( object )
     if metatable == nil
         metatable = {}
@@ -14,6 +15,7 @@ do
     _R[ "nil" ] = metatable
 
     object = 0
+
     metatable = getmetatable( object )
     if metatable == nil
         metatable = {}
@@ -22,6 +24,7 @@ do
     _R[ "number" ] = metatable
 
     object = ""
+
     metatable = getmetatable( object )
     if metatable == nil
         metatable = {}
@@ -30,6 +33,7 @@ do
     _R[ "string" ] = metatable
 
     object = false
+
     metatable = getmetatable( object )
     if metatable == nil
         metatable = {}
@@ -38,6 +42,7 @@ do
     _R[ "boolean" ] = metatable
 
     object = ->
+
     metatable = getmetatable( object )
     if getmetatable( object ) == nil
         metatable = {}
@@ -46,6 +51,7 @@ do
     _R[ "function" ] = metatable
 
     object = coroutine.create( object )
+
     metatable = getmetatable( object )
     if metatable == nil
         metatable = {}
@@ -53,59 +59,57 @@ do
 
     _R[ "thread" ] = metatable
 
-table = gpm.table
+getmetatable = getmetatable
+setmetatable = setmetatable
+rawset = rawset
 rawget = rawget
 
-lib = gpm.Table( gpm, "metaworks" )
-lib.GetValue = table.GetValue
+metaworks = gpm.Table( gpm, "metaworks" )
+metaworks.GetValue = table.GetValue
 
 do
 
+    import SetValue from table
+    import setfenv from debug
     isfunction = isfunction
-    :SetValue = table
-    :setfenv = debug
 
-    lib.SetValue = ( tbl, keyPath, value ) ->
+    metaworks.SetValue = ( tbl, keyPath, value ) ->
         if isfunction( value )
             setfenv( value, tbl )
 
         SetValue( tbl, keyPath, value )
 
-GetLinks = ( tbl ) ->
+getLinks = ( tbl ) ->
     return rawget( tbl, "__indexes" )
 
-lib.GetLinks = GetLinks
+metaworks.GetLinks = getLinks
 
-UnLink = nil
+local unLink
 do
 
-    :RemoveByIValue = table
+    import RemoveByIValue from table
 
-    UnLink = ( table1, table2 ) ->
-        RemoveByIValue( GetLinks( table1 ), table2 )
+    unLink = ( table1, table2 ) ->
+        RemoveByIValue( getLinks( table1 ), table2 )
         return table1
 
-    lib.UnLink = UnLink
+    metaworks.UnLink = unLink
 
-Link = nil
+local link
 do
 
-    :insert = table
+    import insert from table
 
-    Link = ( table1, table2 ) ->
-        UnLink( table1, table2 )
-        insert( GetLinks( table1 ), 1, table2 )
+    link = ( table1, table2 ) ->
+        unLink( table1, table2 )
+        insert( getLinks( table1 ), 1, table2 )
         return table1
 
-    lib.Link = Link
+    metaworks.Link = link
 
 do
 
-    getmetatable = getmetatable
-    setmetatable = setmetatable
-    rawset = rawset
-
-    CreateLink = ( object, read, write ) ->
+    linkedTable = ( object, read, write ) ->
         metatable = {
             "__index": read == true and object or nil
             "__newindex": write == true and object or nil
@@ -113,29 +117,29 @@ do
 
         return setmetatable( {}, metatable ), metatable
 
-    lib.CreateLink = CreateLink
+    metaworks.LinkedTable = linkedTable
 
     meta = {
         __index: ( tbl, key ) ->
-            links = GetLinks( tbl )
+            links = getLinks( tbl )
             for index = 1, #links
                 value = links[ index ][ key ]
                 if value ~= nil
                     if getmetatable( value ) == nil
-                        value = CreateLink( value, true )
+                        value = linkedTable( value, true )
                         rawset( tbl, key, value )
                         return value
 
                     return value
     }
 
-    lib.Create = ( child ) ->
+    metaworks.Environment = ( child ) ->
         tbl = { __indexes: {} }
         setmetatable( tbl, meta )
 
         if child ~= nil
-            Link( tbl, child )
+            link( tbl, child )
 
         return tbl
 
-export default lib
+export default metaworks
