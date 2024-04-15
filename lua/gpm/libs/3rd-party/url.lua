@@ -509,61 +509,58 @@ end
 -- This function will also remove multiple slashes
 -- @param path The string representing the path to clean
 -- @return a string of the path without unnecessary dots and segments
-function META.removeDotSegments( path )
-	if #path == 0 then
-		return path
+function META.removeDotSegments( filePath )
+	local length = #filePath
+	if length == 0 then
+		return filePath
 	end
 
-	local startSlash = false
-	local endSlash = false
+	local startSlash = sub( filePath, 1, 1 ) == "/"
+	local endSlash = ( length > 1 or startSlash == false ) and sub( filePath, -1 ) == "/"
 
-	if sub( path, 1, 1 ) == "/" then
-		startSlash = true
-	end
+	local parts = {}
+	length = 0
 
-	if ( #path > 1 or startSlash == false ) and sub( path, -1 ) == "/" then
-		endSlash = true
-	end
-
-	local fields, fieldsLength = {}, 0
-
-	gsub( path, "[^/]+", function( value )
-		if value ~= "." then
-			fieldsLength = fieldsLength + 1
-			fields[ fieldsLength ] = value
+	gsub( filePath, "[^/]+", function( str )
+		if str == "." then
+			return
 		end
+
+		if str == ".." then
+			if fieldsLength == 0 then
+				return
+			end
+
+			length = length - 1
+			return
+		end
+
+		length = length + 1
+		parts[ length ] = str
 	end )
 
-	local result, resultLength = {}, 0
-
-	for index = 1, fieldsLength do
-		local value = fields[ index ]
-		if value == ".." then
-			if resultLength > 0 then
-				resultLength = resultLength - 1
-			end
-		else
-			resultLength = resultLength + 1
-			result[ resultLength ] = value
+	if length == 0 then
+		if startSlash then
+			return "/"
 		end
+
+		-- if endSlash then
+		--     return "/"
+		-- end
+
+		return ""
 	end
 
-	local ret
-	if resultLength > 0 then
-		ret = concat( result, "/", 1, resultLength )
-	else
-		ret = ""
-	end
-
+	filePath = concat( parts, "/", 1, length )
 	if startSlash then
-		ret = "/" .. ret
+		filePath = "/" .. filePath
 	end
 
 	if endSlash then
-		ret = ret .. "/"
+		filePath = filePath .. "/"
 	end
 
-	return ret
+	return filePath
 end
 
 local function reducePath( base_path, relative_path )

@@ -74,8 +74,7 @@ Their original licenses shall be comply when used.
     For the 6bit encoding and decoding.
 --]]
 
-local gpm = gpm
-local deflate = gpm.Table( gpm, "deflate" )
+local deflate = {}
 
 do
     -- Semantic version. all lowercase.
@@ -112,7 +111,6 @@ local string_gsub = string.gsub
 local string_sub = string.sub
 local table_concat = table.concat
 local table_sort = table.sort
-local ArgAssert = gpm.ArgAssert
 local tostring = tostring
 local type = type
 
@@ -395,7 +393,6 @@ function lib_Adler32( str )
     -- 		end
     -- return b*65536+a
 
-    ArgAssert( str, 1, "string" )
     local strlen = #str
     local i = 1
     local a = 1
@@ -470,10 +467,6 @@ end
 -- @raise error if 'strlen' does not match the length of 'str',
 -- or if 'adler32' does not match the Adler-32 checksum of 'str'.
 function deflate.CreateDictionary(str, strlen, adler32)
-    ArgAssert( str, 1, "string" )
-    ArgAssert( strlen, 2, "number" )
-    ArgAssert( adler32, 2, "number" )
-
     if strlen ~= #str then
         error( string_format( "Usage: deflate.CreateDictionary(str, strlen, adler32): 'strlen' does not match the actual length of 'str'. 'strlen': %u, '#str': %u . Please check if 'str' is modified unintentionally.", strlen, #str ), 2 )
     end
@@ -2904,10 +2897,6 @@ end
 -- local decoded = codec:Decode(encoded)
 -- -- assert(decoded == SOME_STRING)
 function deflate.CreateCodec( reserved_chars, escape_chars, map_chars )
-    ArgAssert( reserved_chars, 1, "string" )
-    ArgAssert( escape_chars, 2, "string" )
-    ArgAssert( map_chars, 3, "string" )
-
     if escape_chars == "" then
         return nil, "No escape characters supplied."
     end
@@ -3017,7 +3006,6 @@ function deflate.CreateCodec( reserved_chars, escape_chars, map_chars )
     local encode_repl = encode_translate
 
     function codec:Encode( str )
-        ArgAssert( str, 1, "string" )
         return string_gsub( str, encode_pattern, encode_repl )
     end
 
@@ -3025,8 +3013,6 @@ function deflate.CreateCodec( reserved_chars, escape_chars, map_chars )
     local decode_fail_pattern = "([" .. escape_for_gsub( reserved_chars ) .. "])"
 
     function codec:Decode( str )
-        ArgAssert( str, 1, "string" )
-
         if string_find( str, decode_fail_pattern ) then return nil end
 
         for i = 1, decode_tblsize do
@@ -3051,8 +3037,6 @@ end
 -- @return The encoded string.
 -- @see deflate.DecodeForWoWAddonChannel
 function deflate.EncodeForWoWAddonChannel( str )
-    ArgAssert( str, 1, "string" )
-
     if not _addon_channel_codec then
         _addon_channel_codec = GenerateWoWAddonChannelCodec()
     end
@@ -3065,7 +3049,6 @@ end
 -- @return [string/nil] The decoded string if succeeds. nil if fails.
 -- @see deflate.EncodeForWoWAddonChannel
 function deflate.DecodeForWoWAddonChannel( str )
-    ArgAssert( str, 1, "string" )
     if not _addon_channel_codec then
         _addon_channel_codec = GenerateWoWAddonChannelCodec()
     end
@@ -3113,7 +3096,6 @@ local _chat_channel_codec
 -- @return [string] The encoded string.
 -- @see deflate.DecodeForWoWChatChannel
 function deflate.EncodeForWoWChatChannel( str )
-    ArgAssert( str, 1, "string" )
     if not _chat_channel_codec then
         _chat_channel_codec = GenerateWoWChatChannelCodec()
     end
@@ -3126,7 +3108,6 @@ end
 -- @return [string/nil] The decoded string if succeeds. nil if fails.
 -- @see deflate.EncodeForWoWChatChannel
 function deflate.DecodeForWoWChatChannel( str )
-    ArgAssert( str, 1, "string" )
     if not _chat_channel_codec then
         _chat_channel_codec = GenerateWoWChatChannelCodec()
     end
@@ -3286,8 +3267,6 @@ local _6bit_to_byte = {
 -- @param str [string] The string to be encoded.
 -- @return [string] The encoded string.
 function deflate.EncodeForPrint( str )
-    ArgAssert( str, 1, "string" )
-
     local strlen = #str
     local strlenMinus2 = strlen - 2
     local i = 1
@@ -3342,8 +3321,6 @@ end
 -- @param str [string] The string to be decoded
 -- @return [string/nil] The decoded string if succeeds. nil if fails.
 function deflate.DecodeForPrint( str )
-    ArgAssert( str, 1, "string" )
-
     str = string_gsub( str, "^[%c ]+", "" )
     str = string_gsub( str, "[%c ]+$", "" )
 
