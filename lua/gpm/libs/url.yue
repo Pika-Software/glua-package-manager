@@ -69,12 +69,12 @@ rebuild = ( data ) ->
 
 class URLSearchParams
     __index: ( key ) =>
-        return URLSearchParams.__base[ key ] or rawget( @, "__query" )[ key ]
+        return URLSearchParams.__base[ key ] or @__query[ key ]
 
     new: ( query, data ) =>
         rawset( @, "__query", ParseQuery( query ) )
         rawset( @, "__data", data )
-        @update!
+        @update( true )
 
     __newindex: ( key, value ) =>
         @__query[ key ] = value
@@ -83,10 +83,11 @@ class URLSearchParams
     __tostring: =>
         return Query( @__query )
 
-    update: =>
-        data = @__data
-        if data
-            rebuild( data )
+    update: ( ignoreData ) =>
+        unless ignoreData
+            data = @__data
+            if data
+                rebuild( data )
 
         size = 0
         for _ in pairs( @__query )
@@ -147,6 +148,10 @@ class URLSearchParams
 
     delete: ( key ) =>
         @__query[ key ] = nil
+        @update!
+
+    clear: =>
+        Empty( @__query )
         @update!
 
     toString: =>
