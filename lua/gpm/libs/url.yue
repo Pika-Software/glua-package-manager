@@ -1,17 +1,29 @@
--- https://developer.mozilla.org/en-US/docs/Web/API/URL
-gpm = gpm
-import valid from gpm.ip
+import gsub, sub, find, format, len, lower, match from gpm.string
+import Encode, Decode, ParseQuery, Query from gpm.http
+import insert, Merge, Empty from gpm.table
+import isv4, isv6 from gpm.ip
 import Resolve from gpm.path
-import string, table, ArgAssert from gpm
 
-:sub, :find, :format, :len, :IsURL, :Split, :Trim = string
-:concat = table
-
+setmetatable = setmetatable
 tostring = tostring
+rawget = rawget
 rawset = rawset
 error = error
 
-defaultPorts = {
+--[[
+
+    URL Object by Unknown Developer
+
+    References:
+        https://developer.mozilla.org/en-US/docs/Web/API/URL
+        https://github.com/nodejs/node/blob/main/doc/api/url.md
+        https://github.com/golgote/neturl/blob/master/lib/net/url.lua
+
+--]]
+
+pathSymbols = "%!%$%&%'%(%)%*%,%-%.%:%;%=%@%_%~"
+
+services = {
     ftp: "21"
     ssh: "22"
     sftp: "22"
@@ -49,211 +61,265 @@ defaultPorts = {
     jms: "5673"
 }
 
-keyWhiteList = {
-    "protocol": true
-    "blob": true
-    "username": true
-    "password": true
-    "auth": true
-    "host": true
-    "hostname": true
-    "port": true
-    "pathname": true
-    "search": true
-    "query": true
-    "hash": true
-    "path": true
-}
+local parse, build
+
+rebuild = ( data ) ->
+    parse( data, build( data ) )
+    return
+
+class URLSearchParams
+    __index: ( key ) =>
+        return URLSearchParams.__base[ key ] or rawget( @, "__query" )[ key ]
+
+    new: ( query, data ) =>
+        rawset( @, "__query", ParseQuery( query ) )
+        rawset( @, "__data", data )
+        @update!
+
+    __newindex: ( key, value ) =>
+        @__query[ key ] = value
+        @update!
+
+    __tostring: =>
+        return Query( @__query )
+
+    update: =>
+        data = @__data
+        if data
+            rebuild( data )
+
+        size = 0
+        for _ in pairs( @__query )
+            size += 1
+
+        rawset( @, "size", size )
+        return
+
+    has: ( ... ) =>
+        query = @__query
+        for key in *{ ... }
+            unless query[ key ]
+                return false
+
+        return true
+
+    keys: =>
+        query, key = @__query, nil
+        return ->
+            key = next( query, key )
+            return key
+
+    values: =>
+        query, key = @__query, nil
+        return ->
+            key, value = next( query, key )
+            return value
+
+    entries: =>
+        return next, @__query
+
+    get: ( key ) =>
+        return @__query[ key ]
+
+    set: ( key, value ) =>
+        @__query[ key ] = value
+        @update!
+
+    getAll: ( key ) =>
+        query = @__query
+        if istable( query[ key ] )
+            return query[ key ]
+
+        return { query[ key ] }
+
+    append: ( key, value ) =>
+        query = @__query
+        tbl = query[ key ]
+        unless istable( tbl )
+            query[ key ] = { tbl }
+
+        if istable( value )
+            query[ key ] = Merge( tbl, value )
+        else
+            insert( tbl, 1, value )
+
+        @update!
+
+    delete: ( key ) =>
+        @__query[ key ] = nil
+        @update!
+
+    toString: =>
+        return Query( @__query )
 
 build = ( data ) ->
-    url = ""
-
-    protocol = data.protocol
-    url ..= protocol .. "://"
-
-    auth = ""
+    url = data.protocol .. "//"
 
     username = data.username
     if username and len( username ) ~= 0
-        auth ..= username
+        url ..= username
 
-    password = data.password
-    if password and len( password ) ~= 0
-        auth ..= ":" .. password
+        password = data.password
+        if password and len( password ) ~= 0
+            url ..= ":" .. password
 
-    if len( auth ) ~= 0
-        url ..= auth .. "@"
-        data.auth = auth
+        url ..= "@"
 
-    host = data.hostname
-    port = data.port
-    if port and len( port ) ~= 0 and port ~= defaultPorts[ protocol ]
-        host ..= ":" .. port
+    hostname = data.hostname
+    if hostname and len( hostname ) ~= 0
+        url ..= hostname
 
-    data.origin = protocol .. "://" .. host
-    data.host = host
-    url ..= host
+        port = data.port
+        if port and len( port ) ~= 0
+            if port ~= services[ data.scheme ]
+                url ..= ":" .. port
 
-    path = ""
+    url ..= data.pathname or "/"
 
-    pathname = data.pathname
-    if pathname and len( pathname ) ~= 0
-        path ..= pathname
-    else
-        path ..= "/"
+    if data.searchParams
+        url ..= tostring( data.searchParams )
 
-    query = data.query
-    if query and len( query ) ~= 0
-        path ..= "?" .. query
-
-    data.path = path
-    url ..= path
-
-    hash = data.hash
-    if hash and len( hash ) ~= 0
-        url ..= "#" .. hash
+    if data.hash
+        url ..= data.hash
 
     return url
 
-parse = ( url, data ) ->
-    url = Trim( url )
-    unless IsURL( url )
-        error format( "Invalid URL: \"%s\"", url ), 4
+parse = ( data, url, ... ) ->
+    Empty( data )
 
-    _, protocolEnd, protocol = find( url, "^(.-)://" )
+    -- protocol & scheme
+    local protocol, scheme
+    url = gsub url, "^(.-:)", ( str ) ->
+        str = lower( str )
+        scheme = sub( str, 1, -2 )
+        protocol = str
+        return ""
+
     unless protocol
-        error "Missing URL protocol", 4
-
-    _, blobEnd, blob = find( protocol, "(.+):" )
-    if blob
-        protocol = sub( protocol, blobEnd + 1 )
-        data.protocol = blob
-        data.href = url
-
-        pathname = sub( url, protocolEnd + 1 )
-        data.pathname = pathname
-
-        slashStart = find( pathname, "/" )
-        if slashStart
-            data.origin = sub( pathname, 1, slashStart - 1 )
-        else
-            data.origin = pathname
-
-        return
-
-    unless find( protocol, "^[a-z].*%w$" )
-        error format( "Invalid URL protocol: \"%s\"", protocol ), 4
+        error "URL protocol is missing!", 3
 
     data.protocol = protocol
 
-    url = sub( url, protocolEnd + 1 )
+    unless find( scheme, "^[a-z].*%w$" )
+        error format( "Invalid URL scheme: \"%s\"", scheme ), 3
 
-    _, authEnd, auth = find( url, "(.+)@" )
-    if auth
-        _, usernameStart, username = find( auth, "(%w+):" )
-        if usernameStart
-            data.username = username
-            data.password = sub( auth, usernameStart + 1 )
+    data.scheme = scheme
+
+    -- hash
+    url = gsub url, "(#.*)$", ( hash ) ->
+        data.hash = hash
+        return ""
+
+    -- search & searchParams
+    url = gsub url, "(%?.*)$", ( str ) ->
+        data.searchParams = URLSearchParams( sub( str, 2 ), data )
+        data.search = str
+        return ""
+
+    -- specific schemes
+    if services[ scheme ]
+        unless sub( url, 1, 2 ) == "//"
+            url = "//" .. url
+
+    elseif match( url, "^(.-:)/*" )
+        data.pathname = url
+
+        if data.search
+            url ..= data.search
+
+        if data.hash
+            url ..= data.hash
+
+        data.href = protocol .. url
+        return
+
+    -- host
+    url = gsub url, "^//([^/]+)", ( host ) ->
+        -- username & password
+        host = gsub host, "^([^@]*)@", ( auth ) ->
+            usernameEnd = find( auth, ":" )
+            if usernameEnd
+                data.username = Decode( sub( auth, 1, usernameEnd - 1 ) )
+                data.password = Decode( sub( auth, usernameEnd + 1 ) )
+            else
+                data.username = Decode( auth )
+
+            return ""
+
+        if len( host ) == 0
+            error "URL host is missing!", 6
+
+        -- host & origin
+        data.origin = protocol .. "//" .. host
+        data.host = host
+
+        -- hostname
+        local port
+        hostname = gsub host, ":(.+)", ( str ) ->
+            port = str
+            return ""
+
+        if len( hostname ) == 0
+            error "URL hostname is missing!", 6
+
+        if isv4( hostname )
+            ok, msg = isv4( hostname, true )
+            unless ok
+                error format( "Invalid IPv4 hostname address: \"%s\", %s.", hostname, msg ), 6
+
+        if isv6( hostname )
+            ok, msg = isv6( hostname, true )
+            unless ok
+                error format( "Invalid IPv6 hostname address: \"%s\", %s.", hostname, msg ), 6
+
+        data.hostname = hostname
+
+        -- port
+        if port
+            if find( port, "^[0-9]+$" )
+                data.port = port
+            else
+                error format( "Invalid URL port: \"%s\"", port ), 6
         else
-            data.username = auth
+            data.port = services[ scheme ]
 
-        url = sub( url, authEnd + 1 )
-        data.auth = auth
+        return ""
 
-    hostEnd = find( url, "/" )
-    if hostEnd
-        hostEnd -= 1
-    else
-        hostEnd = #url
-
-    host = sub( url, 1, hostEnd )
-    if len( host ) == 0
-        error format( "Invalid URL host: \"%s\"", host ), 4
-
-    data.origin = protocol .. "://" .. host
-    data.host = host
-
-    hostname, port = nil, nil
-
-    portStart, portEnd = find( host, ":%d+$" )
-    if portStart
-        port = sub( host, portStart + 1, portEnd )
-        unless find( port, "^[0-9]+$" )
-            error format( "Invalid URL port: %s", port ), 4
-
-        hostname = sub( host, 1, portStart - 1 )
-        url = sub( url, portEnd + 1 )
-    else
-        port = defaultPorts[ protocol ]
-        url = sub( url, #host + 1 )
-        hostname = host
-
-    unless valid( hostname ) or find( hostname, "^[a-z].*%w$" )
-       error format( "Invalid URL hostname: \"%s\"", hostname ), 4
-
-    data.hostname = hostname
-    data.port = port
-
-    hashStart = find( url, "#" )
-    if hashStart
-        data.hash = sub( url, hashStart + 1 )
-        url = sub( url, 1, hashStart - 1 )
-
-    searchStart = find( url, "?" )
-    if searchStart
-        data.query = sub( url, searchStart + 1 )
-
-        pathname = Resolve( sub( url, 1, searchStart - 1 ) )
-        data.pathname = pathname
-
-        search = sub( url, searchStart )
-        data.search = search
-
-        data.path = pathname .. search
-    else
-        pathname = Resolve( url )
-        data.pathname = pathname
-        data.path = pathname
+    -- pathname
+    data.pathname = gsub "/" .. Resolve( url, ... ), "([^/]+)", ( part ) ->
+        return Encode( Decode( part ), pathSymbols )
 
     data.href = build( data )
     return
 
+changeableValues = {
+    protocol: true
+    scheme: true
+
+    hash: true
+
+    search: true
+
+    username: true
+    password: true
+
+    host: true
+
+    hostname: true
+    port: true
+
+    pathname: true
+
+    href: true
+}
+
 class URL
-    Version: "1.0.0"
-    DefaultPorts: defaultPorts
-    KeyWhiteList: keyWhiteList
+    VERSION: "1.0.0"
+    Services: services
 
-    new: ( url, base ) =>
+    new: ( ... ) =>
         data = {}
-
-        if base
-            ArgAssert( base, 2, "string" )
-            parse( base, data )
-
-            unless data.host
-                error "Invalid URL", 4
-
-            segments, segmentsCount = Split( url, "[/\\]+", true )
-            if segmentsCount ~= 0
-                firstSegment = segments[ 1 ]
-                if #firstSegment == 0
-                    data.pathname = url
-                else
-                    result = Split( data.pathname, "[/\\]+", true )
-                    length = #result
-
-                    result[ length ] = firstSegment
-
-                    for index = 2, segmentsCount
-                        length += 1
-                        result[ length ] = segments[ index ]
-
-                    data.pathname = concat( result, "/" )
-
-                parse( build( data ), data )
-        else
-            parse( url, data )
-
+        parse( data, ... )
         rawset( @, "__data", data )
         return
 
@@ -261,21 +327,80 @@ class URL
         return @__data[ key ] or ""
 
     __newindex: ( key, value ) =>
-        if key == "href"
-            parse( value, @__data )
+        unless changeableValues[ key ]
             return
 
-        if keyWhiteList[ key ]
-            data = @__data
-            unless data.host
-                return
+        value = tostring( value )
 
-            rawset( data, key, tostring( value ) )
-            parse( build( data ), data )
-            return
+        data = @__data
+        switch key
+            when "protocol"
+                scheme = lower( match( value, "(.*):?" ) )
+                data.scheme = scheme
+                value = scheme .. ":"
 
-        rawset( @, key, value )
-        return
+            when "scheme"
+                value = lower( value )
+                data.protocol = value .. ":"
+
+            when "hash"
+                value = "#" .. match( value, "#?(.*)" )
+
+            when "search"
+                value = "?" .. match( value, "%??(.*)" )
+                data.searchParams = URLSearchParams( sub( value, 2 ), data )
+
+            when "username"
+                value = Encode( value )
+
+            when "password"
+                value = Encode( value )
+
+            when "host"
+                if len( value ) == 0
+                    error "URL host is missing!", 2
+
+                data.origin = data.protocol .. "//" .. value
+
+                -- hostname
+                local port
+                hostname = gsub value, ":(.+)", ( str ) ->
+                    port = str
+                    return ""
+
+                if len( hostname ) == 0
+                    error "URL hostname is missing!", 2
+
+                if isv4( hostname )
+                    ok, msg = isv4( hostname, true )
+                    unless ok
+                        error format( "Invalid IPv4 hostname address: \"%s\", %s.", hostname, msg ), 2
+
+                if isv6( hostname )
+                    ok, msg = isv6( hostname, true )
+                    unless ok
+                        error format( "Invalid IPv6 hostname address: \"%s\", %s.", hostname, msg ), 2
+
+                data.hostname = hostname
+
+                -- port
+                if port
+                    if find( port, "^[0-9]+$" )
+                        data.port = port
+                    else
+                        error format( "Invalid URL port: \"%s\"", port ), 2
+                else
+                    data.port = services[ scheme ]
+
+            when "pathname"
+                value = gsub "/" .. Resolve( value ), "([^/]+)", ( part ) ->
+                    return Encode( Decode( part ), pathSymbols )
+
+            when "href"
+                return parse( data, value )
+
+        data[ key ] = value
+        return rebuild( data )
 
     __tostring: =>
         return @href
@@ -283,12 +408,34 @@ class URL
     __eq: ( other ) =>
         return other and @href == other.href
 
-    __lt: ( other ) =>
-        return @href < other.href
+--// Tests //-->
 
-    __le: ( other ) =>
-        return @href <= other.href
+-- url = URL( "http://google.com/index.html" )
 
--- TODO: Make URLSearchParams
+-- url.protocol = "https"
+-- url.scheme = "yep"
+
+-- url.hash = "#tag"
+-- url.hash = "tag"
+
+-- url.search = "?query=123&a=1&b=2"
+-- url.searchParams = nil
+
+-- url.username = "cool-guy"
+-- url.password = "secret"
+
+-- url.host = "hell.com"
+
+-- url.hostname = "localhost"
+-- url.port = 27015
+
+-- url.pathname = "garrysmod/lua/autorun/../init.lua"
+
+-- url.href = "http://localhost:27015/garrysmod/lua/autorun/../init.lua"
+
+-- PrintTable url
+
+-- PrintTable URL( "lua:/path/to/my/little/lua.file", "yue.file" ), nil
+-- PrintTable gpm.url.parse "lua:/path/to/my/little/lua.file", "yue.file"
 
 export default URL

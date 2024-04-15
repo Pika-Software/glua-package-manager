@@ -364,9 +364,8 @@ do
 
     path.Resolve = ( ... ) ->
         filePath, args = "", { ... }
-        argsCount = #args
 
-        for index = 1, argsCount
+        for index = 1, #args
             arg = args[ index ]
             unless isstring( arg )
                 arg = tostring( arg )
@@ -374,12 +373,9 @@ do
             if find( arg, "^[/\\]" )
                 if sub( filePath, 1, 1 ) ~= "/"
                     arg = sub( arg, 2 )
-                filePath = ""
-
-            if index ~= argsCount
-                arg ..= "/"
-
-            filePath ..= arg
+                filePath = arg
+            else
+                filePath = gsub( filePath, "[^/\\]+$", "" ) .. arg
 
         segments, segmentsCount = split( filePath, "[/\\]+", true )
         if segmentsCount == 0
@@ -500,6 +496,27 @@ do
         return gsub( gsub( str, "+", " " ), "%%(%x%x)", decodeChar )
 
     http.Decode = decode
+
+    http.ParseQuery = ( query ) ->
+        result = {}
+        for key, value in gmatch( query, "([^&=?]-)=([^&=?]+)" )
+            result[ decode( key ) ] = decode( value )
+
+        return result
+
+    queryKeySymbols = "%-%_%."
+    queryValueSymbols = "%!%$%'%(%)%*%,%-%.%:%;%@%_%~"
+
+    http.Query = ( tbl ) ->
+        result, length = {}, 0
+        for key, value in pairs( tbl )
+            length += 1
+            result[ length ] = encode( key, queryKeySymbols ) .. "=" .. encode( value, queryValueSymbols )
+
+        if length == 0
+            return "", length
+
+        return "?" .. concat( result, "&" ), length
 
 class util.Stack
     __tostring: =>
