@@ -539,43 +539,4 @@ do
         metadata[ key ] = value
         return rebuild( @ )
 
---// Tests //-->
-
--- url = URL( "http://google.com/index.html" )
-
--- url.protocol = "https"
--- url.scheme = "yep"
-
--- url.hash = "#tag"
--- url.hash = "tag"
-
--- url.search = "?query=123&a=1&b=2"
--- url.searchParams = nil
-
--- url.username = "cool-guy"
--- url.password = "secret"
-
--- url.host = "hell.com"
-
--- url.hostname = "localhost"
--- url.port = 27015
-
--- url.pathname = "garrysmod/lua/autorun/../init.lua"
-
--- url.href = "http://localhost:27015/garrysmod/lua/autorun/../init.lua"
-
--- url.searchParams\replace( { a: 1, b: 2 } )
--- url.searchParams\delete "a"
--- url.searchParams\set "a", 5
-
--- url.searchParams\merge { c: 3, d: 4 }
--- print url.searchParams\get "a"
-
--- url.searchParams\set "a", { 1, 2, 3, 4 }
-
--- PrintTable url
-
--- PrintTable URL( "lua:/path/to/my/little/lua.file", "yue.file" ), nil
--- PrintTable gpm.url.parse "lua:/path/to/my/little/lua.file", "yue.file"
-
 export default URL
