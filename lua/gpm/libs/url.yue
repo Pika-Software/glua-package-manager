@@ -1,6 +1,6 @@
 import gsub, sub, find, format, len, lower, match, Extract from gpm.string
-import Empty, Merge, RemoveByIValue from gpm.table
 import Encode, Decode, ParseQuery, Query from gpm.http
+import remove, sort, Empty from gpm.table
 import isv4, isv6 from gpm.ip
 import Resolve from gpm.path
 
@@ -12,7 +12,6 @@ rawget = rawget
 rawset = rawset
 error = error
 pairs = pairs
-next = next
 
 --[[
 
@@ -218,106 +217,181 @@ rebuild = =>
 
 meta.rebuild = rebuild
 
-class URLSearchParams
-    new: ( queryData, urlObject ) =>
-        @query = {}
-        @parse( queryData, urlObject, true )
+local URLSearchParams
+do
 
-    __tostring: =>
-        return Query( @query )
+    abcSort = ( a, b ) ->
+        return a[ 1 ] < b[ 1 ]
 
-    toString: =>
-        return Query( @query )
+    class URLSearchParams
+        new: ( queryData, urlObject ) =>
+            @query, @size = {}, 0
+            @parse( queryData, urlObject, true )
 
-    parse: ( queryData, urlObject, noFullUpdate ) =>
-        @urlObject = urlObject
-        query = @query
+        __tostring: =>
+            return @toString!
 
-        for key in pairs( query )
-            query[ key ] = nil
+        toString: =>
+            return Query( @query, @size )
 
-        if istable( queryData )
-            for key, value in pairs( queryData )
-                query[ key ] = value
-
-        elseif isstring( queryData )
-            for key, value in pairs( ParseQuery( queryData ) )
-                query[ key ] = value
-
-        @update( noFullUpdate )
-
-    update: ( noFullUpdate ) =>
-        unless noFullUpdate
+        updateURL: =>
             urlObject = @urlObject
             if urlObject
                 rebuild( urlObject )
 
-        size = 0
-        for _ in pairs( @query )
-            size += 1
+            return
 
-        @size = size
+        append: ( key, value, dontUpdate ) =>
+            size = @size + 1
+            @query[ size ] = { key, value }
+            @size = size
 
-    has: ( ... ) =>
-        query = @query
-        for key in *{ ... }
-            unless query[ key ]
-                return false
+            unless dontUpdate
+                @updateURL!
 
-        return true
+            return
 
-    keys: =>
-        query, key = @query, nil
-        return ->
-            key = next( query, key )
-            return key
+        delete: ( key, dontUpdate ) =>
+            query, size = @query, @size
+            ::back::
 
-    values: =>
-        query, key = @query, nil
-        return ->
-            key, value = next( query, key )
-            return value
+            for index = 1, size
+                if query[ index ][ 1 ] == key
+                    remove( query, index )
+                    size -= 1
+                    goto back
+                    break
 
-    entries: =>
-        return next, @query
+            @size = size
 
-    get: ( key ) =>
-        return @query[ key ]
+            unless dontUpdate
+                @updateURL!
 
-    set: ( key, value, noFullUpdate ) =>
-        @query[ tostring( key ) ] = tostring( value )
-        @update( noFullUpdate )
+            return
 
-    merge: ( tbl, noFullUpdate ) =>
-        Merge( @query, tbl )
-        @update( noFullUpdate )
+        set: ( key, value, dontUpdate ) =>
+            @delete( key, true )
+            @append( key, value, dontUpdate )
+            return
 
-    getAll: ( key ) =>
-        query = @query
-        if istable( query[ key ] )
-            return query[ key ]
+        merge: ( tbl, dontUpdate ) =>
+            for key, value in pairs( tbl )
+                @set( key, value, true )
 
-        return {}
+            unless dontUpdate
+                @updateURL!
 
-    append: ( key, value, noFullUpdate ) =>
-        @query[] = key .. "=" .. value
-        @update( noFullUpdate )
+            return
 
-    delete: ( key, value, noFullUpdate ) =>
-        query = @query
-        if value == nil or not istable( query[ key ] )
-            query[ key ] = nil
-        else
-            RemoveByIValue( query[ key ], value )
+        get: ( key ) =>
+            query = @query
+            for index = 1, @size
+                if query[ index ][ 1 ] == key
+                    return query[ index ][ 2 ]
 
-        @update( noFullUpdate )
+        getAll: ( key ) =>
+            buffer, length = {}, 0
+            query = @query
 
-    clear: ( noFullUpdate ) =>
-        query = @query
-        for key in pairs( query )
-            query[ key ] = nil
+            for index = 1, @size
+                if query[ index ][ 1 ] == key
+                    length += 1
+                    buffer[ length ] = query[ index ][ 2 ]
 
-        @update( noFullUpdate )
+            return buffer, length
+
+        clear: ( dontUpdate ) =>
+            query = @query
+            for index = 1, @size
+                query[ index ] = nil
+
+            @size = 0
+
+            unless dontUpdate
+                @updateURL!
+
+            return
+
+        parse: ( queryData, urlObject, dontUpdate ) =>
+            @urlObject = urlObject
+            @clear( true )
+
+            if istable( queryData )
+                for key, value in pairs( queryData )
+                    @append( key, value, true )
+
+            elseif isstring( queryData )
+                for _, data in ipairs( ParseQuery( queryData ) )
+                    @append( data[ 1 ], data[ 2 ], true )
+
+            unless dontUpdate
+                @updateURL!
+
+            return
+
+        has: ( ... ) =>
+            for key in *{ ... }
+                if @get( key ) == nil
+                    return false
+
+            return true
+
+        entries: =>
+            query, size = @query, @size
+            index = 0
+
+            return ->
+                index += 1
+                if index > size
+                    return
+
+                line = query[ index ]
+                return line[ 1 ], line[ 2 ]
+
+        keys: =>
+            query, size = @query, @size
+            index = 0
+
+            return ->
+                index += 1
+                if index > size
+                    return
+
+                return query[ index ][ 1 ]
+
+        values: =>
+            query, size = @query, @size
+            index = 0
+
+            return ->
+                index += 1
+                if index > size
+                    return
+
+                return query[ index ][ 2 ]
+
+        forEach: ( callback, thisArg ) =>
+            query = @query
+            if thisArg == nil
+                for index = 1, @size
+                    data = query[ index ]
+                    callback( data[ 1 ], data[ 2 ], @ )
+
+                return
+
+            for index = 1, @size
+                data = query[ index ]
+                callback( thisArg, data[ 1 ], data[ 2 ], @ )
+
+            return
+
+        sort: ( dontUpdate, sortFunc ) =>
+            sort( @query, sortFunc or abcSort )
+
+            unless dontUpdate
+                @updateURL!
+
+            return
 
 gpm.URLSearchParams = URLSearchParams
 
