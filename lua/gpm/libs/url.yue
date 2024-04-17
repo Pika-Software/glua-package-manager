@@ -89,7 +89,10 @@ meta.__index = ( key ) =>
 
 build = =>
     metadata = rawget( @, "metadata" )
-    url = metadata.protocol .. "//"
+    url = metadata.protocol
+
+    if len( metadata.host ) ~= 0
+        url ..= "//"
 
     username = metadata.username
     if len( username ) ~= 0
@@ -149,7 +152,10 @@ parse = ( url, ... ) =>
         @searchParams\clear( true )
 
     -- '//' formatter
-    url = gsub( url, "^//+", "//" )
+    if services[ scheme ]
+        url = gsub( url, "^/*", "//" )
+    else
+        url = gsub( url, "^//+", "//" )
 
     -- 'data' like schemes
     if match( url, "^(.-:)//" )
@@ -167,10 +173,7 @@ parse = ( url, ... ) =>
             error "URL host is missing!", 4
 
         -- username & password
-        if auth
-            if len( auth ) == 0
-                error "Invalid URL username!", 4
-
+        if auth and len( auth ) ~= 0
             usernameEnd = find( auth, ":" )
             if usernameEnd
                 metadata.username = Encode( Decode( sub( auth, 1, usernameEnd - 1 ) ) )
@@ -179,7 +182,11 @@ parse = ( url, ... ) =>
                 metadata.username = Encode( Decode( auth ) )
 
         -- host & origin
-        metadata.origin = protocol .. "//" .. host
+        if services[ scheme ]
+            metadata.origin = protocol .. "//" .. host
+        else
+            metadata.origin = "null"
+
         metadata.host = host
 
         -- hostname
@@ -208,7 +215,11 @@ parse = ( url, ... ) =>
         metadata.origin = "null"
 
     -- pathname & href
-    metadata.pathname = gsub( "/" .. Resolve( url, ... ), "([^/]+)", encodeFilePathPart )
+    if len( metadata.host ) == 0
+        metadata.pathname = gsub( Resolve( url, ... ), "([^/]+)", encodeFilePathPart )
+    else
+        metadata.pathname = gsub( "/" .. Resolve( url, ... ), "([^/]+)", encodeFilePathPart )
+
     metadata.href = build( @ )
     return
 
@@ -477,7 +488,10 @@ do
                 error "URL host is missing!", 2
 
             -- origin
-            metadata.origin = metadata.protocol .. "//" .. value
+            if services[ metadata.scheme ]
+                metadata.origin = metadata.protocol .. "//" .. value
+            else
+                metadata.origin = "null"
 
             -- hostname
             hostname, port = Extract( value, ":(.+)" )
@@ -503,7 +517,10 @@ do
             metadata.port = port
 
         elseif key == "pathname"
-            value = gsub( "/" .. Resolve( value ), "([^/]+)", encodeFilePathPart )
+            if len( metadata.host ) == 0
+                value = gsub( Resolve( value ), "([^/]+)", encodeFilePathPart )
+            else
+                value = gsub( "/" .. Resolve( value ), "([^/]+)", encodeFilePathPart )
 
         elseif key == "href"
             return parse( @, value )
