@@ -112,7 +112,7 @@ build = =>
         if len( port ) ~= 0 and port ~= services[ metadata.scheme ]
             url ..= ":" .. port
 
-    return format( "%s%s%s%s", url, metadata.pathname, @searchParams\toString!, metadata.hash )
+    return format( "%s/%s%s%s", url, metadata.pathname, @searchParams\toString!, metadata.hash )
 
 meta.build = build
 
@@ -215,11 +215,7 @@ parse = ( url, ... ) =>
         metadata.origin = "null"
 
     -- pathname & href
-    if len( metadata.host ) == 0
-        metadata.pathname = gsub( Resolve( url, ... ), "([^/]+)", encodeFilePathPart )
-    else
-        metadata.pathname = gsub( "/" .. Resolve( url, ... ), "([^/]+)", encodeFilePathPart )
-
+    metadata.pathname = gsub( Resolve( url, ... ), "([^/]+)", encodeFilePathPart )
     metadata.href = build( @ )
     return
 
@@ -481,6 +477,9 @@ do
             @searchParams\parse( sub( value, 2 ), @, true )
 
         elseif key == "username" or key == "password"
+            if len( metadata.host ) == 0
+                return
+
             value = Encode( Decode( value ) )
 
         elseif key == "host"
@@ -517,10 +516,22 @@ do
             metadata.port = port
 
         elseif key == "pathname"
-            if len( metadata.host ) == 0
-                value = gsub( Resolve( value ), "([^/]+)", encodeFilePathPart )
+            value = gsub( Resolve( value ), "([^/]+)", encodeFilePathPart )
+
+        elseif key == "hostname"
+            if len( metadata.port ) == 0
+                @host = value
             else
-                value = gsub( "/" .. Resolve( value ), "([^/]+)", encodeFilePathPart )
+                @host = value .. ":" .. metadata.port
+
+            return
+
+        elseif key == "port"
+            if not find( value, "^[0-9]+$" )
+                error format( "Invalid URL port: \"%s\"", value ), 2
+
+            @host = metadata.hostname .. ":" .. value
+            return
 
         elseif key == "href"
             return parse( @, value )
