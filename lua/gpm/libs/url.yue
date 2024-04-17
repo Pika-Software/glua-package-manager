@@ -154,6 +154,7 @@ parse = ( url, ... ) =>
     -- 'data' like schemes
     if match( url, "^(.-:)//" )
         metadata.pathname = url
+        metadata.origin = "null"
         metadata.href = protocol .. url .. search .. metadata.hash
         return
 
@@ -182,7 +183,7 @@ parse = ( url, ... ) =>
         metadata.host = host
 
         -- hostname
-        hostname, port = Extract( host, ":(.+)", "" )
+        hostname, port = Extract( host, ":(.+)" )
         if len( hostname ) == 0
             error "URL hostname is missing!", 4
 
@@ -199,10 +200,12 @@ parse = ( url, ... ) =>
         metadata.hostname = hostname
 
         -- port
-        if len( port ) ~= 0 and not find( port, "^[0-9]+$" )
+        if port and not find( port, "^[0-9]+$" )
             error format( "Invalid URL port: \"%s\"", port ), 4
 
         metadata.port = port
+    else
+        metadata.origin = "null"
 
     -- pathname & href
     metadata.pathname = gsub( "/" .. Resolve( url, ... ), "([^/]+)", encodeFilePathPart )
@@ -451,7 +454,7 @@ do
 
         if key == "protocol"
             scheme = lower( match( value, "(.*):?" ) )
-            metadata.port = services[ scheme ] or metadata.port
+            metadata.port = services[ scheme ] or ( len( metadata.port ) ~= 0 and metadata.port )
             metadata.scheme = scheme
             value = scheme .. ":"
 
@@ -474,9 +477,9 @@ do
                 error "URL host is missing!", 2
 
             -- origin
-            metadata.origin = @protocol .. "//" .. value
+            metadata.origin = metadata.protocol .. "//" .. value
 
-            -- hostname & port
+            -- hostname
             hostname, port = Extract( value, ":(.+)" )
             if len( hostname ) == 0
                 error "URL hostname is missing!", 2
@@ -494,13 +497,10 @@ do
             metadata.hostname = hostname
 
             -- port
-            if port
-                if find( port, "^[0-9]+$" )
-                    metadata.port = port
-                else
-                    error format( "Invalid URL port: \"%s\"", port ), 2
-            else
-                metadata.port = services[ scheme ]
+            if port and not find( port, "^[0-9]+$" )
+                error format( "Invalid URL port: \"%s\"", port ), 2
+
+            metadata.port = port
 
         elseif key == "pathname"
             value = gsub( "/" .. Resolve( value ), "([^/]+)", encodeFilePathPart )
