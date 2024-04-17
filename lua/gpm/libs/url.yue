@@ -1,15 +1,18 @@
-import gsub, sub, find, format, len, lower, match from gpm.string
+import gsub, sub, find, format, len, lower, match, Extract from gpm.string
+import Empty, Merge, RemoveByIValue from gpm.table
 import Encode, Decode, ParseQuery, Query from gpm.http
-import insert, Merge from gpm.table
 import isv4, isv6 from gpm.ip
 import Resolve from gpm.path
 
 setmetatable = setmetatable
 tostring = tostring
+isstring = isstring
+istable = istable
 rawget = rawget
 rawset = rawset
 error = error
 pairs = pairs
+next = next
 
 --[[
 
@@ -22,7 +25,13 @@ pairs = pairs
 
 --]]
 
-pathSymbols = "%!%$%&%'%(%)%*%,%-%.%:%;%=%@%_%~"
+local encodeFilePathPart
+do
+
+    pathSymbols = "%!%$%&%'%(%)%*%,%-%.%:%;%=%@%_%~"
+
+    encodeFilePathPart = ( str ) ->
+        return Encode( Decode( str ), pathSymbols )
 
 services = {
     ftp: "21"
@@ -62,52 +71,195 @@ services = {
     jms: "5673"
 }
 
-local parse, build
+meta = {
+    VERSION: "1.0.0"
+    Services: services
+    __tostring: =>
+        return @href
+}
 
-rebuild = ( data ) ->
-    parse( data, build( data ) )
+do
+
+    getmetatable = getmetatable
+
+    meta.__eq = ( a, b ) ->
+        return getmetatable( b ) == meta and b.href == a.href
+
+meta.__index = ( key ) =>
+    return meta[ key ] or rawget( @, "metadata" )[ key ]
+
+build = =>
+    metadata = rawget( @, "metadata" )
+    url = metadata.protocol .. "//"
+
+    username = metadata.username
+    if len( username ) ~= 0
+        url ..= username
+
+        password = metadata.password
+        if len( password ) ~= 0
+            url ..= ":" .. password
+
+        url ..= "@"
+
+    hostname = metadata.hostname
+    if len( hostname ) ~= 0
+        url ..= hostname
+
+        port = metadata.port
+        if len( port ) ~= 0 and port ~= services[ metadata.scheme ]
+            url ..= ":" .. port
+
+    return format( "%s%s%s%s", url, metadata.pathname, @searchParams\toString!, metadata.hash )
+
+meta.build = build
+
+parse = ( url, ... ) =>
+    metadata = rawget( @, "metadata" )
+    Empty( metadata )
+
+    -- replace backslashes with slashes
+    url = gsub( url, "\\", "/" )
+
+    -- protocol & scheme
+    url, protocol = Extract( url, "^(.-:)" )
+
+    unless protocol
+        error "URL protocol is missing!", 4
+
+    protocol = lower( protocol )
+    metadata.protocol = protocol
+
+    scheme = sub( protocol, 1, -2 )
+
+    unless find( scheme, "^[a-z].*%w$" )
+        error format( "Invalid URL scheme: \"%s\"", scheme ), 4
+
+    metadata.scheme = scheme
+
+    -- hash
+    url, metadata.hash = Extract( url, "(#.*)$" )
+
+    -- search
+    url, search = Extract( url, "(%?.*)$", "" )
+    metadata.search = search
+
+    if search
+        @searchParams\parse( sub( search, 2 ), @, true )
+    else
+        @searchParams\clear( true )
+
+    -- '//' formatter
+    url = gsub( url, "^//+", "//" )
+
+    -- 'data' like schemes
+    if match( url, "^(.-:)//" )
+        metadata.pathname = url
+        metadata.href = protocol .. url .. search .. metadata.hash
+        return
+
+    -- authority
+    url, authority = Extract( url, "^//([^/]+)" )
+    if authority
+        -- host & auth
+        host, auth = Extract( authority, "^([^@]*)@" )
+        if len( host ) == 0
+            error "URL host is missing!", 4
+
+        -- username & password
+        if auth
+            if len( auth ) == 0
+                error "Invalid URL username!", 4
+
+            usernameEnd = find( auth, ":" )
+            if usernameEnd
+                metadata.username = Encode( Decode( sub( auth, 1, usernameEnd - 1 ) ) )
+                metadata.password = Encode( Decode( sub( auth, usernameEnd + 1 ) ) )
+            else
+                metadata.username = Encode( Decode( auth ) )
+
+        -- host & origin
+        metadata.origin = protocol .. "//" .. host
+        metadata.host = host
+
+        -- hostname
+        hostname, port = Extract( host, ":(.+)", "" )
+        if len( hostname ) == 0
+            error "URL hostname is missing!", 4
+
+        if isv4( hostname )
+            ok, msg = isv4( hostname, true )
+            unless ok
+                error format( "Invalid IPv4 hostname address: \"%s\", %s.", hostname, msg ), 4
+
+        if isv6( hostname )
+            ok, msg = isv6( hostname, true )
+            unless ok
+                error format( "Invalid IPv6 hostname address: \"%s\", %s.", hostname, msg ), 4
+
+        metadata.hostname = hostname
+
+        -- port
+        if len( port ) ~= 0 and not find( port, "^[0-9]+$" )
+            error format( "Invalid URL port: \"%s\"", port ), 4
+
+        metadata.port = port
+
+    -- pathname & href
+    metadata.pathname = gsub( "/" .. Resolve( url, ... ), "([^/]+)", encodeFilePathPart )
+    metadata.href = build( @ )
     return
 
+meta.parse = parse
+
+rebuild = =>
+    parse( @, build( @ ) )
+    return @
+
+meta.rebuild = rebuild
+
 class URLSearchParams
-    new: ( str, data ) =>
-        rawset( @, "__query", {} )
-        @parse( str, data, true )
+    new: ( queryData, urlObject ) =>
+        @query = {}
+        @parse( queryData, urlObject, true )
 
     __tostring: =>
-        return Query( @__query )
+        return Query( @query )
 
     toString: =>
-        return Query( rawget( @, "__query" ) )
+        return Query( @query )
 
-    parse: ( str, data, ignoreData ) =>
-        query = rawget( @, "__query" )
+    parse: ( queryData, urlObject, noFullUpdate ) =>
+        @urlObject = urlObject
+        query = @query
+
         for key in pairs( query )
-            rawset( query, key, nil )
+            query[ key ] = nil
 
-        for key, value in pairs( ParseQuery( str ) )
-            rawset( query, key, value )
+        if istable( queryData )
+            for key, value in pairs( queryData )
+                query[ key ] = value
 
-        if data
-            rawset( @, "__data", data )
+        elseif isstring( queryData )
+            for key, value in pairs( ParseQuery( queryData ) )
+                query[ key ] = value
 
-        @update( ignoreData )
-        return
+        @update( noFullUpdate )
 
-    update: ( ignoreData ) =>
-        unless ignoreData
-            data = rawget( @, "__data" )
-            if data
-                rebuild( data )
+    update: ( noFullUpdate ) =>
+        unless noFullUpdate
+            urlObject = @urlObject
+            if urlObject
+                rebuild( urlObject )
 
         size = 0
-        for _ in pairs( rawget( @, "__query" ) )
+        for _ in pairs( @query )
             size += 1
 
-        rawset( @, "size", size )
-        return
+        @size = size
 
     has: ( ... ) =>
-        query = rawget( @, "__query" )
+        query = @query
         for key in *{ ... }
             unless query[ key ]
                 return false
@@ -115,336 +267,175 @@ class URLSearchParams
         return true
 
     keys: =>
-        query, key = rawget( @, "__query" ), nil
+        query, key = @query, nil
         return ->
             key = next( query, key )
             return key
 
     values: =>
-        query, key = rawget( @, "__query" ), nil
+        query, key = @query, nil
         return ->
             key, value = next( query, key )
             return value
 
     entries: =>
-        return next, rawget( @, "__query" )
+        return next, @query
 
     get: ( key ) =>
-        return rawget( rawget( @, "__query" ), key )
+        return @query[ key ]
 
-    set: ( key, value ) =>
-        rawset( rawget( @, "__query" ), key, value )
-        @update!
+    set: ( key, value, noFullUpdate ) =>
+        @query[ tostring( key ) ] = tostring( value )
+        @update( noFullUpdate )
 
-    merge: ( tbl ) =>
-        Merge( rawget( @, "__query" ), tbl )
-        @update!
-
-    replace: ( tbl ) =>
-        query = rawget( @, "__query" )
-        for key in pairs( tbl )
-            rawset( query, key, nil )
-
-        for key, value in pairs( tbl )
-            rawset( query, key, value )
-
-        @update!
+    merge: ( tbl, noFullUpdate ) =>
+        Merge( @query, tbl )
+        @update( noFullUpdate )
 
     getAll: ( key ) =>
-        query = rawget( @, "__query" )
+        query = @query
         if istable( query[ key ] )
             return query[ key ]
 
-        return { query[ key ] }
+        return {}
 
-    append: ( key, value ) =>
-        query = rawget( @, "__query" )
-        tbl = query[ key ]
-        unless istable( tbl )
-            query[ key ] = { tbl }
+    append: ( key, value, noFullUpdate ) =>
+        @query[] = key .. "=" .. value
+        @update( noFullUpdate )
 
-        if istable( value )
-            query[ key ] = Merge( tbl, value )
+    delete: ( key, value, noFullUpdate ) =>
+        query = @query
+        if value == nil or not istable( query[ key ] )
+            query[ key ] = nil
         else
-            insert( tbl, 1, value )
+            RemoveByIValue( query[ key ], value )
 
-        @update!
+        @update( noFullUpdate )
 
-    delete: ( key ) =>
-        rawset( rawget( @, "__query" ), key, nil )
-        @update!
-
-    clear: =>
-        query = rawget( @, "__query" )
+    clear: ( noFullUpdate ) =>
+        query = @query
         for key in pairs( query )
-            rawset( query, key, nil )
+            query[ key ] = nil
 
-        @update!
+        @update( noFullUpdate )
 
-build = ( data ) ->
-    url = data.protocol .. "//"
+gpm.URLSearchParams = URLSearchParams
 
-    username = data.username
-    if username and len( username ) ~= 0
-        url ..= username
-
-        password = data.password
-        if password and len( password ) ~= 0
-            url ..= ":" .. password
-
-        url ..= "@"
-
-    hostname = data.hostname
-    if hostname and len( hostname ) ~= 0
-        url ..= hostname
-
-        port = data.port
-        if port and len( port ) ~= 0
-            if port ~= services[ data.scheme ]
-                url ..= ":" .. port
-
-    url ..= data.pathname or "/"
-
-    if data.searchParams
-        url ..= tostring( data.searchParams )
-
-    if data.hash
-        url ..= data.hash
-
-    return url
-
-parse = ( data, url, ... ) ->
-    for key in pairs( data )
-        if key ~= "searchParams"
-            data[ key ] = nil
-
-    -- protocol & scheme
-    local protocol, scheme
-    url = gsub url, "^(.-:)", ( str ) ->
-        str = lower( str )
-        scheme = sub( str, 1, -2 )
-        protocol = str
+metadataMeta = {
+    __index: ->
         return ""
-
-    unless protocol
-        error "URL protocol is missing!", 3
-
-    data.protocol = protocol
-
-    unless find( scheme, "^[a-z].*%w$" )
-        error format( "Invalid URL scheme: \"%s\"", scheme ), 3
-
-    data.scheme = scheme
-
-    -- hash
-    url = gsub url, "(#.*)$", ( hash ) ->
-        data.hash = hash
-        return ""
-
-    -- search & searchParams
-    unless data.searchParams
-        data.searchParams = URLSearchParams( "", data )
-
-    url = gsub url, "(%?.*)$", ( str ) ->
-        data.search = str
-        return ""
-
-    if data.search
-        data.searchParams\parse( sub( data.search, 2 ), data, true )
-    else
-        data.searchParams\parse( "", data, true )
-
-    -- specific schemes
-    if services[ scheme ]
-        unless sub( url, 1, 2 ) == "//"
-            url = "//" .. url
-
-    elseif match( url, "^(.-:)/*" )
-        data.pathname = url
-
-        if data.search
-            url ..= data.search
-
-        if data.hash
-            url ..= data.hash
-
-        data.href = protocol .. url
-        return
-
-    -- host
-    url = gsub url, "^//([^/]+)", ( host ) ->
-        -- username & password
-        host = gsub host, "^([^@]*)@", ( auth ) ->
-            usernameEnd = find( auth, ":" )
-            if usernameEnd
-                data.username = Encode( Decode( sub( auth, 1, usernameEnd - 1 ) ) )
-                data.password = Encode( Decode( sub( auth, usernameEnd + 1 ) ) )
-            else
-                data.username = Encode( Decode( auth ) )
-
-            return ""
-
-        if len( host ) == 0
-            error "URL host is missing!", 6
-
-        -- host & origin
-        data.origin = protocol .. "//" .. host
-        data.host = host
-
-        -- hostname
-        local port
-        hostname = gsub host, ":(.+)", ( str ) ->
-            port = str
-            return ""
-
-        if len( hostname ) == 0
-            error "URL hostname is missing!", 6
-
-        if isv4( hostname )
-            ok, msg = isv4( hostname, true )
-            unless ok
-                error format( "Invalid IPv4 hostname address: \"%s\", %s.", hostname, msg ), 6
-
-        if isv6( hostname )
-            ok, msg = isv6( hostname, true )
-            unless ok
-                error format( "Invalid IPv6 hostname address: \"%s\", %s.", hostname, msg ), 6
-
-        data.hostname = hostname
-
-        -- port
-        if port
-            if find( port, "^[0-9]+$" )
-                data.port = port
-            else
-                error format( "Invalid URL port: \"%s\"", port ), 6
-        else
-            data.port = services[ scheme ]
-
-        return ""
-
-    -- pathname
-    data.pathname = gsub "/" .. Resolve( url, ... ), "([^/]+)", ( part ) ->
-        return Encode( Decode( part ), pathSymbols )
-
-    data.href = build( data )
-    return
-
-changeableValues = {
-    protocol: true
-    scheme: true
-
-    hash: true
-
-    search: true
-
-    username: true
-    password: true
-
-    host: true
-
-    hostname: true
-    port: true
-
-    pathname: true
-
-    href: true
 }
 
-class URL
-    VERSION: "1.0.0"
-    Services: services
-
-    new: ( ... ) =>
-        data = {}
-        parse( data, ... )
-        rawset( @, "__data", data )
+URL = setmetatable {
+    __name: "URL"
+    __base: meta
+    __init: ( ... ) =>
+        rawset( @, "metadata", setmetatable( {}, metadataMeta ) )
+        rawset( @, "searchParams", URLSearchParams( "", @ ) )
+        parse( @, ... )
         return
+}, {
+    __index: meta
+    __call: ( cls, ... ) ->
+        obj = setmetatable( {}, meta )
+        cls.__init( obj, ... )
+        return obj
+}
 
-    __index: ( key ) =>
-        return rawget( rawget( @, "__data" ), key ) or ( changeableValues[ key ] and "" )
+meta.__class = URL
+gpm.URL = URL
 
-    __newindex: ( key, value ) =>
+do
+
+    changeableValues = {
+        protocol: true
+        scheme: true
+
+        hash: true
+
+        search: true
+
+        username: true
+        password: true
+
+        host: true
+
+        hostname: true
+        port: true
+
+        pathname: true
+
+        href: true
+    }
+
+    meta.__newindex = ( key, value ) =>
         unless changeableValues[ key ]
             return
 
+        metadata = rawget( @, "metadata" )
         value = tostring( value )
 
-        data = @__data
-        switch key
-            when "protocol"
-                scheme = lower( match( value, "(.*):?" ) )
-                data.scheme = scheme
-                value = scheme .. ":"
+        if key == "protocol"
+            scheme = lower( match( value, "(.*):?" ) )
+            metadata.port = services[ scheme ] or metadata.port
+            metadata.scheme = scheme
+            value = scheme .. ":"
 
-            when "scheme"
-                value = lower( value )
-                data.protocol = value .. ":"
+        elseif key == "scheme"
+            value = lower( value )
+            metadata.protocol = value .. ":"
 
-            when "hash"
-                value = "#" .. match( value, "#?(.*)" )
+        elseif key == "hash"
+            value = "#" .. match( value, "#?(.*)" )
 
-            when "search"
-                value = "?" .. match( value, "%??(.*)" )
-                data.searchParams\parse( sub( value, 2 ), data, true )
+        elseif key == "search"
+            value = "?" .. match( value, "%??(.*)" )
+            @searchParams\parse( sub( value, 2 ), @, true )
 
-            when "username"
-                value = Encode( value )
+        elseif key == "username" or key == "password"
+            value = Encode( Decode( value ) )
 
-            when "password"
-                value = Encode( value )
+        elseif key == "host"
+            if len( value ) == 0
+                error "URL host is missing!", 2
 
-            when "host"
-                if len( value ) == 0
-                    error "URL host is missing!", 2
+            -- origin
+            metadata.origin = @protocol .. "//" .. value
 
-                data.origin = data.protocol .. "//" .. value
+            -- hostname & port
+            hostname, port = Extract( value, ":(.+)" )
+            if len( hostname ) == 0
+                error "URL hostname is missing!", 2
 
-                -- hostname
-                local port
-                hostname = gsub value, ":(.+)", ( str ) ->
-                    port = str
-                    return ""
+            if isv4( hostname )
+                ok, msg = isv4( hostname, true )
+                unless ok
+                    error format( "Invalid IPv4 hostname address: \"%s\", %s.", hostname, msg ), 2
 
-                if len( hostname ) == 0
-                    error "URL hostname is missing!", 2
+            if isv6( hostname )
+                ok, msg = isv6( hostname, true )
+                unless ok
+                    error format( "Invalid IPv6 hostname address: \"%s\", %s.", hostname, msg ), 2
 
-                if isv4( hostname )
-                    ok, msg = isv4( hostname, true )
-                    unless ok
-                        error format( "Invalid IPv4 hostname address: \"%s\", %s.", hostname, msg ), 2
+            metadata.hostname = hostname
 
-                if isv6( hostname )
-                    ok, msg = isv6( hostname, true )
-                    unless ok
-                        error format( "Invalid IPv6 hostname address: \"%s\", %s.", hostname, msg ), 2
-
-                data.hostname = hostname
-
-                -- port
-                if port
-                    if find( port, "^[0-9]+$" )
-                        data.port = port
-                    else
-                        error format( "Invalid URL port: \"%s\"", port ), 2
+            -- port
+            if port
+                if find( port, "^[0-9]+$" )
+                    metadata.port = port
                 else
-                    data.port = services[ scheme ]
+                    error format( "Invalid URL port: \"%s\"", port ), 2
+            else
+                metadata.port = services[ scheme ]
 
-            when "pathname"
-                value = gsub "/" .. Resolve( value ), "([^/]+)", ( part ) ->
-                    return Encode( Decode( part ), pathSymbols )
+        elseif key == "pathname"
+            value = gsub( "/" .. Resolve( value ), "([^/]+)", encodeFilePathPart )
 
-            when "href"
-                return parse( data, value )
+        elseif key == "href"
+            return parse( @, value )
 
-        data[ key ] = value
-        return rebuild( data )
-
-    __tostring: =>
-        return @href
-
-    __eq: ( other ) =>
-        return other and @href == other.href
+        metadata[ key ] = value
+        return rebuild( @ )
 
 --// Tests //-->
 

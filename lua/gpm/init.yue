@@ -72,9 +72,8 @@ lib = IncludeShared( "gpm/libs/promise.lua" )
 logger\Info( "gm_promise v%s initialized.", lib.VERSION )
 gpm.Promise = lib
 
-lib = IncludeShared( "gpm/libs/url.lua" )
-logger\Info( "URL v%s initialized.", lib.VERSION )
-gpm.URL = lib
+IncludeShared( "gpm/libs/url.lua" )
+logger\Info( "URL v%s initialized.", gpm.URL.VERSION )
 
 deflate = IncludeShared( "gpm/libs/3rd-party/deflate.lua" )
 logger\Info( "LibDeflate v%s initialized.", deflate._VERSION )
