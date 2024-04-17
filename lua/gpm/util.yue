@@ -178,6 +178,13 @@ split = ( str, separator = " ", withPattern ) ->
 string.Explode = split
 string.Split = split
 
+string.Extract = ( str, pattern, default ) ->
+    startPos, endPos, matched = find( str, pattern, 1, false )
+    if startPos
+        return sub( str, 1, startPos - 1 ) .. sub( str, endPos + 1 ), matched or default
+
+    return str, default
+
 ArgAssert = nil
 do
 
