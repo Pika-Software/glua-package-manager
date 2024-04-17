@@ -398,7 +398,7 @@ do
         if length == 0
             return ""
 
-        return concat( result, "/" )
+        return concat( result, "/", 1, length )
 
     getfmain = ->
         for level = 2, 16
@@ -498,47 +498,47 @@ do
 
     http.Decode = decode
 
+    http.ParseQueryValue = ( str ) ->
+        tbl, length = {}, 0
+        for value in gmatch( str, "\"(.-)\"" )
+            length += 1
+            tbl[ length ] = decode( value )
+
+        return tbl, length
+
     http.ParseQuery = ( str ) ->
         result = {}
         for key, value in gmatch( str, "([^&=?]-)=([^&=?]+)" )
-            if find( value, "^%[.+%]$" )
-                tbl, length = {}, 0
-                for var in gmatch( value, "\"(.-)\"" )
-                    length += 1
-                    tbl[ length ] = decode( var )
-
-                value = tbl
-            else
-                value = decode( value )
-
-            result[ decode( key ) ] = value
+            result[ decode( key ) ] = decode( value )
 
         return result
 
     queryKeySymbols = "%-%_%."
     queryValueSymbols = "%!%$%'%(%)%*%,%-%.%:%;%@%_%~"
 
+    http.ListToQueryValue = ( lst ) ->
+        length = #lst
+        if length == 0
+            return ""
+
+        for index = 1, length
+            lst[ index ] = "\"" .. encode( lst[ index ], queryValueSymbols ) .. "\""
+
+        return "[" .. concat( lst, ",", 1, length ) .. "]"
+
     http.Query = ( tbl ) ->
         result, length = {}, 0
         for key, value in pairs( tbl )
-            if istable( value )
-                if #value == 0
-                    continue
-
-                for index = 1, #value
-                    value[ index ] = "\"" .. encode( value[ index ], queryValueSymbols ) .. "\""
-
-                value = "[" .. concat( value, "," ) .. "]"
-            else
-                value = encode( value, queryValueSymbols )
-
             length += 1
-            result[ length ] = encode( key, queryKeySymbols ) .. "=" .. value
+            result[ length ] = format( "%s=%s", encode( key, queryKeySymbols ), encode( value, queryValueSymbols ) )
 
         if length == 0
             return "", length
 
-        return "?" .. concat( result, "&" ), length
+        if length == 1
+            return "?" .. result[ length ], length
+
+        return "?" .. concat( result, "&", 1, length ), length
 
 class util.Stack
     __tostring: =>
