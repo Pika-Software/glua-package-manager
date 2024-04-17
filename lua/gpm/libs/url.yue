@@ -345,8 +345,8 @@ do
                 if index > size
                     return
 
-                line = query[ index ]
-                return line[ 1 ], line[ 2 ]
+                data = query[ index ]
+                return data[ 1 ], data[ 2 ]
 
         keys: =>
             query, size = @query, @size

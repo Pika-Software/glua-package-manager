@@ -507,11 +507,12 @@ do
         return tbl, length
 
     http.ParseQuery = ( str ) ->
-        result = {}
+        result, length = {}, 0
         for key, value in gmatch( str, "([^&=?]-)=([^&=?]+)" )
-            result[ decode( key ) ] = decode( value )
+            length += 1
+            result[ length ] = { decode( key ), decode( value ) }
 
-        return result
+        return result, length
 
     queryKeySymbols = "%-%_%."
     queryValueSymbols = "%!%$%'%(%)%*%,%-%.%:%;%@%_%~"
@@ -526,17 +527,20 @@ do
 
         return "[" .. concat( lst, ",", 1, length ) .. "]"
 
-    http.Query = ( tbl ) ->
-        result, length = {}, 0
-        for key, value in pairs( tbl )
-            length += 1
-            result[ length ] = format( "%s=%s", encode( key, queryKeySymbols ), encode( value, queryValueSymbols ) )
+    http.Query = ( query, length ) ->
+        length = length or #query
 
         if length == 0
             return "", length
 
         if length == 1
-            return "?" .. result[ length ], length
+            data = query[ length ]
+            return format( "?%s=%s", encode( data[ 1 ], queryKeySymbols ), encode( data[ 2 ], queryValueSymbols ) ), length
+
+        result = {}
+        for index = 1, length
+            data = query[ index ]
+            result[ index ] = format( "%s=%s", encode( data[ 1 ], queryKeySymbols ), encode( data[ 2 ], queryValueSymbols ) )
 
         return "?" .. concat( result, "&", 1, length ), length
 
