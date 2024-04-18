@@ -144,7 +144,7 @@ do
     string.IsURL = ( str ) ->
         return match( str, "[a-z]+://[^ >,;]+" ) ~= nil
 
-import byte, char, sub, gsub, format, lower, len, find from string
+import byte, char, sub, gsub, format, len, find from string
 import concat, remove from table
 import getinfo from debug
 
@@ -226,6 +226,10 @@ table.HasValue = ( tbl, any, isSequential ) ->
 
 	return false
 
+table.Empty = ( tbl ) ->
+    for key in pairs( tbl )
+        tbl[ key ] = nil
+
 table.RemoveByIValue = ( tbl, any ) ->
     for index = 1, #tbl
         if tbl[ index ] == any
@@ -262,35 +266,23 @@ table.SetValue = ( tbl, str, value, ifEmpty ) ->
 
 do
 
-    Lower = ( tbl ) ->
+    import lower from string
+
+    lowerTableKeys = ( tbl ) ->
         for key, value in pairs( tbl )
             if istable( value )
-                value = Lower( value )
+                value = lowerTableKeys( value )
 
             if isstring( key )
                 tbl[ lower( key ) ] = value
                 tbl[ key ] = nil
             elseif istable( key )
-                tbl[ Lower( key ) ] = value
+                tbl[ lowerTableKeys( key ) ] = value
                 tbl[ key ] = nil
 
         return tbl
 
-    table.Lower = Lower
-
-table.RemoveByFunction = ( tbl, func ) ->
-    result, length, fulfilled = {}, 0, false
-    while fulfilled == false
-        fulfilled = true
-
-        for index = 1, #tbl
-            if func( index, tbl[ index ] )
-                length += 1
-                fulfilled = false
-                result[ length ] = remove( tbl, index )
-                break
-
-    return result, length
+    table.LowerKeys = lowerTableKeys
 
 gpm.AddType = ( typeName, func ) ->
     ArgAssert( typeName, 1, "string" )
@@ -338,27 +330,21 @@ do
 do
 
     import StripExtension from string
-    import Empty from table
 
     path = Table( gpm, "path" )
 
-    path_RemoveBackslash = ( filePath ) ->
-        return gsub( filePath, "[/\\]?$", "" )
+    fix = ( filePath ) ->
+        return gsub( filePath, "[/\\]+", "/" )
 
-    path.RemoveBackslash = path_RemoveBackslash
+    path.Fix = fix
 
-    path_Fix = ( filePath ) ->
-        return lower( path_RemoveBackslash( gsub( filePath, "[/\\]+", "/" ) ) )
-
-    path.Fix = path_Fix
-
-    path_Localize = ( filePath ) ->
+    localize = ( filePath ) ->
         return gsub( gsub( gsub( filePath, "^cache/[%w%-_]/", "" ), "^addons/[%w%-_]-/", "" ), "^lua/", "" )
 
-    path.Localize = path_Localize
+    path.Localize = localize
 
     path.Join = ( ... ) ->
-        return path_Fix( concat( { ... }, "/" ) )
+        return fix( concat( { ... }, "/" ) )
 
     path.ReplaceExtension = ( filePath, newExtension ) ->
         return StripExtension( filePath ) .. "." .. newExtension
@@ -414,7 +400,7 @@ do
     getfpathi = ( level ) ->
         info = getinfo( level, "S" )
         if info.what == "main"
-            return path_Localize( path_Fix( sub( info.source, 2 ) ) )
+            return localize( fix( sub( info.source, 2 ) ) )
 
     debug.getfpathi = getfpathi
 
@@ -818,7 +804,7 @@ util.Version = ( number ) ->
 
 do
 
-    :Simple = timer
+    import Simple from timer
 
     util.NextTick = ( func, a, b, c, d, e, f ) ->
         ArgAssert( func, 1, "function" )
@@ -827,10 +813,28 @@ do
 
 do
 
-    :Exists = file
+    import Exists from file
 
     util.IsLuaModuleInstalled = ( name ) ->
         return Exists( "includes/modules/" .. name .. ".lua", "LUA" )
+
+if SERVER
+
+    AddCSLuaFile = AddCSLuaFile
+    import Fix from gpm.path
+    import Find from file
+
+    addCSLuaFolder = ( folderPath ) ->
+        folderPath = Fix( folderPath .. "/" )
+
+        _, folders = Find( folderPath .. "*", "lsv" )
+        for folderName in *folders
+            addCSLuaFolder( folderPath .. folderName )
+
+        for fileName in *Find( folderPath .. "*.lua", "lsv" )
+            AddCSLuaFile( folderPath .. fileName )
+
+    util.AddCSLuaFolder = addCSLuaFolder
 
 do
 
@@ -848,98 +852,95 @@ do
             gpm: Color( 180, 180, 255 )
         }
 
-    :PrimaryText, :SecondaryText, :Info, :Warn, :Error, :Debug, :Realm, :White = colors
-    :RealmName = gpm
+    :PrimaryText, :SecondaryText, :Info, :Warn, :Error, :Debug, :White = colors
 
-    unless isstring( RealmName )
-        RealmName, Realm = "Unknown", White
-
+    unless isstring( gpm.RealmName )
         if MENU_DLL
-            RealmName, Realm = "Menu", Color( 75, 175, 80 )
+            gpm.RealmName, colors.Realm = "Menu", Color( 75, 175, 80 )
         elseif CLIENT
-            RealmName, Realm = "Client", Color( 225, 170, 10 )
+            gpm.RealmName, colors.Realm = "Client", Color( 225, 170, 10 )
         elseif SERVER
-            RealmName, Realm = "Server", Color( 5, 170, 250 )
+            gpm.RealmName, colors.Realm = "Server", Color( 5, 170, 250 )
+        else
+           gpm.RealmName, colors.Realm = "Unknown", White
 
-        gpm.RealmName, colors.Realm = RealmName, Realm
-
-    log = nil
+    local log
     do
 
-        RealmName = "[" .. string.upper( RealmName ) .. "] "
-        select = select
+        import date from os
         MsgC = MsgC
-        :date = os
+
+        realmName = "[" .. string.upper( gpm.RealmName ) .. "] "
+        realmColor = colors.Realm
 
         log = ( color, level, str, ... ) =>
             ArgAssert( color, 1, "Color" )
             ArgAssert( level, 2, "string" )
-
-            if select( "#", ... ) > 0
-                str = format( str, ... )
-
-            MsgC( SecondaryText, date( "%d-%m-%Y %H:%M:%S " ), Realm, RealmName, color, level, SecondaryText, " --> ", @Color, @Name, SecondaryText, " : ", @TextColor, str, "\n" )
+            MsgC( SecondaryText, date( "%d-%m-%Y %H:%M:%S " ), realmColor, realmName, color, level, SecondaryText, " --> ", @color, @name, SecondaryText, " : ", @text_color, format( str, ... ), "\n" )
 
     debugFilter = ->
         return gpm.Developer > 0
 
     class Logger
         __tostring: =>
-            return format( "Logger: %p [%s]", @, @Name )
+            return format( "Logger: %p [%s]", @, @name )
 
         new: ( name, color, func ) =>
-            @Name = isstring( name ) and name or "unknown"
-            @Color = iscolor( color ) and color or White
-            @DebugFilter = isfunction( func ) and func or debugFilter
-            @TextColor = PrimaryText
+            @name = isstring( name ) and name or "unknown"
+            @color = iscolor( color ) and color or White
+            @debug_filter = isfunction( func ) and func or debugFilter
+            @text_color = PrimaryText
 
         -- Logger Name
         GetName: =>
-            return @Name
+            return @name
 
         SetName: ( str ) =>
             ArgAssert( str, 1, "string" )
-            @Name = str
+            @name = str
 
         -- Logger Color
         GetColor: =>
-            return @Color
+            return @color
 
         SetColor: ( color ) =>
             ArgAssert( color, 1, "Color" )
-            @Color = color
+            @color = color
 
         -- Logger Text Color
         GetTextColor: =>
-            return @TextColor
+            return @text_color
 
         SetTextColor: ( color ) =>
             ArgAssert( color, 1, "Color" )
-            @TextColor = color
+            @text_color = color
 
         -- Logger Debug Filter
         GetDebugFilter: =>
-            return @DebugFilter
+            return @debug_filter
 
         SetDebugFilter: ( func ) =>
             ArgAssert( func, 1, "function" )
-            @DebugFilter = func
+            @debug_filter = func
 
         -- Logger Functions
         Log: log
 
         Info: ( ... ) =>
-            log( @, Info, "INFO ", ... )
+            log( @, Info, " INFO ", ... )
 
         Warn: ( ... ) =>
-            log( @, Warn, "WARN ", ... )
+            log( @, Warn, " WARN ", ... )
 
         Error: ( ... ) =>
-            log( @, Error, "ERROR", ... )
+            log( @, Error, "ERROR ", ... )
+
+        Loaded: ( ... ) =>
+            log( @, Debug, "LOADED", ... )
 
         Debug: ( ... ) =>
-            if @DebugFilter( ... )
-                log( @, Debug, "DEBUG", ... )
+            if @debug_filter( ... )
+                log( @, Debug, "DEBUG ", ... )
 
     gpm.Logger = Logger( "gpm@" .. gpm.VERSION, colors.gpm )
     util.Logger = Logger

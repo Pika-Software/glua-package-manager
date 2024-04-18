@@ -316,7 +316,7 @@ do
 
 if SERVER
 
-    :ReplaceExtension, :RemoveBackslash = path
+    :ReplaceExtension, :Fix = path
     AddCSLuaFile = AddCSLuaFile
     :getfpath = debug
 
@@ -346,14 +346,14 @@ if SERVER
 
     -- file.AddCSLuaFolder( folderPath )
     addCSLuaFolder = ( folderPath ) ->
-        folderPath = RemoveBackslash( folderPath )
-        files, folders = Find( folderPath .. "/*", "lsv" )
+        folderPath = Fix( folderPath .. "/" )
 
+        files, folders = Find( folderPath .. "*", "lsv" )
         for folderName in *folders
-            addCSLuaFolder( folderPath .. "/" .. folderName )
+            addCSLuaFolder( folderPath .. folderName )
 
         for fileName in *files
-            filePath = folderPath .. "/" .. fileName
+            filePath = folderPath .. fileName
             if isCompilable( filePath, true )
                 AddCSLuaFile( ReplaceExtension( filePath, "lua" ) )
 

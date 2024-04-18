@@ -1,77 +1,67 @@
-gpm = gpm
-:util, :Logger = gpm
+import util, Logger from gpm
 
 if util.IsBinaryModuleInstalled( "moonloader" )
-    local ok, message = pcall( require, "moonloader" )
-    if ok
-        Logger\Info( "gm_moonloader v%s initialized.", util.Version( moonloader._VERSION ) )
+    local ok, msg = pcall( require, "moonloader" )
+    if ok and istable( moonloader )
+        Logger\Loaded( "gm_moonloader v%s", util.Version( moonloader._VERSION ) )
     else
-        Logger\Error( "gm_moonloader startup error: %s", message )
+        Logger\Error( "gm_moonloader startup error: %s", msg or "unknown error" )
         return
-else
-    Logger\Warn( "gm_moonloder is missing, support of yuescript and moonscript is disabled, running packages using these languages is not possible!" )
+
+unless istable( moonloader )
+    Logger\Warn( "gm_moonloader is missing, support for moon and yue scripts is unavailable!" )
     return
 
+gpm.moonloader = moonloader
+
 CompileString = CompileString
+import ArgAssert from gpm
 isfunction = isfunction
 istable = istable
-:ArgAssert = gpm
 error = error
 
 -- MoonScript
-moonloader = moonloader
-if istable( moonloader )
-    gpm.moonloader = moonloader
-    moonloader_ToLua = moonloader.ToLua
+do
+
+    import ToLua from moonloader
 
     util.CompileMoonString = ( moonCode, identifier, handleError ) ->
         ArgAssert( moonCode, "string", 1 )
         ArgAssert( identifier, "string", 2 )
 
-        luaCode, message = moonloader_ToLua( moonCode )
-        message = message or "MoonScript to Lua compilation failed."
-
+        luaCode, msg = ToLua( moonCode )
         unless luaCode
-            error( message )
+            error( msg or "MoonScript compilation failed." )
 
         func = CompileString( luaCode, identifier, handleError == true )
         unless isfunction( func )
-            error( message )
+            error( msg or "MoonScript compilation failed." )
 
         return func
-
-    Logger\Info( "MoonScript: Found" )
-
-else
-
-    Logger\Info( "MoonScript: Missing" )
 
 -- Yuescript
-yue = moonloader and moonloader.yue
-if istable( yue )
-    yue_ToLua = yue.ToLua
+:yue = moonloader
 
-    -- https://github.com/pigpigyyy/Yuescript/src/yuescript/yue_compiler.h#L28
-    util.CompileYueString = ( yueCode, identifier, handleError, yueConfig ) ->
-        ArgAssert( yueCode, "string", 1 )
-        ArgAssert( identifier, "string", 2 )
-        if yueConfig ~= nil
-            ArgAssert( yueConfig, "table", 4 )
+unless istable( yue )
+    Logger\Warn( "Yuescript support is missing, yue package execution is unavailable!" )
+    return
 
-        luaCode, message = yue_ToLua( yueCode, yueConfig )
-        message = message or "Yuescript to Lua compilation failed."
+import ToLua from yue
 
-        unless luaCode
-            error( message )
+-- https://github.com/pigpigyyy/Yuescript/src/yuescript/yue_compiler.h#L28
+util.CompileYueString = ( yueCode, identifier, handleError, yueConfig ) ->
+    ArgAssert( yueCode, "string", 1 )
+    ArgAssert( identifier, "string", 2 )
 
-        func = CompileString( luaCode, identifier, handleError == true )
-        unless isfunction( func )
-            error( message )
+    if yueConfig ~= nil
+        ArgAssert( yueConfig, "table", 4 )
 
-        return func
+    luaCode, msg = ToLua( yueCode, yueConfig )
+    unless luaCode
+        error( msg or "Yuescript compilation failed." )
 
-    Logger\Info( "Yuescript: Found" )
+    func = CompileString( luaCode, identifier, handleError == true )
+    unless isfunction( func )
+        error( msg or "Yuescript compilation failed." )
 
-else
-
-    Logger\Info( "Yuescript: Missing" )
+    return func

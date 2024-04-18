@@ -1,6 +1,5 @@
+include = include
 SERVER = SERVER
-if SERVER
-    AddCSLuaFile!
 
 unless istable( gpm )
     global gpm = { VERSION: "2.0.0" }
@@ -10,13 +9,15 @@ gpm.StartTime = SysTime!
 
 do
 
-    username = "unknown user"
-    if cvars.String
+    local username
+    if cvars
         username = cvars.String( SERVER and "hostname" or "name", username )
+    else
+        username = "unknown user"
 
     gpm.UserName = username
 
-    splash = {
+    splashes = {
         "I know you, " .. username .. "..."
         "Flying over rooftops..."
         "We need more packages!"
@@ -34,8 +35,10 @@ do
         "I see you."
     }
 
-    splash[] = "Wow, here more " .. #splash .. " splashes!"
-    splash = splash[ math.random( 1, #splash ) ]
+    count = #splashes + 1
+    splashes[ count ] = "Wow, here more " .. ( count - 1 ) .. " splashes!"
+
+    splash = splashes[ math.random( 1, count ) ]
     for i = 1, ( 25 - #splash ) / 2
         if i % 2 == 1
             splash ..= " "
@@ -43,58 +46,86 @@ do
 
     print( string.format( "\n                                     ___          __            \n                                   /'___`\\      /'__`\\          \n     __    _____     ___ ___      /\\_\\ /\\ \\    /\\ \\/\\ \\         \n   /'_ `\\ /\\ '__`\\ /' __` __`\\    \\/_/// /__   \\ \\ \\ \\ \\        \n  /\\ \\L\\ \\\\ \\ \\L\\ \\/\\ \\/\\ \\/\\ \\      // /_\\ \\ __\\ \\ \\_\\ \\   \n  \\ \\____ \\\\ \\ ,__/\\ \\_\\ \\_\\ \\_\\    /\\______//\\_\\\\ \\____/   \n   \\/___L\\ \\\\ \\ \\/  \\/_/\\/_/\\/_/    \\/_____/ \\/_/ \\/___/    \n     /\\____/ \\ \\_\\                                          \n     \\_/__/   \\/_/                %s                        \n\n  GitHub: https://github.com/Pika-Software\n  Discord: https://discord.gg/Gzak99XGvv\n  Website: https://pika-soft.ru\n  Developers: Pika Software\n  License: MIT\n", splash ) )
 
-unless CLIENT and gpm.Developer
+if cvars
     gpm.Developer = cvars.Number( "developer", 0 )
-    cvars.AddChangeCallback( "developer", ( _, __, new ) ->
-        gpm.Developer = tonumber( new ) or 0
+
+    cvars.AddChangeCallback( "developer", ( _, __, value ) ->
+        gpm.Developer = tonumber( value ) or 0
     "gLua Package Manager" )
 
-IncludeShared = ( filePath ) ->
-    if SERVER
-        AddCSLuaFile( filePath )
-    return include( filePath )
-
-IncludeShared( "gpm/util.lua" )
+include( "gpm/util.lua" )
 logger = gpm.Logger
 
-gpm.url = IncludeShared( "gpm/libs/3rd-party/url.lua" )
-gpm.ip = IncludeShared( "gpm/libs/3rd-party/ip.lua" )
+if SERVER
 
-IncludeShared( "gpm/moonloader.lua" )
-logger\Info( "metaworks v%s initialized.", IncludeShared( "libs/metaworks.lua" ).VERSION )
+    import AddCSLuaFolder from gpm.util
+    AddCSLuaFile = AddCSLuaFile
 
-import Error, TypeError, RuntimeError from IncludeShared( "gpm/libs/error.lua" )
-gpm.Error, gpm.TypeError, gpm.RuntimeError = Error, TypeError, RuntimeError
-class gpm.NotImplementedError extends Error
-logger\Info( "gm_error initialized." )
+    AddCSLuaFolder( "gpm/sources" )
+    AddCSLuaFolder( "gpm/libs" )
 
-lib = IncludeShared( "gpm/libs/promise.lua" )
-logger\Info( "gm_promise v%s initialized.", lib.VERSION )
-gpm.Promise = lib
+    clientSideFiles = {
+        "moonloader.lua"
+        "filesystem.lua"
+        "sources.lua"
+        "package.lua"
+        "loader.lua"
+        "init.lua"
+        "http.lua"
+        "util.lua"
+    }
 
-IncludeShared( "gpm/libs/url.lua" )
-logger\Info( "URL v%s initialized.", gpm.URL.VERSION )
+    for index = 1, #clientSideFiles
+        AddCSLuaFile( "gpm/" .. clientSideFiles[ index ] )
 
-deflate = IncludeShared( "gpm/libs/3rd-party/deflate.lua" )
-logger\Info( "LibDeflate v%s initialized.", deflate._VERSION )
+-- 3rd-party libraries
+gpm.url = include( "libs/3rd-party/url.lua" )
+gpm.ip = include( "libs/3rd-party/ip.lua" )
+
+-- LibDeflate
+deflate = include( "libs/3rd-party/deflate.lua" )
+logger\Loaded( "LibDeflate v%s", deflate._VERSION )
 gpm.deflate = deflate
 
-IncludeShared( "gpm/filesystem.lua" )
-IncludeShared( "gpm/http.lua" )
+-- gm_error
+for key, value in pairs( include( "libs/error.lua" ) )
+    gpm[ key ] = value
 
-GMAD = IncludeShared( "gpm/libs/gmad.lua" )
-gpm.GMAD = GMAD
-logger\Info( "%s%d v%s initialized.", GMAD.Identity, GMAD.FormatVersion, GMAD.VERSION )
+class gpm.NotImplementedError extends gpm.Error
 
-IncludeShared( "gpm/package.lua" )
-IncludeShared( "gpm/sources.lua" )
-IncludeShared( "gpm/loader.lua" )
+-- gm_promise
+promise = include( "libs/promise.lua" )
+logger\Loaded( "gm_promise v%s", promise.VERSION )
+gpm.Promise = promise
 
-for f in *file.Find( "gpm/sources/*.lua", "LUA" )
-    IncludeShared( "gpm/sources/#{f}" )
+-- URL & URLSearchParams
+include( "libs/url.lua" )
+logger\Loaded( "URL v%s", gpm.URL.VERSION )
+
+-- gm_moonloader & metaworks
+include( "libs/metaworks.lua" )
+include( "moonloader.lua" )
+
+-- filesystem & http
+include( "filesystem.lua" )
+include( "http.lua" )
+
+-- GMAD
+gmad = include( "libs/gmad.lua" )
+gpm.GMAD = gmad
+logger\Loaded( "%s%d v%s", gmad.Identity, gmad.FormatVersion, gmad.VERSION )
+
+-- Packages
+include( "package.lua" )
+include( "sources.lua" )
+include( "loader.lua" )
+
+-- Sources
+for fileName in *file.Find( "gpm/sources/*.lua", "LUA" )
+    include( "sources/" .. fileName )
 
 if SERVER
-    include( "gpm/test.lua" )
+    include( "test.lua" )
 
 logger\Info( "Start-up time: %.4f sec.", SysTime! - gpm.StartTime )
 return gpm
