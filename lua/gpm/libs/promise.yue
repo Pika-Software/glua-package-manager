@@ -21,21 +21,25 @@
     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
     SOFTWARE.
 --]]
-timer_Simple = timer.Simple
-:Error, :TypeError, :RuntimeError = gpm
+import Error, TypeError, RuntimeError from gpm
+import Simple from timer
 isfunction = isfunction
 istable = istable
+
 iscallable = (obj) ->
     if isfunction obj then return true
     if istable obj then
         meta = getmetatable obj
         return istable(meta) and isfunction(meta.__call)
+
 get_thenable = (obj) ->
     then_fn = obj.Then or obj.next
     iscallable(then_fn) and then_fn
+
 get_awaitable = (obj) ->
     awaitable = obj.Await or obj.await
     iscallable(awaitable) and awaitable
+
 once = () ->
     was_called = false
     (wrapped_fn) ->
@@ -43,13 +47,18 @@ once = () ->
             return ... if was_called
             was_called = true
             wrapped_fn ...
+
 capture_stack = (start_pos = 1) ->
-    stack = {}
+    stack, length = {}, 0
     for i = 1 + start_pos, 16
         info = debug.getinfo i, "Snl"
-        unless info then break
-        stack[] = info
-    return stack
+        unless info
+            break
+
+        length += 1
+        stack[ length ] = info
+
+    return stack, length
 
 error_with_custom_stack = (err, stack) ->
     lines = {}
@@ -116,7 +125,7 @@ class Promise
 
     _Finalize: =>
         return if @state == @STATE_PENDING
-        timer_Simple 0, ->
+        Simple 0, ->
             if @queue
                 for i, p in ipairs @queue
                     @_FinalizePromise p
@@ -305,7 +314,7 @@ class Promise
 
     @Delay: (time, value) ->
         p = Promise!
-        timer_Simple time, -> p\Resolve value
+        Simple time, -> p\Resolve value
         return p
 
     @HTTP: (options) ->

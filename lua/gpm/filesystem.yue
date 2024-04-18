@@ -1,16 +1,16 @@
-import util, path, string, Logger, Error, ArgAssert, Promise from gpm
 import GetPathFromFilename, GetExtensionFromFilename from string
+import util, path, string, Logger, ArgAssert, Promise from gpm
 import async, await from Promise
 
 SERVER = SERVER
 CLIENT = CLIENT
+select = select
+error = error
 file = file
 gpm = gpm
 
-select = select
-error = error
-:Find = file
-:Join = path
+import Join, Resolve from path
+import Find from file
 
 -- https://github.com/Pika-Software/gm_efsw
 if SERVER and not efsw and util.IsBinaryModuleInstalled( "efsw" ) and pcall( require, "efsw" )
@@ -18,9 +18,6 @@ if SERVER and not efsw and util.IsBinaryModuleInstalled( "efsw" ) and pcall( req
 
 lib = gpm.Table gpm, "file", ->
     return setmetatable( {}, { __index: file } )
-
--- file.Move( filePath, newFilePath ) - moves file to new path
-lib.Move = file.Rename
 
 -- file.Time( filePath, gamePath ) - returns file creation time as number
 lib.Time = file.Time
@@ -32,13 +29,34 @@ lib.Find = Find
 luaPath = SERVER and "lsv" or "LUA"
 lib.LuaPath = luaPath
 
-isMounted = nil
+do
+
+    import getfpath from gpm.debug
+    import LocalizeLua from path
+
+    file.ResolvePath = ( ... ) ->
+        return Resolve( LocalizeLua( getfpath! ), ... )
+
+do
+
+    import GetFileFromFilename from string
+    import Rename from file
+
+    -- file.Move( filePath, newFilePath ) - moves file to new path
+    lib.Move = ( filePath, newFilePath ) ->
+        return Rename( filePath, Resolve( filePath, newFilePath .. "/" .. GetFileFromFilename( filePath ) ) )
+
+    -- file.Rename( filePath, newFileName ) - renames file
+    lib.Rename = ( filePath, newFileName ) ->
+        return Rename( filePath, Resolve( GetPathFromFilename( filePath ) .. "/" .. newFileName ) )
+
+local isMounted
 do
 
     -- file.MountedFiles - table of mounted files
     mountedFiles = gpm.Table lib, "MountedFiles", ->
-        :StartsWith = string
-        :insert = gpm.table
+        import StartsWith from string
+        import insert from gpm.table
         rawset = rawset
 
         return setmetatable( {}, {
@@ -69,8 +87,8 @@ do
     -- file.MountGMA( filePath ) - mounts gma file to game filesystem and returns state and list of files
     do
 
+        import MountGMA from game
         ok, length = false, 0
-        :MountGMA = game
 
         lib.MountGMA = ( filePath ) ->
             ok, files = MountGMA( filePath )
@@ -84,11 +102,11 @@ do
 
             return false
 
-isDir, isFile, createDir = nil, nil, nil
+local isDir, isFile, createDir
 do
 
-    :Delete, :Exists, :IsDir = file
-    :Split = string
+    import Delete, Exists, IsDir from file
+    import Split from string
 
     -- file.Exists( filePath, gamePath ) - check if the path exists
     lib.Exists = ( filePath, gamePath ) ->
@@ -97,7 +115,7 @@ do
     -- file.IsDir( filePath, gamePath ) - check if the path is a directory
     do
 
-        :HasValue = gpm.table
+        import HasValue from gpm.table
 
         isDir = ( filePath, gamePath ) ->
             if isMounted( filePath, gamePath, true ) or IsDir( filePath, gamePath )
@@ -141,7 +159,7 @@ do
     -- file.CreateDir( folderPath, force ) - create the folders by the path
     do
 
-        :CreateDir = file
+        import CreateDir from file
 
         createDir = ( folderPath, force ) ->
             if force
@@ -167,27 +185,24 @@ do
         lib.CreateDir = createDir
 
     -- file.Size( filePath, gamePath ) - return the size of the file or folder in bytes as a number
-    do
+    import Size from file
 
-        :Size = file
+    size = ( filePath, gamePath ) ->
+        unless isDir( filePath, gamePath )
+            return Size( filePath, gamePath )
+
         result = 0
 
-        size = ( filePath, gamePath ) ->
-            unless isDir( filePath, gamePath )
-                return Size( filePath, gamePath )
+        files, folders = Find( Join( filePath, "*" ), gamePath )
+        for fileName in *files
+            result += Size( Join( filePath, fileName ), gamePath )
 
-            result = 0
+        for folderName in *folders
+            result += size( Join( filePath, folderName ), gamePath )
 
-            files, folders = Find( Join( filePath, "*" ), gamePath )
-            for fileName in *files
-                result += Size( Join( filePath, fileName ), gamePath )
+        return result
 
-            for folderName in *folders
-                result += size( Join( filePath, folderName ), gamePath )
-
-            return result
-
-        lib.Size = size
+    lib.Size = size
 
 -- file.BuildFilePath( filePath, force ) - build the file path
 buildFilePath = ( filePath, force ) ->
@@ -199,14 +214,37 @@ buildFilePath = ( filePath, force ) ->
 
 lib.BuildFilePath = buildFilePath
 
--- file.IsCompilable( filePath, doPreCache ) - check if the file can be compiled
-isCompilable = nil
+-- file.GetFilePaths( folderPath, gamePath ) - return all files and subfolders in the folder like a table with strings
 do
 
-    :moonloader = gpm
-    :sub = string
+    getFilePaths = ( folderPath, gamePath, result, length ) ->
+        unless result
+            result, length = {}, 0
 
-    preCacheFunc = moonloader and moonloader.PreCacheFile or nil
+        folderPath = Resolve( folderPath .. "/" )
+
+        files, folders = Find( folderPath .. "*", gamePath or "GAME" )
+        unless files
+            return result, length
+
+        for fileName in *files
+            length += 1
+            result[ length ] = folderPath .. fileName
+
+        for folderName in *folders
+            getFilePaths( folderPath .. folderName, gamePath, result, length )
+
+        return result, length
+
+    lib.GetFilePaths = getFilePaths
+
+-- file.IsCompilable( filePath, doPreCache ) - check if the file can be compiled
+local isCompilable
+do
+
+    preCacheFunc = gpm.moonloader and gpm.moonloader.PreCacheFile
+    import sub from string
+
     supportedExtensions = { moon: true, yue: true, lua: true }
     preCacheableExtensions = { "moon", "yue" }
 
@@ -235,9 +273,10 @@ do
 
 do
 
+    import Open from file
+
     File = FindMetaTable( "File" )
     :Close, :Read, :Write = File
-    :Open = file
 
     do
 
@@ -316,9 +355,9 @@ do
 
 if SERVER
 
-    :ReplaceExtension, :Fix = path
+    import ReplaceExtension, Fix from path
+    import getfpath from gpm.debug
     AddCSLuaFile = AddCSLuaFile
-    :getfpath = debug
 
     -- file.AddCSLuaFile( filePath )
     lib.AddCSLuaFile = ( fileName ) ->
@@ -359,16 +398,16 @@ if SERVER
 
     lib.AddCSLuaFolder = addCSLuaFolder
 
+-- Entropia File System Watcher
 if istable( efsw )
-
-    :Watch, :Unwatch = efsw
+    import Watch, Unwatch from efsw
 
     -- file.WatchList
-    watchList = gpm.Table( lib, "WatchList" )
+    observedFiles = gpm.Table( lib, "ObservedFiles" )
 
     -- file.Watch( filePath, gamePath )
     watch = ( filePath, gamePath ) ->
-        if watchList[ filePath .. ";" .. gamePath ] or ( CLIENT and isMounted( filePath, gamePath ) )
+        if observedFiles[ filePath .. ";" .. gamePath ] or ( CLIENT and isMounted( filePath, gamePath ) )
             return false
 
         if isDir( filePath, gamePath )
@@ -377,14 +416,14 @@ if istable( efsw )
             for folderName in *select( 2, Find( filePath .. "*", gamePath ) )
                 watch( filePath .. folderName, gamePath )
 
-        watchList[ filePath .. ";" .. gamePath ] = Watch( filePath, gamePath )
+        observedFiles[ filePath .. ";" .. gamePath ] = Watch( filePath, gamePath )
         return true
 
     lib.Watch = watch
 
     -- file.UnWatch( filePath, gamePath ) - stops file watching
     unWatch = ( filePath, gamePath ) ->
-        watchID = watchList[ filePath .. ";" .. gamePath ]
+        watchID = observedFiles[ filePath .. ";" .. gamePath ]
         if watchID
             if isDir( filePath, gamePath )
                 filePath ..= "/"
@@ -392,7 +431,7 @@ if istable( efsw )
                 for folderName in *select( 2, Find( filePath .. "*", gamePath ) )
                     unWatch( filePath .. folderName, gamePath )
 
-            watchList[ filePath .. ";" .. gamePath ] = nil
+            observedFiles[ filePath .. ";" .. gamePath ] = nil
             Unwatch( watchID )
             return true
 
@@ -405,13 +444,16 @@ else
     lib.Watch = ->
         return false
 
-    lib.Unwatch = ->
-        return false
+    lib.Unwatch = lib.Watch
 
-asyncRead = nil
+local asyncRead
 do
 
-    asyncFunctions = { "Append": false, "Write": false, "Read": false }
+    asyncFunctions = {
+        "Append": false
+        "Write": false
+        "Read": false
+    }
 
     do
 
@@ -491,9 +533,9 @@ do
                 if count > 2
                     break
 
-    -- file.FileSystemAsyncError - async error
-    class FileSystemAsyncError extends Error
-    lib.FileSystemAsyncError = FileSystemAsyncError
+    -- gpm.FileSystemAsyncError - async error
+    class FileSystemAsyncError extends gpm.Error
+    gpm.FileSystemAsyncError = FileSystemAsyncError
 
     -- file.FSASYNC - async error messages table
     FSASYNC = {
@@ -581,15 +623,16 @@ do
 
 do
 
-    -- file.FileSystemCompileError - compile error
-    class FileSystemCompileError extends Error
-    lib.FileSystemCompileError = FileSystemCompileError
+    -- file.LuaCompileError - compile error
+    class LuaCompileError extends gpm.Error
+    gpm.LuaCompileError = LuaCompileError
 
     -- file.CompileLua( filePath, gamePath, handleError ) - async lua file compile function that returns promise
-    compileLua = nil
+    local compileLua
     do
 
-        CompileString, CompileFile = CompileString, CompileFile
+        CompileString = CompileString
+        CompileFile = CompileFile
 
         compileLua = async ( filePath, gamePath, handleError ) ->
             if CLIENT and isMounted( filePath, gamePath )
@@ -598,7 +641,7 @@ do
 
             :content = await asyncRead( filePath, gamePath )
             unless content
-                error FileSystemCompileError "File '" .. filePath .. "' cannot be read."
+                error LuaCompileError "File '" .. filePath .. "' cannot be read."
 
             func = CompileString( content, filePath, handleError )
             if not func and ( gamePath == "LUA" or gamePath == "lsv" or gamePath == "lcl" )
@@ -607,35 +650,35 @@ do
             if func
                 return func
 
-            error FileSystemCompileError "File '" .. filePath .. "' is missing in file system."
+            error LuaCompileError "File '" .. filePath .. "' is missing in file system."
 
         lib.CompileLua = compileLua
 
     -- file.CompileMoon( filePath, gamePath, handleError ) - async moon file compile function that returns promise
-    compileMoon = nil
+    local compileMoon
     do
 
-        :CompileMoonString = util
+        import CompileMoonString from util
 
         compileMoon = async ( filePath, gamePath, handleError ) ->
             :content = await asyncRead( filePath, gamePath )
             unless content
-                error FileSystemCompileError "File '" .. filePath .. "' cannot be read."
+                error LuaCompileError "File '" .. filePath .. "' cannot be read."
 
             return CompileMoonString( content, filePath, handleError )
 
         lib.CompileMoon = compileMoon
 
     -- file.CompileYue( filePath, gamePath, handleError, yueConfig ) - async yue file compile function that returns promise
-    compileYue = nil
+    local compileYue
     do
 
-        :CompileYueString = util
+        import CompileYueString from util
 
         compileYue = async ( filePath, gamePath, handleError, yueConfig ) ->
             :content = await asyncRead( filePath, gamePath )
             unless content
-                error FileSystemCompileError "File '" .. filePath .. "' cannot be read."
+                error LuaCompileError "File '" .. filePath .. "' cannot be read."
 
             return CompileYueString( content, filePath, handleError, yueConfig )
 
@@ -644,7 +687,7 @@ do
     -- file.Compile( filePath, gamePath, handleError, yueConfig ) - async file compile function that returns promise
     do
 
-        :StripExtension = string
+        import StripExtension from string
 
         lib.Compile = ( filePath, gamePath, handleError, yueConfig ) ->
             fileName = StripExtension( filePath )
@@ -661,15 +704,15 @@ do
             if isFile( compilePath, gamePath )
                 return compileYue( compilePath, gamePath, handleError, yueConfig )
 
-            error FileSystemCompileError "File '" .. filePath .. "' cannot be found."
+            error LuaCompileError "File '" .. filePath .. "' cannot be found."
 
 -- file.DecompressDeflate( fileHandle, doCRC ) - zip files iterator
 do
 
-    :DecompressDeflate = gpm.deflate
+    import DecompressDeflate from gpm.deflate
+    import fempty from gpm.debug
+    import CRC from util
     tostring = tostring
-    :fempty = debug
-    :CRC = util
 
     lib.IterateZipFiles = ( fileHandle, doCRC ) ->
         unless fileHandle
