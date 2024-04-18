@@ -1,3 +1,78 @@
+import Open, Find, GetFilePaths from gpm.file
+import HasValue, Empty from gpm.table
+import lower, gsub, find from string
+import ArgAssert from gpm
+import CRC from util
+
+isstring = isstring
+tostring = tostring
+tonumber = tonumber
+istable = istable
+error = error
+
+addon = {}
+
+do
+
+    import GetAddons from engine
+
+    addon.GetAll = GetAddons
+
+    get = ( wsid ) ->
+        for addon in *GetAll!
+            if addon.wsid == wsid
+                return addon
+
+    addon.Get = get
+
+    addon.FileFind = ( filePath, wsid ) ->
+        addon = get( wsid )
+        if addon
+            return Find( filePath, addon.title )
+
+    addon.GetFiles = ( wsid, filePath ) ->
+        addon = get( wsid )
+        if addon
+            return GetFilePaths( filePath or "", addon.title )
+
+-- Addon types
+types = {
+    "gamemode",
+    "map",
+    "weapon",
+    "vehicle",
+    "npc",
+    "entity",
+    "tool",
+    "effects",
+    "model",
+    "servercontent"
+}
+
+addon.Types = types
+
+addon.TypeExists = ( str ) ->
+    return HasValue( types, str, true )
+
+-- Addon tags
+tags = {
+    "fun",
+    "roleplay",
+    "scenic",
+    "movie",
+    "realism",
+    "cartoon",
+    "water",
+    "comic",
+    "build"
+}
+
+addon.Tags = tags
+
+addon.TagExists = ( str ) ->
+    return HasValue( tags, str, true )
+
+-- Addon wildcards
 wildcard = {
     "lua/*.lua",
     "scenes/*.vcd",
@@ -81,141 +156,87 @@ wildcard = {
 }
 
 -- Formatting wildcard to lua patterns
-do
+for index = 1, #wildcard
+    wildcard[ index ] = gsub( gsub( wildcard[ index ], "%.", "%." ), "%*", ".*" )
 
-    :Replace = string
+isFilePathAllowed = ( filePath ) ->
+    for pattern in *wildcard
+        if find( filePath, pattern )
+            return true
 
-    for index, value in ipairs( wildcard )
-        wildcard[ index ] = Replace( Replace( value, ".", "%." ), "*", ".+" )
+    return false
 
-types = {
-    "gamemode",
-    "map",
-    "weapon",
-    "vehicle",
-    "npc",
-    "entity",
-    "tool",
-    "effects",
-    "model",
-    "servercontent"
-}
+addon.IsFilePathAllowed = isFilePathAllowed
 
-tags = {
-    "fun",
-    "roleplay",
-    "scenic",
-    "movie",
-    "realism",
-    "cartoon",
-    "water",
-    "comic",
-    "build"
-}
+identity = "GMAD"
+formatVersion = 3
 
-:RemoveByFunction, :HasValue, :Empty = gpm.table
-isstring = isstring
-util_CRC = util.CRC
-tostring = tostring
-tonumber = tonumber
-istable = istable
-:ArgAssert = gpm
-:Open = gpm.file
-:lower = string
-error = error
-
-isFilePathAllowed = nil
-do
-
-    :find = string
-
-    isFilePathAllowed = ( filePath ) ->
-        for pattern in *wildcard
-            if find( filePath, pattern )
-                return true
-
-        return false
-
-class GMAD
-    VERSION: "1.0.0"
-    Identity: "GMAD"
-    FormatVersion: 3
-    Types: types
-    Tags: tags
-
+class addon.GMAD
     __tostring: =>
-        return "Garry's Mod Addon File '#{@Title}'"
+        return "Garry's Mod Addon File '" .. title .. "'"
 
     new: =>
-        @Title = "unknown"
-        @Author = "unknown"
-        @Description = "unknown"
-        @Version = 1
-        @Timestamp = 0
-        @Required = {}
-        @SteamID = ""
-        @FileCRC = 0
-        @Files = {}
-        @StoredCRC = 0
-
-    @IsFilePathAllowed: isFilePathAllowed
-
-    @TypeExists: ( any ) ->
-        return HasValue( types, any, true )
-
-    @TagExists: ( any ) ->
-        return HasValue( tags, any, true )
+        @title = "unknown"
+        @author = "unknown"
+        @description = "unknown"
+        @version = 1
+        @timestamp = 0
+        @required = {}
+        @steam_id = ""
+        @real_crc = 0
+        @files = {}
+        @stored_crc = 0
 
     GetTitle: =>
-        return @Title
+        return @title
 
     SetTitle: ( str ) =>
         ArgAssert( str, 1, "string" )
-        @Title = str
+        @title = str
 
     GetAuthor: =>
-        return @Author
+        return @author
 
     SetAuthor: ( str ) =>
         ArgAssert( str, 1, "string" )
-        @Author = str
+        @author = str
 
     GetDescription: =>
-        return @Description
+        return @description
 
     SetDescription: ( str ) =>
         ArgAssert( str, 1, "string" )
-        @Description = str
+        @description = str
 
     GetAddonVersion: =>
-        return @Version
+        return @version
 
     SetAddonVersion: ( int32 ) =>
         ArgAssert( int32, 1, "number" )
-        @Version = int32
+        @version = int32
 
     GetTimestamp: =>
-        return @Timestamp
+        return @timestamp
 
     SetTimestamp: ( uint64 ) =>
         ArgAssert( uint64, 1, "number" )
-        @Timestamp = uint64
+        @timestamp = uint64
 
     GetSteamID: =>
-        return @SteamID
+        return @steam_id
 
     SetSteamID: ( str ) =>
         ArgAssert( str, 1, "string" )
-        @SteamID = str
+        @steam_id = str
 
     Open: ( filePath, gamePath, fileMode ) =>
         @Close!
 
         unless filePath
-            filePath = @FilePath
+            filePath = @file_path
 
         unless gamePath
-            gamePath = @GamePath
+            gamePath = @game_path
 
         ArgAssert( filePath, 1, "string" )
         ArgAssert( gamePath, 2, "string" )
@@ -224,71 +245,76 @@ class GMAD
         unless fileHandle
             error( "file read handler is missing, opening is impossible" )
 
-        @FilePath = filePath
-        @GamePath = gamePath
-        @File = fileHandle
+        @file_path = filePath
+        @game_path = gamePath
+        @file_handler = fileHandle
 
         return fileHandle
 
     Close: =>
-        fileHandle = @File
+        fileHandle = @file_handler
         if fileHandle
             fileHandle\Close!
-            @File = nil
+            @file_handler = nil
             return true
+
         return false
 
     Parse: ( doCRCs ) =>
-        fileHandle = @File
+        fileHandle = @file_handler
         unless fileHandle
             error( "file read handler is missing, parsing is impossible" )
 
         fileHandle\Seek( 0 )
         doCRCs = doCRCs ~= true
 
-        if fileHandle\Read( 4 ) ~= @Identity
+        if fileHandle\Read( 4 ) ~= ( @identity or identity )
             error( "File is not a gma" )
 
         version = fileHandle\ReadByte!
-        if version > @FormatVersion
+        if version > ( @format_version or formatVersion )
             error( "gma version is unsupported" )
 
-        @SteamID = tostring( fileHandle\ReadUInt64! ) or ""
-        @Timestamp = fileHandle\ReadUInt64!
+        @steam_id = tostring( fileHandle\ReadUInt64! ) or ""
+        @timestamp = fileHandle\ReadUInt64!
 
         if version > 1
+            required = @required
+
             while not fileHandle\EndOfFile!
                 value = fileHandle\ReadString!
                 unless value
                     break
-                @Required[ value ] = true
+
+                required[ value ] = true
+
             fileHandle\Skip( 1 )
 
-        @Title = fileHandle\ReadString!
-        @Description = fileHandle\ReadString!
-        @Author = fileHandle\ReadString!
+        @title = fileHandle\ReadString!
+        @description = fileHandle\ReadString!
+        @author = fileHandle\ReadString!
 
-        @Version = fileHandle\ReadLong!
+        @version = fileHandle\ReadLong!
 
-        files, offset = @Files, 0
+        files, position = @files, 0
         while not fileHandle\EndOfFile!
             index = fileHandle\ReadULong!
             if index == 0
                 break
 
             data = {
-                FilePath: fileHandle\ReadString!,
-                Position: offset
+                file_path: fileHandle\ReadString!
+                :position
             }
 
-            size = fileHandle\ReadUInt64!
-            data.Size = size
-            offset += size
+            fileSize = fileHandle\ReadUInt64!
+            data.size = fileSize
+            position += fileSize
 
-            data.StoredCRC = fileHandle\ReadULong!
+            data.stored_crc = fileHandle\ReadULong!
             files[ index ] = data
 
-        files.Pointer = fileHandle\Tell!
+        files.data_pointer = fileHandle\Tell!
 
         unless doCRCs
             return
@@ -296,20 +322,20 @@ class GMAD
         contentSize = fileHandle\Size! - 4
         fileHandle\Seek( contentSize )
 
-        @StoredCRC = fileHandle\ReadULong! or 0
+        @stored_crc = fileHandle\ReadULong! or 0
 
         fileHandle\Seek( 0 )
-        @FileCRC = tonumber( util_CRC( fileHandle\Read( contentSize ) ) )
+        @real_crc = tonumber( CRC( fileHandle\Read( contentSize ) ) )
 
     Read: ( filePath, gamePath, readFiles, doCRCs ) =>
-        Empty( @Required )
-        Empty( @Files )
+        Empty( @required )
+        Empty( @files )
 
         if istable( filePath )
             @Close!
             doCRCs = readFiles
             readFiles = gamePath
-            @File = filePath
+            @file_handler = filePath
         else
             @Open( filePath, gamePath, "rb" )
 
@@ -317,35 +343,38 @@ class GMAD
 
         if readFiles
             @ReadFiles( doCRCs )
+
         @Close!
+        return
 
     VerifyCRC: =>
-        return @StoredCRC == @FileCRC
+        return @stored_crc == @real_crc
 
     VerifyFilesCRC: =>
-        for data in *@Files
-            storedCRC = data.StoredCRC
+        for data in *@files
+            storedCRC = data.stored_crc
             unless storedCRC
                 return false, data
 
-            fileCRC = data.FileCRC
-            unless fileCRC
-                content = data.Content
+            realCRC = data.real_crc
+            unless realCRC
+                content = data.content
                 if content
-                    fileCRC = tonumber( util_CRC( content ) )
-                    data.FileCRC = fileCRC
+                    realCRC = tonumber( CRC( content ) )
+                    data.real_crc = realCRC
 
-            if storedCRC ~= fileCRC
+            if storedCRC ~= realCRC
                 return false, data
+
         return true
 
     VerifyFiles: =>
-        files = @Files
+        files = @files
         if #files == 0
             return false, "unknown"
 
         for data in *files
-            unless isFilePathAllowed( data.FilePath )
+            unless isFilePathAllowed( data.file_path )
                 return false, data
 
         return true
@@ -353,128 +382,141 @@ class GMAD
     Write: ( filePath, gamePath, doCRCs ) =>
         ok, result = @VerifyFiles!
         unless ok
-            error( "file is not allowed by whitelist (" .. result.FilePath .. ")" )
+            error( "file is not allowed by whitelist (" .. result.file_path .. ")" )
 
         fileHandle = @Open( filePath, gamePath, "wb" )
         unless fileHandle
             error( "file read handler is missing, opening is impossible" )
 
         doCRCs = doCRCs ~= false
-        fileHandle\Write( @Identity )
-        fileHandle\WriteByte( @FormatVersion )
 
-        fileHandle\WriteUInt64( tonumber( @SteamID ) or 0 )
-        fileHandle\WriteUInt64( @Timestamp or os.time() )
+        fileHandle\Write( @identity or identity )
+        fileHandle\WriteByte( @format_version or formatVersion )
 
-        for value in pairs( @Required )
+        fileHandle\WriteUInt64( tonumber( @steam_id ) or 0 )
+        fileHandle\WriteUInt64( @timestamp or os.time() )
+
+        for value in pairs( @required )
             fileHandle\WriteString( value )
+
         fileHandle\WriteByte( 0 )
 
-        fileHandle\WriteString( @Title )
-        fileHandle\WriteString( @Description )
-        fileHandle\WriteString( @Author )
+        fileHandle\WriteString( @title )
+        fileHandle\WriteString( @description )
+        fileHandle\WriteString( @author )
 
-        fileHandle\WriteLong( @Version )
+        fileHandle\WriteLong( @version )
 
-        files = @Files
+        files = @files
         for index = 1, #files
             fileHandle\WriteULong( index )
             data = files[ index ]
 
-            fileHandle\WriteString( lower( data.FilePath ) )
-            fileHandle\WriteUInt64( data.Size )
+            fileHandle\WriteString( lower( data.file_path ) )
+            fileHandle\WriteUInt64( data.size )
 
             if doCRCs
-                fileHandle\WriteULong( tonumber( util_CRC( data.Content ) ) )
+                fileHandle\WriteULong( tonumber( CRC( data.content ) ) )
             else
                 fileHandle\WriteULong( 0 )
+
         fileHandle\WriteULong( 0 )
 
         for data in *files
-            content = data.Content
-            unless isstring( content )
-                error( "file content must be a string (" .. data.FilePath .. ")" )
-            fileHandle\Write( content )
+            content = data.content
+            if isstring( content )
+                fileHandle\Write( content )
+            else
+                error( "file content must be a string (" .. data.file_path .. ")" )
 
         if doCRCs
             fileHandle = @Open( filePath, gamePath, "rb" )
             unless fileHandle
                 error( "file read handler is missing, opening is impossible" )
 
-            fileCRC = tonumber( util_CRC( fileHandle\Read! ) )
-            @StoredCRC = fileCRC
-            @FileCRC = fileCRC
+            fileCRC = tonumber( CRC( fileHandle\Read! ) )
+            @stored_crc = fileCRC
+            @real_crc = fileCRC
 
             fileHandle = @Open( filePath, gamePath, "ab" )
             unless fileHandle
                 error( "file read handler is missing, opening is impossible" )
+
             fileHandle\WriteULong( crc )
         else
             fileHandle\WriteULong( 0 )
-        @Close!
 
+        @Close!
         return true
 
     ReadFile: ( index ) =>
         ArgAssert( index, 1, "number" )
 
-        fileHandle = @File
+        fileHandle = @file_handler
         unless fileHandle
             error( "file read handler is missing, reading is not possible" )
 
-        files = @Files
+        files = @files
         data = files[ index ]
         unless data
             error( "requested file does not exist" )
 
-        fileHandle\Seek( files.Pointer + data.Position )
-        data.Content = fileHandle\Read( data.Size )
+        fileHandle\Seek( files.data_pointer + data.position )
+        data.content = fileHandle\Read( data.size )
         return data
 
     ReadFiles: ( doCRCs ) =>
-        fileHandle = @File
+        fileHandle = @file_handler
         unless fileHandle
             error( "file read handler is missing, reading is not possible" )
 
-        files = @Files
-        pointer = files.Pointer
+        files = @files
+        pointer = files.data_pointer
         for data in *files
-            fileHandle\Seek( pointer + data.Position )
-            content = fileHandle\Read( data.Size )
-            data.Content = content
+            fileHandle\Seek( pointer + data.position )
+            content = fileHandle\Read( data.size )
+            data.content = content
             if doCRCs
-                data.FileCRC = tonumber( util_CRC( content ) )
+                data.real_crc = tonumber( CRC( content ) )
 
         return files
 
     GetFile: ( index ) =>
-        return @Files[ index ]
+        return @files[ index ]
 
     AddFile: ( filePath, content, doCRCs ) =>
         ArgAssert( filePath, 1, "string" )
         ArgAssert( content, 2, "string" )
-        doCRCs = doCRCs ~= false
-        files = @Files
 
         filePath = lower( filePath )
-        RemoveByFunction( files, ( _, data ) ->
-            return data.FilePath == filePath
-        )
+        doCRCs = doCRCs ~= false
+
+        files = @files
+        length = #files
+        ::removed::
+
+        for index = 1, length
+            if files[ index ].file_path == filePath
+                remove( files, index )
+                length -= 1
+                goto removed
 
         data = {
-            FilePath: filePath
-            Content: content
-            Size: #content
+            file_path: filePath
+            size: #content
+            :content
         }
 
         if doCRCs
-            fileCRC = tonumber( util_CRC( content ) )
-            data.StoredCRC = fileCRC
-            data.FileCRC = fileCRC
-        files[] = data
+            fileCRC = tonumber( CRC( content ) )
+            data.stored_crc = fileCRC
+            data.real_crc = fileCRC
+
+        length += 1
+        files[ length ] = data
 
     ClearFiles: =>
-        Empty( @files )
+        return Empty( @files )
 
     AddRequiredContent: ( value ) =>
         ArgAssert( value, 1, "string" )
@@ -485,6 +527,6 @@ class GMAD
         @requiredContent[ value ] = nil
 
     ClearRequiredContent: =>
-        Empty( @requiredContent )
+        return Empty( @requiredContent )
 
-export default GMAD
+return addon

@@ -111,9 +111,7 @@ include( "filesystem.lua" )
 include( "http.lua" )
 
 -- GMAD
-gmad = include( "libs/gmad.lua" )
-gpm.GMAD = gmad
-logger\Loaded( "%s%d v%s", gmad.Identity, gmad.FormatVersion, gmad.VERSION )
+gpm.addon = include( "libs/addon.lua" )
 
 -- Packages
 include( "package.lua" )

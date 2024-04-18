@@ -128,9 +128,6 @@ math.nan = 0 / 0
 
 debug.fempty = ->
 
-debug.fcall = ( func, ... ) ->
-    return func( ... )
-
 util.CompileMoonString = ->
     error( "Attempt to compile MoonScript failed, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader." )
 
@@ -338,10 +335,10 @@ do
 
     path.Fix = fix
 
-    localize = ( filePath ) ->
-        return gsub( gsub( gsub( filePath, "^cache/[%w%-_]/", "" ), "^addons/[%w%-_]-/", "" ), "^lua/", "" )
+    localizeLua = ( filePath ) ->
+        return gsub( gsub( fix( filePath ), "^.-lua/", "" ), "^.-gamemode/", "" )
 
-    path.Localize = localize
+    path.LocalizeLua = localizeLua
 
     path.Join = ( ... ) ->
         return fix( concat( { ... }, "/" ) )
@@ -400,7 +397,7 @@ do
     getfpathi = ( level ) ->
         info = getinfo( level, "S" )
         if info.what == "main"
-            return localize( fix( sub( info.source, 2 ) ) )
+            return localizeLua( fix( sub( info.source, 2 ) ) )
 
     debug.getfpathi = getfpathi
 
