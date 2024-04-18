@@ -71,7 +71,6 @@ services = {
 }
 
 meta = {
-    VERSION: "1.0.0"
     Services: services
     __tostring: =>
         return @href
