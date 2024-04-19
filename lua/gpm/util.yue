@@ -817,19 +817,19 @@ do
 
 if SERVER
 
+    import Fix, ReplaceExtension from gpm.path
     AddCSLuaFile = AddCSLuaFile
-    import Fix from gpm.path
     import Find from file
 
     addCSLuaFolder = ( folderPath ) ->
         folderPath = Fix( folderPath .. "/" )
 
-        _, folders = Find( folderPath .. "*", "lsv" )
+        files, folders = Find( folderPath .. "*", "lsv" )
         for folderName in *folders
             addCSLuaFolder( folderPath .. folderName )
 
-        for fileName in *Find( folderPath .. "*.lua", "lsv" )
-            AddCSLuaFile( folderPath .. fileName )
+        for fileName in *files
+            AddCSLuaFile( folderPath .. ReplaceExtension( fileName, "lua" ) )
 
     util.AddCSLuaFolder = addCSLuaFolder
 
