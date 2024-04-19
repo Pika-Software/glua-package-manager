@@ -9,12 +9,7 @@ gpm.StartTime = SysTime!
 
 do
 
-    local username
-    if cvars
-        username = cvars.String( SERVER and "hostname" or "name", username )
-    else
-        username = "unknown user"
-
+    username = cvars.String( SERVER and "hostname" or "name", "unknown user" )
     gpm.UserName = username
 
     splashes = {
@@ -46,12 +41,11 @@ do
 
     print( string.format( "\n                                     ___          __            \n                                   /'___`\\      /'__`\\          \n     __    _____     ___ ___      /\\_\\ /\\ \\    /\\ \\/\\ \\         \n   /'_ `\\ /\\ '__`\\ /' __` __`\\    \\/_/// /__   \\ \\ \\ \\ \\        \n  /\\ \\L\\ \\\\ \\ \\L\\ \\/\\ \\/\\ \\/\\ \\      // /_\\ \\ __\\ \\ \\_\\ \\   \n  \\ \\____ \\\\ \\ ,__/\\ \\_\\ \\_\\ \\_\\    /\\______//\\_\\\\ \\____/   \n   \\/___L\\ \\\\ \\ \\/  \\/_/\\/_/\\/_/    \\/_____/ \\/_/ \\/___/    \n     /\\____/ \\ \\_\\                                          \n     \\_/__/   \\/_/                %s                        \n\n  GitHub: https://github.com/Pika-Software\n  Discord: https://discord.gg/Gzak99XGvv\n  Website: https://pika-soft.ru\n  Developers: Pika Software\n  License: MIT\n", splash ) )
 
-if cvars
-    gpm.Developer = cvars.Number( "developer", 0 )
+gpm.Developer = cvars.Number( "developer", 0 )
 
-    cvars.AddChangeCallback( "developer", ( _, __, value ) ->
-        gpm.Developer = tonumber( value ) or 0
-    "gLua Package Manager" )
+cvars.AddChangeCallback( "developer", ( _, __, value ) ->
+    gpm.Developer = tonumber( value ) or 0
+"gLua Package Manager" )
 
 include( "gpm/util.lua" )
 logger = gpm.Logger
