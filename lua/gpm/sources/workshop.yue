@@ -6,4 +6,4 @@
 
 ]]
 
-print()
+local a
