@@ -331,12 +331,12 @@ do
     path = Table( gpm, "path" )
 
     fix = ( filePath ) ->
-        return gsub( filePath, "[/\\]+", "/" )
+        return gsub( filePath, "[/\\]+", "/" ), nil
 
     path.Fix = fix
 
     localizeLua = ( filePath ) ->
-        return gsub( gsub( fix( filePath ), "^.-lua/", "" ), "^.-gamemode/", "" )
+        return gsub( gsub( fix( filePath ), "^.-lua/", "" ), "^.-gamemode/", "" ), nil
 
     path.LocalizeLua = localizeLua
 
