@@ -331,7 +331,7 @@ do
     path = Table( gpm, "path" )
 
     fix = ( filePath ) ->
-        return gsub( filePath, "[/\\]+", "/" ), nil
+        return gsub( gsub( filePath, "[/\\]+", "/" ), "^/+", "" ), nil
 
     path.Fix = fix
 

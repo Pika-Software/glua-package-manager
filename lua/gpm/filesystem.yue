@@ -9,7 +9,7 @@ error = error
 file = file
 gpm = gpm
 
-import Join, Resolve from path
+import Join, Resolve, Fix from path
 import Find from file
 
 -- https://github.com/Pika-Software/gm_efsw
@@ -355,7 +355,7 @@ do
 
 if SERVER
 
-    import ReplaceExtension, Fix from path
+    import ReplaceExtension from path
     import getfpath from gpm.debug
     AddCSLuaFile = AddCSLuaFile
 
@@ -689,22 +689,22 @@ do
 
         import StripExtension from string
 
-        lib.Compile = ( filePath, gamePath, handleError, yueConfig ) ->
-            fileName = StripExtension( filePath )
+        lib.Compile = ( fullPath, gamePath, handleError, yueConfig ) ->
+            filePath = Fix( StripExtension( fullPath ) )
 
-            compilePath = fileName .. ".lua"
+            compilePath = filePath .. ".lua"
             if isFile( compilePath, gamePath )
                 return compileLua( compilePath, gamePath, handleError )
 
-            compilePath = fileName .. ".moon"
+            compilePath = filePath .. ".moon"
             if isFile( compilePath, gamePath )
                 return compileMoon( compilePath, gamePath, handleError )
 
-            compilePath = fileName .. ".yue"
+            compilePath = filePath .. ".yue"
             if isFile( compilePath, gamePath )
                 return compileYue( compilePath, gamePath, handleError, yueConfig )
 
-            error LuaCompileError "File '" .. filePath .. "' cannot be found."
+            error LuaCompileError "File '" .. fullPath .. "' cannot be found."
 
 -- file.DecompressDeflate( fileHandle, doCRC ) - zip files iterator
 do

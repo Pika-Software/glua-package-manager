@@ -1,5 +1,4 @@
-gpm = gpm
-import Promise, Error, path, string, debug from gpm
+import Promise, Error, path, string, debug, file from gpm
 import async, await from Promise
 
 gpm.loader or= {}
@@ -15,21 +14,6 @@ gpm.ModuleLoadError = ModuleLoadError
 
 class ModuleNotFoundError extends Error
 gpm.ModuleNotFoundError = ModuleNotFoundError
-
--- Checks if given lua file exists
-checkFileExists = (path) ->
-    if moonloader
-        path = string.gsub path, "%.lua$", ".*"
-        return file.Find("lua/" .. path, "GAME")[1] != nil
-
-    return file.Exists "lua/" .. path, "GAME"
-
-CompileFile = (path) ->
-    if string.StartsWith path, "/"
-        path = string.sub path, 2
-
-    if checkFileExists path
-        return _G.CompileFile path
 
 --[[
 
@@ -112,7 +96,7 @@ gpm.loader.LoadURL = async (url, parent_package) ->
     entry_fn = nil
     url = gpm.url.parse url
     if url.scheme == "lua"
-        entry_fn = CompileFile url.path
+        entry_fn = await file.Compile( url.path, "LUA" )
         unless entry_fn
             error ModuleLoadError "failed to compile file #{url.path}"
 
