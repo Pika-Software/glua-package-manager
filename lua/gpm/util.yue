@@ -139,7 +139,7 @@ do
     import match from string
 
     string.IsURL = ( str ) ->
-        return match( str, "[a-z]+://[^ >,;]+" ) ~= nil
+        return match( str, "^[a-z%+]+%:[^ >,;]+" ) ~= nil
 
 import byte, char, sub, gsub, format, len, find from string
 import concat, remove from table
@@ -205,7 +205,7 @@ do
 
             expected = "[ " .. concat( expected, ", " ) .. " ]"
 
-        error( format( "bad argument #%d to \'%s\' (%s expected, got %s)", argNum, getinfo( 2, "n" ).name or "unknown", expected, valueType ), errorlevel or 3 )
+        error "bad argument #" .. argNum .. " to \'" .. ( getinfo( 2, "n" ).name or "unknown" ) .. "\' (" .. expected .. " expected, got " .. valueType .. ")", errorlevel or 3
 
     gpm.ArgAssert = ArgAssert
 
@@ -347,41 +347,46 @@ do
         return StripExtension( filePath ) .. "." .. newExtension
 
     path.Resolve = ( ... ) ->
-        filePath, args = "", { ... }
+        buffer, length = {}, 0
+        args = { ... }
 
         for index = 1, #args
-            arg = args[ index ]
-            unless isstring( arg )
-                arg = tostring( arg )
-
-            if find( arg, "^[/\\]" )
-                if sub( filePath, 1, 1 ) ~= "/"
-                    arg = sub( arg, 2 )
-                filePath = arg
+            arg = tostring( args[ index ] )
+            if sub( arg, 1, 1 ) == "/"
+                length = 1
+                if sub( args[ 1 ], 1, 1 ) ~= "/"
+                    buffer[ length ] = sub( arg, 2 )
+                else
+                    buffer[ length ] = arg
             else
-                filePath = gsub( filePath, "[^/\\]+$", "" ) .. arg
+                length += 1
+                buffer[ length ] = arg
+
+        filePath = concat( buffer, "/", 1, length )
 
         segments, segmentsCount = split( filePath, "[/\\]+", true )
         if segmentsCount == 0
             return filePath
 
-        result, length = {}, 0
+        for index = 1, length
+            buffer[ index ] = nil
+
+        length = 0
 
         for index = 1, segmentsCount
             segment = segments[ index ]
             if segment ~= "."
                 if segment == ".."
                     if length ~= 0
-                        remove( result )
                         length -= 1
                 else
                     length += 1
-                    result[ length ] = segment
+                    buffer[ length ] = segment
 
         if length == 0
             return ""
 
-        return concat( result, "/", 1, length )
+        return concat( buffer, "/", 1, length )
 
     getfmain = ->
         for level = 2, 16
@@ -464,9 +469,10 @@ do
 do
 
     import gmatch from string
+    import tohex from bit
 
     encodeChar = ( str ) ->
-        return format( "%%%02X", byte( str ) )
+        return "%" .. tohex( byte( str ), 2 )
 
     encode = ( str, pattern ) ->
         return gsub( str, "[^%w" .. ( pattern or "%-%._~+" ) .. "]", encodeChar ), nil
@@ -518,12 +524,12 @@ do
 
         if length == 1
             data = query[ length ]
-            return format( "?%s=%s", encode( data[ 1 ], queryKeySymbols ), encode( data[ 2 ], queryValueSymbols ) ), length
+            return "?" .. encode( data[ 1 ], queryKeySymbols ) .. "=" .. encode( data[ 2 ], queryValueSymbols ), length
 
         result = {}
         for index = 1, length
             data = query[ index ]
-            result[ index ] = format( "%s=%s", encode( data[ 1 ], queryKeySymbols ), encode( data[ 2 ], queryValueSymbols ) )
+            result[ index ] = encode( data[ 1 ], queryKeySymbols ) .. "=" .. encode( data[ 2 ], queryValueSymbols )
 
         return "?" .. concat( result, "&", 1, length ), length
 
@@ -795,7 +801,7 @@ util.Version = ( number ) ->
 
     if isnumber( number )
         version = format( "%06d", number )
-        return format( "%d.%d.%d", tonumber( sub( version, 0, 2 ) ), tonumber( sub( version, 3, 4 ) ), tonumber( sub( version, 5 ) ) )
+        return sub( version, 0, 2 ) .. "." .. sub( version, 3, 4 ) .. "." .. sub( version, 5 )
 
     return "unknown"
 
@@ -874,6 +880,7 @@ do
             ArgAssert( color, 1, "Color" )
             ArgAssert( level, 2, "string" )
             MsgC( SecondaryText, date( "%d-%m-%Y %H:%M:%S " ), realmColor, realmName, color, level, SecondaryText, " --> ", @color, @name, SecondaryText, " : ", @text_color, format( str, ... ), "\n" )
+            return
 
     debugFilter = ->
         return gpm.Developer > 0

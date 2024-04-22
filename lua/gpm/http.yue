@@ -4,7 +4,7 @@ isstring = isstring
 isnumber = isnumber
 istable = istable
 
-http.UserAgent = string.format( "GLua Package Manager/%s - Garry's Mod/%s", gpm.VERSION, VERSIONSTR )
+http.UserAgent = "GLua Package Manager/" .. gpm.VERSION .. " - Garry's Mod/" .. VERSIONSTR
 
 client, clientName, returnsState, userAgentKey = HTTP, "Garry's Mod", true, nil
 do

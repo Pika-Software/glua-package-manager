@@ -1,4 +1,4 @@
-import gsub, sub, find, format, len, lower, match, Extract from gpm.string
+import gsub, sub, find, len, lower, match, Extract from gpm.string
 import Encode, Decode, ParseQuery, Query from gpm.http
 import remove, sort, Empty from gpm.table
 import isv4, isv6 from gpm.ip
@@ -72,8 +72,6 @@ services = {
 
 meta = {
     Services: services
-    __tostring: =>
-        return @href
 }
 
 do
@@ -111,22 +109,23 @@ build = =>
         if len( port ) ~= 0 and port ~= services[ metadata.scheme ]
             url ..= ":" .. port
 
-    return format( "%s/%s%s%s", url, metadata.pathname, @searchParams\toString!, metadata.hash )
+    return url .. metadata.pathname .. @searchParams\toString! .. metadata.hash
 
+meta.__tostring = build
 meta.build = build
 
 parse = ( url, ... ) =>
     metadata = rawget( @, "metadata" )
     Empty( metadata )
 
-    -- replace backslashes with slashes
-    url = gsub( url, "\\", "/" )
-
     -- protocol & scheme
     url, protocol = Extract( url, "^(.-:)" )
 
     unless protocol
-        error "URL protocol is missing!", 4
+        metadata.pathname = gsub( Resolve( url, ... ), "([^/]+)", encodeFilePathPart )
+        metadata.href = build( @ )
+        metadata.origin = "null"
+        return
 
     protocol = lower( protocol )
     metadata.protocol = protocol
@@ -134,7 +133,7 @@ parse = ( url, ... ) =>
     scheme = sub( protocol, 1, -2 )
 
     unless find( scheme, "^[a-z].*%w$" )
-        error format( "Invalid URL scheme: \"%s\"", scheme ), 4
+        error "Invalid URL scheme: \"" .. scheme .. "\"", 4
 
     metadata.scheme = scheme
 
@@ -146,9 +145,9 @@ parse = ( url, ... ) =>
     metadata.search = search
 
     if search
-        @searchParams\parse( sub( search, 2 ), @, true )
+        @searchParams\parse( sub( search, 2 ) )
     else
-        @searchParams\clear( true )
+        @searchParams\clear!
 
     -- '//' formatter
     if services[ scheme ]
@@ -180,6 +179,43 @@ parse = ( url, ... ) =>
             else
                 metadata.username = Encode( Decode( auth ) )
 
+        -- hostname
+        hostname, port = Extract( host, ":(.+)" )
+
+        length = len( hostname )
+        if length == 0
+            error "URL hostname is missing!", 4
+
+        elseif length < 2
+            error "URL hostname is too short!", 4
+
+        elseif length > 63
+            error "URL hostname is too long!", 4
+
+        if isv4( hostname )
+            unless isv4( hostname, true )
+                error "Invalid IPv4 hostname address: \"" .. hostname .. "\".", 4
+
+        elseif isv6( hostname )
+            unless isv6( hostname, true )
+                error "Invalid IPv6 hostname address: \"" .. hostname .. "\".", 4
+
+        else
+            hostname = Encode( Decode( hostname ), "%-%." )
+
+        metadata.hostname = hostname
+
+        -- port
+        if port
+            if find( port, "^[0-9]+$" )
+                host = hostname .. ":" .. port
+            else
+                error "Invalid URL port: \"" .. port .. "\"", 4
+        else
+            host = hostname
+
+        metadata.port = port
+
         -- host & origin
         if services[ scheme ]
             metadata.origin = protocol .. "//" .. host
@@ -187,29 +223,6 @@ parse = ( url, ... ) =>
             metadata.origin = "null"
 
         metadata.host = host
-
-        -- hostname
-        hostname, port = Extract( host, ":(.+)" )
-        if len( hostname ) == 0
-            error "URL hostname is missing!", 4
-
-        if isv4( hostname )
-            ok, msg = isv4( hostname, true )
-            unless ok
-                error format( "Invalid IPv4 hostname address: \"%s\", %s.", hostname, msg ), 4
-
-        if isv6( hostname )
-            ok, msg = isv6( hostname, true )
-            unless ok
-                error format( "Invalid IPv6 hostname address: \"%s\", %s.", hostname, msg ), 4
-
-        metadata.hostname = hostname
-
-        -- port
-        if port and not find( port, "^[0-9]+$" )
-            error format( "Invalid URL port: \"%s\"", port ), 4
-
-        metadata.port = port
     else
         metadata.origin = "null"
 
@@ -233,9 +246,13 @@ do
         return a[ 1 ] < b[ 1 ]
 
     class URLSearchParams
-        new: ( queryData, urlObject ) =>
+        new: ( queryData ) =>
             @query, @size = {}, 0
-            @parse( queryData, urlObject, true )
+
+            if queryData
+                @parse( queryData )
+
+            return
 
         __tostring: =>
             return @toString!
@@ -243,24 +260,12 @@ do
         toString: =>
             return Query( @query, @size )
 
-        updateURL: =>
-            urlObject = @urlObject
-            if urlObject
-                rebuild( urlObject )
-
-            return
-
-        append: ( key, value, dontUpdate ) =>
+        append: ( key, value ) =>
             size = @size + 1
             @query[ size ] = { key, value }
             @size = size
 
-            unless dontUpdate
-                @updateURL!
-
-            return
-
-        delete: ( key, dontUpdate ) =>
+        delete: ( key ) =>
             query, size = @query, @size
             ::back::
 
@@ -269,28 +274,17 @@ do
                     remove( query, index )
                     size -= 1
                     goto back
-                    break
 
             @size = size
 
-            unless dontUpdate
-                @updateURL!
-
+        set: ( key, value ) =>
+            @delete( key )
+            @append( key, value )
             return
 
-        set: ( key, value, dontUpdate ) =>
-            @delete( key, true )
-            @append( key, value, dontUpdate )
-            return
-
-        merge: ( tbl, dontUpdate ) =>
+        merge: ( tbl ) =>
             for key, value in pairs( tbl )
-                @set( key, value, true )
-
-            unless dontUpdate
-                @updateURL!
-
-            return
+                @set( key, value )
 
         get: ( key ) =>
             query = @query
@@ -309,34 +303,23 @@ do
 
             return buffer, length
 
-        clear: ( dontUpdate ) =>
+        clear: =>
             query = @query
             for index = 1, @size
                 query[ index ] = nil
 
             @size = 0
 
-            unless dontUpdate
-                @updateURL!
-
-            return
-
-        parse: ( queryData, urlObject, dontUpdate ) =>
-            @urlObject = urlObject
-            @clear( true )
+        parse: ( queryData ) =>
+            @clear!
 
             if istable( queryData )
                 for key, value in pairs( queryData )
-                    @append( key, value, true )
+                    @append( key, value )
 
             elseif isstring( queryData )
                 for _, data in ipairs( ParseQuery( queryData ) )
-                    @append( data[ 1 ], data[ 2 ], true )
-
-            unless dontUpdate
-                @updateURL!
-
-            return
+                    @append( data[ 1 ], data[ 2 ] )
 
         has: ( ... ) =>
             for key in *{ ... }
@@ -392,15 +375,8 @@ do
                 data = query[ index ]
                 callback( thisArg, data[ 1 ], data[ 2 ], @ )
 
-            return
-
-        sort: ( dontUpdate, sortFunc ) =>
-            sort( @query, sortFunc or abcSort )
-
-            unless dontUpdate
-                @updateURL!
-
-            return
+        sort: ( sortFunc ) =>
+            return sort( @query, sortFunc or abcSort )
 
 gpm.URLSearchParams = URLSearchParams
 
@@ -414,7 +390,7 @@ URL = setmetatable {
     __base: meta
     __init: ( ... ) =>
         rawset( @, "metadata", setmetatable( {}, metadataMeta ) )
-        rawset( @, "searchParams", URLSearchParams( "", @ ) )
+        rawset( @, "searchParams", URLSearchParams( "" ) )
         parse( @, ... )
         return
 }, {
@@ -473,7 +449,7 @@ do
 
         elseif key == "search"
             value = "?" .. match( value, "%??(.*)" )
-            @searchParams\parse( sub( value, 2 ), @, true )
+            @searchParams\parse( sub( value, 2 ) )
 
         elseif key == "username" or key == "password"
             if len( metadata.host ) == 0
@@ -483,36 +459,53 @@ do
 
         elseif key == "host"
             if len( value ) == 0
-                error "URL host is missing!", 2
-
-            -- origin
-            if services[ metadata.scheme ]
-                metadata.origin = metadata.protocol .. "//" .. value
-            else
                 metadata.origin = "null"
+                metadata.hostname = ""
+                metadata.port = ""
+            else
 
-            -- hostname
-            hostname, port = Extract( value, ":(.+)" )
-            if len( hostname ) == 0
-                error "URL hostname is missing!", 2
+                -- hostname
+                hostname, port = Extract( value, ":(.+)" )
 
-            if isv4( hostname )
-                ok, msg = isv4( hostname, true )
-                unless ok
-                    error format( "Invalid IPv4 hostname address: \"%s\", %s.", hostname, msg ), 2
+                length = len( hostname )
+                if length == 0
+                    error "URL hostname is missing!", 2
 
-            if isv6( hostname )
-                ok, msg = isv6( hostname, true )
-                unless ok
-                    error format( "Invalid IPv6 hostname address: \"%s\", %s.", hostname, msg ), 2
+                elseif length < 2
+                    error "URL hostname is too short!", 2
 
-            metadata.hostname = hostname
+                elseif length > 63
+                    error "URL hostname is too long!", 2
 
-            -- port
-            if port and not find( port, "^[0-9]+$" )
-                error format( "Invalid URL port: \"%s\"", port ), 2
+                if isv4( hostname )
+                    unless isv4( hostname, true )
+                        error "Invalid IPv4 hostname address: \"" .. hostname .. "\".", 2
 
-            metadata.port = port
+                elseif isv6( hostname )
+                    unless isv6( hostname, true )
+                        error "Invalid IPv6 hostname address: \"" .. hostname .. "\".", 2
+
+                else
+                    hostname = Encode( Decode( hostname ), "%-%." )
+
+                metadata.hostname = hostname
+
+                -- port
+                if port
+                    if find( port, "^[0-9]+$" )
+                        value = hostname .. ":" .. port
+                    else
+                        error "Invalid URL port: \"" .. port .. "\"", 2
+                else
+                    value = hostname
+
+                metadata.port = port
+
+                -- origin
+                if services[ metadata.scheme ]
+                    metadata.origin = metadata.protocol .. "//" .. value
+                else
+                    metadata.origin = "null"
 
         elseif key == "pathname"
             value = gsub( Resolve( value ), "([^/]+)", encodeFilePathPart )
@@ -527,7 +520,7 @@ do
 
         elseif key == "port"
             if not find( value, "^[0-9]+$" )
-                error format( "Invalid URL port: \"%s\"", value ), 2
+                error "Invalid URL port: \"" .. value .. "\"", 2
 
             @host = metadata.hostname .. ":" .. value
             return
@@ -536,6 +529,7 @@ do
             return parse( @, value )
 
         metadata[ key ] = value
-        return rebuild( @ )
+        -- return rebuild( @ )
+        return @
 
 export default URL
