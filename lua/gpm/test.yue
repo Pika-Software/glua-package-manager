@@ -194,8 +194,8 @@ bench = (name, fn) ->
     print format( "%s time: %f sec.", name, st )
 
 main = async ->
-    GLuaTest.runAllTests!
-    -- gpm.Import "package_v2"
+    -- GLuaTest.runAllTests!
+    gpm.Import "package_v2"
     -- specifier = "b"
     -- print "=== Loading `#{specifier}` #{CurTime()} ==="
 

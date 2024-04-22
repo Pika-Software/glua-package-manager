@@ -1,4 +1,5 @@
-import Promise, Error, path, string, debug, file from gpm
+import URL, Promise, Error, path, string, debug, file from gpm
+import len from string
 import async, await from Promise
 
 gpm.loader or= {}
@@ -92,67 +93,79 @@ gpm.ModuleNotFoundError = ModuleNotFoundError
 ]]
 
 -- Simple module loader that takes url and tries to get module entry
-gpm.loader.LoadURL = async (url, parent_package) ->
-    entry_fn = nil
-    url = gpm.url.parse url
+gpm.loader.LoadURL = async ( urlStr, parent_package ) ->
+    url = URL( urlStr )
+
+    local entry_fn
     if url.scheme == "lua"
-        entry_fn = await file.Compile( url.path, "LUA" )
+        entry_fn = await file.Compile( url.pathname, "LUA" )
         unless entry_fn
-            error ModuleLoadError "failed to compile file #{url.path}"
+            error ModuleLoadError "failed to compile file #{url.pathname}"
 
     elseif url.scheme == "http" or url.scheme == "https"
-        ext = string.GetExtensionFromFilename url.path
+        ext = string.GetExtensionFromFilename url.pathname
         if ext ~= "lua"
-            error ModuleLoadError "unsupported web url: #{url}"
+            error ModuleLoadError "unsupported web url: " .. url.href
 
-        req = await gpm.http.Fetch tostring url
+        req = await gpm.http.Fetch( url.href )
         unless req and req.code == 200 and req.body
-            error ModuleLoadError "failed to fetch #{url}"
+            error ModuleLoadError "failed to fetch " .. url.href
 
-        entry_fn = CompileString req.body, url\build!
+        entry_fn = CompileString req.body, url.href
         unless entry_fn
-            error ModuleLoadError "failed to compile file #{url}"
+            error ModuleLoadError "failed to compile file " .. url.href
 
     else
-        error ModuleLoadError "unsupported url: #{url}"
+        error ModuleLoadError "unsupported url: " .. url.href
 
     genv = parent_package and parent_package.env or gpm.Package.CreateEnvironment!
     env = setmetatable {
-        URL: url\build!
         PKG: parent_package
+        URL: url.href
     }, { __index: genv, __newindex: genv }
 
     return setfenv entry_fn, env
 
 -- Simple URL resolver based on https://nodejs.org/api/esm.html#resolution-algorithm-specification
 -- without packageResolve since it is more advanced and not needed for now
-gpm.loader.ResolveURL = (specifier, parent_url = "lua:/") ->
-    url = gpm.url.parse specifier
-    if url.scheme
-        -- If specifier is url then just return it
-        return url\build!
+gpm.loader.ResolveURL = ( specifier, parent_url ) ->
+    url = URL( specifier )
+    if #url.scheme ~= 0
+        return url.href
 
-    if string.StartsWith(url.path, "./") or string.StartsWith(url.path, "../") or string.StartsWith(url.path, "/")
+    -- parent-url: lua:/example/foo.lua
+    -- url: ../config.lua
+    -- result: lua:/config.lua
+    if string.StartsWith(url.pathname, "./") or string.StartsWith(url.pathname, "../") or string.StartsWith(url.pathname, "/")
         -- If specifier is relative path then resolve it against parent_url
-        return gpm.url.parse(parent_url)\resolve(url.path)\build!
+        return url\parse( parent_url, url.pathname ).href
 
 -- Simplest vanilla lua `require` implementation
 -- Not uses package or any other fancy stuff
 -- package.path is hardcoded into it :p
-gpm.loader.RequireResolve = async (specifier, parent_url = "lua:/", parent_package) ->
-    parent_url = gpm.url.parse parent_url
-    specifier = string.gsub specifier, "%.", "/" -- replace all dots with slashes
-    -- yup, it is hard coded for now
-    for template in string.gmatch "?.lua;?/init.lua", "[^;]+"
-        resolved = parent_url\resolve string.gsub template, "?", specifier
+gpm.loader.RequireResolve = async ( specifier, parent_url, parent_package ) ->
+    specifier = string.gsub( specifier, "%.", "/" ) -- replace all dots with slashes
+    url = URL( parent_url )
 
-        success, entry = try await gpm.loader.LoadURL resolved, parent_package
+    -- yup, it is hard coded for now
+    for template in string.gmatch( "?.lua;?/init.lua", "[^;]+" )
+        success, entry = try await gpm.loader.LoadURL( url\parse( string.gsub( template, "?", specifier ) ), parent_package )
         if success and entry
             return entry
 
 -- Resolves specifier as it is package specifier
 -- See https://nodejs.org/api/esm.html#resolution-algorithm-specification PACKAGE_RESOLVE
-gpm.loader.PackageResolve = async (specifier, parent_url = "lua:/", parent_package) ->
+gpm.loader.PackageResolve = async (specifier, parent_url, parent_package) ->
+    print specifier, parent_url, parent_package
+
+    --[[
+        [ERROR] addons/glua-package-manager-v2/lua/gpm/loader.yue:13: InvalidModuleSpecifierError: ./submodule.lua
+        1. unknown - addons/glua-package-manager-v2/lua/gpm/loader.yue:13
+        2. xpcall - [C]:-1
+        3. unknown - addons/glua-package-manager-v2/lua/gpm/libs/promise.yue:1
+
+    ]]
+
     package_name = nil
     if url == ""
         error InvalidModuleSpecifierError specifier
@@ -176,39 +189,44 @@ gpm.loader.PackageResolve = async (specifier, parent_url = "lua:/", parent_packa
     -- if self_url := packageSelfResolve package_name, package_subpath, parent_url
     --     return self_url
 
-    parent_url = gpm.url.parse parent_url
-    while parent_url.path and parent_url.path != ""
-        parent_url.path = string.sub string.GetPathFromFilename(parent_url.path), 1, -2
-        package_url = path.Resolve path.Join parent_url.path, "packages", specifier
-        if not file.Exists package_url, "LUA"
+    filePath = URL( parent_url ).pathname
+
+    if len( filePath ) == 0
+        filePath = "./"
+
+    while len( filePath ) ~= 0
+        filePath = string.sub( string.GetPathFromFilename( filePath ), 1, -2 )
+        package_url = path.Resolve( filePath, "packages", specifier )
+        unless file.Exists( package_url, "LUA" )
             continue
 
-        pkg = gpm.ParsePackage path.Join package_url, "package.lua" -- TODO lookup package in global table
+        pkg = gpm.ParsePackage( path.Join( package_url, "package.lua" ) ) -- TODO lookup package in global table
 
         -- TODO If pmeta is not null and pmeta.exports is not null or undefined, then
         -- Return the result of PACKAGE_EXPORTS_RESOLVE(packageURL, packageSubpath, pjson.exports, defaultConditions).
         if package_subpath == "."
             if pkg.entry
-                return pkg\LoadURL "lua:/" .. path.Join( pkg.dir, pkg.entry )
+                return pkg\LoadURL "lua:" .. path.Join( pkg.dir, pkg.entry )
 
         else
-
-            return pkg\LoadURL "lua:/" .. path.Join( pkg.dir, pkg.entry )
+            return pkg\LoadURL "lua:" .. path.Join( pkg.dir, pkg.entry )
 
     error ModuleNotFoundError specifier
 
 -- Resolves specifier and returns a promise with entry function
-gpm.loader.Resolve = async (specifier, parent_url, parent_package) ->
+gpm.loader.Resolve = async (specifier, parent_url = "lua:", parent_package) ->
     -- First lets try to resolve as URL
-    if resolved := gpm.loader.ResolveURL specifier, parent_url
+    resolved = gpm.loader.ResolveURL( specifier, parent_url )
+    if resolved
         return gpm.loader.LoadURL resolved, parent_package
 
     -- Try to resolve as vanilla `require`
-    if entry := await gpm.loader.RequireResolve specifier, parent_url, parent_package
+    entry = await gpm.loader.RequireResolve( specifier, parent_url, parent_package )
+    if entry
         return entry
 
     -- Try to resolve as package
-    return gpm.loader.PackageResolve specifier, parent_url, parent_package
+    return gpm.loader.PackageResolve( specifier, parent_url, parent_package )
 
 gpm.loader.AsyncImport = async (specifier, parent_url, parent_package) ->
     entry_fn = await gpm.loader.Resolve specifier, parent_url, parent_package
@@ -228,7 +246,7 @@ gpm.loader.GetParentURL = ->
             current_dir.scheme or= "lua"
             return current_dir\build!
 
-    return "lua:/" -- default fallback
+    return "lua:" -- default fallback
 
 gpm.loader.GetPackage = ->
     if entry := debug.getfmain!

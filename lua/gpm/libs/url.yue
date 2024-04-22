@@ -229,7 +229,7 @@ parse = ( url, ... ) =>
     -- pathname & href
     metadata.pathname = gsub( Resolve( url, ... ), "([^/]+)", encodeFilePathPart )
     metadata.href = build( @ )
-    return
+    return @
 
 meta.parse = parse
 
