@@ -180,8 +180,22 @@ getPackages = () ->
         pkgs[] = gpm.ParsePackage gpm.path.Join "packages", folder, "package.lua"
     return pkgs
 
+import format from string
+SysTime = SysTime
+
+bench = (name, fn) ->
+    iter = 1000000
+    st = SysTime!
+
+    for i = 1, iter
+        fn!
+
+    st = SysTime! - st
+    print format( "%s time: %f sec.", name, st )
+
 main = async ->
-    gpm.Import "package_v2"
+    GLuaTest.runAllTests!
+    -- gpm.Import "package_v2"
     -- specifier = "b"
     -- print "=== Loading `#{specifier}` #{CurTime()} ==="
 

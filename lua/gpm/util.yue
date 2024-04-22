@@ -688,7 +688,7 @@ do
             return boolean[ @ReadByte! or -1 ]
 
         WriteBool: ( bool ) =>
-            @WriteByte( bool and 1 or 0 )
+            return @WriteByte( bool and 1 or 0 )
 
         -- UInt
         ReadUInt: ( bytes ) =>
