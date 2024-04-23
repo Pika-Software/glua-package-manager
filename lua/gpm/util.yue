@@ -182,7 +182,7 @@ string.Extract = ( str, pattern, default ) ->
 
     return str, default
 
-ArgAssert = nil
+local ArgAssert
 do
 
     import type from gpm

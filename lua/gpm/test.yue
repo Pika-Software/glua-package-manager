@@ -183,8 +183,8 @@ getPackages = () ->
 import format from string
 SysTime = SysTime
 
+iter = 10000000
 bench = (name, fn) ->
-    iter = 1000000
     st = SysTime!
 
     for i = 1, iter
