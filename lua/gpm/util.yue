@@ -203,7 +203,7 @@ do
                 if valueType == expected[ index ]
                     return value
 
-            expected = "[ " .. concat( expected, ", " ) .. " ]"
+            expected = "[ " .. concat( expected, "/" ) .. " ]"
 
         error "bad argument #" .. argNum .. " to \'" .. ( getinfo( 2, "n" ).name or "unknown" ) .. "\' (" .. expected .. " expected, got " .. valueType .. ")", errorlevel or 3
 
@@ -364,8 +364,8 @@ do
 
         filePath = concat( buffer, "/", 1, length )
 
-        segments, segmentsCount = split( filePath, "[/\\]+", true )
-        if segmentsCount == 0
+        segments, segmentCount = split( filePath, "[/\\]+", true )
+        if segmentCount == 0
             return filePath
 
         for index = 1, length
@@ -373,7 +373,7 @@ do
 
         length = 0
 
-        for index = 1, segmentsCount
+        for index = 1, segmentCount
             segment = segments[ index ]
             if segment ~= "."
                 if segment == ".."
@@ -575,8 +575,8 @@ class util.Stack
 
 do
 
-    :abs, :floor, :ldexp = math
-    :band, :rshift = bit
+    import abs, floor, ldexp from math
+    import band, rshift from bit
 
     buffer = setmetatable( {}, { __mode: "v" } )
     boolean = { [ 0 ]: false, [ 1 ]: true }

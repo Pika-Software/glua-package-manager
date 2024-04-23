@@ -1,15 +1,14 @@
-import GetPathFromFilename, GetExtensionFromFilename from string
-import util, path, string, Logger, ArgAssert, Promise from gpm
-import async, await from Promise
-
 SERVER = SERVER
 CLIENT = CLIENT
-select = select
 error = error
 file = file
 gpm = gpm
 
+import util, path, string, Logger, ArgAssert, Promise from gpm
+
+import Split, GetPathFromFilename, GetExtensionFromFilename from string
 import Join, Resolve, Fix from path
+import async, await from Promise
 import Find from file
 
 -- https://github.com/Pika-Software/gm_efsw
@@ -28,6 +27,16 @@ lib.Find = Find
 -- file.LuaPath - "LUA" or "lsv"
 luaPath = SERVER and "lsv" or "LUA"
 lib.LuaPath = luaPath
+
+-- file.LuaGamePaths - table of lua game paths
+luaGamePaths = {
+    "LuaMenu": true
+    "lsv": true
+    "LUA": true
+    "lcl": true
+}
+
+lib.LuaGamePaths = luaGamePaths
 
 do
 
@@ -50,89 +59,91 @@ do
     lib.Rename = ( filePath, newFileName ) ->
         return Rename( filePath, Resolve( GetPathFromFilename( filePath ) .. "/" .. newFileName ) )
 
-local isMounted
+local isFileMounted, isDirMounted
 do
 
-    -- file.MountedFiles - table of mounted files
-    mountedFiles = gpm.Table lib, "MountedFiles", ->
-        import StartsWith from string
-        import insert from gpm.table
-        rawset = rawset
+    mountedFiles, mountedFolders = gpm.Table( lib, "MountedFiles" ), gpm.Table( lib, "MountedFolders" )
 
-        return setmetatable( {}, {
-            "__index": ( tbl, key ) ->
-                for value in *tbl
-                    if StartsWith( value, key )
-                        return true
+    allowedGamePaths = {
+        "LUA": true
+        "lsv": true
+        "lcl": true
+        "GAME": true
+        "WORKSHOP": true
+        "THIRDPARTY": true
+    }
 
-                return false
+    isFileMounted = ( filePath, gamePath ) ->
+        unless allowedGamePaths[ gamePath ]
+            return false
 
-            "__newindex": ( tbl, key ) ->
-                rawset( tbl, key, true )
-                insert( tbl, 1, key )
-        } )
-
-    -- file.IsMounted( filePath, gamePath, onlyDir ) - returns true if file was mounted
-    isMounted = ( filePath, gamePath, onlyDir ) ->
-        if onlyDir and GetExtensionFromFilename( filePath )
-            return
-
-        if gamePath == "LUA" or gamePath == "lsv" or gamePath == "lcl"
+        if luaGamePaths[ gamePath ]
             filePath = "lua/" .. filePath
 
         return mountedFiles[ filePath ]
 
-    lib.IsMounted = isMounted
+    lib.IsFileMounted = isFileMounted
+
+    isDirMounted = ( filePath, gamePath ) ->
+        unless allowedGamePaths[ gamePath ]
+            return false
+
+        if luaGamePaths[ gamePath ]
+            filePath = "lua/" .. filePath
+
+        return mountedFolders[ filePath ]
+
+    lib.IsDirMounted = isDirMounted
 
     -- file.MountGMA( filePath ) - mounts gma file to game filesystem and returns state and list of files
     do
 
         import MountGMA from game
-        ok, length = false, 0
+        import concat from table
 
         lib.MountGMA = ( filePath ) ->
-            ok, files = MountGMA( filePath )
-            if ok
-                length = #files
-                for index = 1, length
-                    mountedFiles[ files[ index ] ] = true
+            success, files = MountGMA( filePath )
+            if success
+                fileCount = #files
+                for index = 1, fileCount
+                    filePath = files[ index ]
 
-                Logger\Debug( "GMA file '%s' was mounted to GAME with %d files.", filePath, length )
-                return ok, files
+                    -- mounted files
+                    mountedFiles[ filePath ] = true
 
-            return false
+                    -- mounted folders
+                    segments, segmentCount = Split( GetPathFromFilename( filePath ), "/", false )
+                    segmentCount -= 1
+
+                    while segmentCount ~= 0
+                        mountedFolders[ concat( segments, "/", 1, segmentCount ) ] = true
+                        segmentCount -= 1
+
+                Logger\Debug( "GMA file '%s' was mounted to GAME with %d files.", filePath, fileCount )
+
+            return success, files
 
 local isDir, isFile, createDir
 do
 
     import Delete, Exists, IsDir from file
-    import Split from string
 
     -- file.Exists( filePath, gamePath ) - check if the path exists
     lib.Exists = ( filePath, gamePath ) ->
-        return isMounted( filePath, gamePath ) or Exists( filePath, gamePath )
+        return Exists( filePath, gamePath ) or isFileMounted( filePath, gamePath ) or isDirMounted( filePath, gamePath )
 
     -- file.IsDir( filePath, gamePath ) - check if the path is a directory
-    do
+    isDir = ( filePath, gamePath ) ->
+        return IsDir( filePath, gamePath ) or isDirMounted( filePath, gamePath )
 
-        import HasValue from gpm.table
-
-        isDir = ( filePath, gamePath ) ->
-            if isMounted( filePath, gamePath, true ) or IsDir( filePath, gamePath )
-                return true
-
-            folders = select( 2, Find( filePath .. "*", gamePath ) )
-            if folders == nil or #folders == 0
-                return false
-
-            splits = Split( filePath, "/" )
-            return HasValue( folders, splits[ #splits ], true )
-
-        lib.IsDir = isDir
+    lib.IsDir = isDir
 
     -- file.IsFile( filePath, gamePath ) - check if the path is a file
     isFile = ( filePath, gamePath ) ->
-        return isMounted( filePath, gamePath ) or ( Exists( filePath, gamePath ) and not isDir( filePath, gamePath ) )
+        if isDir( filePath, gamePath )
+            return false
+
+        return isFileMounted( filePath, gamePath ) or Exists( filePath, gamePath )
 
     lib.IsFile = isFile
 
@@ -407,16 +418,18 @@ if istable( efsw )
 
     -- file.Watch( filePath, gamePath )
     watch = ( filePath, gamePath ) ->
-        if observedFiles[ filePath .. ";" .. gamePath ] or ( CLIENT and isMounted( filePath, gamePath ) )
+        if observedFiles[ filePath .. ";" .. gamePath ]
             return false
 
-        if isDir( filePath, gamePath )
-            filePath ..= "/"
+        observedFiles[ filePath .. ";" .. gamePath ] = Watch( filePath, gamePath )
 
-            for folderName in *select( 2, Find( filePath .. "*", gamePath ) )
+        if isDir( filePath, gamePath )
+            filePath = Fix( filePath .. "/" )
+
+            _, folders = Find( filePath .. "*", gamePath )
+            for folderName in *folders
                 watch( filePath .. folderName, gamePath )
 
-        observedFiles[ filePath .. ";" .. gamePath ] = Watch( filePath, gamePath )
         return true
 
     lib.Watch = watch
@@ -425,14 +438,16 @@ if istable( efsw )
     unWatch = ( filePath, gamePath ) ->
         watchID = observedFiles[ filePath .. ";" .. gamePath ]
         if watchID
-            if isDir( filePath, gamePath )
-                filePath ..= "/"
-
-                for folderName in *select( 2, Find( filePath .. "*", gamePath ) )
-                    unWatch( filePath .. folderName, gamePath )
-
             observedFiles[ filePath .. ";" .. gamePath ] = nil
             Unwatch( watchID )
+
+            if isDir( filePath, gamePath )
+                filePath = Fix( filePath .. "/" )
+
+                _, folders = Find( filePath .. "*", gamePath )
+                for folderName in *folders
+                    unWatch( filePath .. folderName, gamePath )
+
             return true
 
         return false
@@ -588,7 +603,7 @@ do
 
             state = Read filePath, gameDir, ( fileName, gamePath, code, content ) ->
                 if code == 0
-                    return p\Resolve( { :fileName, :gamePath, :content } )
+                    return p\Resolve( content )
 
                 p\Reject( FileSystemAsyncError FSASYNC[ code ] )
 
@@ -635,16 +650,18 @@ do
         CompileFile = CompileFile
 
         compileLua = async ( filePath, gamePath, handleError ) ->
-            if CLIENT and isMounted( filePath, gamePath )
-                filePath = "lua/" .. filePath
-                gamePath = "GAME"
+            if CLIENT and isFileMounted( filePath, gamePath )
+                if luaGamePaths[ gamePath ]
+                    filePath = "lua/" .. filePath
 
-            :content = await asyncRead( filePath, gamePath )
+                gamePath = "WORKSHOP"
+
+            content = await asyncRead( filePath, gamePath )
             unless content
                 error LuaCompileError "File '" .. filePath .. "' cannot be read."
 
             func = CompileString( content, filePath, handleError )
-            if not func and ( gamePath == "LUA" or gamePath == "lsv" or gamePath == "lcl" )
+            if not func and luaGamePaths[ gamePath ]
                 func = CompileFile( filePath )
 
             if func
@@ -661,7 +678,7 @@ do
         import CompileMoonString from util
 
         compileMoon = async ( filePath, gamePath, handleError ) ->
-            :content = await asyncRead( filePath, gamePath )
+            content = await asyncRead( filePath, gamePath )
             unless content
                 error LuaCompileError "File '" .. filePath .. "' cannot be read."
 
@@ -676,7 +693,7 @@ do
         import CompileYueString from util
 
         compileYue = async ( filePath, gamePath, handleError, yueConfig ) ->
-            :content = await asyncRead( filePath, gamePath )
+            content = await asyncRead( filePath, gamePath )
             unless content
                 error LuaCompileError "File '" .. filePath .. "' cannot be read."
 
