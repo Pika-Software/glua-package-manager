@@ -87,10 +87,10 @@ metaworks.GetLinks = getLinks
 local unLink
 do
 
-    import RemoveByIValue from table
+    import RemoveByValue from table
 
     unLink = ( table1, table2 ) ->
-        RemoveByIValue( getLinks( table1 ), table2 )
+        RemoveByValue( getLinks( table1 ), table2, true )
         return table1
 
     metaworks.UnLink = unLink

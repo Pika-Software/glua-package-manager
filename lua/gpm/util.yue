@@ -8,7 +8,7 @@ error = error
 pairs = pairs
 gpm = gpm
 
-Table = ( tbl, name, func, ... ) ->
+gTable = ( tbl, name, func, ... ) ->
     result = tbl[ name ]
     unless istable( result )
         if isfunction( func )
@@ -20,103 +20,131 @@ Table = ( tbl, name, func, ... ) ->
 
     return result
 
-gpm.Table = Table
+gpm.Table = gTable
 
-Names, Indexes = nil, nil
-do
+gTable gpm, "__types", ->
+    return {
+        Functions: {}
 
-    types = Table gpm, "Types", -> {
-        Indexes: {}
-        Names: {
-            [-1]: "unknown"
-            [0]: "nil"
-            [1]: "boolean"
-            [2]: "light userdata"
-            [3]: "number"
-            [4]: "string"
-            [5]: "table"
-            [6]: "function"
-            [7]: "userdata"
-            [8]: "thread"
-            [9]: "Entity"
-            [10]: "Vector"
-            [11]: "Angle"
-            [12]: "PhysObj"
-            [13]: "ISave"
-            [14]: "IRestore"
-            [15]: "CTakeDamageInfo"
-            [16]: "CEffectData"
-            [17]: "CMoveData"
-            [18]: "CRecipientFilter"
-            [19]: "CUserCmd"
-            [21]: "IMaterial"
-            [22]: "Panel"
-            [23]: "CLuaParticle"
-            [24]: "CLuaEmitter"
-            [25]: "ITexture"
-            [26]: "bf_read"
-            [27]: "ConVar"
-            [28]: "IMesh"
-            [29]: "VMatrix"
-            [30]: "CSoundPatch"
-            [31]: "pixelvis_handle_t"
-            [32]: "dlight_t"
-            [33]: "IVideoWriter"
-            [34]: "File"
-            [35]: "CLuaLocomotion"
-            [36]: "PathFollower"
-            [37]: "CNavArea"
-            [38]: "IGModAudioChannel"
-            [39]: "CNavLadder"
-            [40]: "CNewParticleEffect"
-            [41]: "ProjectedTexture"
-            [42]: "PhysCollide"
-            [43]: "SurfaceInfo"
-            [255]: "Color"
-        }
+        Indexes: setmetatable( {
+            "unknown": -1
+            "nil": 0
+            "boolean": 1
+            "light userdata": 2
+            "number": 3
+            "string": 4
+            "table": 5
+            "function": 6
+            "userdata": 7
+            "thread": 8
+            "Entity": 9
+            "Vector": 10
+            "Angle": 11
+            "PhysObj": 12
+            "ISave": 13
+            "IRestore": 14
+            "CTakeDamageInfo": 15
+            "CEffectData": 16
+            "CMoveData": 17
+            "CRecipientFilter": 18
+            "CUserCmd": 19
+            "IMaterial": 21
+            "Panel": 22
+            "CLuaParticle": 23
+            "CLuaEmitter": 24
+            "ITexture": 25
+            "bf_read": 26
+            "ConVar": 27
+            "IMesh": 28
+            "VMatrix": 29
+            "CSoundPatch": 30
+            "pixelvis_handle_t": 31
+            "dlight_t": 32
+            "IVideoWriter": 33
+            "File": 34
+            "CLuaLocomotion": 35
+            "PathFollower": 36
+            "CNavArea": 37
+            "IGModAudioChannel": 38
+            "CNavLadder": 39
+            "CNewParticleEffect": 40
+            "ProjectedTexture": 41
+            "PhysCollide": 42
+            "SurfaceInfo": 43
+            "Color": 255
+        }, {
+            __index: ->
+                return -1
+        } )
+
+        Names: setmetatable( {
+            [ -1 ]: "unknown"
+            [ 0 ]: "nil"
+            [ 1 ]: "boolean"
+            [ 2 ]: "light userdata"
+            [ 3 ]: "number"
+            [ 4 ]: "string"
+            [ 5 ]: "table"
+            [ 6 ]: "function"
+            [ 7 ]: "userdata"
+            [ 8 ]: "thread"
+            [ 9 ]: "Entity"
+            [ 10 ]: "Vector"
+            [ 11 ]: "Angle"
+            [ 12 ]: "PhysObj"
+            [ 13 ]: "ISave"
+            [ 14 ]: "IRestore"
+            [ 15 ]: "CTakeDamageInfo"
+            [ 16 ]: "CEffectData"
+            [ 17 ]: "CMoveData"
+            [ 18 ]: "CRecipientFilter"
+            [ 19 ]: "CUserCmd"
+            [ 21 ]: "IMaterial"
+            [ 22 ]: "Panel"
+            [ 23 ]: "CLuaParticle"
+            [ 24 ]: "CLuaEmitter"
+            [ 25 ]: "ITexture"
+            [ 26 ]: "bf_read"
+            [ 27 ]: "ConVar"
+            [ 28 ]: "IMesh"
+            [ 29 ]: "VMatrix"
+            [ 30 ]: "CSoundPatch"
+            [ 31 ]: "pixelvis_handle_t"
+            [ 32 ]: "dlight_t"
+            [ 33 ]: "IVideoWriter"
+            [ 34 ]: "File"
+            [ 35 ]: "CLuaLocomotion"
+            [ 36 ]: "PathFollower"
+            [ 37 ]: "CNavArea"
+            [ 38 ]: "IGModAudioChannel"
+            [ 39 ]: "CNavLadder"
+            [ 40 ]: "CNewParticleEffect"
+            [ 41 ]: "ProjectedTexture"
+            [ 42 ]: "PhysCollide"
+            [ 43 ]: "SurfaceInfo"
+            [ 255 ]: "Color"
+        }, {
+            __index: ->
+                return "unknown"
+        } )
     }
 
-    :Names, :Indexes = types
-
-do
-
-    TYPE_USERDATA = TYPE_USERDATA
-    TYPE_TABLE = TYPE_TABLE
-    TypeID = TypeID
-
-    id, data = nil, nil
-
-    typeID = ( any ) ->
-        id = TypeID( any )
-        if id == TYPE_TABLE or id == TYPE_USERDATA
-            for index = 1, #Indexes
-                data = Indexes[ index ]
-                if data ~= nil and data[ 1 ]( any )
-                    return data[ 2 ]
-
-        return id
-
-    gpm.TypeID = typeID
-
-    gpm.type = ( any ) ->
-        return Names[ typeID( any ) ] or "unknown"
-
-string = Table gpm, "string", ->
+string = gTable gpm, "string", ->
     return setmetatable( {}, { __index: string } )
 
-table = Table gpm, "table", ->
+table = gTable gpm, "table", ->
     return setmetatable( {}, { __index: table } )
 
-math = Table gpm, "math", ->
+math = gTable gpm, "math", ->
     return setmetatable( {}, { __index: math } )
 
-debug = Table gpm, "debug", ->
+debug = gTable gpm, "debug", ->
     return setmetatable( {}, { __index: debug } )
 
-http = Table gpm, "http", ->
+http = gTable gpm, "http", ->
     return setmetatable( {}, { __index: http } )
 
-util = Table gpm, "util", ->
+util = gTable gpm, "util", ->
     return setmetatable( {}, { __index: util } )
 
 string.StartsWith = string.StartsWith or string.StartWith
@@ -125,6 +153,15 @@ table.unpack = unpack
 
 math.inf = 1 / 0
 math.nan = 0 / 0
+
+math.Clamp = ( number, min, max ) ->
+	if number < min
+        return min
+
+    if number > max
+        return max
+
+    return number
 
 debug.fempty = ->
 
@@ -144,6 +181,56 @@ do
 import byte, char, sub, gsub, format, len, find from string
 import concat, remove from table
 import getinfo from debug
+
+-- Custom variable types
+do
+
+    types = gpm.__types
+    type2Name, type2Index, typeFunctions = types.Names, types.Indexes, types.Functions
+
+    metadataTypes = { "userdata": true, "table": true }
+    type = type
+
+    typeID = ( value ) ->
+        typeName = type( value )
+        if metadataTypes[ typeName ]
+            for funcData in *typeFunctions
+                if funcData and funcData[ 1 ]( value )
+                    return funcData[ 2 ]
+
+        return type2Index[ typeName ]
+
+    gpm.TypeID = typeID
+
+    gpm.type = ( value ) ->
+        return type2Name[ typeID( value ) ]
+
+    gpm.AddType = ( typeName, func ) ->
+        assert( isstring( typeName ), "bad argument #1 to \'AddType\' (string expected)" )
+        assert( isfunction( func ), "bad argument #2 to \'AddType\' (function expected)" )
+
+        typeIndex = 256
+
+        for index, name in pairs( type2Name )
+            if typeName == name
+                typeIndex = index
+                break
+            elseif index >= typeIndex
+                typeIndex = index + 1
+
+        type2Name[ typeIndex ] = typeName
+        type2Index[ typeName ] = typeIndex
+
+        length = #typeFunctions
+        for index = 1, length
+            funcData = typeFunctions[ index ]
+            if funcData and funcData[ 2 ] == typeIndex
+                remove( typeFunctions, index )
+                length -= 1
+                break
+
+        typeFunctions[ length + 1 ] = { func, typeIndex }
+        return typeIndex
 
 split = ( str, separator = " ", withPattern ) ->
     withPattern = withPattern ~= true
@@ -215,11 +302,11 @@ table.HasValue = ( tbl, any, isSequential ) ->
 			if tbl[ index ] == any
                 return true
 
-        return false
+    else
 
-    for _, value in pairs( tbl )
-        if value == any
-            return true
+        for _, value in pairs( tbl )
+            if value == any
+                return true
 
 	return false
 
@@ -227,10 +314,81 @@ table.Empty = ( tbl ) ->
     for key in pairs( tbl )
         tbl[ key ] = nil
 
-table.RemoveByIValue = ( tbl, any ) ->
-    for index = 1, #tbl
-        if tbl[ index ] == any
-            return remove( tbl, index )
+table.GetKeyCount = ( tbl ) ->
+    length = 0
+
+    for _ in pairs( tbl )
+        length += 1
+
+    return length
+
+table.GetKeys = ( tbl ) ->
+    result, length = {}, 0
+
+    for key in pairs( tbl )
+        length += 1
+        result[ length ] = key
+
+    return result, length
+
+table.GetValues = ( tbl ) ->
+    result, length = {}, 0
+
+    for _, value in pairs( tbl )
+        length += 1
+        result[ length ] = value
+
+    return result, length
+
+do
+
+    next = next
+
+    table.IsEmpty = ( tbl ) ->
+        return next( tbl ) == nil
+
+table.IsSequential = ( tbl ) ->
+    index = 1
+
+    for _ in pairs( tbl )
+        if tbl[ index ] == nil
+            return false
+
+        index += 1
+
+    return true
+
+table.RemoveByValue = ( tbl, any, isSequential ) ->
+    if isSequential
+        for index = 1, #tbl
+            if tbl[ index ] == any
+                return remove( tbl, index )
+
+    else
+
+        for key, value in pairs( tbl )
+            if value == any
+                tbl[ key ] = nil
+                return value
+
+    return nil
+
+table.RemoveSameValues = ( tbl, any, isSequential ) ->
+    if isSequential
+        ::removed::
+
+        for index = 1, #tbl
+            if tbl[ index ] == any
+                remove( tbl, index )
+                goto removed
+
+    else
+
+        for key, value in pairs( tbl )
+            if value == any
+                tbl[ key ] = nil
+
+    return nil
 
 table.GetValue = ( tbl, str, default ) ->
     keys, length = split( str, "." )
@@ -263,50 +421,70 @@ table.SetValue = ( tbl, str, value, ifEmpty ) ->
 
 do
 
+    import random from math
+    index, length = 1, 0
+
+    table.Shuffle = ( tbl ) ->
+        length = #tbl
+        for i = length, 1, -1
+            index = random( 1, length )
+            tbl[ i ], tbl[ index ] = tbl[ index ], tbl[ i ]
+
+        return tbl
+
+    do
+
+        keys = setmetatable( {}, { __mode: "v" } )
+
+        table.Random = ( tbl, isSequential ) ->
+            if isSequential
+                length = #tbl
+                if length == 0
+                    return nil, nil
+
+                if length == 1
+                    index = 1
+                else
+                    index = random( 1, length )
+
+            else
+
+                length = 0
+                for key in pairs( tbl )
+                    length += 1
+                    keys[ length ] = key
+
+                if length == 0
+                    return nil, nil
+
+                if length == 1
+                    index = keys[ 1 ]
+                else
+                    index = keys[ random( 1, length ) ]
+
+            return tbl[ index ], index
+
+do
+
     import lower from string
 
-    lowerTableKeys = ( tbl ) ->
+    lowerKeyNames = ( tbl ) ->
         for key, value in pairs( tbl )
             if istable( value )
-                value = lowerTableKeys( value )
+                value = lowerKeyNames( value )
 
             if isstring( key )
                 tbl[ lower( key ) ] = value
                 tbl[ key ] = nil
             elseif istable( key )
-                tbl[ lowerTableKeys( key ) ] = value
+                tbl[ lowerKeyNames( key ) ] = value
                 tbl[ key ] = nil
 
         return tbl
 
-    table.LowerKeys = lowerTableKeys
+    table.LowerKeyNames = lowerKeyNames
 
-gpm.AddType = ( typeName, func ) ->
-    ArgAssert( typeName, 1, "string" )
-    ArgAssert( func, 2, "function" )
-
-    nextIndex = 256
-    for key, value in pairs( Names )
-        if typeName == value
-            nextIndex = key
-            break
-        elseif key >= nextIndex
-            nextIndex = key + 1
-
-    Names[ nextIndex ] = typeName
-
-    length = #Indexes
-    for index = 1, length
-        data = Indexes[ index ]
-        if data ~= nil and data[ 2 ] == nextIndex
-            remove( Indexes, index )
-            length -= 1
-            break
-
-    Indexes[ length + 1 ] = { func, nextIndex }
-    return nextIndex
-
-iscolor = nil
+local iscolor
 do
 
     getmetatable = getmetatable
@@ -326,9 +504,14 @@ do
 
 do
 
-    import StripExtension from string
+    path = gTable( gpm, "path" )
 
-    path = Table( gpm, "path" )
+    do
+
+        import StripExtension from string
+
+        path.ReplaceExtension = ( filePath, newExtension ) ->
+            return StripExtension( filePath ) .. "." .. newExtension
 
     fix = ( filePath ) ->
         return gsub( gsub( filePath, "[/\\]+", "/" ), "^/+", "" ), nil
@@ -342,9 +525,6 @@ do
 
     path.Join = ( ... ) ->
         return fix( concat( { ... }, "/" ) )
-
-    path.ReplaceExtension = ( filePath, newExtension ) ->
-        return StripExtension( filePath ) .. "." .. newExtension
 
     path.Resolve = ( ... ) ->
         buffer, length = {}, 0
@@ -561,11 +741,13 @@ class util.Stack
 
     pop: =>
         pointer = @Pointer
-        if pointer ~= 0
-            @Pointer = pointer - 1
-            value = @[ pointer ]
-            @[ pointer ] = nil
-            return value
+        if pointer == 0
+            return nil
+
+        @Pointer = pointer - 1
+        value = @[ pointer ]
+        @[ pointer ] = nil
+        return value
 
     empty: =>
         for index = 1, @Pointer
@@ -843,7 +1025,7 @@ do
 
     Color = Color
 
-    colors = Table gpm, "Colors", ->
+    colors = gTable gpm, "Colors", ->
         return {
             SecondaryText: Color( 150, 150, 150 )
             PrimaryText: Color( 200, 200, 200 )
