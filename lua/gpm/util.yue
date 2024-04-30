@@ -245,7 +245,7 @@ split = ( str, separator = " ", withPattern ) ->
 
     pointer = 1
 
-    for index = 1, len( str )
+    for _ = 1, len( str )
         startPos, endPos = find( str, separator, pointer, withPattern )
         unless startPos
             break
@@ -390,34 +390,39 @@ table.RemoveSameValues = ( tbl, any, isSequential ) ->
 
     return nil
 
-table.GetValue = ( tbl, str, default ) ->
-    keys, length = split( str, "." )
-    for index = 1, length
-        tbl = tbl[ keys[ index ] ]
-        unless tbl
-            return default
+table.GetValue = ( tbl, str ) ->
+    pointer = 1
 
-    return tbl
+    for _ = 1, len( str )
+        startPos = find( str, ".", pointer, true )
+        unless startPos
+            break
 
-table.SetValue = ( tbl, str, value, ifEmpty ) ->
-    keys, length = split( str, "." )
-    for index = 1, length
-        key = keys[ index ]
-        if index == length
-            oldValue = tbl[ key ]
-            if oldValue ~= nil and ifEmpty
-                return oldValue
-
-            tbl[ key ] = value
-            return value
-
-        nextValue = tbl[ key ]
-        if nextValue == nil
-            tbl[ key ] = {}
-        elseif not istable( nextValue )
+        tbl = tbl[ sub( str, pointer, startPos - 1 ) ]
+        if tbl == nil
             return
 
+        pointer = startPos + 1
+
+    return tbl[ sub( str, pointer ) ]
+
+table.SetValue = ( tbl, str, value ) ->
+    pointer = 1
+
+    for _ = 1, len( str )
+        startPos = find( str, ".", pointer, true )
+        unless startPos
+            break
+
+        key = sub( str, pointer, startPos - 1 )
+        pointer = startPos + 1
+
+        if tbl[ key ] == nil
+            tbl[ key ] = {}
+
         tbl = tbl[ key ]
+
+    tbl[ sub( str, pointer ) ] = value
 
 do
 
