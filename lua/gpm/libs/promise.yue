@@ -23,10 +23,9 @@
 --]]
 import create, resume, running, yield from coroutine
 import TypeError, RuntimeError, iscallable from gpm
-import format, match, rep from string
+import format, match from string
 import Simple from timer
 isstring = isstring
-tostring = tostring
 istable = istable
 pcall = pcall
 
@@ -49,38 +48,40 @@ once = ->
             wasCalled = true
             return wrapped_fn( ... )
 
-local captureStack
-do
+-- local captureStack
+-- do
 
-    import getinfo from debug
+--     import getinfo from debug
 
-    captureStack = ( startPos ) ->
-        stack, length = {}, 0
+--     captureStack = ( startPos ) ->
+--         stack, length = {}, 0
 
-        for level = 1 + ( startPos or 1 ), 16
-            info = getinfo( level, "Snl" )
-            unless info
-                break
+--         for level = 1 + ( startPos or 1 ), 16
+--             info = getinfo( level, "Snl" )
+--             unless info
+--                 break
 
-            length += 1
-            stack[ length ] = info
+--             length += 1
+--             stack[ length ] = info
 
-        return stack, length
+--         return stack, length
 
-local errorWithCustomStack
-do
+-- local errorWithCustomStack
+-- do
 
-    import concat from table
+--     import concat from table
+--     import rep from string
+--     tostring = tostring
 
-    errorWithCustomStack = ( err, stack ) ->
-        lines, length = { "[gm_promise] Unhandled rejected promise: " .. tostring( err ) }, 1
+--     errorWithCustomStack = ( err, stack ) ->
+--         lines, length = { "[gm_promise] Unhandled rejected promise: " .. tostring( err ) }, 1
 
-        for index = 1, #stack
-            length += 1
-            info = stack[ index ]
-            lines[ length ] = format( "%s%d. %s - %s:%d", rep( " ", index * 2 ), index, info.name or "unknown", info.short_src, info.currentline )
+--         for index = 1, #stack
+--             length += 1
+--             info = stack[ index ]
+--             lines[ length ] = format( "%s%d. %s - %s:%d", rep( " ", index * 2 ), index, info.name or "unknown", info.short_src, info.currentline )
 
-        return concat( lines, "\n", 1, length ) .. "\n\n"
+--         return concat( lines, "\n", 1, length ) .. "\n\n"
 
 -- Promise state constants
 STATE_PENDING = 1
