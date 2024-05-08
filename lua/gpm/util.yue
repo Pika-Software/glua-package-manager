@@ -493,6 +493,17 @@ local iscolor
 do
 
     getmetatable = getmetatable
+
+    gpm.iscallable = ( obj ) ->
+        if isfunction( obj )
+            return true
+
+        metatable = getmetatable( obj )
+        if metatable and metatable.__call
+            return true
+
+        return false
+
     metatable = FindMetaTable( "Color" )
 
     iscolor = ( value ) ->
