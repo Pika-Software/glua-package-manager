@@ -1,10 +1,11 @@
 import ArgAssert, Promise, Logger, http, util from gpm
-import HTTPError from Promise
 isstring = isstring
 isnumber = isnumber
 istable = istable
 
 http.UserAgent = "GLua Package Manager/" .. gpm.VERSION .. " - Garry's Mod/" .. VERSIONSTR
+class HTTPError extends gpm.Error
+gpm.HTTPError = HTTPError
 
 client, clientName, returnsState, userAgentKey = HTTP, "Garry's Mod", true, nil
 do
@@ -44,7 +45,7 @@ do
             p\Reject( HTTPError "failed to make http request" )
 
     queue = {}
-    util.NextTick ->
+    timer.Simple 0, ->
         for func in *queue
             func!
 
@@ -68,6 +69,7 @@ do
 
         parameters.success = ( code, body, headers ) ->
             p\Resolve( { :code, :body, :headers } )
+            return
 
         parameters.failed = ( msg ) ->
             p\Reject( HTTPError msg )

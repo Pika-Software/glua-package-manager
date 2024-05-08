@@ -1,3 +1,4 @@
 await Promise.delay 1
+
 global abc = 123
 export data = "async data"
