@@ -1010,6 +1010,14 @@ do
     util.IsLuaModuleInstalled = ( name ) ->
         return Exists( "includes/modules/" .. name .. ".lua", "LUA" )
 
+do
+
+    import Simple from timer
+
+    util.NextTick = ( func, a, b, c, d, e, f ) ->
+        Simple 0, ->
+            func( a, b, c, d, e, f )
+
 if SERVER
 
     import Fix, ReplaceExtension from gpm.path
