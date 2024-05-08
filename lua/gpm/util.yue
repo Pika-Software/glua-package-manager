@@ -994,15 +994,6 @@ util.Version = ( number ) ->
 
 do
 
-    import Simple from timer
-
-    util.NextTick = ( func, a, b, c, d, e, f ) ->
-        ArgAssert( func, 1, "function" )
-        Simple 0, ->
-            func( a, b, c, d, e, f )
-
-do
-
     import Exists from file
 
     util.IsLuaModuleInstalled = ( name ) ->
