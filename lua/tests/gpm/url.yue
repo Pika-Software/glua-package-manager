@@ -1,6 +1,0 @@
--- https://github.com/anonrig/url-js/blob/main/test/coverage.test.ts
-export groupName = "url"
-export cases =
-    * name: "Should create project table13",
-      func: ->
-        expect( gpm ).to.exist()
