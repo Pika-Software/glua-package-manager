@@ -182,6 +182,19 @@ import byte, char, sub, gsub, format, len, find from string
 import concat, remove from table
 import getinfo from debug
 
+debug.getstack = ( startPos ) ->
+    stack, length = {}, 0
+
+    for level = 1 + ( startPos or 1 ), 16
+        info = getinfo( level, "Snl" )
+        unless info
+            break
+
+        length += 1
+        stack[ length ] = info
+
+    return stack, length
+
 -- Custom variable types
 do
 
@@ -1015,8 +1028,9 @@ do
     import Simple from timer
 
     util.NextTick = ( func, a, b, c, d, e, f ) ->
-        Simple 0, ->
+        return Simple 0, ->
             func( a, b, c, d, e, f )
+            return
 
 if SERVER
 

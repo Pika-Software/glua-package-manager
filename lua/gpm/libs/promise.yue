@@ -24,6 +24,7 @@
 import create, resume, running, yield from coroutine
 import TypeError, RuntimeError, iscallable from gpm
 import format, match from string
+-- import getstack from gpm.debug
 import Simple from timer
 isstring = isstring
 istable = istable
@@ -47,24 +48,6 @@ once = ->
 
             wasCalled = true
             return wrapped_fn( ... )
-
--- local captureStack
--- do
-
---     import getinfo from debug
-
---     captureStack = ( startPos ) ->
---         stack, length = {}, 0
-
---         for level = 1 + ( startPos or 1 ), 16
---             info = getinfo( level, "Snl" )
---             unless info
---                 break
-
---             length += 1
---             stack[ length ] = info
-
---         return stack, length
 
 -- local errorWithCustomStack
 -- do
@@ -102,7 +85,7 @@ reject = ( reason ) =>
     @state = STATE_REJECTED
     @reason = reason
 
-    -- @reject_stack = captureStack!
+    -- @reject_stack = getstack!
     -- if @stack[#@stack].currentline == @reject_stack[#@reject_stack].currentline
     --     @reject_stack = {}
 
@@ -472,7 +455,7 @@ class Promise
         -- @value = nil
         -- @reason = nil
         -- @queue = nil -- Queue is created only if then called in pending state
-        -- @stack = captureStack( 3 )
+        -- @stack = getstack( 3 )
 
         if iscallable( executor )
             @resolving = true
