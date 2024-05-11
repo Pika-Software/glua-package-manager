@@ -70,4 +70,5 @@ export class Error
         return
 
 export class RuntimeError extends Error
+export class RangeError extends Error
 export class TypeError extends Error
