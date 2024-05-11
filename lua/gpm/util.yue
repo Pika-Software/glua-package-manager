@@ -249,7 +249,7 @@ split = ( str, separator = " ", withPattern ) ->
     withPattern = withPattern ~= true
     result, length = {}, 0
 
-    if len( separator ) == 0
+    if separator == ""
         for index = 1, len( str )
             length += 1
             result[ length ] = sub( str, index, index )

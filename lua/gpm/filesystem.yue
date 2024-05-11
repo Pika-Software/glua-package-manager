@@ -302,12 +302,12 @@ do
 
         -- File::ReadString() - reads string to first empty byte
         File.ReadString = ( fileHandle ) ->
-            startPos, len = Tell( fileHandle ), 0
+            startPos, length = Tell( fileHandle ), 0
             while not EndOfFile( fileHandle ) and ReadByte( fileHandle ) ~= 0
-                len = len + 1
+                length += 1
 
             Seek( fileHandle, startPos )
-            data = Read( fileHandle, len )
+            data = Read( fileHandle, length )
             Skip( fileHandle, 1 )
             return data
 

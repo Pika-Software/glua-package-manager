@@ -1,5 +1,4 @@
 import URL, Promise, Error, path, string, debug, file from gpm
-import len from string
 import async, await from Promise
 
 gpm.loader or= {}
@@ -191,10 +190,10 @@ gpm.loader.PackageResolve = async (specifier, parent_url, parent_package) ->
 
     filePath = URL( parent_url ).pathname
 
-    if len( filePath ) == 0
+    if filePath == ""
         filePath = "./"
 
-    while len( filePath ) ~= 0
+    while filePath ~= ""
         filePath = string.sub( string.GetPathFromFilename( filePath ), 1, -2 )
         package_url = path.Resolve( filePath, "packages", specifier )
         unless file.Exists( package_url, "LUA" )

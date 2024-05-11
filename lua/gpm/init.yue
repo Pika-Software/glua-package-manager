@@ -72,7 +72,6 @@ if SERVER
     for index = 1, #clientSideFiles
         AddCSLuaFile( "gpm/" .. clientSideFiles[ index ] )
 
-gpm.url = include( "libs/3rd-party/url.lua" )
 gpm.ip = include( "libs/3rd-party/ip.lua" )
 
 deflate = include( "libs/3rd-party/deflate.lua" )
@@ -89,11 +88,15 @@ logger\Loaded( "gm_promise v%s", promise.VERSION )
 gpm.Promise = promise
 
 include( "libs/metaworks.lua" )
-include( "libs/url.lua" )
-
 include( "filesystem.lua" )
 include( "moonloader.lua" )
 include( "http.lua" )
+
+lib = include( "libs/url.lua" )
+gpm.QueryStringParser = lib.QueryStringParser
+gpm.http.EncodeURI = lib.encodeURI
+gpm.http.DecodeURI = lib.decodeURI
+gpm.URL = lib.URL
 
 gpm.addon = include( "libs/addon.lua" )
 
