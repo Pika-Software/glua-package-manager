@@ -201,17 +201,18 @@ do
     types = gpm.__types
     type2Name, type2Index, typeFunctions = types.Names, types.Indexes, types.Functions
 
-    metadataTypes = { "userdata": true, "table": true }
-    type = type
+    metadataTypes = { [ TYPE_USERDATA ]: true, [ TYPE_TABLE ]: true }
+    TypeID = TypeID
 
     typeID = ( value ) ->
-        typeName = type( value )
-        if metadataTypes[ typeName ]
+        typeIndex = TypeID( value )
+
+        if metadataTypes[ typeIndex ]
             for funcData in *typeFunctions
                 if funcData and funcData[ 1 ]( value )
                     return funcData[ 2 ]
 
-        return type2Index[ typeName ]
+        return typeIndex
 
     gpm.TypeID = typeID
 
