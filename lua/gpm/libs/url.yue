@@ -510,9 +510,8 @@ export class URL
 
         startPos = @_parseProtocol(str, startPos, endPos)
 
-        -- Javascript does not have host
         protocol = @_protocol
-        if protocol ~= "javascript"
+        if @_slashProtocols[protocol]
             startPos = @_parseHost(str, startPos, endPos, hostDenotesSlash)
 
             if not @hostname and (@slashes and (protocol and not @_slashProtocols[protocol]))
@@ -526,7 +525,7 @@ export class URL
                 @_parseQuery(str, startPos, endPos, disableAutoEscapeChars)
             elseif ch == 0x23 --[['#']]
                 @_parseHash(str, startPos, endPos, disableAutoEscapeChars)
-            elseif protocol != "javascript"
+            elseif @_slashProtocols[protocol]
                 @_parsePath(str, startPos, endPos, disableAutoEscapeChars)
             else
                 @pathname = sub(str, startPos, endPos)
@@ -591,6 +590,8 @@ export class URL
             scheme = protocol .. (slashes and "//" or "/")
         elseif slashes
             scheme = "//"
+        else
+            scheme = ""
 
         pathname = @pathname or ""
         if slashes and pathname != "" and byte(pathname, 1) != 0x2F -- '/'
@@ -607,7 +608,7 @@ export class URL
         if hash != "" and byte(hash, 1) != 0x23 -- '#'
             hash = "#" .. hash
 
-        return concat([scheme, host == false and "" or host, pathname, search, hash], 1, 5 )
+        return concat([scheme, host == false and "" or host, pathname, search, hash], "", 1, 5 )
 
     resolveObject: (relative) =>
         if isstring(relative)
@@ -650,7 +651,7 @@ export class URL
 
             result._protocol = relative._protocol
 
-            if not relative.host and relative._protocol != "javascript"
+            if not relative.host and  @_slashProtocols[relative._protocol]
                 relPath = Split(relative.pathname or "", "/")
 
                 while #relPath != 0
@@ -743,7 +744,6 @@ export class URL
                 srcPath[length] = relPath[i]
 
             result.search = relative.search
-
         elseif relative.search
             -- just pull out the search.
             -- like href="?foo".
