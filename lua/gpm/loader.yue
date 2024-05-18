@@ -1,7 +1,6 @@
-import URL, Promise, Error, path, string, debug, file from gpm
+import URL, Promise, Error, path, string, file from gpm
+import getfmain, getfpathi from gpm.debug
 import async, await from Promise
-
-gpm.loader or= {}
 
 class ModuleURLResolutionError extends Error
 gpm.ModuleURLResolutionError = ModuleURLResolutionError
@@ -14,6 +13,8 @@ gpm.ModuleLoadError = ModuleLoadError
 
 class ModuleNotFoundError extends Error
 gpm.ModuleNotFoundError = ModuleNotFoundError
+
+loader = gpm.Table( gpm, "loader" )
 
 --[[
 
@@ -92,7 +93,7 @@ gpm.ModuleNotFoundError = ModuleNotFoundError
 ]]
 
 -- Simple module loader that takes url and tries to get module entry
-gpm.loader.LoadURL = async ( urlStr, parent_package ) ->
+loader.LoadURL = async ( urlStr, parent_package ) ->
     url = URL( urlStr )
 
     local entry_fn
@@ -127,7 +128,7 @@ gpm.loader.LoadURL = async ( urlStr, parent_package ) ->
 
 -- Simple URL resolver based on https://nodejs.org/api/esm.html#resolution-algorithm-specification
 -- without packageResolve since it is more advanced and not needed for now
-gpm.loader.ResolveURL = ( specifier, parent_url ) ->
+loader.ResolveURL = ( specifier, parent_url ) ->
     url = URL( specifier )
     if #url.scheme ~= 0
         return url.href
@@ -142,19 +143,19 @@ gpm.loader.ResolveURL = ( specifier, parent_url ) ->
 -- Simplest vanilla lua `require` implementation
 -- Not uses package or any other fancy stuff
 -- package.path is hardcoded into it :p
-gpm.loader.RequireResolve = async ( specifier, parent_url, parent_package ) ->
+loader.RequireResolve = async ( specifier, parent_url, parent_package ) ->
     specifier = string.gsub( specifier, "%.", "/" ) -- replace all dots with slashes
     url = URL( parent_url )
 
     -- yup, it is hard coded for now
     for template in string.gmatch( "?.lua;?/init.lua", "[^;]+" )
-        success, entry = try await gpm.loader.LoadURL( url\parse( string.gsub( template, "?", specifier ) ), parent_package )
+        success, entry = try await loader.LoadURL( url\parse( string.gsub( template, "?", specifier ) ), parent_package )
         if success and entry
             return entry
 
 -- Resolves specifier as it is package specifier
 -- See https://nodejs.org/api/esm.html#resolution-algorithm-specification PACKAGE_RESOLVE
-gpm.loader.PackageResolve = async (specifier, parent_url, parent_package) ->
+loader.PackageResolve = async (specifier, parent_url, parent_package) ->
     print specifier, parent_url, parent_package
 
     --[[
@@ -213,51 +214,55 @@ gpm.loader.PackageResolve = async (specifier, parent_url, parent_package) ->
     error ModuleNotFoundError specifier
 
 -- Resolves specifier and returns a promise with entry function
-gpm.loader.Resolve = async (specifier, parent_url = "lua:", parent_package) ->
+loader.Resolve = async (specifier, parent_url = "lua:", parent_package) ->
     -- First lets try to resolve as URL
-    resolved = gpm.loader.ResolveURL( specifier, parent_url )
+    resolved = loader.ResolveURL( specifier, parent_url )
     if resolved
-        return gpm.loader.LoadURL resolved, parent_package
+        return loader.LoadURL resolved, parent_package
 
     -- Try to resolve as vanilla `require`
-    entry = await gpm.loader.RequireResolve( specifier, parent_url, parent_package )
+    entry = await loader.RequireResolve( specifier, parent_url, parent_package )
     if entry
         return entry
 
     -- Try to resolve as package
-    return gpm.loader.PackageResolve( specifier, parent_url, parent_package )
+    return loader.PackageResolve( specifier, parent_url, parent_package )
 
-gpm.loader.AsyncImport = async (specifier, parent_url, parent_package) ->
-    entry_fn = await gpm.loader.Resolve specifier, parent_url, parent_package
-    entry_fn = async entry_fn -- convert entry to async function
-    return entry_fn!
+asyncImport = async ( specifier, parentURL, parentPackage ) ->
+    print specifier, parentURL, parentPackage
+    -- entry_fn = await loader.Resolve specifier, parent_url, parent_package
+    -- entry_fn = async entry_fn -- convert entry to async function
+    -- return entry_fn!
 
-gpm.loader.GetParentURL = ->
-    if entry := debug.getfmain!
+loader.AsyncImport = asyncImport
+
+getParentURL = ->
+    if entry := getfmain!
         -- Get URL from entry env
-        entry_env = getfenv entry
-        if value := entry_env and rawget entry_env, "URL"
+        env = getfenv( entry )
+        if value := env and rawget( env, "URL" )
             return value
 
         -- Try to resolve URL from entry source
-        if current_dir := debug.getfpathi entry
-            current_dir = gpm.url.parse current_dir
-            current_dir.scheme or= "lua"
-            return current_dir\build!
+        if folderPath := getfpathi( entry )
+            url = URL.parse( folderPath )
+            url.scheme or= "lua"
+            return url\build!
 
     return "lua:" -- default fallback
 
-gpm.loader.GetPackage = ->
-    if entry := debug.getfmain!
-        entry_env = getfenv entry
-        return entry_env and rawget entry_env, "PKG"
+loader.GetParentURL = getParentURL
 
-gpm.Import = (url, should_await = true) ->
-    parent_url = gpm.loader.GetParentURL!
-    parent_pkg = gpm.loader.GetPackage!
-    result = gpm.loader.AsyncImport url, parent_url, parent_pkg
+getPackage = ->
+    if func := getfmain!
+        env = getfenv( func )
+        return env and rawget( env, "PKG" )
 
-    if should_await
-        return result\await!
+loader.GetPackage = getPackage
+
+gpm.Import = ( url, should_await ) ->
+    result = asyncImport( url, getParentURL!, getPackage! )
+    if should_await ~= false
+        return await( result )
 
     return result
