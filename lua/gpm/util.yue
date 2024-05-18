@@ -245,35 +245,33 @@ do
         typeFunctions[ length + 1 ] = { func, typeIndex }
         return typeIndex
 
-split = ( str, separator = " ", withPattern ) ->
-    withPattern = withPattern ~= true
-    result, length = {}, 0
+split = (str, sep, withPattern) ->
+    if not sep
+        return { str }
+    if sep == ""
+        ret = {}
+        for i = 1, len(str)
+            ret[i] = sub str, i, i
+        return ret
 
-    if separator == ""
-        for index = 1, len( str )
-            length += 1
-            result[ length ] = sub( str, index, index )
-
-        return result, length
-
-    pointer = 1
-
-    for _ = 1, len( str )
-        startPos, endPos = find( str, separator, pointer, withPattern )
-        unless startPos
+    prevPos = 1
+    strLen = len(str)
+    ret, length = {}, 0
+    while true
+        startPos, endPos = find(str, sep, prevPos, not withPattern)
+        if not startPos
             break
-
+        
         length += 1
-        result[ length ] = sub( str, pointer, startPos - 1 )
-        pointer = endPos + 1
+        ret[length] = sub(str, prevPos, startPos - 1)
+        prevPos = endPos + 1
 
     length += 1
-    result[ length ] = sub( str, pointer )
+    ret[length] = sub(str, prevPos, strLen)
+    return ret, length
 
-    return result, length
-
-string.Explode = split
 string.Split = split
+string.Explode = (sep, str, withPattern) -> split(str, sep, withPattern)
 
 string.Extract = ( str, pattern, default ) ->
     startPos, endPos, matched = find( str, pattern, 1, false )
