@@ -913,7 +913,7 @@ export class URL
         -- 1. there was no protocol at all
         -- 2. there was a protocol that requires slashes
         -- e.g. in 'http:asd' 'asd' is not a hostname
-        elseif not @_protocol or @_specialSchemes[@_protocol]
+        elseif not @_protocol -- or @_specialSchemes[@_protocol]
             return startPos
 
         doLowerCase = true
