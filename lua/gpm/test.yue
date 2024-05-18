@@ -183,19 +183,26 @@ getPackages = () ->
 import format from string
 SysTime = SysTime
 
-iter = 10000000
+iter = 10000
+warmup = math.min( iter / 100, 100 )
 bench = (name, fn) ->
+    -- Warmup
+    for i = 1, warmup
+        fn!
+
+    collectgarbage "stop"
     st = SysTime!
 
     for i = 1, iter
         fn!
 
     st = SysTime! - st
+    collectgarbage "restart"
     print format( "%s time: %f sec.", name, st )
 
 main = async ->
     -- GLuaTest.runAllTests!
-    gpm.Import "package_v2"
+    -- gpm.Import "package_v2"
     -- specifier = "b"
     -- print "=== Loading `#{specifier}` #{CurTime()} ==="
 
