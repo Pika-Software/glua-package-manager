@@ -1,12 +1,4 @@
-setmetatable = setmetatable
-isfunction = isfunction
-isstring = isstring
-isnumber = isnumber
-tonumber = tonumber
-istable = istable
-error = error
-pairs = pairs
-gpm = gpm
+import gpm, pairs, error, istable, isnumber, isstring, isfunction, tostring, setmetatable from _G
 
 gTable = ( tbl, name, func, ... ) ->
     result = tbl[ name ]
@@ -246,33 +238,67 @@ do
         typeFunctions[ length + 1 ] = { func, typeIndex }
         return typeIndex
 
-split = (str, sep, withPattern) ->
-    if not sep
+split = ( str, sep, withPattern ) ->
+    unless sep
         return { str }
+
     if sep == ""
         ret = {}
-        for i = 1, len(str)
-            ret[i] = sub str, i, i
+        for i = 1, len( str )
+            ret[ i ] = sub( str, i, i )
+
         return ret
 
-    prevPos = 1
-    strLen = len(str)
+    withPattern = withPattern ~= true
     ret, length = {}, 0
+    strLen = len( str )
+    prevPos = 1
+
     while true
-        startPos, endPos = find(str, sep, prevPos, not withPattern)
-        if not startPos
+        startPos, endPos = find( str, sep, prevPos, withPattern )
+        unless startPos
             break
-        
+
         length += 1
-        ret[length] = sub(str, prevPos, startPos - 1)
+        ret[ length ] = sub( str, prevPos, startPos - 1 )
         prevPos = endPos + 1
 
     length += 1
-    ret[length] = sub(str, prevPos, strLen)
+    ret[ length ] = sub( str, prevPos, strLen )
+
     return ret, length
 
 string.Split = split
-string.Explode = (sep, str, withPattern) -> split(str, sep, withPattern)
+
+string.Explode = ( sep, str, withPattern ) ->
+    return split( str, sep, withPattern )
+
+fastSplit = ( str, separator ) ->
+    unless separator
+        return { str }
+
+    if isstring( separator )
+        separator = byte( separator )
+
+    result, length = {}, 0
+    startPos, endPos = 1, 1
+
+    nextByte = byte( str, endPos )
+    while nextByte
+        if nextByte == separator
+            length += 1
+            result[ length ] = sub( str, startPos, endPos - 1 )
+            startPos = endPos + 1
+
+        endPos += 1
+        nextByte = byte( str, endPos )
+
+    length += 1
+    result[ length ] = sub( str, startPos, endPos - 1 )
+
+    return result, length
+
+string.FastSplit = fastSplit
 
 string.Extract = ( str, pattern, default ) ->
     startPos, endPos, matched = find( str, pattern, 1, false )
@@ -560,19 +586,19 @@ do
 
         for index = 1, #args
             arg = tostring( args[ index ] )
-            if sub( arg, 1, 1 ) == "/"
+            if byte( arg, 1 ) == 0x2F --[[ / ]]
                 length = 1
-                if sub( args[ 1 ], 1, 1 ) ~= "/"
-                    buffer[ length ] = sub( arg, 2 )
-                else
+                if byte( args[ 1 ], 1 ) == 0x2F --[[ / ]]
                     buffer[ length ] = arg
+                else
+                    buffer[ length ] = sub( arg, 2 )
             else
                 length += 1
                 buffer[ length ] = arg
 
         filePath = concat( buffer, "/", 1, length )
 
-        segments, segmentCount = split( filePath, "[/\\]+", true )
+        segments, segmentCount = fastSplit( filePath, 0x2F --[[ / ]] )
         if segmentCount == 0
             return filePath
 

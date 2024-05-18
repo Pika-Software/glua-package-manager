@@ -22,7 +22,7 @@
     SOFTWARE.
 --]]
 import string, table, Error, TypeError, RangeError from gpm
-import byte, char, sub, gsub, match, find, lower, Split from string
+import byte, char, sub, gsub, match, find, lower, FastSplit from string
 import istable, isnumber, isstring, tostring, tonumber, rawget, rawset from _G
 import concat, insert, remove from table
 
@@ -648,7 +648,7 @@ export class URL
             result._protocol = relative._protocol
 
             if not relative.host and relative._protocol != "javascript"
-                relPath = Split(relative.pathname or "", "/")
+                relPath = relative.pathname and FastSplit(relative.pathname, 0x2F --[[ / ]]) or []
 
                 while #relPath != 0
                     host = remove(relPath, 1)
@@ -686,8 +686,8 @@ export class URL
         mustEndAbs = isRelAbs or isSourceAbs or (result.host and relative.pathname)
         removeAllDots = mustEndAbs
 
-        srcPath = result.pathname and Split(result.pathname, "/") or []
-        relPath = relative.pathname and Split(relative.pathname, "/") or []
+        srcPath = result.pathname and FastSplit(result.pathname, 0x2F --[[ / ]]) or []
+        relPath = relative.pathname and FastSplit(relative.pathname, 0x2F --[[ / ]]) or []
         psychotic = result._protocol and not @_specialSchemes[result._protocol]
 
         -- if the url is a non-slashed url, then relative
@@ -749,7 +749,7 @@ export class URL
                 -- occationaly the auth can get stuck only in host
                 -- this especialy happens in cases like
                 -- url.resolveObject("mailto:local1@domain1", "local2@domain2")
-                authInHost = (result.host and (find(result.host, "@", 1, true) or -1) > 0) and Split(result.host, "@") or false
+                authInHost = (result.host and (find(result.host, "@", 1, true) or -1) > 0) and FastSplit(result.host, 0x40 --[[ @ ]]) or false
                 if authInHost
                     result.auth = authInHost[1]
                     result.host = result.hostname = authInHost[2]
@@ -805,7 +805,7 @@ export class URL
             -- occationaly the auth can get stuck only in host
             -- this especialy happens in cases like
             -- url.resolveObject("mailto:local1@domain1", "local2@domain2")
-            authInHost = result.host and (find(result.host, "@", 1, true) or -1) > 0 and Split(result.host, "@") or false
+            authInHost = result.host and (find(result.host, "@", 1, true) or -1) > 0 and FastSplit(result.host, 0x40 --[[ @ ]]) or false
             if authInHost
                 result.auth = authInHost[1]
                 result.host = result.hostname = authInHost[2]

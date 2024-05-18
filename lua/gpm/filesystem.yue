@@ -6,7 +6,7 @@ gpm = gpm
 
 import util, path, string, Logger, ArgAssert, Promise from gpm
 
-import Split, GetPathFromFilename, GetExtensionFromFilename from string
+import FastSplit, GetPathFromFilename, GetExtensionFromFilename from string
 import Join, Resolve, Fix from path
 import async, await from Promise
 import Find from file
@@ -112,7 +112,7 @@ do
                     mountedFiles[ filePath ] = true
 
                     -- mounted folders
-                    segments, segmentCount = Split( GetPathFromFilename( filePath ), "/", false )
+                    segments, segmentCount = FastSplit( GetPathFromFilename( filePath ), 0x2F --[[ / ]] )
                     segmentCount -= 1
 
                     while segmentCount ~= 0
@@ -175,7 +175,7 @@ do
         createDir = ( folderPath, force ) ->
             if force
                 currentPath = nil
-                for folderName in *Split( folderPath, "/" )
+                for folderName in *FastSplit( folderPath, 0x2F --[[ / ]] )
                     if folderName
                         if currentPath
                             currentPath ..= "/" .. folderName
