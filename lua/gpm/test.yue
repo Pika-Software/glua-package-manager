@@ -173,12 +173,13 @@ import async, await from Promise
 concommand.Add "gpm_test", ->
     include( "gpm/test.lua" )
 
-getPackages = () ->
+getPackages = async ->
     pkgs = {}
-    local files, folders = file.Find "packages/*", "LUA"
-    for folder in *folders
-        pkgs[] = gpm.ParsePackage gpm.path.Join "packages", folder, "package.lua"
-    return pkgs
+    for folderName in *select( 2, file.Find( "packages/*", "LUA" ) )
+        pkgs[] = gpm.ParsePackage( gpm.path.Join( "packages", folderName, "package.lua" ) )
+
+    return await Promise.All( pkgs )
+    -- return pkgs, length
 
 import format from string
 SysTime = SysTime
@@ -202,7 +203,7 @@ bench = (name, fn) ->
 
 main = async ->
     -- GLuaTest.runAllTests!
-    -- gpm.Import "package_v2"
+    gpm.Import( "package_v2" )
     -- specifier = "b"
     -- print "=== Loading `#{specifier}` #{CurTime()} ==="
 
@@ -211,7 +212,7 @@ main = async ->
     -- if entry
     --     print "return:", await entry!
 
-    -- pkgs = getPackages!
+    -- pkgs = await getPackages!
     -- for pkg in *pkgs
     --     gpm.Logger\Info "Loading package `#{pkg}`..."
     --     gpm.Import "lua://" .. pkg.dir .. pkg.entry
