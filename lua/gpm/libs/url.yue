@@ -765,7 +765,9 @@ export class URL
             result._href = ""
             return result
 
-        if #srcPath == 0
+        -- TODO: Make this faster
+        srcLength = #srcPath
+        if srcLength == 0
             -- no path at all.  easy.
             -- we"ve already handled the other stuff above.
             result.pathname = nil
@@ -775,13 +777,13 @@ export class URL
         -- if a url ENDs in . or .., then it must get a trailing slash.
         -- however, if it ends in anything else non-slashy,
         -- then it must NOT get a trailing slash.
-        last = srcPath[#srcPath]
-        hasTrailingSlash = (result.host or relative.host) or (last == "." or last == ".." ) or last == ""
+        last = srcPath[srcLength]
+        hasTrailingSlash = --[[(result.host or relative.host) or--]] (last == "." or last == ".." ) or last == ""
 
         -- strip single dots, resolve double dots to parent dir
         -- if the path tries to go above the root, `up` ends up > 0
         up = 0
-        for i = #srcPath, 1, -1
+        for i = srcLength, 1, -1
             last = srcPath[i]
             if last == "."
                 remove(srcPath, i)
@@ -808,7 +810,7 @@ export class URL
 
         -- put the host back
         if psychotic
-            result.hostname = result.host = isAbsolute and "" or #srcPath > 0 and remove(srcPath, 1) or ""
+            result.hostname = result.host = isAbsolute and "" or #srcPath > 0 and ( remove(srcPath, 1) .. "/" ) or ""
             -- occationaly the auth can get stuck only in host
             -- this especialy happens in cases like
             -- url.resolveObject("mailto:local1@domain1", "local2@domain2")
@@ -822,7 +824,7 @@ export class URL
         if not mustEndAbs and not isAbsolute
             insert(srcPath, 1, "")
 
-        result.pathname = srcPath != 0 and concat(srcPath, "/") or nil
+        result.pathname = #srcPath != 0 and concat(srcPath, "/") or nil
         result.auth = relative.auth or result.auth
         result.slashes = result.slashes or relative.slashes
         result._href = ""
