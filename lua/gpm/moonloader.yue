@@ -26,8 +26,8 @@ do
     import ToLua from moonloader
 
     util.CompileMoonString = ( moonCode, identifier, handleError ) ->
-        ArgAssert( moonCode, "string", 1 )
-        ArgAssert( identifier, "string", 2 )
+        ArgAssert( moonCode, 1, "string" )
+        ArgAssert( identifier, 2, "string" )
 
         luaCode, msg = ToLua( moonCode )
         unless luaCode
@@ -47,14 +47,17 @@ unless istable( yue )
     return
 
 import ToLua from yue
+emptyTable = {}
 
 -- https://github.com/pigpigyyy/Yuescript/src/yuescript/yue_compiler.h#L28
 util.CompileYueString = ( yueCode, identifier, handleError, yueConfig ) ->
-    ArgAssert( yueCode, "string", 1 )
-    ArgAssert( identifier, "string", 2 )
+    ArgAssert( yueCode, 1, "string" )
+    ArgAssert( identifier, 2, "string" )
 
     if yueConfig ~= nil
-        ArgAssert( yueConfig, "table", 4 )
+        ArgAssert( yueConfig, 4, "table" )
+    else
+        yueConfig = emptyTable
 
     luaCode, msg = ToLua( yueCode, yueConfig )
     unless luaCode

@@ -88,8 +88,8 @@ logger\Loaded( "gm_promise v%s", promise.VERSION )
 gpm.Promise = promise
 
 include( "libs/metaworks.lua" )
-include( "filesystem.lua" )
 include( "moonloader.lua" )
+include( "filesystem.lua" )
 include( "http.lua" )
 
 lib = include( "libs/url.lua" )

@@ -517,11 +517,11 @@ do
                 value = lowerKeyNames( value )
 
             if isstring( key )
+                tbl[ key ] = nil
                 tbl[ lower( key ) ] = value
-                tbl[ key ] = nil
             elseif istable( key )
-                tbl[ lowerKeyNames( key ) ] = value
                 tbl[ key ] = nil
+                tbl[ lowerKeyNames( key ) ] = value
 
         return tbl
 
