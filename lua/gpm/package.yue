@@ -51,18 +51,22 @@ Environment.InvalidPackageConfigurationError = InvalidPackageConfigurationError
 
 --]]
 
+gpm.CreateEnvironment = ->
+    return metaworks.Environment( Environment )
+
 -- Maybe gpm.Package must be a just metadata from package.lua
 class Package
     new: ( @metadata = {}, @import_path ) =>
         unless istable( @metadata )
             error InvalidPackageConfigurationError "metadata is #{type @metadata}, expected table"
 
-        @env = @@CreateEnvironment!
         @parse!
+        environment = gpm.CreateEnvironment!
+        rawset( environment, "_G", _G )
+        @environment = environment
 
-    -- TODO: Make smart metatable
-    CreateEnvironment: ->
-        return setmetatable( {}, { __index: Environment } )
+    GetEnvironment: =>
+        return @environment
 
     GetEntry: ( metadata ) ->
         return metadata.entry or "init.lua"

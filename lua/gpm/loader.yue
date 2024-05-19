@@ -32,7 +32,7 @@ loader = gpm.InitTable( gpm, "loader" )
 
     _PKG.name
     _PKG.metadata.name
-    _PKG.env == getfenv(1)
+    _PKG\GetEnvironment! == getfenv(1)
     PARENT_URL
 
     _PKG == gpm.Package!
@@ -122,7 +122,7 @@ loader.LoadURL = async ( urlStr, parentPackage ) ->
     else
         error ModuleLoadError "unsupported url: " .. url.href
 
-    genv = parentPackage and parentPackage.env or gpm.Package.CreateEnvironment!
+    genv = parentPackage and parentPackage\GetEnvironment! or gpm.CreateEnvironment!
 
     env = setmetatable( {
         _PKG: parentPackage

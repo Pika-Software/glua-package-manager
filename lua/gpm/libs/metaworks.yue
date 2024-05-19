@@ -134,12 +134,12 @@ do
                     return value
     }
 
-    metaworks.Environment = ( child ) ->
+    metaworks.Environment = ( other ) ->
         tbl = { __indexes: {} }
         setmetatable( tbl, meta )
 
-        if child ~= nil
-            link( tbl, child )
+        if other ~= nil
+            link( tbl, other )
 
         return tbl
 
