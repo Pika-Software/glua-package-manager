@@ -1,9 +1,9 @@
 gpm = gpm
-:Promise, :Error, :NotImplementedError, :string = gpm
-:async, :await = Promise
+import Environment from gpm
+import async, await, string, error, Promise, URL, NotImplementedError from Environment
 
-class SourceError extends Error
-gpm.SourceError = SourceError
+class SourceError extends Environment.Error
+Environment.SourceError = SourceError
 
 sources = gpm.Table( gpm, "Sources" )
 
@@ -26,31 +26,42 @@ sources = gpm.Table( gpm, "Sources" )
 ]]
 
 class gpm.BaseSourceHandler
-    ShouldHandle: (url) => false
-    FetchInfo: async (url) => error NotImplementedError "Source:FetchInfo(url)"
-    Install: async (url, info) => error NotImplementedError "Source:Install(url, info)"
+    ShouldHandle: ( url ) =>
+        return false
+
+    FetchInfo: async ( url ) =>
+        error NotImplementedError "Source:FetchInfo(url)"
+        return
+
+    Install: async ( url, info ) =>
+        error NotImplementedError "Source:Install(url, info)"
+        return
 
 class gpm.BaseSource
     new: =>
         @handlers = {}
 
-    RegisterHandler: (handler) =>
+    RegisterHandler: ( handler ) =>
         @handlers[] = handler
 
-    CallHandler: (name, url, ...) =>
+    CallHandler: ( name, url, ... ) =>
         for handler in *@handlers
-            if handler\ShouldHandle url
-                return handler[name] handler, url
+            if handler\ShouldHandle( url )
+                return handler[name]( handler, url )
+
         return Promise.reject SourceError "No handler found for URL #{url} (#{name})"
 
-    FetchInfo: (url) => @CallHandler "FetchInfo", url
-    Install: (url, info) => @CallHandler "Install", url, info
+    FetchInfo: ( url ) =>
+        return @CallHandler( "FetchInfo", url )
 
-gpm.RegisterSource = (protocol, source) ->
-    sources[protocol] = source
+    Install: ( url, info ) =>
+        return @CallHandler( "Install", url, info )
+
+gpm.RegisterSource = ( protocol, source ) ->
+    sources[ protocol ] = source
 
 gpm.ParsePackageURL = ( url ) ->
-    if istable( url ) and url.__class == gpm.URL
+    if istable( url ) and url.__class == URL
         return url
 
     if isstring( url )
@@ -59,10 +70,10 @@ gpm.ParsePackageURL = ( url ) ->
             unless string.IsURL( url )
                 return
 
-        return gpm.URL( url )
+        return URL( url )
 
 gpm.ValidatePackageURL = ( original_url ) ->
-    url = gpm.ParsePackageURL original_url
+    url = gpm.ParsePackageURL( original_url )
     unless url
         error SourceError "Invalid url: #{original_url}"
 
@@ -71,22 +82,22 @@ gpm.ValidatePackageURL = ( original_url ) ->
 
     return url
 
-gpm.FindSourceByURL = (url) ->
-    src = sources[url.protocol]
+gpm.FindSourceByURL = ( url ) ->
+    src = sources[ url.protocol ]
     unless src
         error SourceError "No source found for URL #{url}"
 
     return src
 
-gpm.FetchInfo = async (url) ->
-    url = gpm.ValidatePackageURL url
-    src = gpm.FindSourceByURL url
-    return src\FetchInfo url
+gpm.FetchInfo = async ( url ) ->
+    url = gpm.ValidatePackageURL( url )
+    src = gpm.FindSourceByURL( url )
+    return src\FetchInfo( url )
 
-gpm.Install = async (url, info) ->
-    url = gpm.ValidatePackageURL url
-    src = gpm.FindSourceByURL url
+gpm.Install = async ( url, info ) ->
+    url = gpm.ValidatePackageURL( url )
+    src = gpm.FindSourceByURL( url )
     unless info
-        info = await gpm.FetchInfo url
+        info = await gpm.FetchInfo( url )
 
-    return src\Install url, info
+    return src\Install( url, info )

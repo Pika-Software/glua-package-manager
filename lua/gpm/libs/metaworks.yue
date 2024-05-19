@@ -1,4 +1,4 @@
-import table, debug from gpm
+import table, debug from gpm.Environment
 
 do
 
@@ -64,8 +64,9 @@ setmetatable = setmetatable
 rawset = rawset
 rawget = rawget
 
-metaworks = gpm.Table( gpm, "metaworks" )
-metaworks.GetValue = table.GetValue
+metaworks = {
+    GetValue: table.GetValue
+}
 
 do
 
@@ -142,4 +143,4 @@ do
 
         return tbl
 
-export default metaworks
+return metaworks

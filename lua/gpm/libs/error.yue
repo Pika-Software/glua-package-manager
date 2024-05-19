@@ -22,8 +22,8 @@
     SOFTWARE.
 ]]
 ErrorNoHaltWithStack = ErrorNoHaltWithStack
+import getstack from gpm.Environment.debug
 import format, rep from string
-import getstack from gpm.debug
 ErrorNoHalt = ErrorNoHalt
 import concat from table
 isstring = isstring

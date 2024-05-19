@@ -1,21 +1,19 @@
+import Environment, Table, Logger from gpm
 SERVER = SERVER
 CLIENT = CLIENT
 error = error
 file = file
-gpm = gpm
 
-import util, path, string, Logger, ArgAssert, Promise from gpm
-
+import async, await, debug, util, path, string, ArgAssert, Promise from Environment
 import FastSplit, GetPathFromFilename, GetExtensionFromFilename from string
 import Join, Resolve, Fix from path
-import async, await from Promise
 import Find from file
 
 -- https://github.com/Pika-Software/gm_efsw
 if SERVER and not efsw and util.IsBinaryModuleInstalled( "efsw" ) and pcall( require, "efsw" )
     Logger\Info( "gm_efsw is initialized, package auto-reloading are available." )
 
-lib = gpm.Table gpm, "file", ->
+lib = Table Environment, "file", ->
     return setmetatable( {}, { __index: file } )
 
 -- file.Time( filePath, gamePath ) - returns file creation time as number
@@ -40,8 +38,8 @@ lib.LuaGamePaths = luaGamePaths
 
 do
 
-    import getfpath from gpm.debug
     import LocalizeLua from path
+    import getfpath from debug
 
     file.ResolvePath = ( ... ) ->
         return Resolve( LocalizeLua( getfpath! ), ... )
@@ -62,7 +60,7 @@ do
 local isFileMounted, isDirMounted
 do
 
-    mountedFiles, mountedFolders = gpm.Table( lib, "MountedFiles" ), gpm.Table( lib, "MountedFolders" )
+    mountedFiles, mountedFolders = Table( lib, "MountedFiles" ), Table( lib, "MountedFolders" )
 
     allowedGamePaths = {
         "LUA": true
@@ -253,7 +251,7 @@ do
 local isCompilable
 do
 
-    preCacheFunc = gpm.moonloader and gpm.moonloader.PreCacheFile
+    preCacheFunc = Environment.moonloader and Environment.moonloader.PreCacheFile
     import sub from string
 
     supportedExtensions = { moon: true, yue: true, lua: true }
@@ -367,8 +365,8 @@ do
 if SERVER
 
     import ReplaceExtension from path
-    import getfpath from gpm.debug
     AddCSLuaFile = AddCSLuaFile
+    import getfpath from debug
 
     -- file.AddCSLuaFile( filePath )
     lib.AddCSLuaFile = ( fileName ) ->
@@ -414,7 +412,7 @@ if istable( efsw )
     import Watch, Unwatch from efsw
 
     -- file.WatchList
-    observedFiles = gpm.Table( lib, "ObservedFiles" )
+    observedFiles = Table( lib, "ObservedFiles" )
 
     -- file.Watch( filePath, gamePath )
     watch = ( filePath, gamePath ) ->
@@ -548,9 +546,9 @@ do
                 if count > 2
                     break
 
-    -- gpm.FileSystemAsyncError - async error
-    class FileSystemAsyncError extends gpm.Error
-    gpm.FileSystemAsyncError = FileSystemAsyncError
+    -- Environment.FileSystemAsyncError - async error
+    class FileSystemAsyncError extends Environment.Error
+    Environment.FileSystemAsyncError = FileSystemAsyncError
 
     -- file.FSASYNC - async error messages table
     FSASYNC = {
@@ -639,8 +637,8 @@ do
 do
 
     -- file.LuaCompileError - compile error
-    class LuaCompileError extends gpm.Error
-    gpm.LuaCompileError = LuaCompileError
+    class LuaCompileError extends Environment.Error
+    Environment.LuaCompileError = LuaCompileError
 
     -- file.CompileLua( filePath, gamePath, handleError ) - async lua file compile function that returns promise
     local compileLua
@@ -726,8 +724,8 @@ do
 -- file.DecompressDeflate( fileHandle, doCRC ) - zip files iterator
 do
 
-    import DecompressDeflate from gpm.deflate
-    import fempty from gpm.debug
+    import DecompressDeflate from Environment.deflate
+    import fempty from debug
     import CRC from util
     tostring = tostring
 

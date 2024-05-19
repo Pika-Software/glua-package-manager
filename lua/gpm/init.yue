@@ -47,6 +47,13 @@ cvars.AddChangeCallback( "developer", ( _, __, value ) ->
     gpm.Developer = tonumber( value ) or 0
 "gLua Package Manager" )
 
+environment = gpm.Environment
+unless istable( environment )
+    environment = gpm.Environment = {}
+
+setmetatable( environment, { __index: _G } )
+setmetatable( gpm, { __index: environment } )
+
 include( "gpm/util.lua" )
 logger = gpm.Logger
 
@@ -72,43 +79,51 @@ if SERVER
     for index = 1, #clientSideFiles
         AddCSLuaFile( "gpm/" .. clientSideFiles[ index ] )
 
-gpm.ip = include( "libs/3rd-party/ip.lua" )
+environment.ipa = include( "libs/3rd-party/ip.lua" )
 
 deflate = include( "libs/3rd-party/deflate.lua" )
 logger\Loaded( "LibDeflate v%s", deflate._VERSION )
-gpm.deflate = deflate
+environment.deflate = deflate
 
 for key, value in pairs( include( "libs/error.lua" ) )
-    gpm[ key ] = value
+    environment[ key ] = value
 
-class gpm.NotImplementedError extends gpm.Error
+class environment.NotImplementedError extends environment.Error
 
 promise = include( "libs/promise.lua" )
 logger\Loaded( "gm_promise v%s", promise.VERSION )
-gpm.Promise = promise
+environment.async = promise.async
+environment.await = promise.await
+environment.Promise = promise
 
-include( "libs/metaworks.lua" )
+environment.metaworks = include( "libs/metaworks.lua" )
+
 include( "moonloader.lua" )
 include( "filesystem.lua" )
 include( "http.lua" )
 
-lib = include( "libs/url.lua" )
-gpm.QueryStringParser = lib.QueryStringParser
-gpm.http.EncodeURI = lib.encodeURI
-gpm.http.DecodeURI = lib.decodeURI
-gpm.URL = lib.URL
+url = include( "libs/url.lua" )
+environment.QueryStringParser = url.QueryStringParser
+environment.http.EncodeURI = url.encodeURI
+environment.http.DecodeURI = url.decodeURI
+environment.URL = url.URL
 
-gpm.addon = include( "libs/addon.lua" )
+environment.addon = include( "libs/addon.lua" )
 
 include( "package.lua" )
 include( "sources.lua" )
 include( "loader.lua" )
 
-for fileName in *file.Find( "gpm/sources/*.lua", "LUA" )
+for fileName in *environment.file.Find( "gpm/sources/*.lua", "LUA" )
     include( "sources/" .. fileName )
 
 if SERVER
     include( "test.lua" )
 
 logger\Info( "Start-up time: %.4f sec.", SysTime! - gpm.StartTime )
+
+-- Locking environment and gpm tables from changes
+getmetatable( environment ).__newindex = environment.debug.fempty
+getmetatable( gpm ).__newindex = environment.debug.fempty
+
 return gpm

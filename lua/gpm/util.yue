@@ -1,4 +1,5 @@
 import gpm, pairs, error, istable, isnumber, isstring, isfunction, tostring, setmetatable from _G
+import Environment from gpm
 
 gTable = ( tbl, name, func, ... ) ->
     result = tbl[ name ]
@@ -14,7 +15,7 @@ gTable = ( tbl, name, func, ... ) ->
 
 gpm.Table = gTable
 
-gTable gpm, "__types", ->
+gTable gpm, "Types", ->
     return {
         Functions: {}
 
@@ -121,22 +122,22 @@ gTable gpm, "__types", ->
         } )
     }
 
-string = gTable gpm, "string", ->
+string = gTable Environment, "string", ->
     return setmetatable( {}, { __index: string } )
 
-table = gTable gpm, "table", ->
+table = gTable Environment, "table", ->
     return setmetatable( {}, { __index: table } )
 
-math = gTable gpm, "math", ->
+math = gTable Environment, "math", ->
     return setmetatable( {}, { __index: math } )
 
-debug = gTable gpm, "debug", ->
+debug = gTable Environment, "debug", ->
     return setmetatable( {}, { __index: debug } )
 
-http = gTable gpm, "http", ->
+http = gTable Environment, "http", ->
     return setmetatable( {}, { __index: http } )
 
-util = gTable gpm, "util", ->
+util = gTable Environment, "util", ->
     return setmetatable( {}, { __index: util } )
 
 string.StartsWith = string.StartsWith or string.StartWith
@@ -190,52 +191,50 @@ debug.getstack = ( startPos ) ->
 -- Custom variable types
 do
 
-    types = gpm.__types
-    type2Name, type2Index, typeFunctions = types.Names, types.Indexes, types.Functions
-
     metadataTypes = { [ TYPE_USERDATA ]: true, [ TYPE_TABLE ]: true }
+    import Names, Indexes, Functions from gpm.Types
     TypeID = TypeID
 
     typeID = ( value ) ->
         typeIndex = TypeID( value )
 
         if metadataTypes[ typeIndex ]
-            for funcData in *typeFunctions
+            for funcData in *Functions
                 if funcData and funcData[ 1 ]( value )
                     return funcData[ 2 ]
 
         return typeIndex
 
-    gpm.TypeID = typeID
+    Environment.TypeID = typeID
 
-    gpm.type = ( value ) ->
-        return type2Name[ typeID( value ) ]
+    Environment.type = ( value ) ->
+        return Names[ typeID( value ) ]
 
-    gpm.AddType = ( typeName, func ) ->
+    Environment.AddType = ( typeName, func ) ->
         assert( isstring( typeName ), "bad argument #1 to \'AddType\' (string expected)" )
         assert( isfunction( func ), "bad argument #2 to \'AddType\' (function expected)" )
 
         typeIndex = 256
 
-        for index, name in pairs( type2Name )
+        for index, name in pairs( Names )
             if typeName == name
                 typeIndex = index
                 break
             elseif index >= typeIndex
                 typeIndex = index + 1
 
-        type2Name[ typeIndex ] = typeName
-        type2Index[ typeName ] = typeIndex
+        Names[ typeIndex ] = typeName
+        Indexes[ typeName ] = typeIndex
 
-        length = #typeFunctions
+        length = #Functions
         for index = 1, length
-            funcData = typeFunctions[ index ]
+            funcData = Functions[ index ]
             if funcData and funcData[ 2 ] == typeIndex
-                remove( typeFunctions, index )
+                remove( Functions, index )
                 length -= 1
                 break
 
-        typeFunctions[ length + 1 ] = { func, typeIndex }
+        Functions[ length + 1 ] = { func, typeIndex }
         return typeIndex
 
 split = ( str, sep, withPattern ) ->
@@ -310,7 +309,7 @@ string.Extract = ( str, pattern, default ) ->
 local ArgAssert
 do
 
-    import type from gpm
+    import type from Environment
 
     ArgAssert = ( value, argNum, expected, errorlevel ) ->
         valueType = type( value )
@@ -332,7 +331,7 @@ do
 
         error "bad argument #" .. argNum .. " to \'" .. ( getinfo( 2, "n" ).name or "unknown" ) .. "\' (" .. expected .. " expected, got " .. valueType .. ")", errorlevel or 3
 
-    gpm.ArgAssert = ArgAssert
+    Environment.ArgAssert = ArgAssert
 
 table.HasValue = ( tbl, any, isSequential ) ->
 	if isSequential
@@ -532,7 +531,7 @@ do
 
     getmetatable = getmetatable
 
-    gpm.iscallable = ( obj ) ->
+    Environment.iscallable = ( obj ) ->
         if isfunction( obj )
             return true
 
@@ -553,12 +552,12 @@ do
 
         return false
 
-    gpm.AddType( "Color", iscolor )
-    gpm.iscolor = iscolor
+    Environment.AddType( "Color", iscolor )
+    Environment.iscolor = iscolor
 
 do
 
-    path = gTable( gpm, "path" )
+    path = gTable( Environment, "path" )
 
     do
 
@@ -992,7 +991,7 @@ do
 
 if SERVER
 
-    import Fix, ReplaceExtension from gpm.path
+    import Fix, ReplaceExtension from Environment.path
     AddCSLuaFile = AddCSLuaFile
     import Find from file
 
@@ -1034,7 +1033,7 @@ do
         elseif SERVER
             gpm.RealmName, colors.Realm = "Server", Color( 5, 170, 250 )
         else
-           gpm.RealmName, colors.Realm = "Unknown", White
+            gpm.RealmName, colors.Realm = "Unknown", White
 
     local log
     do

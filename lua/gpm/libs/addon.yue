@@ -1,7 +1,8 @@
-import Open, Find, GetFilePaths from gpm.file
-import HasValue, Empty from gpm.table
+import Environment from gpm
+import Open, Find, GetFilePaths from Environment.file
+import HasValue, Empty from Environment.table
 import lower, gsub, find from string
-import ArgAssert from gpm
+import ArgAssert from Environment
 import CRC from util
 
 isstring = isstring
@@ -72,7 +73,7 @@ addon.Tags = tags
 addon.TagExists = ( str ) ->
     return HasValue( tags, str, true )
 
--- Addon wildcards
+-- https://github.com/Facepunch/gmad/blob/master/include/AddonWhiteList.h
 wildcard = {
     "lua/*.lua",
     "scenes/*.vcd",
@@ -157,7 +158,7 @@ wildcard = {
 
 -- Formatting wildcard to lua patterns
 for index = 1, #wildcard
-    wildcard[ index ] = gsub( gsub( wildcard[ index ], "%.", "%." ), "%*", ".*" )
+    wildcard[ index ] = gsub( gsub( wildcard[ index ], "%.", "%." ), "%*", ".+" )
 
 isFilePathAllowed = ( filePath ) ->
     for pattern in *wildcard

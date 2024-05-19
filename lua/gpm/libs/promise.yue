@@ -21,10 +21,10 @@
     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
     SOFTWARE.
 --]]
+import TypeError, RuntimeError, iscallable from gpm.Environment
 import create, resume, running, yield from coroutine
-import TypeError, RuntimeError, iscallable from gpm
+-- import getstack from gpm.Environment.debug
 import format, match from string
--- import getstack from gpm.debug
 import Simple from timer
 isstring = isstring
 istable = istable
