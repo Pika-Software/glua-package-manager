@@ -1,5 +1,5 @@
 gpm = gpm
-import file, path, metaworks, Logger, Promise, Error from gpm
+import file, path, metaworks, table, Logger, Promise, Error from gpm
 import async, await from Promise
 istable = istable
 
@@ -67,27 +67,33 @@ gpm.Environment = setmetatable( {
 }, { __index: _G } )
 
 -- Maybe gpm.Package must be a just metadata from package.lua
-class gpm.Package
-    new: ( @meta = {}, @path ) =>
-        unless istable( @meta )
-            error InvalidPackageConfigurationError "metadata is #{type @meta}, expected table"
+class Package
+    new: ( @metadata = {}, @import_path ) =>
+        unless istable( @metadata )
+            error InvalidPackageConfigurationError "metadata is #{type @metadata}, expected table"
 
         @env = @@CreateEnvironment!
         @parse!
 
     -- TODO: Make smart metatable
-    CreateEnvironment: -> setmetatable {}, { __index: gpm.Environment }
-    GetEntry: (meta) -> meta.entry or "init.lua"
+    CreateEnvironment: ->
+        return setmetatable( {}, { __index: gpm.Environment } )
+
+    GetEntry: ( metadata ) ->
+        return metadata.entry or "init.lua"
 
     parse: =>
-        @name = @meta.name or string.gsub(@path, "/", "_") or "unknown"
-        @version = @meta.version or "0.0.1"
-        @dir = string.GetPathFromFilename @path
-        @entry = @@GetEntry @meta
+        :import_path, :metadata = @
+        @name = metadata.name or string.gsub( import_path, "/", "_" ) or "unknown"
+        @dir = string.GetPathFromFilename( import_path )
+        @version = metadata.version or "0.0.1"
+        @entry = @@GetEntry( metadata )
 
     __tostring: => "Package #{@name}@#{@version}"
 
-    LoadURL: (url) => gpm.loader.LoadURL url, @
+    LoadURL: ( url ) =>
+        return gpm.loader.LoadURL( url, @ )
+
     Import: (url, should_await = true) =>
         parent_url = gpm.loader.GetParentURL!
         result = gpm.loader.AsyncImport url, parent_url, @
@@ -97,23 +103,26 @@ class gpm.Package
 
         return result
 
-gpm.ParsePackageMeta = (path) ->
-    meta = {}
+gpm.Package = Package
 
-    entry = CompileFile path
-    unless entry
-        return nil
+gpm.ParsePackageMeta = async ( metaPath ) ->
+    func = await file.Compile( metaPath, "LUA" )
 
-    setfenv entry, meta
-    unless success, reason := try entry!
-        error InvalidPackageConfigurationError reason
+    metadata = {}
+    setfenv( func, metadata )
 
-    if SERVER
-        AddCSLuaFile path
+    success, result = pcall( func )
+    unless success
+        error InvalidPackageConfigurationError result
 
-    return meta
+    if istable( result )
+        table.Merge( metadata, result )
 
-gpm.ParsePackage = (path) -> gpm.Package gpm.ParsePackageMeta(path), path
+    table.LowerKeyNames( metadata )
+    return metadata
+
+gpm.ParsePackage = async ( importPath ) ->
+    return Package( await( gpm.ParsePackageMeta( importPath ) ), importPath )
 
 --[[
     gpm.PACKAGE_LOAD_TASKS = {}
