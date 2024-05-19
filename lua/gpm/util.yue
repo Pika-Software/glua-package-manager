@@ -537,12 +537,12 @@ do
 
     metatable = FindMetaTable( "Color" )
 
-    iscolor = ( value ) ->
-        if getmetatable( value ) == metatable
+    iscolor = ( any ) ->
+        if getmetatable( any ) == metatable
             return true
 
-        if istable( value )
-            return isnumber( value.r ) and isnumber( value.g ) and isnumber( value.b )
+        if istable( any )
+            return isnumber( any.r ) and isnumber( any.g ) and isnumber( any.b )
 
         return false
 

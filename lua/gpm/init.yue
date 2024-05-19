@@ -103,9 +103,11 @@ include( "filesystem.lua" )
 include( "http.lua" )
 
 url = include( "libs/url.lua" )
+environment.IsQueryStringParser = url.IsQueryStringParser
 environment.QueryStringParser = url.QueryStringParser
 environment.http.EncodeURI = url.encodeURI
 environment.http.DecodeURI = url.decodeURI
+environment.IsURL = url.IsURL
 environment.URL = url.URL
 
 environment.addon = include( "libs/addon.lua" )

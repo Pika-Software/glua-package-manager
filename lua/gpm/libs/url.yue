@@ -23,7 +23,7 @@
 --]]
 import string, table, Error, TypeError, RangeError from gpm.Environment
 import byte, char, sub, gsub, match, find, lower, FastSplit from string
-import istable, isnumber, isstring, tostring, tonumber, rawget, rawset from _G
+import istable, isnumber, isstring, tostring, tonumber, rawget, rawset, getmetatable from _G
 import concat, insert, remove from table
 
 CERTAINLY_NOT_NESTED = false
@@ -1249,3 +1249,11 @@ export class URL
 
     @__base.setScheme = @__base.setProtocol
     @__base.__tostring = @__base.format
+
+export IsQueryStringParser = ( any ) ->
+    metatable = getmetatable( any )
+    return metatable and metatable.__class == QueryStringParser
+
+export IsURL = ( any ) ->
+    metatable = getmetatable( any )
+    return metatable and metatable.__class == URL
