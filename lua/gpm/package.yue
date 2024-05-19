@@ -1,8 +1,8 @@
 gpm = gpm
-import Environment from gpm
-import file, path, metaworks, table, Logger from Environment
+import Environment, loader from gpm
+import file, path, metaworks, table, istable, Logger from Environment
 import async, await from Environment
-istable = istable
+import format from string
 
 packages = gpm.InitTable( gpm, "Packages" )
 
@@ -74,14 +74,14 @@ class Package
         @version = metadata.version or "0.0.1"
         @entry = @@GetEntry( metadata )
 
-    __tostring: => "Package #{@name}@#{@version}"
+    __tostring: =>
+        return format( "Package: %p [%s@%s]", @, @name, @version )
 
     LoadURL: ( url ) =>
-        return gpm.loader.LoadURL( url, @ )
+        return loader.LoadURL( url, @ )
 
-    Import: (url, should_await = true) =>
-        parent_url = gpm.loader.GetParentURL!
-        result = gpm.loader.AsyncImport url, parent_url, @
+    Import: ( url, should_await = true ) =>
+        result = loader.AsyncImport( url, loader.GetParentURL!, @ )
 
         if should_await
             return result\await!
