@@ -189,6 +189,7 @@ loader.PackageResolve = async ( specifier, parentURL, parentPackage ) ->
         return entry_fn
 
     error ModuleNotFoundError specifier
+    return
 
 -- Simplest vanilla lua `require` implementation
 -- Not uses package or any other fancy stuff
@@ -196,16 +197,25 @@ loader.PackageResolve = async ( specifier, parentURL, parentPackage ) ->
 do
 
     templates = {
-        "/init.lua"
         ".lua"
+        "/init.lua"
     }
+
+    length = #templates
+
+    if CLIENT
+        length += 1
+        templates[ length ] = "/cl_init.lua"
+
+    length += 1
+    templates[ length ] = "/shared.lua"
 
     loader.RequireResolve = async ( specifier, parentURL, parentPackage ) ->
         specifier = gsub( specifier, "%.", "/" )
         url = URL.parse( parentURL )
 
-        for template in *templates
-            success, entry = saveAwait loader.LoadURL( url\resolve( specifier .. template ), parentPackage )
+        for index = 1, length
+            success, entry = saveAwait loader.LoadURL( url\resolve( specifier .. templates[ index ] ), parentPackage )
             if success and entry
                 return entry
 
