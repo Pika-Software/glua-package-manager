@@ -1,8 +1,6 @@
-import Environment, InitTable, Logger from gpm
-SERVER = SERVER
-CLIENT = CLIENT
-error = error
-file = file
+_G = _G
+import gpm, file, CLIENT, SERVER, error from _G
+import Environment, Logger from gpm
 
 import async, await, debug, util, path, string, ArgAssert, Promise from Environment
 import FastSplit, GetPathFromFilename, GetExtensionFromFilename from string
@@ -13,8 +11,9 @@ import Find from file
 if SERVER and not efsw and util.IsBinaryModuleInstalled( "efsw" ) and pcall( require, "efsw" )
     Logger\Info( "gm_efsw is initialized, package auto-reloading are available." )
 
-lib = InitTable Environment, "file", ->
-    return setmetatable( {}, { __index: file } )
+lib = Environment.file
+unless istable( lib )
+    lib = Environment.file = setmetatable( {}, { __index: file } )
 
 -- file.Time( filePath, gamePath ) - returns file creation time as number
 lib.Time = file.Time
@@ -60,7 +59,13 @@ do
 local isFileMounted, isDirMounted
 do
 
-    mountedFiles, mountedFolders = InitTable( lib, "MountedFiles" ), InitTable( lib, "MountedFolders" )
+    mountedFiles = lib.MountedFiles
+    unless istable( mountedFiles )
+        mountedFiles = lib.MountedFiles = {}
+
+    mountedFolders = lib.MountedFolders
+    unless istable( mountedFolders )
+        mountedFolders = lib.MountedFolders = {}
 
     allowedGamePaths = {
         "LUA": true
@@ -411,8 +416,10 @@ if SERVER
 if istable( efsw )
     import Watch, Unwatch from efsw
 
-    -- file.WatchList
-    observedFiles = InitTable( lib, "ObservedFiles" )
+    -- file.ObservedFiles
+    observedFiles = lib.ObservedFiles
+    unless istable( observedFiles )
+        observedFiles = lib.ObservedFiles = {}
 
     -- file.Watch( filePath, gamePath )
     watch = ( filePath, gamePath ) ->

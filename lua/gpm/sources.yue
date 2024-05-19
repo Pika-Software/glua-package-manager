@@ -5,7 +5,9 @@ import async, await, string, error, Promise, URL, NotImplementedError from Envir
 class SourceError extends Environment.Error
 Environment.SourceError = SourceError
 
-sources = gpm.InitTable( gpm, "Sources" )
+:sources = gpm
+unless istable( sources )
+    sources = gpm.Sources = {}
 
 --[[
 

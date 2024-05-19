@@ -1,10 +1,12 @@
-gpm = gpm
+_G = _G
+import gpm from _G
 import Environment, loader from gpm
-import file, path, metaworks, table, istable, Logger from Environment
-import async, await from Environment
-import format from string
+import async, await, string, file, path, metaworks, table, istable, rawset, Logger from Environment
+import format, gsub, GetPathFromFilename from string
 
-packages = gpm.InitTable( gpm, "Packages" )
+:packages = gpm
+unless istable( packages )
+    packages = gpm.Packages = {}
 
 class InvalidPackageConfigurationError extends Environment.Error
 Environment.InvalidPackageConfigurationError = InvalidPackageConfigurationError
@@ -73,8 +75,8 @@ class Package
 
     parse: =>
         :import_path, :metadata = @
-        @name = metadata.name or string.gsub( import_path, "/", "_" ) or "unknown"
-        @dir = string.GetPathFromFilename( import_path )
+        @name = metadata.name or gsub( import_path, "/", "_" ) or "unknown"
+        @dir = GetPathFromFilename( import_path )
         @version = metadata.version or "0.0.1"
         @entry = @@GetEntry( metadata )
 

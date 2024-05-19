@@ -1,24 +1,9 @@
 _G = _G
-
 import gpm, pairs, error, istable, isnumber, isstring, isfunction, tostring, setmetatable from _G
 import Environment from gpm
 
-initTable = ( tbl, name, func, ... ) ->
-    result = tbl[ name ]
-    unless istable( result )
-        if isfunction( func )
-            result = func( ... )
-        else
-            result = {}
-
-        tbl[ name ] = result
-
-    return result
-
-gpm.InitTable = initTable
-
-initTable gpm, "Types", ->
-    return {
+unless istable( gpm.Types )
+    gpm.Types = {
         Functions: {}
 
         Indexes: setmetatable( {
@@ -124,28 +109,35 @@ initTable gpm, "Types", ->
         } )
     }
 
-string = initTable Environment, "string", ->
-    return setmetatable( {}, { __index: _G.string } )
+:string = Environment
+unless istable( string )
+    string = Environment.string = setmetatable( {}, { __index: _G.string } )
 
-table = initTable Environment, "table", ->
-    return setmetatable( {}, { __index: _G.table } )
+:table = Environment
+unless istable( table )
+    table = Environment.table = setmetatable( {}, { __index: _G.table } )
 
-math = initTable Environment, "math", ->
-    return setmetatable( {}, { __index: _G.math } )
+:math = Environment
+unless istable( math )
+    math = Environment.math = setmetatable( {}, { __index: _G.math } )
 
-debug = initTable Environment, "debug", ->
-    return setmetatable( {}, { __index: _G.debug } )
+:debug = Environment
+unless istable( debug )
+    debug = Environment.debug = setmetatable( {}, { __index: _G.debug } )
 
-http = initTable Environment, "http", ->
-    return setmetatable( {}, { __index: _G.http } )
+:http = Environment
+unless istable( http )
+    http = Environment.http = setmetatable( {}, { __index: _G.http } )
 
-util = initTable Environment, "util", ->
-    return setmetatable( {}, { __index: _G.util } )
+:util = Environment
+unless istable( util )
+    util = Environment.util = setmetatable( {}, { __index: _G.util } )
 
+-- Aliases
 string.StartsWith = string.StartsWith or string.StartWith
-
 table.unpack = unpack
 
+-- Constants
 math.inf = 1 / 0
 math.nan = 0 / 0
 
@@ -559,7 +551,9 @@ do
 
 do
 
-    path = initTable( Environment, "path" )
+    :path = Environment
+    unless istable( path )
+        path = Environment.path = {}
 
     do
 
@@ -1013,8 +1007,9 @@ do
 
     Color = Color
 
-    colors = initTable gpm, "Colors", ->
-        return {
+    colors = gpm.Colors
+    unless istable( colors )
+        colors = gpm.Colors = {
             SecondaryText: Color( 150, 150, 150 )
             PrimaryText: Color( 200, 200, 200 )
             White: Color( 255, 255, 255 )
