@@ -1,6 +1,7 @@
 import URL, Promise, Error, path, string, file from gpm
+import sub, find, gsub, len, match from string
+import async, await, saveAwait from Promise
 import getfmain, getfpathi from gpm.debug
-import async, await from Promise
 
 class ModuleURLResolutionError extends Error
 gpm.ModuleURLResolutionError = ModuleURLResolutionError
@@ -20,7 +21,7 @@ loader = gpm.Table( gpm, "loader" )
 
     tasks = {}
     for package in packages
-        tasks[] = asyncImport package, parent_url
+        tasks[] = asyncImport package, parentURL
 
     for task in tasks
         task\Catch (err) ->
@@ -93,17 +94,18 @@ loader = gpm.Table( gpm, "loader" )
 ]]
 
 -- Simple module loader that takes url and tries to get module entry
-loader.LoadURL = async ( urlStr, parent_package ) ->
-    url = URL( urlStr )
+loader.LoadURL = async ( urlStr, parentPackage ) ->
+    url = URL.parse( urlStr )
+    :scheme = url
 
     local entry_fn
-    if url.scheme == "lua"
+    if scheme == "lua"
         entry_fn = await file.Compile( url.pathname, "LUA" )
         unless entry_fn
-            error ModuleLoadError "failed to compile file #{url.pathname}"
+            error ModuleLoadError "failed to compile file " .. url.pathname
 
-    elseif url.scheme == "http" or url.scheme == "https"
-        ext = string.GetExtensionFromFilename url.pathname
+    elseif scheme == "http" or scheme == "https"
+        ext = string.GetExtensionFromFilename( url.pathname )
         if ext ~= "lua"
             error ModuleLoadError "unsupported web url: " .. url.href
 
@@ -111,128 +113,133 @@ loader.LoadURL = async ( urlStr, parent_package ) ->
         unless req and req.code == 200 and req.body
             error ModuleLoadError "failed to fetch " .. url.href
 
-        entry_fn = CompileString req.body, url.href
+        entry_fn = CompileString( req.body, url.href )
         unless entry_fn
             error ModuleLoadError "failed to compile file " .. url.href
-
     else
         error ModuleLoadError "unsupported url: " .. url.href
 
-    genv = parent_package and parent_package.env or gpm.Package.CreateEnvironment!
-    env = setmetatable {
-        PKG: parent_package
+    genv = parentPackage and parentPackage.env or gpm.Package.CreateEnvironment!
+
+    env = setmetatable( {
+        PKG: parentPackage
         URL: url.href
-    }, { __index: genv, __newindex: genv }
+    },
+    {
+        __index: genv
+        __newindex: genv
+    } )
 
-    return setfenv entry_fn, env
+    return setfenv( entry_fn, env )
 
--- Simple URL resolver based on https://nodejs.org/api/esm.html#resolution-algorithm-specification
--- without packageResolve since it is more advanced and not needed for now
-loader.ResolveURL = ( specifier, parent_url ) ->
-    url = URL( specifier )
-    if #url.scheme ~= 0
-        return url.href
+resolvePackagePath = ( currentPath, specifier, subPathIsLocal ) ->
+    local filePath
+    if currentPath == ""
+        filePath = path.Resolve( "packages", specifier )
+    else
+        filePath = path.Resolve( currentPath, "packages", specifier )
 
-    -- parent-url: lua:/example/foo.lua
-    -- url: ../config.lua
-    -- result: lua:/config.lua
-    if string.StartsWith(url.pathname, "./") or string.StartsWith(url.pathname, "../") or string.StartsWith(url.pathname, "/")
-        -- If specifier is relative path then resolve it against parent_url
-        return url\parse( parent_url, url.pathname ).href
+    if file.Exists( filePath, "LUA" )
+        pkg = await gpm.ParsePackage( path.Join( filePath, "package.lua" ) ) -- TODO: lookup package in global table
+
+        -- TODO: If pmeta is not null and pmeta.exports is not null or undefined, then
+        -- Return the result of PACKAGE_EXPORTS_RESOLVE(filePath, packageSubpath, pjson.exports, defaultConditions).
+        if not subPathIsLocal or pkg.entry
+            return pkg\LoadURL( "lua:" .. path.Join( pkg.dir, pkg.entry ) )
+
+    if currentPath ~= ""
+        return resolvePackagePath( sub( string.GetPathFromFilename( currentPath ), 1, -2 ), specifier, subPathIsLocal )
+
+-- Resolves specifier as it is package specifier
+-- See https://nodejs.org/api/esm.html#resolution-algorithm-specification PACKAGE_RESOLVE
+loader.PackageResolve = async ( specifier, parentURL, parentPackage ) ->
+    local packageName
+    if specifier == ""
+        error InvalidModuleSpecifierError specifier
+
+    if string.StartsWith( specifier, "@" )
+        unless match( specifier, "/" ) -- check if specifier even has /
+            error InvalidModuleSpecifierError specifier
+
+        packageName = match( specifier, "(@[^/]*/[^/]*)" )
+    else
+        packageName = match( specifier, "([^/]*)" )
+
+    if sub( packageName, 1, 1 ) == "." or match( packageName, "[\\%%]" )
+        error InvalidModuleSpecifierError specifier
+
+    subPath = "." .. sub( specifier, len( packageName ) + 1 )
+    -- if string.EndsWith( subPath, "/" )
+    if sub( subPath, -1 ) == "/"
+        error InvalidModuleSpecifierError specifier
+
+    -- TODO make PACKAGE_SELF_RESOLVE
+    -- if specifier := packageSelfResolve packageName, subPath, parentURL
+    --     return specifier
+
+    parentPath = URL.parse( parentURL )\getPath!
+    if parentPath == ""
+        parentPath = "./"
+
+    entry_fn = resolvePackagePath( parentPath, specifier, subPath == "." )
+    if entry_fn
+        return entry_fn
+
+    error ModuleNotFoundError specifier
 
 -- Simplest vanilla lua `require` implementation
 -- Not uses package or any other fancy stuff
 -- package.path is hardcoded into it :p
-loader.RequireResolve = async ( specifier, parent_url, parent_package ) ->
-    specifier = string.gsub( specifier, "%.", "/" ) -- replace all dots with slashes
-    url = URL( parent_url )
+do
 
-    -- yup, it is hard coded for now
-    for template in string.gmatch( "?.lua;?/init.lua", "[^;]+" )
-        success, entry = try await loader.LoadURL( url\parse( string.gsub( template, "?", specifier ) ), parent_package )
-        if success and entry
-            return entry
+    templates = {
+        "/init.lua"
+        ".lua"
+    }
 
--- Resolves specifier as it is package specifier
--- See https://nodejs.org/api/esm.html#resolution-algorithm-specification PACKAGE_RESOLVE
-loader.PackageResolve = async (specifier, parent_url, parent_package) ->
-    print specifier, parent_url, parent_package
+    loader.RequireResolve = async ( specifier, parentURL, parentPackage ) ->
+        specifier = gsub( specifier, "%.", "/" )
+        url = URL.parse( parentURL )
 
-    --[[
-        [ERROR] addons/glua-package-manager-v2/lua/gpm/loader.yue:13: InvalidModuleSpecifierError: ./submodule.lua
-        1. unknown - addons/glua-package-manager-v2/lua/gpm/loader.yue:13
-        2. xpcall - [C]:-1
-        3. unknown - addons/glua-package-manager-v2/lua/gpm/libs/promise.yue:1
+        for template in *templates
+            success, entry = saveAwait loader.LoadURL( url\resolve( specifier .. template ), parentPackage )
+            if success and entry
+                return entry
 
-    ]]
+-- Simple URL resolver based on https://nodejs.org/api/esm.html#resolution-algorithm-specification
+-- without packageResolve since it is more advanced and not needed for now
+loader.ResolveURL = ( specifier, parentURL ) ->
+    url = URL.parse( specifier )
+    if url.scheme
+        return url\format!
 
-    package_name = nil
-    if url == ""
-        error InvalidModuleSpecifierError specifier
-
-    if string.StartsWith specifier, "@"
-        unless string.match specifier, "/" -- check if specifier even has /
-            error InvalidModuleSpecifierError specifier
-
-        package_name = string.match specifier, "(@[^/]*/[^/]*)"
-    else
-        package_name = string.match specifier, "([^/]*)"
-
-    if string.StartsWith(package_name, ".") or string.match(package_name, "[\\%%]")
-        error InvalidModuleSpecifierError specifier
-
-    package_subpath = "." .. string.sub(specifier, #package_name + 1)
-    if string.EndsWith package_subpath, "/"
-        error InvalidModuleSpecifierError specifier
-
-    -- TODO make PACKAGE_SELF_RESOLVE
-    -- if self_url := packageSelfResolve package_name, package_subpath, parent_url
-    --     return self_url
-
-    filePath = URL( parent_url ).pathname
-
-    if filePath == ""
-        filePath = "./"
-
-    while filePath ~= ""
-        filePath = string.sub( string.GetPathFromFilename( filePath ), 1, -2 )
-        package_url = path.Resolve( filePath, "packages", specifier )
-        unless file.Exists( package_url, "LUA" )
-            continue
-
-        pkg = gpm.ParsePackage( path.Join( package_url, "package.lua" ) ) -- TODO lookup package in global table
-
-        -- TODO If pmeta is not null and pmeta.exports is not null or undefined, then
-        -- Return the result of PACKAGE_EXPORTS_RESOLVE(packageURL, packageSubpath, pjson.exports, defaultConditions).
-        if package_subpath == "."
-            if pkg.entry
-                return pkg\LoadURL "lua:" .. path.Join( pkg.dir, pkg.entry )
-
-        else
-            return pkg\LoadURL "lua:" .. path.Join( pkg.dir, pkg.entry )
-
-    error ModuleNotFoundError specifier
+    -- parent-url: lua:/example/foo.lua
+    -- url: ../config.lua
+    -- result: lua:/config.lua
+    if find( url.pathname, "%.?%.?/", 1, false )
+        -- If specifier is relative path then resolve it against parentURL
+        return URL.resolve( parentURL, url.pathname )\format!
 
 -- Resolves specifier and returns a promise with entry function
-loader.Resolve = async (specifier, parent_url = "lua:", parent_package) ->
+loader.Resolve = async ( specifier, parentURL = "lua:", parentPackage ) ->
     -- First lets try to resolve as URL
-    resolved = loader.ResolveURL( specifier, parent_url )
+    resolved = loader.ResolveURL( specifier, parentURL )
     if resolved
-        return loader.LoadURL resolved, parent_package
+        return loader.LoadURL( resolved, parentPackage )
 
     -- Try to resolve as vanilla `require`
-    entry = await loader.RequireResolve( specifier, parent_url, parent_package )
+    entry = await loader.RequireResolve( specifier, parentURL, parentPackage )
     if entry
         return entry
 
     -- Try to resolve as package
-    return loader.PackageResolve( specifier, parent_url, parent_package )
+    return loader.PackageResolve( specifier, parentURL, parentPackage )
 
+-- TODO: What is this for?
 asyncImport = async ( specifier, parentURL, parentPackage ) ->
-    print specifier, parentURL, parentPackage
-    -- entry_fn = await loader.Resolve specifier, parent_url, parent_package
-    -- entry_fn = async entry_fn -- convert entry to async function
-    -- return entry_fn!
+    entry_fn = await loader.Resolve( specifier, parentURL, parentPackage )
+    entry_fn = async entry_fn -- convert entry to async function
+    return entry_fn!
 
 loader.AsyncImport = asyncImport
 
@@ -246,8 +253,8 @@ getParentURL = ->
         -- Try to resolve URL from entry source
         if folderPath := getfpathi( entry )
             url = URL.parse( folderPath )
-            url.scheme or= "lua"
-            return url\build!
+            url.protocol or= "lua"
+            return url\format!
 
     return "lua:" -- default fallback
 
