@@ -1,14 +1,13 @@
-gpm = gpm
-:Promise, :BaseSource, :BaseSourceHandler, :SourceError, :GMAD, :util, :file = gpm
-:async, :await = Promise
-:ByteStream = util
+_G = _G
+import gpm from _G
+import Environment from gpm
+import async, await, file, path, ModuleLoadError from Environment
 
 --[[
 
     Handler List:
-    [  ] file://data/my_gma.gma ( gma, zip, lua, moon, yue )
-    [  ] module://module_name ( binarry or lua modules )
     [  ] lua://my_addon/init.lua ( lua, moon, yue )
+    [  ] file://data/my_gma.gma ( gma, zip, lua, moon, yue )
     [  ] package://package_name ( package from lua/packages folder )
 
     Single File Package:
@@ -25,118 +24,64 @@ gpm = gpm
 
 ]]
 
-class FileHandler extends BaseSourceHandler
-    SupportedExtensions: {
-        "moon": true
-        "yue": true
-        "lua": true
-        "zip": true
-        "gma": true
-    }
+do
 
+    import IsBinaryModuleInstalled from Environment.util
+    import require from _G
+
+    class BinaryHandler extends gpm.BaseSourceHandler
+        ShouldHandle: ( url ) =>
+            return true
+
+        FetchInfo: async ( url ) =>
+            :hostname = url
+            return {
+                name: hostname
+                installed: IsBinaryModuleInstalled( hostname )
+            }
+
+        Install: async ( _, info ) =>
+            :name = info
+            if info.installed
+                require( name )
+                return _G[ name ]
+
+            error "Binary module " .. name .. " is not installed locally!"
+            return
+
+    class BinarySource extends gpm.BaseSource
+
+    bs = BinarySource!
+    bs\RegisterHandler( BinaryHandler! )
+
+    gpm.RegisterSource( "binary", bs )
+    gpm.RegisterSource( "dll", bs )
+
+class LuaHandler extends gpm.BaseSourceHandler
     ShouldHandle: ( url ) =>
-        if url.protocol == "file"
-            extension = string.GetExtensionFromFilename( url.path )
-            if extension and @SupportedExtensions[ extension ]
-                return true
-        return false
+        return true
 
     FetchInfo: async ( url ) =>
-        error SourceError "file:// protocol is not supported yet"
-        filePath = string.gsub( url, "^.-://", "" )
-        switch string.GetExtensionFromFilename( filePath )
-            when "gma"
-                result = await file.AsyncRead( filePath, "GAME" )
+        return ( url.hostname or "" ) .. ( url.pathname or "" )
 
-                gma = GMAD!
-                gma.File = ByteStream( result.content )
-                gma\Parse( true )
-                gma\ReadFiles( true )
+    Install: async ( url, filePath, parentPath, parentPackage ) =>
+        if parentPath
+            filePath = path.Resolve( parentPath, filePath )
 
+        unless file.Exists( filePath, "LUA" )
+            error ModuleLoadError "file not found: " .. filePath
 
-                return {
+        func = await file.Compile( filePath, "LUA" )
+        gpm.ModuleEnvironment( func, url.href, parentPackage )
 
-                }
-            when "zip"
-                return {}
-            when "lua"
-                return {}
-            when "zip"
-                return {}
-            when "moon"
-                return {}
-            when "yue"
-                return {}
+        return func!
 
-class ModuleHandler extends BaseSourceHandler
-    ShouldHandle: ( url ) => url.protocol == "module"
+class LuaSource extends gpm.BaseSource
 
-    FetchInfo: async ( url ) =>
-        error SourceError "module:// protocol is not supported yet"
-        moduleName = string.gsub( url, "^.-://", "" )
-        return {
-            "name": moduleName
-            "type": util.IsBinaryModuleInstalled( moduleName ) and "binary" or "lua"
-        }
+-- Lua, MoonScript, YueScript
+ls = LuaSource!
+ls\RegisterHandler( LuaHandler! )
+gpm.RegisterSource( "lua", ls )
+gpm.RegisterSource( "moon", ls )
+gpm.RegisterSource( "yue", ls )
 
-
-class LuaHandler extends BaseSourceHandler
-    ShouldHandle: (url) =>
-        return url.protocol == "lua"
-
-    FindPackageLua: (path) ->
-        if string.EndsWith path, "package.lua"
-            return path
-
-        path = gpm.path.Join path, "package.lua"
-        return file.Exists( path, "LUA" ) and path
-
-    FetchInfo: async (url) =>
-        path = url.path
-        package_lua_path = LuaHandler.FindPackageLua path
-        if package_lua_path
-            env = {}
-            env.dir = dir -- We are assigning here, so package.lua can define custom directory
-
-            func = CompileFile package_lua_path
-            unless func then error SourceError "Failed to compile package info file: #{package_lua_path}"
-
-            setfenv func, env
-            unless success, reason := try func!
-                error SourceError reason
-
-            return env
-        elseif string.EndsWith path, ".lua"
-            -- Make stub env
-            env = {}
-            env.dir = string.GetPathFromFilename(path)
-            env.main = string.GetFileFromFilename(path)
-
-            return env
-        else
-            return @FetchInfo "lua://#{path}.lua"
-
-    Install: (url) =>
-        -- No need to install anything
-
-class PackageHandler extends BaseSourceHandler
-    ShouldHandle: (url) => url.protocol == "package" -- string.StartsWith( url, "package://" )
-    FetchInfo: ( url ) =>
-        url.protocol = "lua"
-        url.path = gpm.path.Join "packages", url.path
-        gpm.FetchInfo( url )
-    Install: (url, info) =>
-        -- No need to install anything
-
-class FilesystemSource extends BaseSource
-
-fs = FilesystemSource!
-fs\RegisterHandler FileHandler!
-fs\RegisterHandler ModuleHandler!
-fs\RegisterHandler LuaHandler!
-fs\RegisterHandler PackageHandler!
-
-gpm.RegisterSource( "file", fs )
-gpm.RegisterSource( "module", fs )
-gpm.RegisterSource( "lua", fs )
-gpm.RegisterSource( "package", fs )

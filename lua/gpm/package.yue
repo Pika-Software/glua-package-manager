@@ -54,18 +54,18 @@ Environment.InvalidPackageConfigurationError = InvalidPackageConfigurationError
 --]]
 
 gpm.CreateEnvironment = ->
-    return metaworks.Environment( Environment )
+    environment = metaworks.Environment( Environment )
+    rawset( environment, "_G", _G )
+    return environment
 
 -- Maybe gpm.Package must be a just metadata from package.lua
 class Package
     new: ( @metadata = {}, @import_path ) =>
         unless istable( @metadata )
-            error InvalidPackageConfigurationError "metadata is #{type @metadata}, expected table"
+            error InvalidPackageConfigurationError "metadata is " .. type( @metadata ) .. ", expected table"
 
+        @environment = gpm.CreateEnvironment!
         @parse!
-        environment = gpm.CreateEnvironment!
-        rawset( environment, "_G", _G )
-        @environment = environment
 
     GetEnvironment: =>
         return @environment
@@ -96,6 +96,10 @@ class Package
 
 gpm.Package = Package
 
+Environment.IsPackage = ( any ) ->
+    metatable = getmetatable( any )
+    return metatable and metatable.__class == Package
+
 gpm.ParsePackageMeta = async ( metaPath ) ->
     func = await file.Compile( metaPath, "LUA" )
 
@@ -114,6 +118,16 @@ gpm.ParsePackageMeta = async ( metaPath ) ->
 
 gpm.ParsePackage = async ( importPath ) ->
     return Package( await( gpm.ParsePackageMeta( importPath ) ), importPath )
+
+gpm.ModuleEnvironment = ( func, urlStr, package ) ->
+    env = package and package\GetEnvironment! or gpm.CreateEnvironment!
+
+    setfenv( func, setmetatable(
+        { _PKG: package, _URL: urlStr },
+        { __index: env, __newindex: env }
+    ) )
+
+    return func
 
 --[[
     gpm.PACKAGE_LOAD_TASKS = {}

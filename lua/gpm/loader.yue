@@ -140,7 +140,7 @@ loader.LoadURL = async ( urlStr, parentPackage ) ->
         )
     )
 
-resolvePackagePath = ( currentPath, specifier, subPathIsLocal ) ->
+resolvePackagePath = ( currentPath, specifier ) ->
     local filePath
     if currentPath == ""
         filePath = path.Resolve( "packages", specifier )
@@ -148,15 +148,10 @@ resolvePackagePath = ( currentPath, specifier, subPathIsLocal ) ->
         filePath = path.Resolve( currentPath, "packages", specifier )
 
     if file.Exists( filePath, "LUA" )
-        pkg = await gpm.ParsePackage( path.Join( filePath, "package.lua" ) ) -- TODO: lookup package in global table
-
-        -- TODO: If pmeta is not null and pmeta.exports is not null or undefined, then
-        -- Return the result of PACKAGE_EXPORTS_RESOLVE(filePath, packageSubpath, pjson.exports, defaultConditions).
-        if not subPathIsLocal or pkg.entry
-            return pkg\LoadURL( "lua:" .. path.Join( pkg.dir, pkg.entry ) )
+        return filePath
 
     if currentPath ~= ""
-        return resolvePackagePath( sub( string.GetPathFromFilename( currentPath ), 1, -2 ), specifier, subPathIsLocal )
+        return resolvePackagePath( sub( string.GetPathFromFilename( currentPath ), 1, -2 ), specifier )
 
 -- Resolves specifier as it is package specifier
 -- See https://nodejs.org/api/esm.html#resolution-algorithm-specification PACKAGE_RESOLVE
@@ -176,22 +171,31 @@ loader.PackageResolve = async ( specifier, parentURL, parentPackage ) ->
     if sub( packageName, 1, 1 ) == "." or match( packageName, "[\\%%]" )
         error InvalidModuleSpecifierError specifier
 
-    subPath = "." .. sub( specifier, len( packageName ) + 1 )
-    -- if string.EndsWith( subPath, "/" )
-    if sub( subPath, -1 ) == "/"
+    packageSubPath = "." .. sub( specifier, len( packageName ) + 1 )
+    if sub( packageSubPath, -1 ) == "/"
         error InvalidModuleSpecifierError specifier
 
     -- TODO make PACKAGE_SELF_RESOLVE
-    -- if specifier := packageSelfResolve packageName, subPath, parentURL
+    -- if specifier := packageSelfResolve packageName, packageSubPath, parentURL
     --     return specifier
 
     parentPath = URL.parse( parentURL )\getPath!
     if parentPath == ""
         parentPath = "./"
 
-    entry_fn = resolvePackagePath( parentPath, specifier, subPath == "." )
-    if entry_fn
-        return entry_fn
+    packagePath = resolvePackagePath( parentPath, specifier )
+    if packagePath
+        pkg = await gpm.ParsePackage( path.Join( packagePath, "package.lua" ) ) -- TODO: lookup package in global table
+
+        -- TODO: If pmeta is not null and pmeta.exports is not null or undefined, then
+        -- Return the result of PACKAGE_EXPORTS_RESOLVE(packagePath, packageSubpath, pjson.exports, defaultConditions).
+        urlStr = "lua:" .. path.Join( pkg.dir, pkg.entry )
+
+        if packageSubPath ~= "." or pkg.entry
+            if parentPackage
+                return loader.LoadURL( urlStr, parentPackage )
+
+            return pkg\LoadURL( urlStr )
 
     error ModuleNotFoundError specifier
     return
