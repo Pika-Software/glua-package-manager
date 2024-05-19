@@ -18,7 +18,7 @@ Environment.ModuleLoadError = ModuleLoadError
 class ModuleNotFoundError extends Error
 Environment.ModuleNotFoundError = ModuleNotFoundError
 
-loader = gpm.Table( gpm, "loader" )
+loader = gpm.InitTable( gpm, "loader" )
 
 --[[
 

@@ -4,7 +4,7 @@ import file, path, metaworks, table, Logger from Environment
 import async, await from Environment
 istable = istable
 
-packages = gpm.Table( gpm, "Packages" )
+packages = gpm.InitTable( gpm, "Packages" )
 
 class InvalidPackageConfigurationError extends Environment.Error
 Environment.InvalidPackageConfigurationError = InvalidPackageConfigurationError

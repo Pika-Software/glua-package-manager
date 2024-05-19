@@ -1,4 +1,4 @@
-import Environment, Table, Logger from gpm
+import Environment, InitTable, Logger from gpm
 SERVER = SERVER
 CLIENT = CLIENT
 error = error
@@ -13,7 +13,7 @@ import Find from file
 if SERVER and not efsw and util.IsBinaryModuleInstalled( "efsw" ) and pcall( require, "efsw" )
     Logger\Info( "gm_efsw is initialized, package auto-reloading are available." )
 
-lib = Table Environment, "file", ->
+lib = InitTable Environment, "file", ->
     return setmetatable( {}, { __index: file } )
 
 -- file.Time( filePath, gamePath ) - returns file creation time as number
@@ -60,7 +60,7 @@ do
 local isFileMounted, isDirMounted
 do
 
-    mountedFiles, mountedFolders = Table( lib, "MountedFiles" ), Table( lib, "MountedFolders" )
+    mountedFiles, mountedFolders = InitTable( lib, "MountedFiles" ), InitTable( lib, "MountedFolders" )
 
     allowedGamePaths = {
         "LUA": true
@@ -412,7 +412,7 @@ if istable( efsw )
     import Watch, Unwatch from efsw
 
     -- file.WatchList
-    observedFiles = Table( lib, "ObservedFiles" )
+    observedFiles = InitTable( lib, "ObservedFiles" )
 
     -- file.Watch( filePath, gamePath )
     watch = ( filePath, gamePath ) ->

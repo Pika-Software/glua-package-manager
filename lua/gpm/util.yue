@@ -1,7 +1,7 @@
 import gpm, pairs, error, istable, isnumber, isstring, isfunction, tostring, setmetatable from _G
 import Environment from gpm
 
-gTable = ( tbl, name, func, ... ) ->
+initTable = ( tbl, name, func, ... ) ->
     result = tbl[ name ]
     unless istable( result )
         if isfunction( func )
@@ -13,9 +13,9 @@ gTable = ( tbl, name, func, ... ) ->
 
     return result
 
-gpm.Table = gTable
+gpm.InitTable = initTable
 
-gTable gpm, "Types", ->
+initTable gpm, "Types", ->
     return {
         Functions: {}
 
@@ -122,22 +122,22 @@ gTable gpm, "Types", ->
         } )
     }
 
-string = gTable Environment, "string", ->
+string = initTable Environment, "string", ->
     return setmetatable( {}, { __index: string } )
 
-table = gTable Environment, "table", ->
+table = initTable Environment, "table", ->
     return setmetatable( {}, { __index: table } )
 
-math = gTable Environment, "math", ->
+math = initTable Environment, "math", ->
     return setmetatable( {}, { __index: math } )
 
-debug = gTable Environment, "debug", ->
+debug = initTable Environment, "debug", ->
     return setmetatable( {}, { __index: debug } )
 
-http = gTable Environment, "http", ->
+http = initTable Environment, "http", ->
     return setmetatable( {}, { __index: http } )
 
-util = gTable Environment, "util", ->
+util = initTable Environment, "util", ->
     return setmetatable( {}, { __index: util } )
 
 string.StartsWith = string.StartsWith or string.StartWith
@@ -557,7 +557,7 @@ do
 
 do
 
-    path = gTable( Environment, "path" )
+    path = initTable( Environment, "path" )
 
     do
 
@@ -1011,7 +1011,7 @@ do
 
     Color = Color
 
-    colors = gTable gpm, "Colors", ->
+    colors = initTable gpm, "Colors", ->
         return {
             SecondaryText: Color( 150, 150, 150 )
             PrimaryText: Color( 200, 200, 200 )
