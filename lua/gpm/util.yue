@@ -1,3 +1,5 @@
+_G = _G
+
 import gpm, pairs, error, istable, isnumber, isstring, isfunction, tostring, setmetatable from _G
 import Environment from gpm
 
@@ -123,22 +125,22 @@ initTable gpm, "Types", ->
     }
 
 string = initTable Environment, "string", ->
-    return setmetatable( {}, { __index: string } )
+    return setmetatable( {}, { __index: _G.string } )
 
 table = initTable Environment, "table", ->
-    return setmetatable( {}, { __index: table } )
+    return setmetatable( {}, { __index: _G.table } )
 
 math = initTable Environment, "math", ->
-    return setmetatable( {}, { __index: math } )
+    return setmetatable( {}, { __index: _G.math } )
 
 debug = initTable Environment, "debug", ->
-    return setmetatable( {}, { __index: debug } )
+    return setmetatable( {}, { __index: _G.debug } )
 
 http = initTable Environment, "http", ->
-    return setmetatable( {}, { __index: http } )
+    return setmetatable( {}, { __index: _G.http } )
 
 util = initTable Environment, "util", ->
-    return setmetatable( {}, { __index: util } )
+    return setmetatable( {}, { __index: _G.util } )
 
 string.StartsWith = string.StartsWith or string.StartWith
 

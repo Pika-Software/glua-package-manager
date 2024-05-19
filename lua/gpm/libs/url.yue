@@ -557,7 +557,7 @@ export class URL
 
         search = @search or ""
         if search == ""
-            search = query != "" and "?" .. query or ""
+            search = query != "" and ("?" .. query) or ""
 
         protocol = @_protocol or ""
         if protocol != "" and byte(protocol, -1) != 0x3A -- ':'
@@ -602,16 +602,21 @@ export class URL
         else
             pathname = ""
 
-        if search != "" and byte(search, 1) != 0x3F -- '?'
-            search = "?" .. search
+        if search != ""
+            if byte(search, 1) != 0x3F -- '?'
+                search = "?" .. search
 
-        search = @_escapeSearch( search )
+            search = @_escapeSearch(search)
 
         hash = @hash or ""
         if hash != "" and byte(hash, 1) != 0x23 -- '#'
             hash = "#" .. hash
 
-        return concat([scheme, host == false and "" or host, pathname, search, hash], "", 1, 5 )
+        href = scheme
+        if host
+            href ..= host
+
+        return href .. pathname .. search .. hash
 
     resolveObject: (relative) =>
         if isstring(relative)
@@ -778,7 +783,7 @@ export class URL
         -- however, if it ends in anything else non-slashy,
         -- then it must NOT get a trailing slash.
         last = srcPath[srcLength]
-        hasTrailingSlash = --[[(result.host or relative.host) or--]] (last == "." or last == ".." ) or last == ""
+        hasTrailingSlash = (result.host or relative.host) or (last == "." or last == ".." ) or last == ""
 
         -- strip single dots, resolve double dots to parent dir
         -- if the path tries to go above the root, `up` ends up > 0
@@ -800,17 +805,19 @@ export class URL
                 insert(srcPath, 1, "..")
                 up -= 1
 
-        if mustEndAbs and srcPath[1] != "" and (not srcPath[0] or byte(srcPath[1], 1) != 0x2F --[['/']])
+        if mustEndAbs and srcPath[1] != "" and (not srcPath[1] or byte(srcPath[1], 1) != 0x2F --[['/']])
             insert(srcPath, 1, "")
 
-        if hasTrailingSlash and (byte( concat(srcPath, "/"), 1 ) != 0x2F --[['/']])
-            srcPath[] = ""
+        -- TODO: there ( in glua ) are no absolute paths and idk how fix this
+        -- if hasTrailingSlash and byte( concat( srcPath, "/" ), 1 ) != 0x2F --[['/']]
+        --     srcPath[] = ""
 
-        isAbsolute = srcPath[1] == "" or (srcPath[0] and byte(srcPath[1], 1) == 0x2F --[['/']])
+        -- isAbsolute = srcPath[1] == "" or (srcPath[1] and byte(srcPath[1], 1) == 0x2F --[['/']])
+        isAbsolute = true
 
         -- put the host back
         if psychotic
-            result.hostname = result.host = isAbsolute and "" or #srcPath > 0 and ( remove(srcPath, 1) .. "/" ) or ""
+            result.hostname = result.host = isAbsolute and "" or #srcPath > 0 and remove(srcPath, 1) or ""
             -- occationaly the auth can get stuck only in host
             -- this especialy happens in cases like
             -- url.resolveObject("mailto:local1@domain1", "local2@domain2")
@@ -915,7 +922,7 @@ export class URL
         -- 1. there was no protocol at all
         -- 2. there was a protocol that requires slashes
         -- e.g. in 'http:asd' 'asd' is not a hostname
-        elseif not @_protocol -- or @_specialSchemes[@_protocol]
+        elseif not @_protocol or @_specialSchemes[@_protocol]
             return startPos
 
         doLowerCase = true
