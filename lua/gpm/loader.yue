@@ -1,6 +1,6 @@
 gpm = gpm
 import Environment from gpm
-import URL, Promise, Error, path, string, file from Environment
+import URL, Promise, Error, path, string, file, rawget, getfenv from Environment
 import getfmain, getfpathi from Environment.debug
 import sub, find, gsub, len, match from string
 import async, await, saveAwait from Promise
@@ -30,14 +30,14 @@ loader = gpm.InitTable( gpm, "loader" )
         task\Catch (err) ->
             print err
 
-    PKG.name
-    PKG.metadata.name
-    PKG.env == getfenv(1)
+    _PKG.name
+    _PKG.metadata.name
+    _PKG.env == getfenv(1)
     PARENT_URL
 
-    PKG == gpm.Package!
+    _PKG == gpm.Package!
 
-    PKG.Tasks = {
+    _PKG.Tasks = {
         metadata: Promise 1
         download: Primise 2
     }
@@ -125,8 +125,8 @@ loader.LoadURL = async ( urlStr, parentPackage ) ->
     genv = parentPackage and parentPackage.env or gpm.Package.CreateEnvironment!
 
     env = setmetatable( {
-        PKG: parentPackage
-        URL: url.href
+        _PKG: parentPackage
+        _URL: url.href
     },
     {
         __index: genv
@@ -250,7 +250,7 @@ getParentURL = ->
     if entry := getfmain!
         -- Get URL from entry env
         env = getfenv( entry )
-        if value := env and rawget( env, "URL" )
+        if value := env and rawget( env, "_URL" )
             return value
 
         -- Try to resolve URL from entry source
@@ -266,7 +266,7 @@ loader.GetParentURL = getParentURL
 getPackage = ->
     if func := getfmain!
         env = getfenv( func )
-        return env and rawget( env, "PKG" )
+        return env and rawget( env, "_PKG" )
 
 loader.GetPackage = getPackage
 
