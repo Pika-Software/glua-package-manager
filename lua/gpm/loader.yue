@@ -124,18 +124,21 @@ loader.LoadURL = async ( urlStr, parentPackage ) ->
     else
         error ModuleLoadError "unsupported url: " .. url.href
 
-    genv = parentPackage and parentPackage\GetEnvironment! or gpm.CreateEnvironment!
+    -- Package environment
+    env = parentPackage and parentPackage\GetEnvironment! or gpm.CreateEnvironment!
 
-    env = setmetatable( {
-        _PKG: parentPackage
-        _URL: url.href
-    },
-    {
-        __index: genv
-        __newindex: genv
-    } )
-
-    return setfenv( entry_fn, env )
+    -- Func environment
+    return setfenv( entry_fn, setmetatable(
+            {
+                _PKG: parentPackage
+                _URL: url.href
+            },
+            {
+                __index: env
+                __newindex: env
+            }
+        )
+    )
 
 resolvePackagePath = ( currentPath, specifier, subPathIsLocal ) ->
     local filePath
