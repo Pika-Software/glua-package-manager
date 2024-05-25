@@ -11,7 +11,7 @@ import Find from file
 if SERVER and not efsw and util.IsBinaryModuleInstalled( "efsw" ) and pcall( require, "efsw" )
     Logger\Info( "gm_efsw is initialized, package auto-reloading are available." )
 
-lib = Environment.file
+lib = rawget( Environment, "file" )
 unless istable( lib )
     lib = Environment.file = setmetatable( {}, { __index: file } )
 

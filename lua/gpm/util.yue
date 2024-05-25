@@ -1,5 +1,5 @@
 _G = _G
-import gpm, pairs, error, istable, isnumber, isstring, isfunction, tostring, setmetatable from _G
+import gpm, pairs, error, istable, isnumber, isstring, isfunction, tostring, rawget, setmetatable from _G
 import Environment from gpm
 
 unless istable( gpm.Types )
@@ -109,27 +109,27 @@ unless istable( gpm.Types )
         } )
     }
 
-:string = Environment
+string = rawget( Environment, "string" )
 unless istable( string )
     string = Environment.string = setmetatable( {}, { __index: _G.string } )
 
-:table = Environment
+table = rawget( Environment, "table" )
 unless istable( table )
     table = Environment.table = setmetatable( {}, { __index: _G.table } )
 
-:math = Environment
+math = rawget( Environment, "math" )
 unless istable( math )
     math = Environment.math = setmetatable( {}, { __index: _G.math } )
 
-:debug = Environment
+debug = rawget( Environment, "debug" )
 unless istable( debug )
     debug = Environment.debug = setmetatable( {}, { __index: _G.debug } )
 
-:http = Environment
+http = rawget( Environment, "http" )
 unless istable( http )
     http = Environment.http = setmetatable( {}, { __index: _G.http } )
 
-:util = Environment
+util = rawget( Environment, "util" )
 unless istable( util )
     util = Environment.util = setmetatable( {}, { __index: _G.util } )
 
@@ -551,7 +551,7 @@ do
 
 do
 
-    :path = Environment
+    path = rawget( Environment, "path" )
     unless istable( path )
         path = Environment.path = {}
 

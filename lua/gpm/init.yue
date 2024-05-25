@@ -51,8 +51,19 @@ environment = gpm.Environment
 unless istable( environment )
     environment = gpm.Environment = {}
 
-setmetatable( environment, { __index: _G } )
-setmetatable( gpm, { __index: environment } )
+do
+
+    _G = _G
+
+    environment._G = _G
+    environment.garrysmod = _G
+
+    environment.CLIENT = _G.CLIENT == true
+    environment.SERVER = _G.SERVER == true
+    environment.MENU = _G.MENU_DLL == true
+
+    setmetatable( environment, { __index: _G } )
+    setmetatable( gpm, { __index: environment } )
 
 include( "gpm/util.lua" )
 logger = gpm.Logger
