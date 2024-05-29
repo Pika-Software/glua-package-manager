@@ -27,10 +27,6 @@ environment.SourceError = SourceError
 unless istable( loader )
     loader = gpm.loader = {}
 
-:sources = gpm
-unless istable( sources )
-    sources = gpm.Sources = {}
-
 --[[
 
     file://path/to/file/in/game
@@ -96,17 +92,23 @@ class gpm.BaseSource
     Install: ( url, info ) =>
         return @CallHandler( "Install", url, info )
 
+-- Sources
+sources = gpm.Sources
+unless istable( sources )
+    sources = gpm.Sources = {}
+
+findSource = ( scheme ) ->
+    src = sources[ scheme ]
+    if src
+        return src
+
+    error SourceError "Source for scheme #{scheme} not implemented"
+    return
+
+gpm.FindSource = findSource
+
 gpm.RegisterSource = ( scheme, source ) ->
     sources[ scheme ] = source
-
-findSourceByURL = ( url ) ->
-    src = sources[ url.scheme ]
-    unless src
-        error SourceError "No source found for URL: " .. url.href
-
-    return src
-
-gpm.FindSourceByURL = findSourceByURL
 
 parsePackageURL = ( any ) ->
     if isurl( any )
@@ -131,11 +133,11 @@ gpm.GetPackageURL = getPackageURL
 
 loader.FetchInfo = async ( url ) ->
     url = getPackageURL( url )
-    return findSourceByURL( url )\FetchInfo( url )
+    return findSource( url.scheme )\FetchInfo( url )
 
 loader.AsyncImport = async ( url, parentURL = "lua:", parentPackage, packageInfo ) ->
     url = getPackageURL( URL.resolve( parentURL or "", url ) )
-    src = findSourceByURL( url )
+    src = findSource( url.scheme )
 
     unless packageInfo
         packageInfo = await src\FetchInfo( url )
