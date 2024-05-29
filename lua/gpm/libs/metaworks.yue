@@ -59,10 +59,7 @@ do
 
     _R[ "thread" ] = metatable
 
-getmetatable = getmetatable
-setmetatable = setmetatable
-rawset = rawset
-rawget = rawget
+import getmetatable, setmetatable, rawget, rawset from _G
 
 metaworks = {
     GetValue: table.GetValue
@@ -134,13 +131,19 @@ do
                     return value
     }
 
-    metaworks.Environment = ( other ) ->
-        tbl = { __indexes: {} }
-        setmetatable( tbl, meta )
+    metaworks.Environment = ( other, base ) ->
+        local env
+        if base
+            rawset( base, "__indexes", {} )
+            env = base
+        else
+            env = { __indexes: {} }
 
-        if other ~= nil
-            link( tbl, other )
+        setmetatable( env, meta )
 
-        return tbl
+        if other
+            link( env, other )
+
+        return env
 
 return metaworks
