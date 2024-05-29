@@ -12,4 +12,3 @@ print "pkg:", _PKG
 print "abc:", abc, "_G.abc:", _G.abc
 
 nil
-

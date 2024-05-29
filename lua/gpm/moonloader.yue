@@ -1,5 +1,5 @@
-import Environment, Logger from gpm
-import util from Environment
+import environment, Logger from gpm
+import util from environment
 
 if util.IsBinaryModuleInstalled( "moonloader" )
     local ok, msg = pcall( require, "moonloader" )
@@ -13,9 +13,9 @@ unless istable( moonloader )
     Logger\Warn( "gm_moonloader is missing, support for moon and yue scripts is unavailable!" )
     return
 
-Environment.moonloader = moonloader
+environment.moonloader = moonloader
 
-import ArgAssert from Environment
+import ArgAssert from environment
 CompileString = CompileString
 isfunction = isfunction
 istable = istable

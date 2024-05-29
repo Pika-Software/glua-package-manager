@@ -21,7 +21,7 @@
     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
     SOFTWARE.
 --]]
-import string, table, Error, TypeError, RangeError from gpm.Environment
+import string, table, Error, TypeError, RangeError from gpm.environment
 import byte, char, sub, gsub, match, find, lower, FastSplit from string
 import istable, isnumber, isstring, tostring, tonumber, rawget, rawset, getmetatable from _G
 import concat, insert, remove from table

@@ -1,15 +1,15 @@
-import Environment, Logger from gpm
+import environment, Logger from gpm
 isstring = isstring
 isnumber = isnumber
 istable = istable
 
-import ArgAssert, Promise, http from Environment
+import ArgAssert, Promise, http from environment
 
 unless isstring( http.UserAgent )
     http.UserAgent = "GLua Package Manager/" .. gpm.VERSION .. " - Garry's Mod/" .. VERSIONSTR
 
-class HTTPError extends Environment.Error
-Environment.HTTPError = HTTPError
+class HTTPError extends environment.Error
+environment.HTTPError = HTTPError
 
 client, clientName, returnsState, userAgentKey = HTTP, "Garry's Mod", true, nil
 do
@@ -87,7 +87,7 @@ do
 
         return p
 
-    Environment.HTTP = HTTP
+    environment.HTTP = HTTP
 
 do
 

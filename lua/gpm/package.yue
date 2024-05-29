@@ -1,15 +1,15 @@
 _G = _G
 import gpm from _G
-import Environment, loader from gpm
-import async, await, string, file, path, metaworks, table, istable, rawset, Logger from Environment
+import environment, loader from gpm
+import async, await, string, file, path, metaworks, table, istable, rawset, Logger from environment
 import format, gsub, GetPathFromFilename from string
 
 :packages = gpm
 unless istable( packages )
     packages = gpm.Packages = {}
 
-class InvalidPackageConfigurationError extends Environment.Error
-Environment.InvalidPackageConfigurationError = InvalidPackageConfigurationError
+class InvalidPackageConfigurationError extends environment.Error
+environment.InvalidPackageConfigurationError = InvalidPackageConfigurationError
 
 --[[
     Packages: {
@@ -53,10 +53,10 @@ Environment.InvalidPackageConfigurationError = InvalidPackageConfigurationError
 
 --]]
 
-gpm.CreateEnvironment = ->
-    environment = metaworks.Environment( Environment )
-    rawset( environment, "_G", _G )
-    return environment
+createEnvironment = ->
+    return metaworks.Environment( environment, { :_G } )
+
+gpm.CreateEnvironment = createEnvironment
 
 -- Maybe gpm.Package must be a just metadata from package.lua
 class Package
@@ -64,7 +64,7 @@ class Package
         unless istable( @metadata )
             error InvalidPackageConfigurationError "metadata is " .. type( @metadata ) .. ", expected table"
 
-        @environment = gpm.CreateEnvironment!
+        @environment = createEnvironment!
         @parse!
 
     GetEnvironment: =>
@@ -96,7 +96,7 @@ class Package
 
 gpm.Package = Package
 
-Environment.IsPackage = ( any ) ->
+environment.ispackage = ( any ) ->
     metatable = getmetatable( any )
     return metatable and metatable.__class == Package
 
@@ -119,15 +119,6 @@ gpm.ParsePackageMeta = async ( metaPath ) ->
 gpm.ParsePackage = async ( importPath ) ->
     return Package( await( gpm.ParsePackageMeta( importPath ) ), importPath )
 
-gpm.ModuleEnvironment = ( func, urlStr, package ) ->
-    env = package and package\GetEnvironment! or gpm.CreateEnvironment!
-
-    setfenv( func, setmetatable(
-        { _PKG: package, _URL: urlStr },
-        { __index: env, __newindex: env }
-    ) )
-
-    return func
 
 --[[
     gpm.PACKAGE_LOAD_TASKS = {}

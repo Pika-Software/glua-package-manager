@@ -1,22 +1,18 @@
-gpm = gpm
-import Environment from gpm
-import URL, Promise, Error, path, string, file, rawget, getfenv from Environment
-import getfmain, getfpathi from Environment.debug
-import sub, find, gsub, len, match from string
+import environment, CreateEnvironment from gpm
 import async, await, saveAwait from Promise
-import Fetch from Environment.http
+import Fetch from environment.http
 
 class ModuleURLResolutionError extends Error
-Environment.ModuleURLResolutionError = ModuleURLResolutionError
+environment.ModuleURLResolutionError = ModuleURLResolutionError
 
 class InvalidModuleSpecifierError extends Error
-Environment.InvalidModuleSpecifierError = InvalidModuleSpecifierError
+environment.InvalidModuleSpecifierError = InvalidModuleSpecifierError
 
 class ModuleLoadError extends Error
-Environment.ModuleLoadError = ModuleLoadError
+environment.ModuleLoadError = ModuleLoadError
 
 class ModuleNotFoundError extends Error
-Environment.ModuleNotFoundError = ModuleNotFoundError
+environment.ModuleNotFoundError = ModuleNotFoundError
 
 :loader = gpm
 unless istable( loader )
@@ -125,7 +121,7 @@ loader.LoadURL = async ( urlStr, parentPackage ) ->
         error ModuleLoadError "unsupported url: " .. url.href
 
     -- Package environment
-    env = parentPackage and parentPackage\GetEnvironment! or gpm.CreateEnvironment!
+    env = parentPackage and parentPackage\GetEnvironment! or CreateEnvironment!
 
     -- Func environment
     return setfenv( entry_fn, setmetatable(
@@ -296,4 +292,4 @@ gpm.Import = ( url, should_await ) ->
 
     return result
 
-Environment.require = gpm.Import
+environment.require = gpm.Import

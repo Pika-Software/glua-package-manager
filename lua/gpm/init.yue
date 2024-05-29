@@ -4,7 +4,7 @@ SERVER = SERVER
 unless istable( gpm )
     global gpm = { VERSION: "2.0.0" }
 
-gpm = gpm
+import gpm from _G
 gpm.StartTime = SysTime!
 
 do
@@ -47,9 +47,9 @@ cvars.AddChangeCallback( "developer", ( _, __, value ) ->
     gpm.Developer = tonumber( value ) or 0
 "gLua Package Manager" )
 
-environment = gpm.Environment
+environment = gpm.environment
 unless istable( environment )
-    environment = gpm.Environment = {}
+    environment = gpm.environment = {}
 
 do
 
@@ -118,7 +118,7 @@ environment.IsQueryStringParser = url.IsQueryStringParser
 environment.QueryStringParser = url.QueryStringParser
 environment.http.EncodeURI = url.encodeURI
 environment.http.DecodeURI = url.decodeURI
-environment.IsURL = url.IsURL
+environment.isurl = url.IsURL
 environment.URL = url.URL
 
 environment.addon = include( "libs/addon.lua" )

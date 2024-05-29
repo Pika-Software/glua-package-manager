@@ -1,8 +1,8 @@
-import Environment from gpm
-import Open, Find, GetFilePaths from Environment.file
-import HasValue, Empty from Environment.table
+import environment from gpm
+import Open, Find, GetFilePaths from environment.file
+import HasValue, Empty from environment.table
 import lower, gsub, find from string
-import ArgAssert from Environment
+import ArgAssert from environment
 import CRC from util
 
 isstring = isstring

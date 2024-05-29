@@ -1,8 +1,8 @@
 _G = _G
 import gpm, file, CLIENT, SERVER, error from _G
-import Environment, Logger from gpm
+import environment, Logger from gpm
 
-import async, await, debug, util, path, string, ArgAssert, Promise from Environment
+import async, await, debug, util, path, string, ArgAssert, Promise from environment
 import FastSplit, GetPathFromFilename, GetExtensionFromFilename from string
 import Join, Resolve, Fix from path
 import Find from file
@@ -11,9 +11,9 @@ import Find from file
 if SERVER and not efsw and util.IsBinaryModuleInstalled( "efsw" ) and pcall( require, "efsw" )
     Logger\Info( "gm_efsw is initialized, package auto-reloading are available." )
 
-lib = rawget( Environment, "file" )
+lib = rawget( environment, "file" )
 unless istable( lib )
-    lib = Environment.file = setmetatable( {}, { __index: file } )
+    lib = environment.file = setmetatable( {}, { __index: file } )
 
 -- file.Time( filePath, gamePath ) - returns file creation time as number
 lib.Time = file.Time
@@ -256,7 +256,7 @@ do
 local isCompilable
 do
 
-    preCacheFunc = Environment.moonloader and Environment.moonloader.PreCacheFile
+    preCacheFunc = environment.moonloader and environment.moonloader.PreCacheFile
     import sub from string
 
     supportedExtensions = { moon: true, yue: true, lua: true }
@@ -553,9 +553,9 @@ do
                 if count > 2
                     break
 
-    -- Environment.FileSystemAsyncError - async error
-    class FileSystemAsyncError extends Environment.Error
-    Environment.FileSystemAsyncError = FileSystemAsyncError
+    -- environment.FileSystemAsyncError - async error
+    class FileSystemAsyncError extends environment.Error
+    environment.FileSystemAsyncError = FileSystemAsyncError
 
     -- file.FSASYNC - async error messages table
     FSASYNC = {
@@ -644,8 +644,8 @@ do
 do
 
     -- file.LuaCompileError - compile error
-    class LuaCompileError extends Environment.Error
-    Environment.LuaCompileError = LuaCompileError
+    class LuaCompileError extends environment.Error
+    environment.LuaCompileError = LuaCompileError
 
     -- file.CompileLua( filePath, gamePath, handleError ) - async lua file compile function that returns promise
     local compileLua
@@ -731,7 +731,7 @@ do
 -- file.DecompressDeflate( fileHandle, doCRC ) - zip files iterator
 do
 
-    import DecompressDeflate from Environment.deflate
+    import DecompressDeflate from environment.deflate
     import fempty from debug
     import CRC from util
     tostring = tostring

@@ -1,6 +1,6 @@
 _G = _G
 import gpm, pairs, error, istable, isnumber, isstring, isfunction, tostring, rawget, setmetatable from _G
-import Environment from gpm
+import environment from gpm
 
 unless istable( gpm.Types )
     gpm.Types = {
@@ -109,29 +109,29 @@ unless istable( gpm.Types )
         } )
     }
 
-string = rawget( Environment, "string" )
+string = rawget( environment, "string" )
 unless istable( string )
-    string = Environment.string = setmetatable( {}, { __index: _G.string } )
+    string = environment.string = setmetatable( {}, { __index: _G.string } )
 
-table = rawget( Environment, "table" )
+table = rawget( environment, "table" )
 unless istable( table )
-    table = Environment.table = setmetatable( {}, { __index: _G.table } )
+    table = environment.table = setmetatable( {}, { __index: _G.table } )
 
-math = rawget( Environment, "math" )
+math = rawget( environment, "math" )
 unless istable( math )
-    math = Environment.math = setmetatable( {}, { __index: _G.math } )
+    math = environment.math = setmetatable( {}, { __index: _G.math } )
 
-debug = rawget( Environment, "debug" )
+debug = rawget( environment, "debug" )
 unless istable( debug )
-    debug = Environment.debug = setmetatable( {}, { __index: _G.debug } )
+    debug = environment.debug = setmetatable( {}, { __index: _G.debug } )
 
-http = rawget( Environment, "http" )
+http = rawget( environment, "http" )
 unless istable( http )
-    http = Environment.http = setmetatable( {}, { __index: _G.http } )
+    http = environment.http = setmetatable( {}, { __index: _G.http } )
 
-util = rawget( Environment, "util" )
+util = rawget( environment, "util" )
 unless istable( util )
-    util = Environment.util = setmetatable( {}, { __index: _G.util } )
+    util = environment.util = setmetatable( {}, { __index: _G.util } )
 
 -- Aliases
 string.StartsWith = string.StartsWith or string.StartWith
@@ -199,12 +199,12 @@ do
 
         return typeIndex
 
-    Environment.TypeID = typeID
+    environment.TypeID = typeID
 
-    Environment.type = ( value ) ->
+    environment.type = ( value ) ->
         return Names[ typeID( value ) ]
 
-    Environment.AddType = ( typeName, func ) ->
+    environment.AddType = ( typeName, func ) ->
         assert( isstring( typeName ), "bad argument #1 to \'AddType\' (string expected)" )
         assert( isfunction( func ), "bad argument #2 to \'AddType\' (function expected)" )
 
@@ -303,7 +303,7 @@ string.Extract = ( str, pattern, default ) ->
 local ArgAssert
 do
 
-    import type from Environment
+    import type from environment
 
     ArgAssert = ( value, argNum, expected, errorlevel ) ->
         valueType = type( value )
@@ -325,7 +325,7 @@ do
 
         error "bad argument #" .. argNum .. " to \'" .. ( getinfo( 2, "n" ).name or "unknown" ) .. "\' (" .. expected .. " expected, got " .. valueType .. ")", errorlevel or 3
 
-    Environment.ArgAssert = ArgAssert
+    environment.ArgAssert = ArgAssert
 
 table.HasValue = ( tbl, any, isSequential ) ->
 	if isSequential
@@ -525,7 +525,7 @@ do
 
     getmetatable = getmetatable
 
-    Environment.iscallable = ( obj ) ->
+    environment.iscallable = ( obj ) ->
         if isfunction( obj )
             return true
 
@@ -546,14 +546,14 @@ do
 
         return false
 
-    Environment.AddType( "Color", iscolor )
-    Environment.iscolor = iscolor
+    environment.AddType( "Color", iscolor )
+    environment.iscolor = iscolor
 
 do
 
-    path = rawget( Environment, "path" )
+    path = rawget( environment, "path" )
     unless istable( path )
-        path = Environment.path = {}
+        path = environment.path = {}
 
     do
 
@@ -987,7 +987,7 @@ do
 
 if SERVER
 
-    import Fix, ReplaceExtension from Environment.path
+    import Fix, ReplaceExtension from environment.path
     AddCSLuaFile = AddCSLuaFile
     import Find from file
 
