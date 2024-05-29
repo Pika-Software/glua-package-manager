@@ -202,6 +202,9 @@ bench = (name, fn) ->
     print format( "%s time: %f sec.", name, st )
 
 main = async ->
+    -- gpm.Import( "dll://asyncio" )
+    gpm.Import( "lua://packages/b/init.yue" )
+
     -- GLuaTest.runAllTests!
     -- gpm.Import( "package_v2" )
     -- specifier = "b"

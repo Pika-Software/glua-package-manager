@@ -1,6 +1,7 @@
 _G = _G
 import gpm from _G
 import environment, loader from gpm
+import GetExtensionFromFilename from gpm.string
 import async, await, file, path, ModuleLoadError from environment
 
 --[[
@@ -62,7 +63,11 @@ class LuaHandler extends gpm.BaseSourceHandler
         return true
 
     FetchInfo: async ( url ) =>
-        return ( url.hostname or "" ) .. ( url.pathname or "" )
+        filePath = ( url.hostname or "" ) .. ( url.pathname or "" )
+        unless GetExtensionFromFilename( filePath )
+            filePath ..= ".lua"
+
+        return filePath
 
     Install: async ( url, filePath, parentPath, parentPackage ) =>
         if parentPath
