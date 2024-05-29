@@ -1,7 +1,7 @@
 _G = _G
 import gpm from _G
-import Environment from gpm
-import async, await, file, path, ModuleLoadError from Environment
+import environment, loader from gpm
+import async, await, file, path, ModuleLoadError from environment
 
 --[[
 
@@ -26,7 +26,7 @@ import async, await, file, path, ModuleLoadError from Environment
 
 do
 
-    import IsBinaryModuleInstalled from Environment.util
+    import IsBinaryModuleInstalled from environment.util
     import require from _G
 
     class BinaryHandler extends gpm.BaseSourceHandler
@@ -72,7 +72,7 @@ class LuaHandler extends gpm.BaseSourceHandler
             error ModuleLoadError "file not found: " .. filePath
 
         func = await file.Compile( filePath, "LUA" )
-        gpm.ModuleEnvironment( func, url.href, parentPackage )
+        loader.SetFileEnvironment( func, url.href, parentPackage )
 
         return func!
 

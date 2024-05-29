@@ -203,7 +203,7 @@ bench = (name, fn) ->
 
 main = async ->
     -- GLuaTest.runAllTests!
-    gpm.Import( "package_v2" )
+    -- gpm.Import( "package_v2" )
     -- specifier = "b"
     -- print "=== Loading `#{specifier}` #{CurTime()} ==="
 

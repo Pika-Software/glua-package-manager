@@ -79,7 +79,6 @@ if SERVER
     clientSideFiles = {
         "moonloader.lua"
         "filesystem.lua"
-        "sources.lua"
         "package.lua"
         "loader.lua"
         "init.lua"
@@ -124,7 +123,6 @@ environment.URL = url.URL
 environment.addon = include( "libs/addon.lua" )
 
 include( "package.lua" )
-include( "sources.lua" )
 include( "loader.lua" )
 
 for fileName in *environment.file.Find( "gpm/sources/*.lua", "LUA" )
