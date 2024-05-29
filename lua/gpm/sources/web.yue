@@ -1,5 +1,9 @@
 import gpm from _G
-import loader from gpm
+import environment, loader from gpm
+import BaseSource, BaseSourceHandler, SetFileEnvironment from loader
+import GetExtensionFromFilename from environment.string
+import await, async, util from environment
+import Fetch from environment.http
 
 --[[
 
@@ -33,7 +37,90 @@ import loader from gpm
 
 ]]
 
-class WebSource extends loader.BaseSource
+local LuaCodeHandler
+do
 
+    import CompileLuaString, CompileMoonString, CompileYueString from util
 
-WebSource( "http", "https" )
+    extensions = {
+        "lua": true
+        "moon": true
+        "yue": true
+    }
+
+    class LuaCodeHandler extends BaseSourceHandler
+        ShouldHandle: ( url ) =>
+            url.extension or= GetExtensionFromFilename( url.pathname ) or "txt"
+            return extensions[ url.extension ]
+
+        FetchInfo: async ( url ) =>
+            result = await Fetch( url.href )
+            if result.code ~= 200
+                error "failed to fetch " .. url.href
+
+            return result.body
+
+        Install: async ( url, luaCode, _, parentPackage, parentEnvironment ) =>
+            func = await switch url.extension
+                when "lua"
+                    util.CompileLuaString( luaCode, url.href )
+
+                when "moon"
+                    util.CompileMoonString( luaCode, url.href )
+
+                when "yue"
+                    util.CompileYueString( luaCode, url.href )
+
+            unless func
+                error ModuleLoadError "File '" .. filePath .. "' cannot be compiled."
+                return
+
+            SetFileEnvironment( func, url.href, parentPackage, parentEnvironment )
+            return func!
+
+class TextHandler extends BaseSourceHandler
+    ShouldHandle: ( url ) =>
+        url.extension or= GetExtensionFromFilename( url.pathname ) or "txt"
+        return url.extension == "txt"
+
+    FetchInfo: async ( url ) =>
+        result = await Fetch( url.href )
+        if result.code ~= 200
+            error "failed to fetch " .. url.href
+
+        return result.body
+
+    Install: async ( url, text ) =>
+        return text
+
+local JSONHandler
+do
+
+    import JSONToTable from util
+
+    class JSONHandler extends BaseSourceHandler
+        ShouldHandle: ( url ) =>
+            url.extension or= GetExtensionFromFilename( url.pathname ) or "txt"
+            return url.extension == "json"
+
+        FetchInfo: async ( url ) =>
+            result = await Fetch( url.href )
+            if result.code ~= 200
+                error "failed to fetch " .. url.href
+
+            return result.body
+
+        Install: async ( url, json ) =>
+            tbl = JSONToTable( json, true, false )
+            if tbl
+                return tbl
+
+            error "failed to decode json"
+            return
+
+class WebSource extends BaseSource
+
+ws = WebSource( "http", "https" )
+ws\RegisterHandler( LuaCodeHandler! )
+ws\RegisterHandler( TextHandler! )
+ws\RegisterHandler( JSONHandler! )

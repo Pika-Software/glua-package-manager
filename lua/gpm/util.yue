@@ -152,6 +152,9 @@ math.Clamp = ( number, min, max ) ->
 
 debug.fempty = ->
 
+util.CompileLuaString = _G.CompileString
+util.CompileLuaFile = _G.CompileFile
+
 util.CompileMoonString = ->
     error( "Attempt to compile MoonScript failed, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader." )
 
@@ -988,7 +991,7 @@ do
 if SERVER
 
     import Fix, ReplaceExtension from environment.path
-    AddCSLuaFile = AddCSLuaFile
+    import AddCSLuaFile from _G
     import Find from file
 
     addCSLuaFolder = ( folderPath ) ->

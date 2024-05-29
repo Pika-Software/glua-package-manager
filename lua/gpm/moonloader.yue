@@ -15,11 +15,9 @@ unless istable( moonloader )
 
 environment.moonloader = moonloader
 
+import isfunction, istable, error from _G
+import CompileLuaString from util
 import ArgAssert from environment
-CompileString = CompileString
-isfunction = isfunction
-istable = istable
-error = error
 
 -- MoonScript
 do
@@ -34,7 +32,7 @@ do
         unless luaCode
             error( msg or "MoonScript compilation failed." )
 
-        func = CompileString( luaCode, identifier, handleError == true )
+        func = CompileLuaString( luaCode, identifier, handleError == true )
         unless isfunction( func )
             error( msg or "MoonScript compilation failed." )
 
@@ -64,7 +62,7 @@ util.CompileYueString = ( yueCode, identifier, handleError, yueConfig ) ->
     unless luaCode
         error( msg or "Yuescript compilation failed." )
 
-    func = CompileString( luaCode, identifier, handleError == true )
+    func = CompileLuaString( luaCode, identifier, handleError == true )
     unless isfunction( func )
         error( msg or "Yuescript compilation failed." )
 

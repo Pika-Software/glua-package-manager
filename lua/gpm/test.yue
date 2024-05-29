@@ -206,6 +206,8 @@ main = async ->
     gpm.Import( "lua://packages/b/init" )
     -- gpm.Import( "package:package_v2" )
 
+    -- PrintTable gpm.Import "https://raw.githubusercontent.com/unknown-gd/unknown-ghosts/main/jb_mars_lp.json"
+
     -- specifier = "b"
     -- print "=== Loading `#{specifier}` #{CurTime()} ==="
 

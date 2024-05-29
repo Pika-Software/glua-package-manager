@@ -1,12 +1,13 @@
 _G = _G
 import gpm from _G
 import environment, CreateEnvironment from gpm
-import URL, isurl, isstring, rawget, getfenv from environment
+import isurl, isstring, rawget, getfenv from environment
 import async, await, reject from environment.Promise
 -- import sub, find, gsub, len, match from string
 import getfmain, getfpathi from environment.debug
 import format, IsURL from environment.string
 import NotImplementedError from environment
+import parse, resolve from environment.URL
 -- import Fetch from environment.http
 
 -- class ModuleURLResolutionError extends environment.Error
@@ -119,7 +120,7 @@ parseFileURL = ( any ) ->
         return any
 
     if isstring( any ) and IsURL( any )
-        return URL.parse( any )
+        return parse( any )
 
 loader.ParseFileURL = parseFileURL
 
@@ -140,7 +141,7 @@ loader.FetchInfo = async ( url ) ->
     return findSource( url.scheme )\FetchInfo( url )
 
 asyncImport = async ( base, url = "lua:", pkg, env, info ) ->
-    fileURL = getFileURL( URL.resolve( url, base ) )
+    fileURL = getFileURL( resolve( url, base ) )
     src = findSource( fileURL.scheme )
 
     unless info
@@ -403,7 +404,7 @@ loader.GetParentURL = ->
 
         -- Try to resolve URL from func source
         if folderPath := getfpathi( func )
-            url = URL.parse( folderPath )
+            url = parse( folderPath )
             url.protocol or= "lua"
             return url\format!
 
@@ -429,7 +430,7 @@ gpm.Import = ( url, should_await ) ->
 
         unless parentURL
             if folderPath := getfpathi( func )
-                url = URL.parse( folderPath )
+                url = parse( folderPath )
                 url.protocol or= "lua"
                 parentURL = url\format!
 

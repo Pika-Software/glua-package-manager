@@ -651,8 +651,7 @@ do
     local compileLua
     do
 
-        CompileString = CompileString
-        CompileFile = CompileFile
+        import CompileLuaString, CompileLuaFile from util
 
         compileLua = async ( filePath, gamePath, handleError ) ->
             if CLIENT and isFileMounted( filePath, gamePath )
@@ -665,9 +664,9 @@ do
             unless content
                 error LuaCompileError "File '" .. filePath .. "' cannot be read."
 
-            func = CompileString( content, filePath, handleError )
+            func = CompileLuaString( content, filePath, handleError )
             if not func and luaGamePaths[ gamePath ]
-                func = CompileFile( filePath )
+                func = CompileLuaFile( filePath )
 
             if func
                 return func
