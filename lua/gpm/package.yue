@@ -119,7 +119,6 @@ gpm.ParsePackageMeta = async ( metaPath ) ->
 gpm.ParsePackage = async ( importPath ) ->
     return Package( await( gpm.ParsePackageMeta( importPath ) ), importPath )
 
-
 --[[
     gpm.PACKAGE_LOAD_TASKS = {}
 

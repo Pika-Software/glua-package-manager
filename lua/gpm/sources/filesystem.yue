@@ -2,6 +2,7 @@ _G = _G
 import gpm from _G
 import environment, loader from gpm
 import GetExtensionFromFilename from gpm.string
+import RegisterSource, SetFileEnvironment from loader
 import async, await, file, path, ModuleLoadError from environment
 
 --[[
@@ -30,10 +31,7 @@ do
     import IsBinaryModuleInstalled from environment.util
     import require from _G
 
-    class BinaryHandler extends gpm.BaseSourceHandler
-        ShouldHandle: ( url ) =>
-            return true
-
+    class BinarySource extends loader.BaseSource
         FetchInfo: async ( url ) =>
             :hostname = url
             return {
@@ -50,18 +48,9 @@ do
             error "Binary module " .. name .. " is not installed locally!"
             return
 
-    class BinarySource extends gpm.BaseSource
+    BinarySource( "binary", "dll" )
 
-    bs = BinarySource!
-    bs\RegisterHandler( BinaryHandler! )
-
-    gpm.RegisterSource( "binary", bs )
-    gpm.RegisterSource( "dll", bs )
-
-class LuaHandler extends gpm.BaseSourceHandler
-    ShouldHandle: ( url ) =>
-        return true
-
+class LuaSource extends loader.BaseSource
     FetchInfo: async ( url ) =>
         filePath = ( url.hostname or "" ) .. ( url.pathname or "" )
         unless GetExtensionFromFilename( filePath )
@@ -69,24 +58,10 @@ class LuaHandler extends gpm.BaseSourceHandler
 
         return filePath
 
-    Install: async ( url, filePath, parentPath, parentPackage ) =>
-        if parentPath
-            filePath = path.Resolve( parentPath, filePath )
-
-        unless file.Exists( filePath, "LUA" )
-            error ModuleLoadError "file not found: " .. filePath
-
+    Install: async ( url, filePath, _, parentPackage, parentEnvironment ) =>
         func = await file.Compile( filePath, "LUA" )
-        loader.SetFileEnvironment( func, url.href, parentPackage )
-
+        SetFileEnvironment( func, url.href, parentPackage, parentEnvironment )
         return func!
 
-class LuaSource extends gpm.BaseSource
-
--- Lua, MoonScript, YueScript
-ls = LuaSource!
-ls\RegisterHandler( LuaHandler! )
-gpm.RegisterSource( "lua", ls )
-gpm.RegisterSource( "moon", ls )
-gpm.RegisterSource( "yue", ls )
+LuaSource( "lua", "moon", "yue" )
 

@@ -1,24 +1,25 @@
 _G = _G
 import gpm from _G
 import environment, CreateEnvironment from gpm
-import URL, isurl, isstring, Promise, path, string, file, metaworks, rawget, getfenv from environment
-import sub, find, gsub, len, match, format from string
-import NotImplementedError, Error from environment
+import async, await, URL, isurl, isstring, rawget, getfenv from environment
+-- import async, await, saveAwait from environment.Promise
+-- import sub, find, gsub, len, match from string
 import getfmain, getfpathi from environment.debug
-import async, await, saveAwait from Promise
-import Fetch from environment.http
+import format, IsURL from environment.string
+import NotImplementedError from environment
+-- import Fetch from environment.http
 
-class ModuleURLResolutionError extends Error
-environment.ModuleURLResolutionError = ModuleURLResolutionError
+-- class ModuleURLResolutionError extends environment.Error
+-- environment.ModuleURLResolutionError = ModuleURLResolutionError
 
-class InvalidModuleSpecifierError extends Error
-environment.InvalidModuleSpecifierError = InvalidModuleSpecifierError
+-- class InvalidModuleSpecifierError extends environment.Error
+-- environment.InvalidModuleSpecifierError = InvalidModuleSpecifierError
 
-class ModuleLoadError extends Error
-environment.ModuleLoadError = ModuleLoadError
+-- class ModuleLoadError extends environment.Error
+-- environment.ModuleLoadError = ModuleLoadError
 
-class ModuleNotFoundError extends Error
-environment.ModuleNotFoundError = ModuleNotFoundError
+-- class ModuleNotFoundError extends environment.Error
+-- environment.ModuleNotFoundError = ModuleNotFoundError
 
 class SourceError extends environment.Error
 environment.SourceError = SourceError
@@ -45,57 +46,36 @@ unless istable( loader )
 
 ]]
 
--- Individual file environment
 loader.GetFileEnvironment = getfenv
 
-loader.SetFileEnvironment = ( location, url, pkg ) ->
-    env = pkg and pkg\GetEnvironment! or CreateEnvironment!
+loader.SetFileEnvironment = ( location, url, pkg, env ) ->
+    unless env
+        env = pkg and pkg\GetEnvironment! or CreateEnvironment!
 
     return setfenv( location, setmetatable(
         { _URL: url, _PKG: pkg, _ENV: env },
         { __index: env, __newindex: env }
     ) )
 
--- Source classes
-class gpm.BaseSourceHandler
-    __tostring: =>
-        return format( "%s: %p", @@__name or "unknown source handler", @ )
+sources = loader.Sources
+unless istable( sources )
+    sources = loader.Sources = {}
 
-    FetchInfo: async ( url ) =>
-        error NotImplementedError "Source:FetchInfo(url)"
-        return
-
-    Install: async ( url, info ) =>
-        error NotImplementedError "Source:Install(url, info)"
-        return
-
-class gpm.BaseSource
+class loader.BaseSource
     __tostring: =>
         return format( "%s: %p", @@__name or "unknown source", @ )
 
-    new: =>
-        @handlers = {}
+    new: ( ... ) =>
+        for scheme in *{ ... }
+            sources[ scheme ] = @
 
-    RegisterHandler: ( handler ) =>
-        @handlers[] = handler
+    FetchInfo: async ( fileURL, parentURL, parentPackage, parentEnvironment ) =>
+        error NotImplementedError "Source:FetchInfo( fileURL, parentURL, parentPackage, parentEnvironment )"
+        return
 
-    CallHandler: ( name, url, ... ) =>
-        for handler in *@handlers
-            if not handler.ShouldHandle or handler\ShouldHandle( url, ... )
-                return handler[ name ]( handler, url, ... )
-
-        return Promise.reject SourceError "No handler found for URL #{url} (" .. name .. ")"
-
-    FetchInfo: ( url ) =>
-        return @CallHandler( "FetchInfo", url )
-
-    Install: ( url, info ) =>
-        return @CallHandler( "Install", url, info )
-
--- Sources
-sources = gpm.Sources
-unless istable( sources )
-    sources = gpm.Sources = {}
+    Install: async ( fileURL, fileInfo, parentURL, parentPackage, parentEnvironment ) =>
+        error NotImplementedError "Source:Install( fileURL, fileInfo, parentURL, parentPackage, parentEnvironment )"
+        return
 
 findSource = ( scheme ) ->
     src = sources[ scheme ]
@@ -105,22 +85,22 @@ findSource = ( scheme ) ->
     error SourceError "Source for scheme #{scheme} not implemented"
     return
 
-gpm.FindSource = findSource
+loader.FindSource = findSource
 
-gpm.RegisterSource = ( scheme, source ) ->
+loader.RegisterSource = ( scheme, source ) ->
     sources[ scheme ] = source
 
-parsePackageURL = ( any ) ->
+parseFileURL = ( any ) ->
     if isurl( any )
         return any
 
-    if isstring( any ) and string.IsURL( any )
+    if isstring( any ) and IsURL( any )
         return URL.parse( any )
 
-gpm.ParsePackageURL = parsePackageURL
+loader.ParseFileURL = parseFileURL
 
-getPackageURL = ( any ) ->
-    url = parsePackageURL( any )
+getFileURL = ( any ) ->
+    url = parseFileURL( any )
     unless url
         error SourceError "Invalid URL: #{any}"
 
@@ -129,20 +109,22 @@ getPackageURL = ( any ) ->
 
     return url
 
-gpm.GetPackageURL = getPackageURL
+loader.GetFileURL = getFileURL
 
 loader.FetchInfo = async ( url ) ->
-    url = getPackageURL( url )
+    url = getFileURL( url )
     return findSource( url.scheme )\FetchInfo( url )
 
-loader.AsyncImport = async ( url, parentURL = "lua:", parentPackage, packageInfo ) ->
-    url = getPackageURL( URL.resolve( parentURL or "", url ) )
-    src = findSource( url.scheme )
+asyncImport = async ( base, url = "lua:", pkg, env, info ) ->
+    fileURL = getFileURL( URL.resolve( url, base ) )
+    src = findSource( fileURL.scheme )
 
-    unless packageInfo
-        packageInfo = await src\FetchInfo( url )
+    unless info
+        info = await src\FetchInfo( fileURL, url, pkg, env )
 
-    return src\Install( url, packageInfo, parentURL, parentPackage )
+    return src\Install( fileURL, info, url, pkg, env )
+
+loader.AsyncImport = asyncImport
 
 --[[
 
@@ -388,32 +370,46 @@ loader.Resolve = async ( specifier, parentURL = "lua:", parentPackage ) ->
 
 --]]
 
-getParentURL = ->
-    if entry := getfmain!
-        -- Get URL from entry env
-        env = getfenv( entry )
+loader.GetParentURL = ->
+    if func := getfmain!
+        -- Get URL from func env
+        env = getfenv( func )
         if value := env and rawget( env, "_URL" )
             return value
 
-        -- Try to resolve URL from entry source
-        if folderPath := getfpathi( entry )
+        -- Try to resolve URL from func source
+        if folderPath := getfpathi( func )
             url = URL.parse( folderPath )
             url.protocol or= "lua"
             return url\format!
 
     return "lua:" -- default fallback
 
-loader.GetParentURL = getParentURL
-
-getPackage = ->
+loader.GetPackage = ->
     if func := getfmain!
         env = getfenv( func )
         return env and rawget( env, "_PKG" )
 
-loader.GetPackage = getPackage
+loader.GetEnvironment = ->
+    if func := getfmain!
+        env = getfenv( func )
+        return env and rawget( env, "_ENV" )
 
 gpm.Import = ( url, should_await ) ->
-    result = loader.AsyncImport( url, getParentURL!, getPackage! )
+    local env, pkg, parentURL
+    if func := getfmain!
+        if fenv := getfenv( func )
+            env = rawget( fenv, "_ENV" )
+            pkg = rawget( fenv, "_PKG" )
+            parentURL = rawget( fenv, "_URL" )
+
+        unless parentURL
+            if folderPath := getfpathi( func )
+                url = URL.parse( folderPath )
+                url.protocol or= "lua"
+                parentURL = url\format!
+
+    result = asyncImport( url, parentURL, pkg, env, nil )
     if should_await ~= false
         return await( result )
 

@@ -727,6 +727,7 @@ do
                 return compileYue( compilePath, gamePath, handleError, yueConfig )
 
             error LuaCompileError "File '" .. fullPath .. "' cannot be found."
+            return
 
 -- file.DecompressDeflate( fileHandle, doCRC ) - zip files iterator
 do
