@@ -203,10 +203,9 @@ bench = (name, fn) ->
 
 main = async ->
     -- gpm.Import( "dll://asyncio" )
-    gpm.Import( "lua://packages/b/init.yue" )
+    gpm.Import( "lua://packages/b/init" )
+    -- gpm.Import( "package:package_v2" )
 
-    -- GLuaTest.runAllTests!
-    -- gpm.Import( "package_v2" )
     -- specifier = "b"
     -- print "=== Loading `#{specifier}` #{CurTime()} ==="
 

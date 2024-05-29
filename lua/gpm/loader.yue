@@ -1,8 +1,8 @@
 _G = _G
 import gpm from _G
 import environment, CreateEnvironment from gpm
-import async, await, URL, isurl, isstring, rawget, getfenv from environment
--- import async, await, saveAwait from environment.Promise
+import URL, isurl, isstring, rawget, getfenv from environment
+import async, await, reject from environment.Promise
 -- import sub, find, gsub, len, match from string
 import getfmain, getfpathi from environment.debug
 import format, IsURL from environment.string
@@ -15,8 +15,8 @@ import NotImplementedError from environment
 -- class InvalidModuleSpecifierError extends environment.Error
 -- environment.InvalidModuleSpecifierError = InvalidModuleSpecifierError
 
--- class ModuleLoadError extends environment.Error
--- environment.ModuleLoadError = ModuleLoadError
+class ModuleLoadError extends environment.Error
+environment.ModuleLoadError = ModuleLoadError
 
 -- class ModuleNotFoundError extends environment.Error
 -- environment.ModuleNotFoundError = ModuleNotFoundError
@@ -61,34 +61,58 @@ sources = loader.Sources
 unless istable( sources )
     sources = loader.Sources = {}
 
-class loader.BaseSource
-    __tostring: =>
-        return format( "%s: %p", @@__name or "unknown source", @ )
-
-    new: ( ... ) =>
-        for scheme in *{ ... }
-            sources[ scheme ] = @
-
-    FetchInfo: async ( fileURL, parentURL, parentPackage, parentEnvironment ) =>
-        error NotImplementedError "Source:FetchInfo( fileURL, parentURL, parentPackage, parentEnvironment )"
-        return
-
-    Install: async ( fileURL, fileInfo, parentURL, parentPackage, parentEnvironment ) =>
-        error NotImplementedError "Source:Install( fileURL, fileInfo, parentURL, parentPackage, parentEnvironment )"
-        return
-
 findSource = ( scheme ) ->
     src = sources[ scheme ]
     if src
         return src
 
-    error SourceError "Source for scheme #{scheme} not implemented"
+    error SourceError "Source for scheme '#{scheme}' not implemented."
     return
 
 loader.FindSource = findSource
 
-loader.RegisterSource = ( scheme, source ) ->
+registerSource = ( scheme, source ) ->
     sources[ scheme ] = source
+
+loader.RegisterSource = registerSource
+
+class loader.BaseSourceHandler
+    __tostring: =>
+        return format( "%s: %p", @@__name or "unknown source handler", @ )
+
+    FetchInfo: async ( url, parent_url, parent_pkg, parent_env ) =>
+        error NotImplementedError "Source:FetchInfo( url, parent_url, parent_pkg, parent_env )"
+        return
+
+    Install: async ( url, info, parent_url, parent_pkg, parent_env ) =>
+        error NotImplementedError "Source:Install( url, info, parent_url, parent_pkg, parent_env )"
+        return
+
+class loader.BaseSource
+    __tostring: =>
+        return format( "%s: %p", @@__name or "unknown source", @ )
+
+    new: ( ... ) =>
+        @handlers = {}
+
+        for scheme in *{ ... }
+            registerSource( scheme, @ )
+
+    RegisterHandler: ( handler ) =>
+        @handlers[] = handler
+
+    CallHandler: ( name, url, ... ) =>
+        for handler in *@handlers
+            if not handler.ShouldHandle or handler\ShouldHandle( url, ... )
+                return handler[ name ]( handler, url, ... )
+
+        return reject SourceError "No handler found for URL '#{url}' (" .. name .. ")"
+
+    FetchInfo: ( url, parent_url, parent_pkg, parent_env ) =>
+        return @CallHandler( "FetchInfo", url, parent_url, parent_pkg, parent_env )
+
+    Install: ( url, info, parent_url, parent_pkg, parent_env ) =>
+        return @CallHandler( "Install", url, info, parent_url, parent_pkg, parent_env )
 
 parseFileURL = ( any ) ->
     if isurl( any )

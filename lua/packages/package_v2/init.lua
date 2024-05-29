@@ -11,6 +11,6 @@ print("Got from submodule:", submodule)
 Promise.delay(1):await()
 
 print("I am", _PKG)
-require "b"
+require "package:b"
 
 return "this package is da best"

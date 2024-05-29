@@ -1,28 +1,38 @@
 _G = _G
 import gpm from _G
 import environment, loader from gpm
-import GetExtensionFromFilename from gpm.string
-import RegisterSource, SetFileEnvironment from loader
+import BaseSource, BaseSourceHandler, SetFileEnvironment from loader
+import GetExtensionFromFilename from environment.string
 import async, await, file, path, ModuleLoadError from environment
 
 --[[
 
-    Handler List:
-    [  ] lua://my_addon/init.lua ( lua, moon, yue )
-    [  ] file://data/my_gma.gma ( gma, zip, lua, moon, yue )
-    [  ] package://package_name ( package from lua/packages folder )
+    Concept:
 
-    Single File Package:
-        lua://packages/pkg1.lua
+    lua source, async compile and run ( returns function result )
+        lua://path/to/file.{ext} ( will use specified extension {ext} )
+        lua://my_addon/init ( yue, moon, lua )
+        moon://my_addon/init ( same as lua:// )
+        yue://my_addon/init ( same as lua:// )
 
-    Multi-File Package:
-        lua://packages/pkg2
-            ||
-            ||
-            package.lua
+    file source, file://path/to/file.{ext} ( depends on file extension )
+        lua, moon, yue will compile and run ( returns function result )
+        zip and gma will be mounted in the game ( returns mounted file list )
+
+    package source
+        npm like behavior ( i guess ) ( returns package object )
+
+        Single File Package:
+            package://pkg1.lua ( obviously /autorun files )
+
+        Package:
+            package://pkg2
                 ||
                 ||
-                init.lua
+                package.lua
+                    ||
+                    ||
+                    init.lua
 
 ]]
 
@@ -31,7 +41,7 @@ do
     import IsBinaryModuleInstalled from environment.util
     import require from _G
 
-    class BinarySource extends loader.BaseSource
+    class BinarySourceHandler extends BaseSourceHandler
         FetchInfo: async ( url ) =>
             :hostname = url
             return {
@@ -48,20 +58,49 @@ do
             error "Binary module " .. name .. " is not installed locally!"
             return
 
-    BinarySource( "binary", "dll" )
+    class BinarySource extends BaseSource
 
-class LuaSource extends loader.BaseSource
+    BinarySource( "binary", "dll" )\RegisterHandler( BinarySourceHandler! )
+
+import Compile, CompileLua, CompileMoon, CompileYue, Exists from file
+
+class LuaSourceHandler extends BaseSourceHandler
     FetchInfo: async ( url ) =>
-        filePath = ( url.hostname or "" ) .. ( url.pathname or "" )
-        unless GetExtensionFromFilename( filePath )
-            filePath ..= ".lua"
-
-        return filePath
+        return ( url.hostname or "" ) .. ( url.pathname or "" )
 
     Install: async ( url, filePath, _, parentPackage, parentEnvironment ) =>
-        func = await file.Compile( filePath, "LUA" )
+        local func
+
+        switch GetExtensionFromFilename( filePath )
+            when nil
+                func = await Compile( filePath, "LUA" )
+
+            when "lua"
+                unless Exists( filePath, "LUA" )
+                    error ModuleLoadError "File '" .. filePath .. "' cannot be found."
+
+                func = await CompileLua( filePath, "LUA" )
+
+            when "moon"
+                unless Exists( filePath, "LUA" )
+                    error ModuleLoadError "File '" .. filePath .. "' cannot be found."
+
+                func = await CompileMoon( filePath, "LUA" )
+
+            when "yue"
+                unless Exists( filePath, "LUA" )
+                    error ModuleLoadError "File '" .. filePath .. "' cannot be found."
+
+                func = await CompileYue( filePath, "LUA" )
+
+        unless func
+            error ModuleLoadError "File '" .. filePath .. "' cannot be compiled."
+            return
+
         SetFileEnvironment( func, url.href, parentPackage, parentEnvironment )
         return func!
 
-LuaSource( "lua", "moon", "yue" )
+class LuaSource extends BaseSource
 
+ls = LuaSource( "lua", "moon", "yue" )
+ls\RegisterHandler( LuaSourceHandler! )

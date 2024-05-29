@@ -1,9 +1,39 @@
+import gpm from _G
+import loader from gpm
+
 --[[
 
-    Handler List:
-    [  ] http://domain.zone ( gma, zip, lua, moon, yue, json, github repository )
-    [  ] https://workshop_id ( gma, zip, lua, moon, yue, json, github repository )
+    Concept:
+
+    download and compile
+    http://domain.com/path/to/file.lua
+    https://domain.com/path/to/other/file.lua
+
+    http://domain.com/path/to/file.moon
+    https://domain.com/path/to/file.yue
+
+    will return a table of decoded json because yeeeep ( will create error if json is invalid )
+    http://domain.com/path/to/file.json
+
+    will return a string ( file content )
+    http://domain.com/path/to/file.txt
+
+    will just download, and the next step is to mount the gma with data://gpm/downloads/{md5_url_hash}.gma
+    https://domain.com/path/to/file.gma
+
+    download the zip file, create a new gma into data://gpm/downloads/{md5_url_hash}.gma, then mount it.
+    http://domain.com/path/to/file.zip
+
+    download the default or specified brunch and mount it as a gma to the game just like a zip.
+    https://github.com/pika-software/gm_moonloader
+
+    github://pika-software/gm_moonloader/?/path/to/file ->
+        https://api.github.com/repos/pika-software/gm_moonloader ( default_branch ) ->
+            https://api.github.com/repos/pika-software/gm_moonloader/git/trees/{default_branch} ->
 
 ]]
 
-local a
+class WebSource extends loader.BaseSource
+
+
+WebSource( "http", "https" )
