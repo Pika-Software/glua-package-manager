@@ -113,8 +113,10 @@ include( "filesystem.lua" )
 include( "http.lua" )
 
 url = include( "libs/url.lua" )
-environment.IsQueryStringParser = url.IsQueryStringParser
-environment.QueryStringParser = url.QueryStringParser
+-- environment.IsQueryStringParser = url.IsQueryStringParser
+-- environment.QueryStringParser = url.QueryStringParser
+environment.http.EncodeURIComponent = url.encodeURIComponent
+environment.http.DecodeURIComponent = url.decodeURIComponent
 environment.http.EncodeURI = url.encodeURI
 environment.http.DecodeURI = url.decodeURI
 environment.isurl = url.IsURL

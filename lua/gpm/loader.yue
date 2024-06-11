@@ -7,7 +7,7 @@ import async, await, reject from environment.Promise
 import getfmain, getfpathi from environment.debug
 import format, IsURL from environment.string
 import NotImplementedError from environment
-import parse, resolve from environment.URL
+import parse from environment.URL
 -- import Fetch from environment.http
 
 -- class ModuleURLResolutionError extends environment.Error
@@ -140,14 +140,14 @@ loader.FetchInfo = async ( url ) ->
     url = getFileURL( url )
     return findSource( url.scheme )\FetchInfo( url )
 
-asyncImport = async ( base, url = "lua:", pkg, env, info ) ->
-    fileURL = getFileURL( resolve( url, base ) )
+asyncImport = async ( url, base = "lua:", pkg, env, info ) ->
+    fileURL = getFileURL( parse( url, base ) )
     src = findSource( fileURL.scheme )
 
     unless info
-        info = await src\FetchInfo( fileURL, url, pkg, env )
+        info = await src\FetchInfo( fileURL, base, pkg, env )
 
-    return src\Install( fileURL, info, url, pkg, env )
+    return src\Install( fileURL, info, base, pkg, env )
 
 loader.AsyncImport = asyncImport
 
@@ -406,7 +406,7 @@ loader.GetParentURL = ->
         if folderPath := getfpathi( func )
             url = parse( folderPath )
             url.protocol or= "lua"
-            return url\format!
+            return url.href
 
     return "lua:" -- default fallback
 
@@ -432,7 +432,7 @@ gpm.Import = ( url, should_await ) ->
             if folderPath := getfpathi( func )
                 url = parse( folderPath )
                 url.protocol or= "lua"
-                parentURL = url\format!
+                parentURL = url.href
 
     result = asyncImport( url, parentURL, pkg, env, nil )
     if should_await ~= false

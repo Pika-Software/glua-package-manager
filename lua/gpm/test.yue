@@ -199,7 +199,8 @@ bench = (name, fn) ->
 
     st = SysTime! - st
     collectgarbage "restart"
-    print format( "%s time: %f sec.", name, st )
+    print format( "%d iterations of %s, took %f sec.", iter, name, st )
+    return st
 
 main = async ->
     -- gpm.Import( "dll://asyncio" )
