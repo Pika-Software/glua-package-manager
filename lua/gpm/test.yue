@@ -205,6 +205,7 @@ bench = (name, fn) ->
 main = async ->
     -- gpm.Import( "dll://asyncio" )
     gpm.Import( "lua://packages/b/init" )
+    -- PrintTable gpm.Import( "https://github.com/Meiryi/gtetris/archive/refs/heads/main.zip" )
     -- gpm.Import( "package:package_v2" )
 
     -- PrintTable gpm.Import "https://raw.githubusercontent.com/unknown-gd/unknown-ghosts/main/jb_mars_lp.json"

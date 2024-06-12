@@ -631,8 +631,8 @@ do
 
     debug.getfmain = getfmain
 
-    getfpathi = ( level ) ->
-        info = getinfo( level, "S" )
+    getfpathi = ( location ) ->
+        info = getinfo( location, "S" )
         if info.what == "main"
             return localizeLua( fix( sub( info.source, 2 ) ) )
 

@@ -1,15 +1,23 @@
 _G = _G
-import gpm from _G
+
+import gpm, setmetatable, setfenv from _G
 import environment, loader from gpm
-import async, await, string, file, path, metaworks, table, istable, rawset, Logger from environment
+
+import async, await, debug,
+    string, file, path,
+    table, istable, rawset,
+    Logger, Error, type,
+    isstring from environment
+
 import format, gsub, GetPathFromFilename from string
+import Environment, Link from environment.metaworks
+import getfpathi from debug
 
-:packages = gpm
-unless istable( packages )
-    packages = gpm.Packages = {}
-
-class InvalidPackageConfigurationError extends environment.Error
+class InvalidPackageConfigurationError extends Error
 environment.InvalidPackageConfigurationError = InvalidPackageConfigurationError
+
+class InvalidModuleConfigurationError extends Error
+environment.InvalidModuleConfigurationError = InvalidModuleConfigurationError
 
 --[[
     Packages: {
@@ -19,84 +27,80 @@ environment.InvalidPackageConfigurationError = InvalidPackageConfigurationError
             1.1.0: Package Object3
         }
     }
-]]
-
--- class Package
---     new: ( url ) =>
---         @url = url
---         @name = "unknown"
---         @version = "unknown"
---         @dependencies = {}
---         @environment = {}
-
---     GetInfo: =>
---         p = @info
---         if p ~= nil
---             return p
---         p = @source\GetInfo( @ )
---         @info = p
---         return p
-
---     Install: =>
-
--- gpm.Package = Package
-
---[[
-
-    https://github.com/user/repos -> GitHub Type -> https://github.com/user/repos.zip -> HTTP Type -> ...
-
-    gpm.Install = ( url ) ->
-        protocol, filePath = string.match( url, "^(%w+)%:%/%/(%w+)$" )
-        for source in *sources
-            if table.HasValue( source.Protocols, protocol, true )
-                return source.Process( protocol, filePath )
 
 --]]
 
-createEnvironment = ->
-    return metaworks.Environment( environment, { :_G } )
+--[[
 
-gpm.CreateEnvironment = createEnvironment
+    package = [
+        file1: Module
+        file2: Module
+        ...
+    ]
 
--- Maybe gpm.Package must be a just metadata from package.lua
+]]
+
+class Module
+    __tostring: =>
+        return format( "Module: %p [%s]", @, @name )
+
+    new: ( @location, @url, @env = _G ) =>
+        unless isstring( url )
+            error InvalidModuleConfigurationError "url is " .. type( url ) .. ", expected URL"
+
+        @name = getfpathi( location ) or "unknown"
+        setfenv( location, setmetatable({ _MODULE: @ }, { __index: env, __newindex: env }) )
+        return
+
+gpm.Module = Module
+
+--[[
+
+    parent1 = [
+        parent2 = [
+            child1,
+            child2
+        ]
+    ]
+
+]]
+
+packages = gpm.Packages
+unless istable( packages )
+    packages = gpm.Packages = setmetatable( {}, { __newindex: debug.fempty, __index: ( key ) =>
+        tbl = {}
+        rawset( @, key, tbl )
+        return tbl
+    } )
+
+local ispackage
+
 class Package
-    new: ( @metadata = {}, @import_path ) =>
-        unless istable( @metadata )
-            error InvalidPackageConfigurationError "metadata is " .. type( @metadata ) .. ", expected table"
-
-        @environment = createEnvironment!
-        @parse!
-
-    GetEnvironment: =>
-        return @environment
-
-    GetEntry: ( metadata ) ->
-        return metadata.entry or "init.lua"
-
-    parse: =>
-        :import_path, :metadata = @
-        @name = metadata.name or gsub( import_path, "/", "_" ) or "unknown"
-        @dir = GetPathFromFilename( import_path )
-        @version = metadata.version or "0.0.1"
-        @entry = @@GetEntry( metadata )
-
     __tostring: =>
         return format( "Package: %p [%s@%s]", @, @name, @version )
 
-    LoadURL: ( url ) =>
-        return loader.LoadURL( url, @ )
+    new: ( location, @url, @parent, metadata ) =>
+        unless istable( metadata )
+            error InvalidPackageConfigurationError "metadata is " .. type( metadata ) .. ", expected table"
 
-    Import: ( url, should_await = true ) =>
-        result = loader.AsyncImport( url, loader.GetParentURL!, @ )
+        name = @name = metadata.name or getfpathi( location ) or "unknown"
+        version = @version = metadata.version or "0.1.0"
+        packages[ name ][ version ] = @
 
-        if should_await
-            return result\await!
+        env = @env = Environment( environment, { :_G, _PACKAGE: @ } )
+        @entry = Module( location, @url, env )
 
-        return result
+        parents = @parents = {}
+        @children = {}
+
+        if ispackage( parent )
+            parents[] = parent
+            parent.children[] = @
+            Link( parent.env, env )
 
 gpm.Package = Package
 
-environment.ispackage = ( any ) ->
+ispackage = environment.ispackage = ( any ) ->
     metatable = getmetatable( any )
     return metatable and metatable.__class == Package
 

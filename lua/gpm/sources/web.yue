@@ -1,9 +1,12 @@
-import gpm from _G
-import environment, loader from gpm
-import BaseSource, BaseSourceHandler, SetFileEnvironment from loader
+import gpm, pairs from _G
+import environment, loader, Module from gpm
+import BaseSource, BaseSourceHandler from loader
 import GetExtensionFromFilename from environment.string
-import await, async, util from environment
+import await, async, file, util from environment
 import Fetch from environment.http
+import AsyncWrite from file
+import MD5 from util
+import time from os
 
 --[[
 
@@ -22,10 +25,10 @@ import Fetch from environment.http
     will return a string ( file content )
     http://domain.com/path/to/file.txt
 
-    will just download, and the next step is to mount the gma with data://gpm/downloads/{md5_url_hash}.gma
+    will just download, and the next step is to mount the gma with data://gpm/mount/{md5_url_hash}.gma
     https://domain.com/path/to/file.gma
 
-    download the zip file, create a new gma into data://gpm/downloads/{md5_url_hash}.gma, then mount it.
+    download the zip file, create a new gma into data://gpm/mount/{md5_url_hash}.gma, then mount it.
     http://domain.com/path/to/file.zip
 
     download the default or specified brunch and mount it as a gma to the game just like a zip.
@@ -36,6 +39,8 @@ import Fetch from environment.http
             https://api.github.com/repos/pika-software/gm_moonloader/git/trees/{default_branch} ->
 
 ]]
+
+file.CreateDir( "gpm/mount" )
 
 local LuaCodeHandler
 do
@@ -75,7 +80,7 @@ do
                 error ModuleLoadError "File '" .. filePath .. "' cannot be compiled."
                 return
 
-            SetFileEnvironment( func, url.href, parentPackage, parentEnvironment )
+            Module( func, url.href, parentPackage, parentEnvironment )
             return func!
 
 class TextHandler extends BaseSourceHandler
@@ -115,7 +120,91 @@ do
             if tbl
                 return tbl
 
-            error "failed to decode json"
+            error "failed to parse json"
+            return
+
+local GMAHandler
+do
+
+    class GMAHandler extends BaseSourceHandler
+        ShouldHandle: ( url ) =>
+            url.extension or= GetExtensionFromFilename( url.pathname ) or "txt"
+            return url.extension == "gma"
+
+        FetchInfo: async ( url ) =>
+            result = await Fetch( url.href )
+            if result.code ~= 200
+                error "failed to fetch " .. url.href
+
+            return await AsyncWrite( "gpm/mount/" .. MD5( url.href .. time! ) .. ".gma", result.body )
+
+        Install: async ( url, data ) =>
+            ok, result = file.MountGMA( "data/" .. data.fileName )
+            if ok
+                return result
+
+            error result
+            return
+
+local ZIPHandler
+do
+
+    import GMAD, IsFilePathAllowed from environment.addon
+    import IterateZipFiles from file
+    import match, sub from string
+    import ByteStream from util
+
+    class ZIPHandler extends BaseSourceHandler
+        ShouldHandle: ( url ) =>
+            url.extension or= GetExtensionFromFilename( url.pathname ) or "txt"
+            return url.extension == "zip"
+
+        FetchInfo: async ( url ) =>
+            result = await Fetch( url.href )
+            if result.code ~= 200
+                error "failed to fetch " .. url.href
+
+            return result.body
+
+        Install: async ( url, data ) =>
+            gma = GMAD!
+
+            local isInFolder, last
+            temp = {}
+
+            for fileName, data in IterateZipFiles( ByteStream( data ) )
+                temp[ fileName ] = data
+
+                if isInFolder ~= false
+                    current = match( fileName, "^(.-)/" )
+                    if last
+                        isInFolder = last == current
+
+                    last = current
+
+            files = temp
+            if isInFolder
+                files = {}
+                endPos = #last + 2
+                for fileName, data in pairs( temp )
+                    files[ sub( fileName, endPos ) ] = data
+
+            for fileName, data in pairs( files )
+                if IsFilePathAllowed( fileName )
+                    gma\AddFile( fileName, data )
+
+            bs = ByteStream!
+            gma\SetTitle( MD5( url.href .. time! ) )
+            gma\Write( bs, nil, false )
+
+            filePath = "gpm/mount/" .. gma\GetTitle! .. ".gma"
+            await AsyncWrite( filePath, bs.Data )
+
+            ok, result = file.MountGMA( "data/" .. filePath )
+            if ok
+                return result
+
+            error result
             return
 
 class WebSource extends BaseSource
@@ -124,3 +213,5 @@ ws = WebSource( "http", "https" )
 ws\RegisterHandler( LuaCodeHandler! )
 ws\RegisterHandler( TextHandler! )
 ws\RegisterHandler( JSONHandler! )
+ws\RegisterHandler( GMAHandler! )
+ws\RegisterHandler( ZIPHandler! )

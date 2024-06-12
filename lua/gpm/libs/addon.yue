@@ -158,7 +158,7 @@ wildcard = {
 
 -- Formatting wildcard to lua patterns
 for index = 1, #wildcard
-    wildcard[ index ] = gsub( gsub( wildcard[ index ], "%.", "%." ), "%*", ".+" )
+    wildcard[ index ] = "^" .. gsub( gsub( wildcard[ index ], "%.", "%." ), "%*", ".+" ) .. "$"
 
 isFilePathAllowed = ( filePath ) ->
     for pattern in *wildcard
@@ -232,6 +232,12 @@ class addon.GMAD
 
     Open: ( filePath, gamePath, fileMode ) =>
         @Close!
+
+        if istable( filePath )
+            @file_path = "memory"
+            @game_path = "unknown"
+            @file_handler = filePath
+            return filePath
 
         unless filePath
             filePath = @file_path
@@ -332,14 +338,7 @@ class addon.GMAD
         Empty( @required )
         Empty( @files )
 
-        if istable( filePath )
-            @Close!
-            doCRCs = readFiles
-            readFiles = gamePath
-            @file_handler = filePath
-        else
-            @Open( filePath, gamePath, "rb" )
-
+        @Open( filePath, gamePath, "rb" )
         @Parse( doCRCs )
 
         if readFiles
@@ -372,7 +371,7 @@ class addon.GMAD
     VerifyFiles: =>
         files = @files
         if #files == 0
-            return false, "unknown"
+            return false, nil
 
         for data in *files
             unless isFilePathAllowed( data.file_path )
@@ -383,7 +382,10 @@ class addon.GMAD
     Write: ( filePath, gamePath, doCRCs ) =>
         ok, result = @VerifyFiles!
         unless ok
-            error( "file is not allowed by whitelist (" .. result.file_path .. ")" )
+            if result
+                error( "file is not allowed by whitelist (" .. result.file_path .. ")" )
+            else
+                error( "here is no files to write" )
 
         fileHandle = @Open( filePath, gamePath, "wb" )
         unless fileHandle

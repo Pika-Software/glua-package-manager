@@ -47,17 +47,6 @@ unless istable( loader )
 
 ]]
 
-loader.GetFileEnvironment = getfenv
-
-loader.SetFileEnvironment = ( location, url, pkg, env ) ->
-    unless env
-        env = pkg and pkg\GetEnvironment! or CreateEnvironment!
-
-    return setfenv( location, setmetatable(
-        { _URL: url, _PKG: pkg, _ENV: env },
-        { __index: env, __newindex: env }
-    ) )
-
 sources = loader.Sources
 unless istable( sources )
     sources = loader.Sources = {}
@@ -395,46 +384,47 @@ loader.Resolve = async ( specifier, parentURL = "lua:", parentPackage ) ->
 
 --]]
 
-loader.GetParentURL = ->
-    if func := getfmain!
-        -- Get URL from func env
-        env = getfenv( func )
-        if value := env and rawget( env, "_URL" )
-            return value
+-- loader.GetParentURL = ->
+--     if func := getfmain!
+--         -- Get URL from func env
+--         env = getfenv( func )
+--         if value := env and rawget( env, "_URL" )
+--             return value
 
-        -- Try to resolve URL from func source
-        if folderPath := getfpathi( func )
-            url = parse( folderPath )
-            url.protocol or= "lua"
-            return url.href
+--         -- Try to resolve URL from func source
+--         if folderPath := getfpathi( func )
+--             url = parse( folderPath )
+--             url.protocol or= "lua"
+--             return url.href
 
-    return "lua:" -- default fallback
+--     return "lua:" -- default fallback
 
-loader.GetPackage = ->
-    if func := getfmain!
-        env = getfenv( func )
-        return env and rawget( env, "_PKG" )
+-- loader.GetPackage = ->
+--     if func := getfmain!
+--         env = getfenv( func )
+--         return env and rawget( env, "_PKG" )
 
-loader.GetEnvironment = ->
-    if func := getfmain!
-        env = getfenv( func )
-        return env and rawget( env, "_ENV" )
+-- loader.GetEnvironment = ->
+--     if func := getfmain!
+--         env = getfenv( func )
+--         return env and rawget( env, "_ENV" )
 
 gpm.Import = ( url, should_await ) ->
-    local env, pkg, parentURL
+    local env, pkg, base
     if func := getfmain!
         if fenv := getfenv( func )
-            env = rawget( fenv, "_ENV" )
-            pkg = rawget( fenv, "_PKG" )
-            parentURL = rawget( fenv, "_URL" )
+            mdl = rawget( fenv, "_MODULE" )
+            if mdl
+                env, base = mdl.env, mdl.url
+                pkg = env._PACKAGE
 
-        unless parentURL
+        unless base
             if folderPath := getfpathi( func )
                 url = parse( folderPath )
                 url.protocol or= "lua"
-                parentURL = url.href
+                base = url.href
 
-    result = asyncImport( url, parentURL, pkg, env, nil )
+    result = asyncImport( url, base, pkg, env, nil )
     if should_await ~= false
         return await( result )
 

@@ -1,7 +1,7 @@
 _G = _G
 import gpm from _G
-import environment, loader from gpm
-import BaseSource, BaseSourceHandler, SetFileEnvironment from loader
+import environment, loader, Module from gpm
+import BaseSource, BaseSourceHandler from loader
 import GetExtensionFromFilename from environment.string
 import async, await, file, path, ModuleLoadError from environment
 
@@ -97,7 +97,7 @@ class LuaSourceHandler extends BaseSourceHandler
             error ModuleLoadError "File '" .. filePath .. "' cannot be compiled."
             return
 
-        SetFileEnvironment( func, url.href, parentPackage, parentEnvironment )
+        Module( func, url.href, parentPackage, parentEnvironment )
         return func!
 
 class LuaSource extends BaseSource
