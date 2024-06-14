@@ -1,15 +1,15 @@
 _G = _G
 
 import gpm, setmetatable, setfenv from _G
-import environment, loader from gpm
+import environment from gpm
 
 import async, await, debug,
-    string, file, path,
+    string, file,
     table, istable, rawset,
-    Logger, Error, type,
+    Error, type,
     isstring from environment
 
-import format, gsub, GetPathFromFilename from string
+import format from string
 import Environment, Link from environment.metaworks
 import getfpathi from debug
 

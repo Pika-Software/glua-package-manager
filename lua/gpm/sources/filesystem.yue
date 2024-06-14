@@ -1,9 +1,10 @@
 _G = _G
 import gpm from _G
-import environment, loader, Module from gpm
-import BaseSource, BaseSourceHandler from loader
-import GetExtensionFromFilename from environment.string
-import async, await, file, path, ModuleLoadError from environment
+import environment, Module from gpm
+import async, await, file, ModuleLoadError from environment
+import AsyncImport, BaseSource, BaseSourceHandler from gpm.loader
+import Compile, CompileLua, CompileMoon, CompileYue, Exists from file
+import GetExtensionFromFilename, gsub, match from environment.string
 
 --[[
 
@@ -36,6 +37,28 @@ import async, await, file, path, ModuleLoadError from environment
 
 ]]
 
+getExtension = ( url ) ->
+    extension = url.extension
+    unless extension
+        extension = url.extension = GetExtensionFromFilename( url.pathname ) or ""
+
+    return extension
+
+getFullPath = ( url ) ->
+    fullPath = url.fullpath
+    unless fullPath
+        fullPath = ( url.hostname or "" ) .. ( url.pathname or "" )
+        switch url.scheme
+            when "data"
+                fullPath = "data/" .. fullPath
+
+            when "cache"
+                fullPath = "cache/" .. fullPath
+
+        url.fullpath = fullPath
+
+    return fullPath
+
 do
 
     import IsBinaryModuleInstalled from environment.util
@@ -43,10 +66,15 @@ do
 
     class BinarySourceHandler extends BaseSourceHandler
         FetchInfo: async ( url ) =>
-            :hostname = url
+            name = getFullPath( url )
+            name = gsub( name, "^lua/bin/", "" )
+            name = gsub( name, "%.dll.*$", "" )
+            name = gsub( name, "gm[cs][lv]_", "" )
+            name = gsub( name, "_%w+", "" )
+
             return {
-                name: hostname
-                installed: IsBinaryModuleInstalled( hostname )
+                :name
+                installed: IsBinaryModuleInstalled( name )
             }
 
         Install: async ( _, info ) =>
@@ -62,45 +90,149 @@ do
 
     BinarySource( "binary", "dll" )\RegisterHandler( BinarySourceHandler! )
 
-import Compile, CompileLua, CompileMoon, CompileYue, Exists from file
+do
 
-class LuaSourceHandler extends BaseSourceHandler
-    FetchInfo: async ( url ) =>
-        return ( url.hostname or "" ) .. ( url.pathname or "" )
+    import MountGMA, MountZIP from file
 
-    Install: async ( url, filePath, _, parentPackage, parentEnvironment ) =>
-        local func
+    fetchInfo = async ( url ) =>
+        return getFullPath( url )
 
-        switch GetExtensionFromFilename( filePath )
-            when nil
-                func = await Compile( filePath, "LUA" )
+    class GMAHandler extends BaseSourceHandler
+        ShouldHandle: ( url ) =>
+            return getExtension( url ) == "gma"
 
-            when "lua"
-                unless Exists( filePath, "LUA" )
-                    error ModuleLoadError "File '" .. filePath .. "' cannot be found."
+        FetchInfo: fetchInfo
 
-                func = await CompileLua( filePath, "LUA" )
+        Install: async ( _, filePath ) =>
+            ok, result = MountGMA( filePath )
+            if ok
+                return result
 
-            when "moon"
-                unless Exists( filePath, "LUA" )
-                    error ModuleLoadError "File '" .. filePath .. "' cannot be found."
-
-                func = await CompileMoon( filePath, "LUA" )
-
-            when "yue"
-                unless Exists( filePath, "LUA" )
-                    error ModuleLoadError "File '" .. filePath .. "' cannot be found."
-
-                func = await CompileYue( filePath, "LUA" )
-
-        unless func
-            error ModuleLoadError "File '" .. filePath .. "' cannot be compiled."
+            error result
             return
 
-        Module( func, url.href, parentPackage, parentEnvironment )
-        return func!
+    class ZIPHandler extends BaseSourceHandler
+        ShouldHandle: ( url ) =>
+            return getExtension( url ) == "zip"
 
-class LuaSource extends BaseSource
+        FetchInfo: fetchInfo
 
-ls = LuaSource( "lua", "moon", "yue" )
-ls\RegisterHandler( LuaSourceHandler! )
+        Install: async ( _, filePath ) =>
+            return await MountZIP( filePath )
+
+    class LuaHandler extends BaseSourceHandler
+        ShouldHandle: ( url ) =>
+            return getExtension( url ) == "lua"
+
+        FetchInfo: fetchInfo
+
+        Install: async ( url, filePath, _, __, parentEnvironment ) =>
+            unless Exists( filePath, "GAME" )
+                error ModuleLoadError "File '" .. filePath .. "' cannot be found."
+
+            func = await CompileLua( filePath, "GAME" )
+            unless func
+                error ModuleLoadError "File '" .. filePath .. "' cannot be compiled."
+                return
+
+            Module( func, url.href, parentEnvironment )
+            return func!
+
+    class MoonHandler extends BaseSourceHandler
+        ShouldHandle: ( url ) =>
+            return getExtension( url ) == "moon"
+
+        FetchInfo: fetchInfo
+
+        Install: async ( url, filePath, _, __, parentEnvironment ) =>
+            unless Exists( filePath, "GAME" )
+                error ModuleLoadError "File '" .. filePath .. "' cannot be found."
+
+            func = await CompileMoon( filePath, "GAME" )
+            unless func
+                error ModuleLoadError "File '" .. filePath .. "' cannot be compiled."
+                return
+
+            Module( func, url.href, parentEnvironment )
+            return func!
+
+    class YueHandler extends BaseSourceHandler
+        ShouldHandle: ( url ) =>
+            return getExtension( url ) == "yue"
+
+        FetchInfo: fetchInfo
+
+        Install: async ( url, filePath, _, __, parentEnvironment ) =>
+            unless Exists( filePath, "GAME" )
+                error ModuleLoadError "File '" .. filePath .. "' cannot be found."
+
+            func = await CompileYue( filePath, "GAME" )
+            unless func
+                error ModuleLoadError "File '" .. filePath .. "' cannot be compiled."
+                return
+
+            Module( func, url.href, parentEnvironment )
+            return func!
+
+    class BinaryHandler extends BaseSourceHandler
+        ShouldHandle: ( url ) =>
+            return getExtension( url ) == "dll" or match( getFullPath( url ), "^lua/bin/([%w_]+)" )
+
+        FetchInfo: async ( url ) =>
+            return getFullPath( url )
+
+        Install: async ( _, fullPath ) =>
+            return AsyncImport( "binary://" .. fullPath )
+
+    class FileSource extends BaseSource
+
+    fs = FileSource( "file", "game", "data", "cache" )
+    fs\RegisterHandler( GMAHandler! )
+    fs\RegisterHandler( ZIPHandler! )
+    fs\RegisterHandler( LuaHandler! )
+    fs\RegisterHandler( MoonHandler! )
+    fs\RegisterHandler( YueHandler! )
+    fs\RegisterHandler( BinaryHandler! )
+
+do
+
+    class LuaSourceHandler extends BaseSourceHandler
+        FetchInfo: async ( url ) =>
+            return ( url.hostname or "" ) .. ( url.pathname or "" )
+
+        Install: async ( url, filePath, _, __, parentEnvironment ) =>
+            local func
+
+            switch GetExtensionFromFilename( filePath )
+                when nil
+                    func = await Compile( filePath, "LUA" )
+
+                when "lua"
+                    unless Exists( filePath, "LUA" )
+                        error ModuleLoadError "File '" .. filePath .. "' cannot be found."
+
+                    func = await CompileLua( filePath, "LUA" )
+
+                when "moon"
+                    unless Exists( filePath, "LUA" )
+                        error ModuleLoadError "File '" .. filePath .. "' cannot be found."
+
+                    func = await CompileMoon( filePath, "LUA" )
+
+                when "yue"
+                    unless Exists( filePath, "LUA" )
+                        error ModuleLoadError "File '" .. filePath .. "' cannot be found."
+
+                    func = await CompileYue( filePath, "LUA" )
+
+            unless func
+                error ModuleLoadError "File '" .. filePath .. "' cannot be compiled."
+                return
+
+            Module( func, url.href, parentEnvironment )
+            return func!
+
+    class LuaSource extends BaseSource
+
+    ls = LuaSource( "lua", "moon", "yue" )
+    ls\RegisterHandler( LuaSourceHandler! )

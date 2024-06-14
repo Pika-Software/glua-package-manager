@@ -1,3 +1,6 @@
+_G = _G
+
+import gpm, isfunction, istable, error from _G
 import environment, Logger from gpm
 import util from environment
 
@@ -13,9 +16,7 @@ unless istable( moonloader )
     Logger\Warn( "gm_moonloader is missing, support for moon and yue scripts is unavailable!" )
     return
 
-environment.moonloader = moonloader
-
-import isfunction, istable, error from _G
+moonloader = environment.moonloader = moonloader
 import CompileLuaString from util
 import ArgAssert from environment
 

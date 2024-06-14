@@ -1,0 +1,104 @@
+_G = _G
+import gpm, pairs, tostring from _G
+
+import environment from gpm
+import await, async, file from environment
+
+import time from environment.os
+import fempty from environment.debug
+import match, sub from environment.string
+import AsyncRead, AsyncWrite, MountGMA from file
+import DecompressDeflate from environment.deflate
+import ByteStream, MD5, CRC from environment.util
+import GMAD, IsFilePathAllowed from environment.addon
+
+-- file.DecompressDeflate( fileHandle, doCRC ) - zip files iterator
+iterateZipFiles = file.IterateZipFiles = ( fileHandle, doCRC ) ->
+    unless fileHandle
+        return fempty
+
+    return ->
+        if fileHandle\Read( 4 ) ~= "PK\x03\x04"
+            return
+
+        fileHandle\Skip( 4 )
+
+        compressionMethod = fileHandle\ReadUShort!
+        fileHandle\Skip( 4 )
+
+        crc = fileHandle\ReadULong!
+        compressedSize = fileHandle\ReadULong!
+        fileHandle\Skip( 4 )
+
+        fileNameLen = fileHandle\ReadUShort!
+        extraLen = fileHandle\ReadUShort!
+        fileName = fileHandle\Read( fileNameLen )
+        fileHandle\Skip( extraLen )
+
+        local data
+        switch compressionMethod
+            -- Without compression
+            when 0
+                data = fileHandle\Read( compressedSize )
+
+            -- Deflate compression
+            when 8
+                compressedData = fileHandle\Read( compressedSize )
+                data = DecompressDeflate( compressedData )
+
+        if data ~= nil and doCRC ~= false and tostring( crc ) ~= CRC( data )
+            data = nil
+
+        return fileName, data
+
+file.Delete( "gpm/mount" )
+file.CreateDir( "gpm/mount" )
+
+mountZIPData = file.MountZIPData = async ( data, uniqueName ) ->
+    gma = GMAD!
+
+    local isInFolder, last
+    temp = {}
+
+    for fileName, content in iterateZipFiles( ByteStream( data ) )
+        temp[ fileName ] = content
+
+        if isInFolder ~= false
+            current = match( fileName, "^(.-)/" )
+            if last
+                isInFolder = last == current
+
+            last = current
+
+    files = temp
+    if isInFolder
+        files = {}
+        endPos = #last + 2
+        for fileName, content in pairs( temp )
+            files[ sub( fileName, endPos ) ] = content
+
+    for fileName, content in pairs( files )
+        if IsFilePathAllowed( fileName )
+            gma\AddFile( fileName, content )
+
+    bs = ByteStream!
+    gma\SetTitle( MD5( uniqueName .. time! ) )
+    gma\Write( bs, nil, false )
+
+    filePath = "gpm/mount/" .. gma\GetTitle! .. ".gma"
+    await AsyncWrite( filePath, bs.Data )
+
+    ok, result = MountGMA( "data/" .. filePath )
+    if ok
+        return result
+
+    error result
+    return
+
+file.MountZIP = async ( filePath ) ->
+    ok, result = await AsyncRead( filePath )
+    if ok
+        return await mountZIPData( result, "file://" .. filePath )
+
+    error result
+    return

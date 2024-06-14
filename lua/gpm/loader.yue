@@ -1,6 +1,6 @@
 _G = _G
 import gpm from _G
-import environment, CreateEnvironment from gpm
+import environment from gpm
 import isurl, isstring, rawget, getfenv from environment
 import async, await, reject from environment.Promise
 -- import sub, find, gsub, len, match from string

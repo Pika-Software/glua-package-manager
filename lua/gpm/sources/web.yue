@@ -1,10 +1,10 @@
 import gpm, pairs from _G
-import environment, loader, Module from gpm
-import BaseSource, BaseSourceHandler from loader
-import GetExtensionFromFilename from environment.string
-import await, async, file, util from environment
+import environment, Module from gpm
+import await, async, string, file, util from environment
+
+import AsyncImport, BaseSource, BaseSourceHandler from gpm.loader
+import AsyncWrite, MountZIPData from file
 import Fetch from environment.http
-import AsyncWrite from file
 import MD5 from util
 import time from os
 
@@ -40,7 +40,20 @@ import time from os
 
 ]]
 
-file.CreateDir( "gpm/mount" )
+file.Delete( "gpm/downloads" )
+file.CreateDir( "gpm/downloads" )
+
+local getExtension
+do
+
+    import GetExtensionFromFilename from string
+
+    getExtension = ( url ) ->
+        extension = url.extension
+        unless extension
+            extension = url.extension = GetExtensionFromFilename( url.pathname ) or ""
+
+        return extension
 
 local LuaCodeHandler
 do
@@ -48,15 +61,14 @@ do
     import CompileLuaString, CompileMoonString, CompileYueString from util
 
     extensions = {
-        "lua": true
         "moon": true
         "yue": true
+        "lua": true
     }
 
     class LuaCodeHandler extends BaseSourceHandler
         ShouldHandle: ( url ) =>
-            url.extension or= GetExtensionFromFilename( url.pathname ) or "txt"
-            return extensions[ url.extension ]
+            return extensions[ getExtension( url ) ]
 
         FetchInfo: async ( url ) =>
             result = await Fetch( url.href )
@@ -65,38 +77,37 @@ do
 
             return result.body
 
-        Install: async ( url, luaCode, _, parentPackage, parentEnvironment ) =>
+        Install: async ( url, luaCode, _, __, parentEnvironment ) =>
             func = await switch url.extension
                 when "lua"
-                    util.CompileLuaString( luaCode, url.href )
+                    CompileLuaString( luaCode, url.href )
 
                 when "moon"
-                    util.CompileMoonString( luaCode, url.href )
+                    CompileMoonString( luaCode, url.href )
 
                 when "yue"
-                    util.CompileYueString( luaCode, url.href )
+                    CompileYueString( luaCode, url.href )
 
             unless func
                 error ModuleLoadError "File '" .. filePath .. "' cannot be compiled."
                 return
 
-            Module( func, url.href, parentPackage, parentEnvironment )
+            Module( func, url.href, parentEnvironment )
             return func!
 
 class TextHandler extends BaseSourceHandler
     ShouldHandle: ( url ) =>
-        url.extension or= GetExtensionFromFilename( url.pathname ) or "txt"
-        return url.extension == "txt"
+        return getExtension( url ) == "txt"
 
     FetchInfo: async ( url ) =>
-        result = await Fetch( url.href )
+        return url.href
+
+    Install: async ( url, href ) =>
+        result = await Fetch( href )
         if result.code ~= 200
-            error "failed to fetch " .. url.href
+            error "failed to fetch " .. href
 
         return result.body
-
-    Install: async ( url, text ) =>
-        return text
 
 local JSONHandler
 do
@@ -105,8 +116,7 @@ do
 
     class JSONHandler extends BaseSourceHandler
         ShouldHandle: ( url ) =>
-            url.extension or= GetExtensionFromFilename( url.pathname ) or "txt"
-            return url.extension == "json"
+            return getExtension( url ) == "json"
 
         FetchInfo: async ( url ) =>
             result = await Fetch( url.href )
@@ -123,89 +133,33 @@ do
             error "failed to parse json"
             return
 
-local GMAHandler
-do
+class GMAHandler extends BaseSourceHandler
+    ShouldHandle: ( url ) =>
+        return getExtension( url ) == "gma"
 
-    class GMAHandler extends BaseSourceHandler
-        ShouldHandle: ( url ) =>
-            url.extension or= GetExtensionFromFilename( url.pathname ) or "txt"
-            return url.extension == "gma"
+    FetchInfo: async ( url ) =>
+        result = await Fetch( url.href )
+        if result.code ~= 200
+            error "failed to fetch " .. url.href
 
-        FetchInfo: async ( url ) =>
-            result = await Fetch( url.href )
-            if result.code ~= 200
-                error "failed to fetch " .. url.href
+        return AsyncWrite( "gpm/downloads/" .. MD5( url.href .. time! ) .. ".gma", result.body )
 
-            return await AsyncWrite( "gpm/mount/" .. MD5( url.href .. time! ) .. ".gma", result.body )
+    Install: async ( url, data ) =>
+        return AsyncImport( "file://data/" .. data.fileName )
 
-        Install: async ( url, data ) =>
-            ok, result = file.MountGMA( "data/" .. data.fileName )
-            if ok
-                return result
+class ZIPHandler extends BaseSourceHandler
+    ShouldHandle: ( url ) =>
+        return getExtension( url ) == "zip"
 
-            error result
-            return
+    FetchInfo: async ( url ) =>
+        result = await Fetch( url.href )
+        if result.code ~= 200
+            error "failed to fetch " .. url.href
 
-local ZIPHandler
-do
+        return result.body
 
-    import GMAD, IsFilePathAllowed from environment.addon
-    import IterateZipFiles from file
-    import match, sub from string
-    import ByteStream from util
-
-    class ZIPHandler extends BaseSourceHandler
-        ShouldHandle: ( url ) =>
-            url.extension or= GetExtensionFromFilename( url.pathname ) or "txt"
-            return url.extension == "zip"
-
-        FetchInfo: async ( url ) =>
-            result = await Fetch( url.href )
-            if result.code ~= 200
-                error "failed to fetch " .. url.href
-
-            return result.body
-
-        Install: async ( url, data ) =>
-            gma = GMAD!
-
-            local isInFolder, last
-            temp = {}
-
-            for fileName, data in IterateZipFiles( ByteStream( data ) )
-                temp[ fileName ] = data
-
-                if isInFolder ~= false
-                    current = match( fileName, "^(.-)/" )
-                    if last
-                        isInFolder = last == current
-
-                    last = current
-
-            files = temp
-            if isInFolder
-                files = {}
-                endPos = #last + 2
-                for fileName, data in pairs( temp )
-                    files[ sub( fileName, endPos ) ] = data
-
-            for fileName, data in pairs( files )
-                if IsFilePathAllowed( fileName )
-                    gma\AddFile( fileName, data )
-
-            bs = ByteStream!
-            gma\SetTitle( MD5( url.href .. time! ) )
-            gma\Write( bs, nil, false )
-
-            filePath = "gpm/mount/" .. gma\GetTitle! .. ".gma"
-            await AsyncWrite( filePath, bs.Data )
-
-            ok, result = file.MountGMA( "data/" .. filePath )
-            if ok
-                return result
-
-            error result
-            return
+    Install: async ( url, data ) =>
+        return MountZIPData( data, url.href )
 
 class WebSource extends BaseSource
 

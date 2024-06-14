@@ -1,15 +1,12 @@
+_G = _G
+import gpm, isstring, istable, error, tostring, tonumber from _G
 import environment from gpm
+
 import Open, Find, GetFilePaths from environment.file
 import HasValue, Empty from environment.table
 import lower, gsub, find from string
 import ArgAssert from environment
 import CRC from util
-
-isstring = isstring
-tostring = tostring
-tonumber = tonumber
-istable = istable
-error = error
 
 addon = {}
 
@@ -20,9 +17,9 @@ do
     addon.GetAll = GetAddons
 
     get = ( wsid ) ->
-        for addon in *GetAll!
-            if addon.wsid == wsid
-                return addon
+        for tbl in *GetAll!
+            if tbl.wsid == wsid
+                return tbl
 
     addon.Get = get
 
@@ -385,7 +382,7 @@ class addon.GMAD
             if result
                 error( "file is not allowed by whitelist (" .. result.file_path .. ")" )
             else
-                error( "here is no files to write" )
+                error( "gma is empty" )
 
         fileHandle = @Open( filePath, gamePath, "wb" )
         unless fileHandle

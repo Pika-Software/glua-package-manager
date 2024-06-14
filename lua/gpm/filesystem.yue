@@ -728,49 +728,4 @@ do
             error LuaCompileError "File '" .. fullPath .. "' cannot be found."
             return
 
--- file.DecompressDeflate( fileHandle, doCRC ) - zip files iterator
-do
-
-    import DecompressDeflate from environment.deflate
-    import fempty from debug
-    import CRC from util
-    tostring = tostring
-
-    lib.IterateZipFiles = ( fileHandle, doCRC ) ->
-        unless fileHandle
-            return fempty
-
-        return ->
-            if fileHandle\Read( 4 ) ~= "PK\x03\x04"
-                return
-            fileHandle\Skip( 4 )
-
-            compressionMethod = fileHandle\ReadUShort!
-            fileHandle\Skip( 4 )
-
-            crc = fileHandle\ReadULong!
-            compressedSize = fileHandle\ReadULong!
-            fileHandle\Skip( 4 )
-
-            fileNameLen = fileHandle\ReadUShort!
-            extraLen = fileHandle\ReadUShort!
-            fileName = fileHandle\Read( fileNameLen )
-            fileHandle\Skip( extraLen )
-
-            data = nil
-            switch compressionMethod
-                -- Without compression
-                when 0
-                    data = fileHandle\Read( compressedSize )
-
-                -- Deflate compression
-                when 8
-                    compressedData = fileHandle\Read( compressedSize )
-                    data = DecompressDeflate( compressedData )
-
-            if data ~= nil and doCRC ~= false and tostring( crc ) ~= CRC( data )
-                data = nil
-
-            return fileName, data
-
 return lib

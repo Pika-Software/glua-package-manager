@@ -77,6 +77,7 @@ if SERVER
     AddCSLuaFolder( "gpm/libs" )
 
     clientSideFiles = {
+        "filesystem-zip.lua"
         "moonloader.lua"
         "filesystem.lua"
         "package.lua"
@@ -123,7 +124,7 @@ environment.isurl = url.IsURL
 environment.URL = url.URL
 
 environment.addon = include( "libs/addon.lua" )
-
+include( "filesystem-zip.lua" )
 include( "package.lua" )
 include( "loader.lua" )
 
