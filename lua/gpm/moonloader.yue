@@ -2,7 +2,7 @@ _G = _G
 
 import gpm, isfunction, istable, error from _G
 import environment, Logger from gpm
-import util from environment
+import util, LuaCompileError from environment
 
 if util.IsBinaryModuleInstalled( "moonloader" )
     local ok, msg = pcall( require, "moonloader" )
@@ -31,11 +31,11 @@ do
 
         luaCode, msg = ToLua( moonCode )
         unless luaCode
-            error( msg or "MoonScript compilation failed." )
+            error LuaCompileError msg or "MoonScript compilation failed."
 
         func = CompileLuaString( luaCode, identifier, handleError == true )
         unless isfunction( func )
-            error( msg or "MoonScript compilation failed." )
+            error LuaCompileError msg or "MoonScript compilation failed."
 
         return func
 
@@ -61,10 +61,10 @@ util.CompileYueString = ( yueCode, identifier, handleError, yueConfig ) ->
 
     luaCode, msg = ToLua( yueCode, yueConfig )
     unless luaCode
-        error( msg or "Yuescript compilation failed." )
+        error LuaCompileError msg or "Yuescript compilation failed."
 
     func = CompileLuaString( luaCode, identifier, handleError == true )
     unless isfunction( func )
-        error( msg or "Yuescript compilation failed." )
+        error LuaCompileError msg or "Yuescript compilation failed."
 
     return func

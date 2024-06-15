@@ -10,7 +10,10 @@ import match, sub from environment.string
 import AsyncRead, AsyncWrite, MountGMA from file
 import DecompressDeflate from environment.deflate
 import ByteStream, MD5, CRC from environment.util
-import GMAD, IsFilePathAllowed from environment.addon
+import Addon, IsFilePathAllowed from environment.addon
+
+class MountError extends environment.Error
+environment.MountError = MountError
 
 -- file.DecompressDeflate( fileHandle, doCRC ) - zip files iterator
 iterateZipFiles = file.IterateZipFiles = ( fileHandle, doCRC ) ->
@@ -55,7 +58,7 @@ file.Delete( "gpm/mount" )
 file.CreateDir( "gpm/mount" )
 
 mountZIPData = file.MountZIPData = async ( data, uniqueName ) ->
-    gma = GMAD!
+    gma = Addon!
 
     local isInFolder, last
     temp = {}
@@ -92,7 +95,7 @@ mountZIPData = file.MountZIPData = async ( data, uniqueName ) ->
     if ok
         return result
 
-    error result
+    error MountError result
     return
 
 file.MountZIP = async ( filePath ) ->
@@ -100,5 +103,5 @@ file.MountZIP = async ( filePath ) ->
     if ok
         return await mountZIPData( result, "file://" .. filePath )
 
-    error result
+    error MountError result
     return

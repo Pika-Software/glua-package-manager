@@ -70,8 +70,8 @@ do
 
             parameters.headers[ userAgentKey ] = http.UserAgent
 
-        parameters.success = ( code, body, headers ) ->
-            p\Resolve( { :code, :body, :headers } )
+        parameters.success = ( status, body, headers ) ->
+            p\Resolve( { :status, :body, :headers } )
             return
 
         parameters.failed = ( msg ) ->

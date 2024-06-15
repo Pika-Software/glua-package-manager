@@ -155,11 +155,17 @@ debug.fempty = ->
 util.CompileLuaString = _G.CompileString
 util.CompileLuaFile = _G.CompileFile
 
-util.CompileMoonString = ->
-    error( "Attempt to compile MoonScript failed, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader." )
+do
 
-util.CompileYueString = ->
-    error( "Attempt to compile Yuescript failed, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader." )
+    class LuaCompileError extends environment.Error
+    environment.LuaCompileError = LuaCompileError
+
+
+    util.CompileMoonString = ->
+        error LuaCompileError "Attempt to compile MoonScript failed, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader."
+
+    util.CompileYueString = ->
+        error LuaCompileError "Attempt to compile Yuescript failed, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader."
 
 do
 
@@ -693,8 +699,8 @@ do
 
     http.Codes = codes
 
-    http.GetStatusDescription = ( code ) ->
-        data = codes[ code ]
+    http.GetStatusDescription = ( statusCode ) ->
+        data = codes[ statusCode ]
         if data
             return data[ 1 ], data[ 2 ]
 

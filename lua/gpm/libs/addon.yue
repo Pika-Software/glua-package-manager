@@ -8,6 +8,9 @@ import lower, gsub, find from string
 import ArgAssert from environment
 import CRC from util
 
+class AddonError extends environment.Error
+environment.AddonError = AddonError
+
 addon = {}
 
 do
@@ -16,22 +19,20 @@ do
 
     addon.GetAll = GetAddons
 
-    get = ( wsid ) ->
-        for tbl in *GetAll!
-            if tbl.wsid == wsid
-                return tbl
-
-    addon.Get = get
+    get = addon.Get = ( wsid ) ->
+        for data in *GetAll!
+            if data.wsid == wsid
+                return data
 
     addon.FileFind = ( filePath, wsid ) ->
-        addon = get( wsid )
-        if addon
-            return Find( filePath, addon.title )
+        data = get( wsid )
+        if data
+            return Find( filePath, data.title )
 
     addon.GetFiles = ( wsid, filePath ) ->
-        addon = get( wsid )
-        if addon
-            return GetFilePaths( filePath or "", addon.title )
+        data = get( wsid )
+        if data
+            return GetFilePaths( filePath or "", data.title )
 
 -- Addon types
 types = {
@@ -166,10 +167,10 @@ isFilePathAllowed = ( filePath ) ->
 
 addon.IsFilePathAllowed = isFilePathAllowed
 
-identity = "GMAD"
-formatVersion = 3
+class addon.Addon
+    Identity: "GMAD"
+    Version: 3
 
-class addon.GMAD
     __tostring: =>
         return "Garry's Mod Addon File '" .. title .. "'"
 
@@ -247,7 +248,7 @@ class addon.GMAD
 
         fileHandle = Open( filePath, fileMode or "rb", gamePath )
         unless fileHandle
-            error( "file read handler is missing, opening is impossible" )
+            error AddonError "file read handler is missing, opening is impossible"
 
         @file_path = filePath
         @game_path = gamePath
@@ -267,17 +268,17 @@ class addon.GMAD
     Parse: ( doCRCs ) =>
         fileHandle = @file_handler
         unless fileHandle
-            error( "file read handler is missing, parsing is impossible" )
+            error AddonError "file read handler is missing, parsing is impossible"
 
         fileHandle\Seek( 0 )
         doCRCs = doCRCs ~= true
 
-        if fileHandle\Read( 4 ) ~= ( @identity or identity )
-            error( "File is not a gma" )
+        if fileHandle\Read( 4 ) ~= ( @identity or @Identity )
+            error AddonError "File is not a gma"
 
         version = fileHandle\ReadByte!
-        if version > ( @format_version or formatVersion )
-            error( "gma version is unsupported" )
+        if version > ( @format_version or @Version )
+            error AddonError "gma version is unsupported"
 
         @steam_id = tostring( fileHandle\ReadUInt64! ) or ""
         @timestamp = fileHandle\ReadUInt64!
@@ -380,18 +381,18 @@ class addon.GMAD
         ok, result = @VerifyFiles!
         unless ok
             if result
-                error( "file is not allowed by whitelist (" .. result.file_path .. ")" )
+                error AddonError "file is not allowed by whitelist (" .. result.file_path .. ")"
             else
-                error( "gma is empty" )
+                error AddonError "gma is empty"
 
         fileHandle = @Open( filePath, gamePath, "wb" )
         unless fileHandle
-            error( "file read handler is missing, opening is impossible" )
+            error AddonError "file read handler is missing, opening is impossible"
 
         doCRCs = doCRCs ~= false
 
-        fileHandle\Write( @identity or identity )
-        fileHandle\WriteByte( @format_version or formatVersion )
+        fileHandle\Write( @identity or @Identity )
+        fileHandle\WriteByte( @format_version or @Version )
 
         fileHandle\WriteUInt64( tonumber( @steam_id ) or 0 )
         fileHandle\WriteUInt64( @timestamp or os.time() )
@@ -427,12 +428,12 @@ class addon.GMAD
             if isstring( content )
                 fileHandle\Write( content )
             else
-                error( "file content must be a string (" .. data.file_path .. ")" )
+                error AddonError "file content must be a string (" .. data.file_path .. ")"
 
         if doCRCs
             fileHandle = @Open( filePath, gamePath, "rb" )
             unless fileHandle
-                error( "file read handler is missing, opening is impossible" )
+                error AddonError "file read handler is missing, opening is impossible"
 
             fileCRC = tonumber( CRC( fileHandle\Read! ) )
             @stored_crc = fileCRC
@@ -440,7 +441,7 @@ class addon.GMAD
 
             fileHandle = @Open( filePath, gamePath, "ab" )
             unless fileHandle
-                error( "file read handler is missing, opening is impossible" )
+                error AddonError "file read handler is missing, opening is impossible"
 
             fileHandle\WriteULong( crc )
         else
@@ -454,12 +455,12 @@ class addon.GMAD
 
         fileHandle = @file_handler
         unless fileHandle
-            error( "file read handler is missing, reading is not possible" )
+            error AddonError "file read handler is missing, reading is not possible"
 
         files = @files
         data = files[ index ]
         unless data
-            error( "requested file does not exist" )
+            error AddonError "requested file does not exist"
 
         fileHandle\Seek( files.data_pointer + data.position )
         data.content = fileHandle\Read( data.size )
@@ -468,7 +469,7 @@ class addon.GMAD
     ReadFiles: ( doCRCs ) =>
         fileHandle = @file_handler
         unless fileHandle
-            error( "file read handler is missing, reading is not possible" )
+            error AddonError "file read handler is missing, reading is not possible"
 
         files = @files
         pointer = files.data_pointer

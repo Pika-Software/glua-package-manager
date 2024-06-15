@@ -1,44 +1,12 @@
 import gpm, pairs from _G
 import environment, Module from gpm
-import await, async, string, file, util from environment
+import await, async, string, file, util, ModuleLoadError, SourceError from environment
 
 import AsyncImport, BaseSource, BaseSourceHandler from gpm.loader
 import AsyncWrite, MountZIPData from file
 import Fetch from environment.http
 import MD5 from util
 import time from os
-
---[[
-
-    Concept:
-
-    download and compile
-    http://domain.com/path/to/file.lua
-    https://domain.com/path/to/other/file.lua
-
-    http://domain.com/path/to/file.moon
-    https://domain.com/path/to/file.yue
-
-    will return a table of decoded json because yeeeep ( will create error if json is invalid )
-    http://domain.com/path/to/file.json
-
-    will return a string ( file content )
-    http://domain.com/path/to/file.txt
-
-    will just download, and the next step is to mount the gma with data://gpm/mount/{md5_url_hash}.gma
-    https://domain.com/path/to/file.gma
-
-    download the zip file, create a new gma into data://gpm/mount/{md5_url_hash}.gma, then mount it.
-    http://domain.com/path/to/file.zip
-
-    download the default or specified brunch and mount it as a gma to the game just like a zip.
-    https://github.com/pika-software/gm_moonloader
-
-    github://pika-software/gm_moonloader/?/path/to/file ->
-        https://api.github.com/repos/pika-software/gm_moonloader ( default_branch ) ->
-            https://api.github.com/repos/pika-software/gm_moonloader/git/trees/{default_branch} ->
-
-]]
 
 file.Delete( "gpm/downloads" )
 file.CreateDir( "gpm/downloads" )
@@ -72,8 +40,8 @@ do
 
         FetchInfo: async ( url ) =>
             result = await Fetch( url.href )
-            if result.code ~= 200
-                error "failed to fetch " .. url.href
+            if result.status ~= 200
+                error SourceError "failed to fetch " .. url.href
 
             return result.body
 
@@ -89,7 +57,7 @@ do
                     CompileYueString( luaCode, url.href )
 
             unless func
-                error ModuleLoadError "File '" .. filePath .. "' cannot be compiled."
+                error ModuleLoadError "File '" .. url.href .. "' cannot be compiled."
                 return
 
             Module( func, url.href, parentEnvironment )
@@ -104,8 +72,8 @@ class TextHandler extends BaseSourceHandler
 
     Install: async ( url, href ) =>
         result = await Fetch( href )
-        if result.code ~= 200
-            error "failed to fetch " .. href
+        if result.status ~= 200
+            error SourceError "failed to fetch " .. href
 
         return result.body
 
@@ -120,8 +88,8 @@ do
 
         FetchInfo: async ( url ) =>
             result = await Fetch( url.href )
-            if result.code ~= 200
-                error "failed to fetch " .. url.href
+            if result.status ~= 200
+                error SourceError "failed to fetch " .. url.href
 
             return result.body
 
@@ -130,7 +98,7 @@ do
             if tbl
                 return tbl
 
-            error "failed to parse json"
+            error SourceError "failed to parse json"
             return
 
 class GMAHandler extends BaseSourceHandler
@@ -139,8 +107,8 @@ class GMAHandler extends BaseSourceHandler
 
     FetchInfo: async ( url ) =>
         result = await Fetch( url.href )
-        if result.code ~= 200
-            error "failed to fetch " .. url.href
+        if result.status ~= 200
+            error SourceError "failed to fetch " .. url.href
 
         return AsyncWrite( "gpm/downloads/" .. MD5( url.href .. time! ) .. ".gma", result.body )
 
@@ -153,8 +121,8 @@ class ZIPHandler extends BaseSourceHandler
 
     FetchInfo: async ( url ) =>
         result = await Fetch( url.href )
-        if result.code ~= 200
-            error "failed to fetch " .. url.href
+        if result.status ~= 200
+            error SourceError "failed to fetch " .. url.href
 
         return result.body
 

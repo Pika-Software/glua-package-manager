@@ -2,10 +2,16 @@ _G = _G
 import gpm, file, CLIENT, SERVER, error from _G
 import environment, Logger from gpm
 
-import async, await, debug, util, path, string, ArgAssert, Promise from environment
+import async, await, debug, util, path, string, ArgAssert, Promise, Error, LuaCompileError from environment
 import FastSplit, GetPathFromFilename, GetExtensionFromFilename from string
 import Join, Resolve, Fix from path
 import Find from file
+
+class FileSystemAsyncError extends Error
+environment.FileSystemAsyncError = FileSystemAsyncError
+
+class MountError extends Error
+environment.MountError = MountError
 
 -- https://github.com/Pika-Software/gm_efsw
 if SERVER and not efsw and util.IsBinaryModuleInstalled( "efsw" ) and pcall( require, "efsw" )
@@ -277,7 +283,7 @@ do
                     if preCacheFunc( preCachePath )
                         Logger\Debug( "Pre-compiling '%s' into Lua completed successfully.", preCachePath )
                     else
-                        error( "Pre-compiling '" .. preCachePath .. "' file in Lua failed." )
+                        error LuaCompileError "Pre-compiling '" .. preCachePath .. "' file in Lua failed."
 
                 return true
 
@@ -395,7 +401,8 @@ if SERVER
             AddCSLuaFile( fileName )
             return
 
-        error( "Couldn't AddCSLuaFile file '" .. fileName .. "' - File not found" )
+        error LuaCompileError "Couldn't AddCSLuaFile file '" .. fileName .. "' - File not found"
+        return
 
     -- file.AddCSLuaFolder( folderPath )
     addCSLuaFolder = ( folderPath ) ->
@@ -553,10 +560,6 @@ do
                 if count > 2
                     break
 
-    -- environment.FileSystemAsyncError - async error
-    class FileSystemAsyncError extends environment.Error
-    environment.FileSystemAsyncError = FileSystemAsyncError
-
     -- file.FSASYNC - async error messages table
     FSASYNC = {
         [ -8 ]: "Filename not part of the specified file system, try a different one."
@@ -587,11 +590,11 @@ do
 
             p = Promise!
 
-            state = Append filePath, content, ( fileName, gamePath, code ) ->
-                if code == 0
+            state = Append filePath, content, ( fileName, gamePath, iState ) ->
+                if iState == 0
                     return p\Resolve( { :fileName, :gamePath } )
 
-                p\Reject( FileSystemAsyncError FSASYNC[ code ] )
+                p\Reject( FileSystemAsyncError FSASYNC[ iState ] )
 
             if state ~= 0
                 p\Reject( FileSystemAsyncError FSASYNC[ state ] )
@@ -606,11 +609,11 @@ do
         asyncRead = ( filePath, gameDir ) ->
             p = Promise!
 
-            state = Read filePath, gameDir, ( fileName, gamePath, code, content ) ->
-                if code == 0
+            state = Read filePath, gameDir, ( fileName, gamePath, iState, content ) ->
+                if iState == 0
                     return p\Resolve( content )
 
-                p\Reject( FileSystemAsyncError FSASYNC[ code ] )
+                p\Reject( FileSystemAsyncError FSASYNC[ iState ] )
 
             if state ~= 0
                 p\Reject( FileSystemAsyncError FSASYNC[ state ] )
@@ -630,11 +633,11 @@ do
 
             p = Promise!
 
-            state = Write filePath, content, ( fileName, gamePath, code ) ->
-                if code == 0
+            state = Write filePath, content, ( fileName, gamePath, iState ) ->
+                if iState == 0
                     return p\Resolve( { :fileName, :gamePath } )
 
-                p\Reject( FileSystemAsyncError FSASYNC[ code ] )
+                p\Reject( FileSystemAsyncError FSASYNC[ iState ] )
 
             if state ~= 0
                 p\Reject( FileSystemAsyncError FSASYNC[ state ] )
@@ -642,10 +645,6 @@ do
             return p
 
 do
-
-    -- file.LuaCompileError - compile error
-    class LuaCompileError extends environment.Error
-    environment.LuaCompileError = LuaCompileError
 
     -- file.CompileLua( filePath, gamePath, handleError ) - async lua file compile function that returns promise
     local compileLua

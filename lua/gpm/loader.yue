@@ -235,7 +235,7 @@ loader.LoadURL = async ( urlStr, parentPackage ) ->
             error ModuleLoadError "unsupported web url: " .. url.href
 
         req = await Fetch( url.href )
-        unless req and req.code == 200 and req.body
+        unless req and req.status == 200 and req.body
             error ModuleLoadError "failed to fetch " .. url.href
 
         entry_fn = CompileString( req.body, url.href )

@@ -1,24 +1,14 @@
 _G = _G
 import gpm from _G
 import environment, Module from gpm
-import async, await, file, ModuleLoadError from environment
-import AsyncImport, BaseSource, BaseSourceHandler from gpm.loader
+import async, await, file, ModuleLoadError, MountError, SourceError from environment
 import Compile, CompileLua, CompileMoon, CompileYue, Exists from file
 import GetExtensionFromFilename, gsub, match from environment.string
+import AsyncImport, BaseSource, BaseSourceHandler from gpm.loader
 
 --[[
 
     Concept:
-
-    lua source, async compile and run ( returns function result )
-        lua://path/to/file.{ext} ( will use specified extension {ext} )
-        lua://my_addon/init ( yue, moon, lua )
-        moon://my_addon/init ( same as lua:// )
-        yue://my_addon/init ( same as lua:// )
-
-    file source, file://path/to/file.{ext} ( depends on file extension )
-        lua, moon, yue will compile and run ( returns function result )
-        zip and gma will be mounted in the game ( returns mounted file list )
 
     package source
         npm like behavior ( i guess ) ( returns package object )
@@ -83,7 +73,7 @@ do
                 require( name )
                 return _G[ name ]
 
-            error "Binary module " .. name .. " is not installed locally!"
+            error SourceError "Binary module " .. name .. " is not installed locally!"
             return
 
     class BinarySource extends BaseSource
@@ -108,7 +98,7 @@ do
             if ok
                 return result
 
-            error result
+            error MountError result
             return
 
     class ZIPHandler extends BaseSourceHandler

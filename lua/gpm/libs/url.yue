@@ -624,7 +624,7 @@ export class URL
 
     STATE_FIELDS = {"scheme": true, "username": true, "password": true, "hostname": true, "port": true, "path": true, "query": true, "fragment": true}
 
-    resetCache = () =>
+    resetCache = =>
         rawset(@, "_href", nil)
         rawset(@, "_origin", nil)
         rawset(@, "_host", nil)
@@ -671,7 +671,7 @@ export class URL
 
         -- State fields
         if STATE_FIELDS[key]
-            resetCache()
+            resetCache(@)
             switch key
                 when "username"
                     if not state.hostname or state.hostname == "" or state.scheme == "file"
@@ -684,13 +684,13 @@ export class URL
                 when "hostname"
                     if isstring(state.path)
                         return
-                    resetCache()
+                    resetCache(@)
                     parseHost(state, value, 1, #value, state.scheme and SPECIAL_SCHEMAS[state.scheme], "hostname")
                 when "port"
                     if not state.hostname or state.hostname == "" or state.scheme == "file"
                         return
 
-                    resetCache()
+                    resetCache(@)
                     if not value or value == ""
                         state.port = nil
                         return
@@ -703,34 +703,34 @@ export class URL
         -- Special fields
         switch key
             when "href"
-                resetCache()
+                resetCache(@)
                 state = {}
                 parse(state, value)
                 rawset(@, "state", state)
             when "origin" then return -- readonly field
             when "protocol"
-                resetCache()
+                resetCache(@)
                 parseScheme(state, value, 1, #value, nil, true)
             when "host"
                 if isstring(state.path)
                     return
-                resetCache()
+                resetCache(@)
                 parseHost(state, value, 1, #value, state.scheme and SPECIAL_SCHEMAS[state.scheme], "host")
             when "pathname"
                 if isstring(state.path)
                     return
-                resetCache()
+                resetCache(@)
                 path = {}
                 parsePathStart(state, value, 1, #value, state.scheme and SPECIAL_SCHEMAS[state.scheme], true)
             when "search"
-                resetCache()
+                resetCache(@)
                 leadingSymbol = byte(value, 1) == 0x3F --[['?']]
                 parseQuery(state, value, leadingSymbol and 2 or 1, #value, state.scheme and SPECIAL_SCHEMAS[state.scheme], true)
             when "hash"
                 if not value or value == ""
                     state.fragment = nil
                     return
-                resetCache()
+                resetCache(@)
                 leadingSymbol = byte(value, 1) == 0x23 --[['#']]
                 parseFragment(state, value, leadingSymbol and 2 or 1, #value)
             else rawset(@, key, value)

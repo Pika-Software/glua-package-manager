@@ -1,0 +1,176 @@
+import gpm from _G
+import environment, Module from gpm
+import await, async, SourceError, ModuleLoadError from environment
+
+import Base64Decode, JSONToTable, CompileLuaString, CompileMoonString, CompileYueString from environment.util
+import GetExtensionFromFilename from environment.string
+import BaseSource, BaseSourceHandler from gpm.loader
+import MountZIPData from environment.file
+import insert from environment.table
+import Fetch from environment.http
+
+class RepositoryHandler extends BaseSourceHandler
+    FetchInfo: async ( url ) =>
+        segments = url.path
+        if url.hostname
+            insert( segments, 1, url.hostname )
+
+        user = segments[ 1 ]
+        unless user
+            error SourceError "Repository user not specified."
+
+        repository = segments[ 2 ]
+        unless repository
+            error SourceError "Repository name not specified."
+
+        headers = {
+            ["Authorization"]: "Bearer " .. (url.username or "") .. (url.password or "")
+        }
+
+        url.username = nil
+        url.password = nil
+
+        branch = segments[ 3 ]
+        if not branch or branch == ""
+            response = await Fetch( "https://api.github.com/repos/" .. user .. "/" .. repository, headers )
+            if response.status ~= 200
+                json = JSONToTable( response.body )
+                error SourceError json and json.message or "Failed to fetch repository info."
+
+            json = JSONToTable( response.body )
+            unless json
+                error SourceError "Unable to parse JSON response."
+
+            branch = json.default_branch
+            unless branch
+                error SourceError "Failed to fetch repository default branch."
+
+            segments[ 3 ] = branch
+
+        response = await Fetch( "https://api.github.com/repos/" .. user .. "/" .. repository .. "/git/trees/" .. branch, headers )
+        if response.status ~= 200
+            json = JSONToTable( response.body )
+            error SourceError json and json.message or "Failed to fetch repository info."
+
+        info = JSONToTable( response.body )
+        unless info
+            error SourceError "Unable to parse JSON response."
+
+        if #segments > 3
+            path = {}
+            for i = 4, #segments
+                path[ i - 3 ] = segments[ i ]
+
+            info.path = path
+
+        info.repository = repository
+        info.headers = headers
+        info.branch = branch
+        info.user = user
+        return info
+
+    Install: async ( url, info, _, __, env ) =>
+        unless info.path
+            response = await Fetch( "https://api.github.com/repos/" .. info.user .. "/" .. info.repository .. "/zipball/" .. info.branch, info.headers )
+            if response.status ~= 200
+                error SourceError "Failed to download the repository."
+
+            return MountZIPData( response, url.href )
+
+        :path = info
+        pathStart, pathEnd = 1, #path
+        currentPath = ""
+
+        :tree = info
+        ::tree::
+
+        treeLength = #tree
+
+        for i = pathStart, pathEnd
+            fileName = path[ i ]
+
+            if currentPath == ""
+                currentPath = fileName
+            else
+                currentPath ..= "/" .. fileName
+
+            for j = 1, treeLength
+                item = tree[ j ]
+                if item.path == fileName
+                    if item.type == "tree"
+                        response = await Fetch( item.url, info.headers )
+                        if response.status ~= 200
+                            json = JSONToTable( response.body )
+                            error SourceError json and json.message or "Failed to resolve repository path."
+
+                        json = JSONToTable( response.body )
+                        unless json
+                            error SourceError "Unable to parse JSON response."
+
+                        tree = json.tree
+                        pathStart += 1
+                        goto tree
+
+                    elseif item.type == "blob"
+                        if i ~= pathEnd
+                            error SourceError "Can't download the blob file in the middle of the path."
+
+                        response = await Fetch( item.url, info.headers )
+                        if response.status ~= 200
+                            json = JSONToTable( response.body )
+                            error SourceError json and json.message or "Failed to get repository file."
+
+                        json = JSONToTable( response.body )
+                        unless json
+                            error SourceError "Unable to parse JSON response."
+
+                        switch json.encoding
+                            when "base64"
+                                json.content = Base64Decode( json.content )
+
+                        switch GetExtensionFromFilename( currentPath )
+                            when "lua"
+                                func = await CompileLuaString( json.content, url.href )
+                                unless func
+                                    error ModuleLoadError "File '" .. url.href .. "' cannot be compiled."
+                                    return
+
+                                Module( func, url.href, env )
+                                return func!
+
+                            when "moon"
+                                func = await CompileMoonString( json.content, url.href )
+                                unless func
+                                    error ModuleLoadError "File '" .. url.href .. "' cannot be compiled."
+                                    return
+
+                                Module( func, url.href, env )
+                                return func!
+
+                            when "yue"
+                                func = await CompileYueString( json.content, url.href )
+                                unless func
+                                    error ModuleLoadError "File '" .. url.href .. "' cannot be compiled."
+                                    return
+
+                                Module( func, url.href, env )
+                                return func!
+
+                            when "json"
+                                return JSONToTable( json.content, true, false )
+
+
+                        return json.content
+
+                    break
+
+            if i == pathEnd
+                error SourceError "Couldn't find `" .. currentPath .. "` in " .. info.user .. "/" .. info.repository .. " (" .. info.branch .. ")."
+
+        error SourceError "Invalid path: " .. currentPath
+        return
+
+class RepositorySource extends BaseSource
+
+gh = RepositorySource( "github" )
+gh\RegisterHandler( RepositoryHandler! )
