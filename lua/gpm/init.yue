@@ -96,11 +96,6 @@ deflate = include( "libs/3rd-party/deflate.lua" )
 logger\Loaded( "LibDeflate v%s", deflate._VERSION )
 environment.deflate = deflate
 
-for key, value in pairs( include( "libs/error.lua" ) )
-    environment[ key ] = value
-
-class environment.NotImplementedError extends environment.Error
-
 promise = include( "libs/promise.lua" )
 logger\Loaded( "gm_promise v%s", promise.VERSION )
 environment.async = promise.async

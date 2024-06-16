@@ -157,9 +157,16 @@ util.CompileLuaFile = _G.CompileFile
 
 do
 
-    class LuaCompileError extends environment.Error
-    environment.LuaCompileError = LuaCompileError
+    -- gm_error
+    for key, value in pairs( include( "libs/error.lua" ) )
+        environment[ key ] = value
 
+    import Error from environment
+
+    class environment.NotImplementedError extends Error
+
+    class LuaCompileError extends Error
+    environment.LuaCompileError = LuaCompileError
 
     util.CompileMoonString = ->
         error LuaCompileError "Attempt to compile MoonScript failed, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader."
