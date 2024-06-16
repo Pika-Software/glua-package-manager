@@ -11,31 +11,25 @@ import CRC from util
 class AddonError extends environment.Error
 environment.AddonError = AddonError
 
-addon = {}
+export GetAll = engine.GetAddons
 
-do
+export Get = ( wsid ) ->
+    for data in *GetAll!
+        if data.wsid == wsid
+            return data
 
-    import GetAddons from engine
+export FileFind = ( filePath, wsid ) ->
+    data = Get( wsid )
+    if data
+        return Find( filePath, data.title )
 
-    addon.GetAll = GetAddons
-
-    get = addon.Get = ( wsid ) ->
-        for data in *GetAll!
-            if data.wsid == wsid
-                return data
-
-    addon.FileFind = ( filePath, wsid ) ->
-        data = get( wsid )
-        if data
-            return Find( filePath, data.title )
-
-    addon.GetFiles = ( wsid, filePath ) ->
-        data = get( wsid )
-        if data
-            return GetFilePaths( filePath or "", data.title )
+export GetFiles = ( wsid, filePath ) ->
+    data = Get( wsid )
+    if data
+        return GetFilePaths( filePath or "", data.title )
 
 -- Addon types
-types = {
+export Types = {
     "gamemode",
     "map",
     "weapon",
@@ -48,13 +42,11 @@ types = {
     "servercontent"
 }
 
-addon.Types = types
-
-addon.TypeExists = ( str ) ->
-    return HasValue( types, str, true )
+export TypeExists = ( str ) ->
+    return HasValue( Types, str, true )
 
 -- Addon tags
-tags = {
+export Tags = {
     "fun",
     "roleplay",
     "scenic",
@@ -66,10 +58,8 @@ tags = {
     "build"
 }
 
-addon.Tags = tags
-
-addon.TagExists = ( str ) ->
-    return HasValue( tags, str, true )
+export TagExists = ( str ) ->
+    return HasValue( Tags, str, true )
 
 -- https://github.com/Facepunch/gmad/blob/master/include/AddonWhiteList.h
 wildcard = {
@@ -158,16 +148,14 @@ wildcard = {
 for index = 1, #wildcard
     wildcard[ index ] = "^" .. gsub( gsub( wildcard[ index ], "%.", "%." ), "%*", ".+" ) .. "$"
 
-isFilePathAllowed = ( filePath ) ->
+export IsFilePathAllowed = ( filePath ) ->
     for pattern in *wildcard
         if find( filePath, pattern )
             return true
 
     return false
 
-addon.IsFilePathAllowed = isFilePathAllowed
-
-class addon.Addon
+export class Addon
     Identity: "GMAD"
     Version: 3
 
@@ -372,7 +360,7 @@ class addon.Addon
             return false, nil
 
         for data in *files
-            unless isFilePathAllowed( data.file_path )
+            unless IsFilePathAllowed( data.file_path )
                 return false, data
 
         return true
@@ -529,5 +517,3 @@ class addon.Addon
 
     ClearRequiredContent: =>
         return Empty( @requiredContent )
-
-return addon
