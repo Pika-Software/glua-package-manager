@@ -43,11 +43,10 @@ lib.LuaGamePaths = luaGamePaths
 
 do
 
-    import LocalizeLua from path
     import getfpath from debug
 
     file.ResolvePath = ( ... ) ->
-        return Resolve( LocalizeLua( getfpath! ), ... )
+        return Resolve( getfpath!, ... )
 
 do
 

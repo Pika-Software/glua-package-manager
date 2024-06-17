@@ -79,7 +79,7 @@ class Package
     __tostring: =>
         return format( "Package: %p [%s@%s]", @, @name, @version )
 
-    new: ( location, @url, @parent, metadata ) =>
+    new: ( location, url, parent, metadata ) =>
         unless istable( metadata )
             error InvalidPackageConfigurationError "metadata is " .. type( metadata ) .. ", expected table"
 
@@ -88,7 +88,7 @@ class Package
         packages[ name ][ version ] = @
 
         env = @env = Environment( environment, { :_G, _PACKAGE: @ } )
-        @entry = Module( location, @url, env )
+        @entry = Module( location, url, env )
 
         parents = @parents = {}
         @children = {}
