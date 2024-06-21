@@ -22,9 +22,22 @@
     SOFTWARE.
 --]]
 import type, tostring, tonumber, rawget, rawset, getmetatable, pairs from _G
-import byte, char, sub, gsub, lower from string
+import byte, char, sub, gsub, lower, format from string
+import rshift, lshift, band, bor from (bit or bit32)
 import concat from table
+import floor from math
 
+-- a quirky way to check if number have metatable
+-- if it has, then we can use getmetatable and have even faster isnumber function
+local isstring
+if stringMeta := getmetatable("")
+    isstring = (v) -> getmetatable(v) == stringMeta
+
+local isnumber
+if numberMeta := getmetatable(0)
+    isnumber = (v) -> getmetatable(v) == numberMeta
+
+-- Garry's Mod have is<type> functions, prefer them because they are faster than type
 isstring = isstring or (v) -> type(v) == "string"
 istable = istable or (v) -> type(v) == "table"
 isnumber = isnumber or (v) -> type(v) == "number"
@@ -45,6 +58,8 @@ containsCharacter = (str, chars, startPos = 1, endPos = #str) ->
         if chars[byte(str, i)]
             return true
     return false
+
+PUNYCODE_PREFIX = [0x78, 0x6E, 0x2D, 0x2D] -- xn--
 
 SPECIAL_SCHEMAS =
     ftp: 21
@@ -135,6 +150,7 @@ isLower = (ch) -> ch >= 0x61 --[['a']] and ch <= 0x7A --[['z']]
 isUpper = (ch) -> ch >= 0x41 --[['A']] and ch <= 0x5A --[['Z']]
 isAlpha = (ch) -> isLower(ch) or isUpper(ch)
 isDigit = (ch) -> ch >= 0x30 --[['0']] and ch <= 0x39 --[['9']]
+isHexDigit = (ch) -> isDigit(ch) or ch >= 0x41 --[['A']] and ch <= 0x46 --[['F']] or ch >= 0x61 --[['a']] and ch <= 0x66 --[['f']]
 isSingleDot = (str) ->
     return switch #str
         when 1 then str == "."
@@ -152,9 +168,17 @@ isWindowsDriveLetterCodePoints = (ch1, ch2, normalized) -> isAlpha(ch1) and (ch2
 isWindowsDriveLetter = (str, normalized) -> return #str == 2 and isWindowsDriveLetterCodePoints(byte(str, 1), byte(str, 2), normalized)
 startsWithWindowsDriveLetter = (str, startPos, endPos) ->
     len = endPos - startPos + 1
-    return len > 2 and
-        isWindowsDriveLetterCodePoints(byte(str, startPos), byte(str, startPos + 1)) and
+    return len >= 2 and
+        isWindowsDriveLetterCodePoints(byte(str, startPos), byte(str, startPos + 1), false) and
         (len == 2 or FILE_OTHERWISE_CODE_POINTS[byte(str, startPos + 2)])
+
+-- Converts character to digit,
+-- if given non valid character it will return invalid number
+charToDec = (ch) -> ch - 0x30
+hexToDec = (ch) ->
+    if ch >= 0x61 --[['a']] then return ch - 0x61 + 10
+    elseif ch >= 0x41 --[['A']] then return ch - 0x41 + 10
+    else return charToDec(ch)
 
 -- Finds nearest non whitespace character from startPos to endPos
 -- And returns the position of that character
@@ -165,13 +189,364 @@ trimInput = (str, startPos, endPos) ->
             return i
     return endPos - 1
 
+-- UTF-8 decoder from https://bjoern.hoehrmann.de/utf-8/decoder/dfa/
+UTF8_DECODE_LOOKUP = []
+do
+    UTF8_DECODE_LOOKUP_RULES = [
+        {0, 0x00, 0x7f}, {1, 0x80, 0x8f}, {9, 0x90, 0x9f}, {7, 0xa0, 0xbf},             -- 0x00 - 0xbf
+        {8, 0xc0, 0xc1}, {2, 0xc2, 0xdf}, {0xa, 0xe0}, {0x3, 0xe1, 0xef},               -- 0xc0 - 0xef
+        {0xb, 0xf0}, {0x6, 0xf1, 0xf3}, {0x5, 0xf4}, {0x8, 0xf5, 0xff},                 -- 0xf0 - 0xff
+        {0x0, 0x100}, {0x1, 0x101}, {0x2, 0x102}, {0x3, 0x103}, {0x5, 0x104}            -- 0x100 - 0x104
+        {0x8, 0x105}, {0x7, 0x106}, {0x1, 0x107, 0x10f}, {0x4, 0x10a}, {0x6, 0x10b},    -- 0x105 - 0x10f
+        {1, 0x110, 0x12f}, {0, 0x121}, {0, 0x127}, {0, 0x129},                          -- 0x110 - 0x12f
+        {1, 0x130, 0x14f}, {2, 0x131}, {2, 0x137}, {2, 0x139}, {2, 0x147},              -- 0x130 - 0x14f
+        {1, 0x150, 0x16f}, {2, 0x151}, {2, 0x159}, {3, 0x167}, {3, 0x169},              -- 0x150 - 0x16f
+        {1, 0x170, 0x18f}, {3, 0x171}, {3, 0x177}, {3, 0x179}, {3, 0x181}               -- 0x170 - 0x181
+    ] -- {val, start, end} / {val, pos}
+    for rule in *UTF8_DECODE_LOOKUP_RULES do
+        if rule[3]
+            for i = rule[2], rule[3] do UTF8_DECODE_LOOKUP[i] = rule[1]
+        else UTF8_DECODE_LOOKUP[rule[2]] = rule[1]
+
+utf8Decode = (str, startPos, endPos) ->
+    -- TODO add support for fullwidth utf8/utf16
+    output = []
+    count = state = codep = 0
+    for i = startPos, endPos
+        b = byte(str, i)
+        t = UTF8_DECODE_LOOKUP[b]
+        codep = (state != 0) and
+            bor( band(b, 0x3f), lshift(codep, 6) ) or
+            band( rshift(0xff, t), b )
+        state = UTF8_DECODE_LOOKUP[256 + state * 16 + t]
+        if state == 0
+            count += 1
+            output[count] = codep
+    if state != 0
+        error "Invalid URL: UTF-8 decoding error"
+    return output
+
+-- RFC 3492 Punycode encode
+punycodeEncode = (str, startPos, endPos) ->
+    const base = 36
+    const tMin = 1
+    const tMax = 26
+    const skew = 38
+    const damp = 700
+    const initialBias = 72
+    const initialN = 0x80
+    const delimiter = 0x2D --[['-']]
+
+    -- Initialize the state
+    n = initialN
+    input = utf8Decode(str, startPos, endPos)
+    inputLen = #input
+    output = []
+    delta = out = 0
+    bias = initialBias
+
+    -- Handle the basic code points
+    for ch in *input
+        if ch < 0x80
+            out += 1
+            output[out] = char(ch)
+
+    -- h is the number of code points that have been handled, b is the number of basic code points
+    -- that have been handled, and out is the number of characters that have been output.
+    h = b = out
+
+    if b > 0
+        out += 1
+        output[out] = char(delimiter)
+
+    -- Main encoding loop
+    while h < inputLen
+        -- All non-basic code points < n have been handled already. Find the next larger one
+        m = 0x7FFFFFFF
+        for ch in *input
+            if ch >= n and ch < m then m = ch
+
+        -- Increase delta enough to advance the decoder's <n,i> state to <m,0>, but guard against overflow
+        if m - n > (0x7FFFFFFF - delta) / (h + 1)
+            error "Invalid URL: Punycode overflow"
+
+        delta += (m - n) * (h + 1)
+        n = m
+
+        for ch in *input
+            -- Punycode does not need to check whether input[j] is basic:
+            if ch < n
+                delta += 1 -- Move this down incase of wrong answer
+                if delta + 1 > 0x7FFFFFFF
+                    error "Invalid URL: Punycode overflow"
+            if ch == n
+                -- Represent delta as a generalized variable-length integer
+                q = delta
+                k = base
+                while true
+                    t = k <= bias and tMin or
+                        k >= bias + tMax and tMax or k - bias
+                    if q < t then break
+                    d = t + (q - t) % (base - t)
+                    out += 1
+                    output[out] = char(d + 22 + (d < 26 and 75 or 0))
+                    q = floor((q - t) / (base - t))
+                    k += base
+
+                out += 1
+                output[out] = char(q + 22 + (q < 26 and 75 or 0))
+
+                k = 0
+                delta = h == b and floor(delta / damp) or rshift(delta, 1)
+
+                delta += floor(delta / (h + 1))
+                while delta > ((base - tMin) * tMax) / 2
+                    delta = floor(delta / (base - tMin))
+                    k += base
+                bias = floor(k + (base - tMin + 1) * delta / (delta + skew))
+                delta = 0
+                h += 1
+
+        delta += 1
+        n += 1
+
+    return concat(output, "", 1, out)
+
+parseIPv4InIPv6 = (str, pointer, endPos, address, pieceIndex) ->
+    numbersSeen = 0
+    while pointer <= endPos
+        ipv4Piece = nil
+        ch = byte(str, pointer)
+        if numbersSeen > 0
+            unless ch == 0x2E --[['.']] and numbersSeen < 4
+                error "Invalid URL: IPv4 in IPv6 invalid code point"
+            pointer += 1
+            ch = pointer <= endPos and byte(str, pointer)
+
+        while ch and isDigit(ch)
+            num = charToDec(ch)
+            unless ipv4Piece
+                ipv4Piece = num
+            elseif ipv4Piece == 0
+                error "Invalid URL: IPv4 in IPv6 invalid code point"
+            else
+                ipv4Piece = ipv4Piece * 10 + num
+
+            if ipv4Piece > 255
+                error "Invalid URL: IPv4 in IPv6 out of range part"
+
+            pointer += 1
+            ch = pointer <= endPos and byte(str, pointer)
+
+        unless ipv4Piece
+            error "Invalid URL: IPv4 in IPv6 invalid code point"
+
+        address[pieceIndex] = address[pieceIndex] * 0x100 + ipv4Piece
+        numbersSeen += 1
+        if numbersSeen == 2 or numbersSeen == 4
+            pieceIndex += 1
+
+    if numbersSeen != 4
+        error "Invalid URL: IPv4 in IPv6 too few parts"
+
+    return pieceIndex
+
+parseIPv6 = (str, startPos, endPos) ->
+    address = [0, 0, 0, 0, 0, 0, 0, 0] -- ipv6 address
+    pointer = startPos
+    pieceIndex = 1
+    compress = nil
+    dotSeen = false
+
+    if byte(str, startPos) == 0x3A -- ':'
+        if startPos == endPos --[[ EOF ]] or byte(str, startPos + 1) != 0x3A -- ':'
+            error "Invalid URL: IPv6 invalid compression"
+        pointer += 2
+        pieceIndex = compress = 2
+
+    while pointer <= endPos
+        if pieceIndex == 9
+            error "Invalid URL: IPv6 too many pieces"
+
+        ch = byte(str, pointer)
+        if ch == 0x3A -- ':'
+            if compress
+                error "Invalid URL: IPv6 multiple compression"
+            pointer += 1
+            pieceIndex = compress = pieceIndex + 1
+            continue
+
+        value = length = 0
+        while length < 4 and ch and isHexDigit(ch)
+            value = value * 0x10 + hexToDec(ch)
+            pointer += 1
+            length += 1
+            ch = pointer <= endPos and byte(str, pointer)
+
+        if ch == 0x2E -- '.'
+            if length == 0
+                error "Invalud URL: IPv4 in IPv6 invalid code point"
+
+            pointer -= length
+            if pieceIndex > 7
+                error "Invalid URL: IPv4 in IPv6 too many pieces"
+
+            pieceIndex = parseIPv4InIPv6(str, pointer, endPos, address, pieceIndex)
+            break
+        elseif ch == 0x3A -- ':'
+            pointer += 1
+            if pointer > endPos -- EOF
+                error "Invalid URL: IPv6 invalid code point"
+        elseif pointer <= endPos
+            error "Invalid URL: IPv6 invalid code point"
+
+        address[pieceIndex] = value
+        pieceIndex += 1
+
+    if compress
+        swaps = pieceIndex - compress
+        pieceIndex = 8
+        while pieceIndex != 1 and swaps > 0
+            value = address[pieceIndex]
+            address[pieceIndex] = address[compress + swaps - 1]
+            address[compress + swaps - 1] = value
+            swaps -= 1
+            pieceIndex -= 1
+    elseif pieceIndex != 9
+        error "Invalid URL: IPv6 too few pieces"
+
+    return address
+
+parseIPv4Number = (str) ->
+    if str == ""
+        return
+    radix = 10
+    ch1 = byte(str, 1)
+    ch2 = byte(str, 2)
+    if ch1 == 0x30 --[['0']] and (ch2 == 0x78 --[['x']] or ch2 == 0x58 --[['X']])
+        radix = 16
+        if #str == 2 then str = "0"
+    elseif ch1 == 0x30 --[['0']] and ch2
+        radix = 8
+    return tonumber(str, radix)
+
+endsInANumberChecker = (str, startPos, endPos) ->
+    -- find a starting point for number
+    numStart = startPos
+    numEnd = endPos
+    for i = numEnd, numStart, -1
+        if byte(str, i) == 0x2E --[['.']]
+            if i == endPos -- if dot is at the end, then skip it
+                numEnd = i - 1
+            else -- dot was found, so after it must be a number
+                numStart = i + 1
+                break
+
+    -- sanity check, do not invoke parser if we have ONLY digits
+    for i = numStart, numEnd
+        if not isDigit byte(str, i)
+            -- welp, let us try at least parse it, what if it is a hex number
+            return parseIPv4Number sub(str, numStart, numEnd)
+
+    return numStart <= numEnd -- every charactar was a digit, yay!
+
+parseIPv4 = (str, startPos, endPos) ->
+    numbers = []
+    pointer = startPos
+    while true
+        ch = pointer <= endPos and byte(str, pointer)
+        if not ch or ch == 0x2E -- '.'
+            num = parseIPv4Number sub(str, startPos, pointer - 1)
+            if not num
+                if pointer > endPos and #numbers > 0
+                    break
+                error "Invalid URL: IPv4 non numeric part"
+
+            startPos = pointer + 1
+            numbers[] = num
+            if not ch
+                break
+
+        pointer += 1
+
+    if #numbers > 4
+        error "Invalid URL: IPv4 too many parts"
+
+    for i = 1, #numbers - 1
+        if numbers[i] > 255
+            error "Invalid URL: IPv4 out of range part"
+
+    if numbers[#numbers] >= 256 ^ (5 - #numbers)
+        error "Invalid URL: IPv4 out of range part"
+
+    ipv4 = numbers[#numbers]
+    counter = 0
+    for i = 1, #numbers - 1
+        ipv4 += numbers[i] * 256 ^ (3 - counter)
+        counter += 1
+    return ipv4
+
+domainToASCII = (domain) ->
+    for i = 1, #domain
+        if byte(domain, i) > 0x7F
+            -- We are dealing with some complicated unicode domain name
+            -- Since I am lazy newbie who does not want to implement proper unicode
+            -- handling into lua, I'll just cover edge cases for tests
+            -- You can open issue on Github if it REALLY BOTHERS YOU
+            -- But if it REALLY BOTHERS YOU then feel free to make proper unicode support
+            -- yourself :)
+
+            -- Remove special symbols that are ignored
+            -- I probably really should implement some proper punycode
+            domain = gsub(domain, "\xC2\xAD", "") -- remove soft hyphen
+            domain = gsub(domain, "\xE3\x80\x82", ".") -- Ideographic full stop
+            -- remove space characters
+            domain = gsub(domain, "\xE2\x80\x8B", "")
+            domain = gsub(domain, "\xE2\x81\xA0", "")
+            domain = gsub(domain, "\xEF\xBB\xBF", "")
+
+            break
+
+    containsNonASCII = doLowerCase = false
+    punycodePrefix = 0
+    partStart = pointer = 1
+    parts = []
+    while true
+        ch = byte(domain, pointer)
+        if not ch or ch == 0x2E -- '.'
+            if punycodePrefix == 4
+                -- decode an find errors
+                if containsNonASCII then error "Invalid URL: Domain invalid code point"
+
+            domainPart = containsNonASCII and "xn--" .. punycodeEncode(domain, partStart, pointer - 1) or sub(domain, partStart, pointer - 1)
+            -- btw, punycode decode lowercases the domain, so we need to lowercase it
+            -- in ideal sutiation I should have written punycodeDecode, but I am not in the mood to write it
+            if doLowerCase
+                domainPart = lower(domainPart)
+
+            parts[] = domainPart
+            partStart = pointer + 1
+            containsNonASCII = doLowerCase = false
+            punycodePrefix = 0
+            if not ch
+                break
+        elseif ch > 0x7F
+            containsNonASCII = true
+        elseif PUNYCODE_PREFIX[pointer - partStart + 1] == ch
+            punycodePrefix += 1
+        elseif isUpper(ch)
+            doLowerCase = true
+
+        pointer += 1
+
+    return concat(parts, ".")
+
 parseHostString = (str, startPos, endPos, isSpecial) ->
     if byte(str, startPos) == 0x5B -- '['
         if byte(str, endPos) != 0x5D -- ']'
             error "Invalid URL: IPv6 unclosed"
 
-        -- TODO parse ipv6
-        return sub(str, startPos + 1, endPos - 1)
+        return parseIPv6(str, startPos + 1, endPos - 1)
     elseif not isSpecial
         -- opaque host parsing
         if containsCharacter(str, FORBIDDEN_HOST_CODE_POINTS, startPos, endPos)
@@ -180,13 +555,15 @@ parseHostString = (str, startPos, endPos, isSpecial) ->
         return percentEncode(sub(str, startPos, endPos), C0_ENCODE_SET)
     else
         domain = percentDecode(sub(str, startPos, endPos), DECODE_LOOKUP_TABLE)
-        asciiDomain = percentEncode(domain, C0_ENCODE_SET) -- TODO punycode encode
+        asciiDomain = domainToASCII(domain)
 
         if containsCharacter(asciiDomain, FORBIDDEN_DOMAIN_CODE_POINTS)
             error "Invalid URL: Domain invalid code point"
-        -- TODO ends in a number + ipv4 parsing
 
-        return domain
+        if endsInANumberChecker(asciiDomain, 1, #asciiDomain)
+            return parseIPv4(asciiDomain, 1, #asciiDomain)
+
+        return asciiDomain
 
 -- Predefine locals so we can make functions in the order I want (as if you were reading specs)
 local parseScheme, parseNoScheme, parseSpecialRelativeOrAuthority, parsePathOrAuthority
@@ -196,7 +573,7 @@ local parseQuery, parseFragment
 
 parseScheme = (str, startPos, endPos, base, stateOverride) =>
     -- scheme start state
-    if isAlpha byte(str, startPos)
+    if startPos <= endPos and isAlpha byte(str, startPos)
         -- scheme state
         doLowerCase = false
         scheme = nil
@@ -238,7 +615,7 @@ parseScheme = (str, startPos, endPos, base, stateOverride) =>
                 return
             elseif isUpper(ch)
                 doLowerCase = true
-            elseif not isLower(ch) and ch != 0x2B --[['+']] and ch != 0x2D --[['-']] and ch != 0x2E --[['.']]
+            elseif not isLower(ch) and not isDigit(ch) and ch != 0x2B --[['+']] and ch != 0x2D --[['-']] and ch != 0x2E --[['.']]
                 -- scheme have an invalid character, so it's not a scheme
                 break
 
@@ -258,7 +635,7 @@ parseNoScheme = (str, startPos, endPos, base) =>
         @query = base.query
         parseFragment(@, str, startPos + 1, endPos)
     elseif base.scheme != "file"
-        parseRelative(@, str, startPos, endPos, base)
+        parseRelative(@, str, startPos, endPos, base, SPECIAL_SCHEMAS[base.scheme])
     else
         @scheme = "file"
         parseFile(@, str, startPos, endPos, base)
@@ -280,7 +657,7 @@ parsePathOrAuthority = (str, startPos, endPos, base) =>
 
 parseRelative = (str, startPos, endPos, base, isSpecial) =>
     @scheme = base.scheme
-    ch = byte(str, startPos)
+    ch = startPos <= endPos and byte(str, startPos)
     if ch == 0x2F --[['/']] or (isSpecial and ch == 0x5C --[['\']])
         -- relative slash state
         parseRelativeSlash(@, str, startPos + 1, endPos, base, isSpecial)
@@ -289,7 +666,7 @@ parseRelative = (str, startPos, endPos, base, isSpecial) =>
         @password = base.password
         @hostname = base.hostname
         @port = base.port
-        path = @path = {...base.path} -- clone path
+        path = @path = {...(base.path or {})} -- clone path
         if ch == 0x3F --[['?']]
             parseQuery(@, str, startPos + 1, endPos)
         elseif ch == 0x23 --[['#']]
@@ -328,6 +705,7 @@ parseAuthority = (str, startPos, endPos, isSpecial) =>
     -- authority state
     atSignSeen = false
     passwordTokenSeen = false
+    pathEndPos = endPos
     for i = startPos, endPos
         ch = byte(str, i)
         if ch == 0x2F --[['/']] or ch == 0x3F --[['?']] or ch == 0x23 --[['#']] or (isSpecial and ch == 0x5C --[['\']])
@@ -335,7 +713,7 @@ parseAuthority = (str, startPos, endPos, isSpecial) =>
             break
         elseif ch == 0x40 -- '@'
             atSignSeen = i
-        elseif ch == 0x3A --[[':']] and not passwordTokenSeen
+        elseif ch == 0x3A --[[':']] and not passwordTokenSeen and not atSignSeen
             passwordTokenSeen = i
 
     -- After @ there is no hostname
@@ -350,7 +728,7 @@ parseAuthority = (str, startPos, endPos, isSpecial) =>
             @username = percentEncode(sub(str, startPos, atSignSeen - 1), USERINFO_ENCODE_SET)
 
     parseHost(@, str, atSignSeen and atSignSeen + 1 or startPos, endPos, isSpecial)
-    parsePathStart(@, str, endPos + 1, endPos, isSpecial)
+    parsePathStart(@, str, endPos + 1, pathEndPos, isSpecial)
 
 parseHost = (str, startPos, endPos, isSpecial, stateOverride) =>
     if stateOverride and isSpecial == true
@@ -374,7 +752,7 @@ parseHost = (str, startPos, endPos, isSpecial, stateOverride) =>
         elseif ch == 0x5D -- ']'
             insideBrackets = false
 
-    if isSpecial and startPos == endPos
+    if isSpecial and startPos > endPos
         error "Invalid URL: Missing host"
     elseif stateOverride and startPos == endPos and (@username or @password or @port)
         return
@@ -382,6 +760,9 @@ parseHost = (str, startPos, endPos, isSpecial, stateOverride) =>
     @hostname = parseHostString(str, startPos, endPos, isSpecial)
 
 parsePort = (str, startPos, endPos, defaultPort, stateOverride) =>
+    if startPos > endPos
+        return
+
     port = tonumber sub(str, startPos, endPos)
     if not port or (port > 2 ^ 16 - 1) or port < 0
         if stateOverride then
@@ -392,12 +773,14 @@ parsePort = (str, startPos, endPos, defaultPort, stateOverride) =>
         @port = port
 
 parseFile = (str, startPos, endPos, base) =>
-    ch = byte(str, startPos)
+    @scheme = "file"
+    @hostname = ""
+    ch = startPos <= endPos and byte(str, startPos)
     if ch == 0x2F --[['/']] or ch == 0x5C --[['\']]
         parseFileSlash(@, str, startPos + 1, endPos, base)
     elseif base and base.scheme == "file"
         @hostname = base.hostname
-        path = @path = {...base.path}
+        path = @path = {...(base.path or {})}
         if ch == 0x3F --[['?']]
             parseQuery(@, str, startPos + 1, endPos)
         elseif ch == 0x23 --[['#']]
@@ -429,7 +812,7 @@ parseFileSlash = (str, startPos, endPos, base) =>
 parseFileHost = (str, startPos, endPos, stateOverride) =>
     i = startPos
     while true
-        ch = byte(str, i)
+        ch = i <= endPos and byte(str, i)
         if ch == 0x2F --[['/']] or ch == 0x5C --[['\']] or ch == 0x3F --[['?']] or ch == 0x23 --[['#']] or not ch -- EOF
             hostLen = i - startPos
             if not stateOverride and hostLen == 2 and isWindowsDriveLetterCodePoints(byte(str, startPos), byte(str, startPos + 1), false)
@@ -441,7 +824,7 @@ parseFileHost = (str, startPos, endPos, stateOverride) =>
 
                 parsePathStart(@, str, i, endPos, true)
             else
-                hostname = parseHostString(str, startPos, i - 1, false)
+                hostname = parseHostString(str, startPos, i - 1, true)
                 if hostname == "localhost"
                     hostname = ""
 
@@ -454,7 +837,7 @@ parseFileHost = (str, startPos, endPos, stateOverride) =>
         i += 1
 
 parsePathStart = (str, startPos, endPos, isSpecial, stateOverride) =>
-    ch = byte(str, startPos)
+    ch = startPos <= endPos and byte(str, startPos)
     if isSpecial
         if ch == 0x2F --[['/']] or ch == 0x5C --[['\']]
             startPos += 1
@@ -471,13 +854,13 @@ parsePathStart = (str, startPos, endPos, isSpecial, stateOverride) =>
         @path[] = "" -- append empty string to path
 
 parsePath = (str, startPos, endPos, isSpecial, segments={}, stateOverride) =>
-    hasWindowsLetter = false
     segmentsCount = #segments
+    hasWindowsLetter = segmentsCount != 0 and isWindowsDriveLetter(segments[1], false)
     segmentStart = startPos
 
     i = startPos
     while true
-        ch = byte(str, i)
+        ch = i <= endPos and byte(str, i)
         if ch == 0x2F --[['/']] or (isSpecial and ch == 0x5C --[['\']]) or (not stateOverride and (ch == 0x3F --[['?']] or ch == 0x23 --[['#']])) or not ch -- EOF
             segment = percentEncode(sub(str, segmentStart, i - 1), PATH_ENCODE_SET)
             segmentStart = i + 1
@@ -485,12 +868,19 @@ parsePath = (str, startPos, endPos, isSpecial, segments={}, stateOverride) =>
                 if segmentsCount != 1 or not hasWindowsLetter
                     segments[segmentsCount] = nil
                     segmentsCount -= 1
+                    if segmentsCount == -1 then segmentsCount = 0 -- do not allow underflow
+                if ch != 0x2F --[['/']] and (isSpecial and ch != 0x5C --[['\']])
+                    segmentsCount += 1
+                    segments[segmentsCount] = ""
             elseif not isSingleDot(segment)
                 if isSpecial == true --[[is file scheme]] and segmentsCount == 0 and isWindowsDriveLetter(segment, false)
                     segment = gsub(segment, "|", ":")
                     hasWindowsLetter = true
                 segmentsCount += 1
                 segments[segmentsCount] = segment
+            elseif ch != 0x2F --[['/']] and (isSpecial and ch != 0x5C --[['\']])
+                segmentsCount += 1
+                segments[segmentsCount] = ""
 
             if ch == 0x3F --[['?']]
                 parseQuery(@, str, i + 1, endPos)
@@ -550,10 +940,53 @@ export parse = (str, base) =>
     startPos = trimInput(str, startPos, endPos)
     endPos = trimInput(str, endPos, startPos)
 
-    if startPos > endPos
-        error "Invalid URL: Empty URL"
-
     parseScheme(@, str, startPos, endPos, base)
+    return @
+
+serializeIPv6 = (address) ->
+    output = []
+    len = compress = compressLen = zeroStart = 0
+    -- Find first longest sequence of zeros
+    for i = 1, 8
+        if address[i] == 0
+            if zeroStart == 0
+                zeroStart = i
+            elseif i - zeroStart > compressLen
+                compress = zeroStart
+                compressLen = i - zeroStart
+        else
+            zeroStart = 0
+
+    ignore0 = false
+    for i = 1, 8
+        if ignore0
+            if address[i] == 0
+                continue
+            ignore0 = false
+        if compress == i
+            len += 1
+            output[len] = i == 1 and "::" or ":"
+            ignore0 = true
+            continue
+        len += 1
+        output[len] = format("%x", address[i]) -- 🤔 I believe it is fastest way to represent a number as hex in lua
+        -- why format? because it returns hex without zeros (aka smallest hex value)
+        if i != 8
+            len += 1
+            output[len] = ":"
+
+    return concat(output, "", 1, len)
+
+serializeHost = (host) ->
+    if istable host
+        return "[" .. serializeIPv6(host) .. "]"
+    elseif isnumber host
+        address = []
+        for i = 1, 4
+            address[5 - i] = format("%u", host % 256)
+            host = floor(host / 256)
+        return concat(address, ".")
+    return host
 
 export serialize = (excludeFragment) =>
     scheme = @scheme
@@ -577,7 +1010,7 @@ export serialize = (excludeFragment) =>
                 output[] = ":"
                 output[] = password
             output[] = "@"
-        output[] = hostname
+        output[] = serializeHost(hostname)
         if port := @port
             output[] = ":"
             output[] = tostring(port)
@@ -601,18 +1034,22 @@ getOrigin = =>
     switch @scheme
         when "ftp", "http", "https", "ws", "wss"
             return @scheme, @hostname, @port
+        when "blob"
+            pathURL = @path
+            if not isstring pathURL
+                return
+            ok, url = pcall(parse, {}, pathURL)
+            if ok
+                return getOrigin(url)
         -- otherwise it is opaque
 
 serializeOrigin = =>
-    scheme, hostname, port = getOrigin()
+    scheme, hostname, port = getOrigin(@)
     if scheme
-        output = scheme .. "://" .. hostname
+        output = scheme .. "://" .. serializeHost(hostname)
         if port
             output = output .. ":" .. port
         return output
-
-serializeHost = (host) ->
-    return host -- TODO
 
 export class URL
     new: (str, base) =>
@@ -664,7 +1101,6 @@ export class URL
             when "hash"
                 if not state.fragment or state.fragment == "" then return ""
                 return "#" .. state.fragment
-            else return rawget(@, key)
 
     __newindex: (key, value) =>
         state = rawget(@, "state")
@@ -734,10 +1170,6 @@ export class URL
                 leadingSymbol = byte(value, 1) == 0x23 --[['#']]
                 parseFragment(state, value, leadingSymbol and 2 or 1, #value)
             else rawset(@, key, value)
-
--- export IsQueryStringParser = ( any ) ->
---     metatable = getmetatable( any )
---     return metatable and metatable.__class == QueryStringParser
 
 export IsURL = ( any ) ->
     metatable = getmetatable( any )
