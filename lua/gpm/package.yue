@@ -89,13 +89,10 @@ class Package
 
         env = @env = Environment( environment, { :_G, _PACKAGE: @ } )
         @entry = Module( location, url, env )
-
-        parents = @parents = {}
-        @children = {}
+        @packages = {}
 
         if ispackage( parent )
-            parents[] = parent
-            parent.children[] = @
+            parent.packages[] = @
             Link( parent.env, env )
 
 gpm.Package = Package

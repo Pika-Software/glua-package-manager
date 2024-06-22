@@ -1,6 +1,54 @@
 _G = _G
-import gpm, pairs, error, istable, isnumber, isstring, isfunction, tostring, rawget, setmetatable from _G
+import gpm, pairs, error, istable, tostring, rawget, getmetatable, setmetatable from _G
 import environment from gpm
+
+local isstring, isnumber, isbool, isfunction
+do
+
+    :isstring, :isnumber, :isbool, :isfunction = _G
+    import type from _G
+
+    if stringMeta := getmetatable("")
+        isstring = (v) -> getmetatable(v) == stringMeta
+
+    unless isstring
+        isstring = (v) -> type(v) == "string"
+
+    environment.isstring = isstring
+
+    if numberMeta := getmetatable(0)
+        isnumber = (v) -> getmetatable(v) == numberMeta
+
+    unless isnumber
+        isnumber = (v) -> type(v) == "number"
+
+    environment.isnumber = isnumber
+
+    if boolMeta := getmetatable(false)
+        isbool = (v) -> getmetatable(v) == boolMeta
+
+    unless isbool
+        isbool = (v) -> type(v) == "boolean"
+
+    environment.isbool = isbool
+
+    if functionMeta := getmetatable(->)
+        isfunction = (v) -> getmetatable(v) == functionMeta
+
+    unless isfunction
+        isfunction = (v) -> type(v) == "function"
+
+    environment.isfunction = isfunction
+
+environment.iscallable = ( obj ) ->
+    if isfunction( obj )
+        return true
+
+    metatable = getmetatable( obj )
+    if metatable and metatable.__call
+        return true
+
+    return false
 
 unless istable( gpm.Types )
     gpm.Types = {
@@ -121,6 +169,10 @@ math = rawget( environment, "math" )
 unless istable( math )
     math = environment.math = setmetatable( {}, { __index: _G.math } )
 
+-- math extensions
+for key, value in pairs( include( "math.lua" ) )
+    math[ key ] = value
+
 debug = rawget( environment, "debug" )
 unless istable( debug )
     debug = environment.debug = setmetatable( {}, { __index: _G.debug } )
@@ -136,19 +188,6 @@ unless istable( util )
 -- Aliases
 string.StartsWith = string.StartsWith or string.StartWith
 table.unpack = unpack
-
--- Constants
-math.inf = 1 / 0
-math.nan = 0 / 0
-
-math.Clamp = ( number, min, max ) ->
-	if number < min
-        return min
-
-    if number > max
-        return max
-
-    return number
 
 debug.fempty = ->
 
@@ -173,13 +212,6 @@ do
 
     util.CompileYueString = ->
         error LuaCompileError "Attempt to compile Yuescript failed, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader."
-
-do
-
-    import match from string
-
-    string.IsURL = ( str ) ->
-        return match( str, "^[a-z%+]+%:[^ >,;]+" ) ~= nil
 
 import byte, char, sub, gsub, format, len, find from string
 import concat, remove from table
@@ -247,11 +279,11 @@ do
         Functions[ length + 1 ] = { func, typeIndex }
         return typeIndex
 
-split = ( str, sep, withPattern ) ->
-    unless sep
+split = ( str, pattern, withPattern ) ->
+    unless pattern
         return { str }
 
-    if sep == ""
+    if pattern == ""
         ret = {}
         for i = 1, len( str )
             ret[ i ] = sub( str, i, i )
@@ -259,42 +291,59 @@ split = ( str, sep, withPattern ) ->
         return ret
 
     withPattern = withPattern ~= true
-    ret, length = {}, 0
-    strLen = len( str )
-    prevPos = 1
+    ret, rlength = {}, 0
+    pointer = 1
 
     while true
-        startPos, endPos = find( str, sep, prevPos, withPattern )
+        startPos, endPos = find( str, pattern, pointer, withPattern )
         unless startPos
             break
 
-        length += 1
-        ret[ length ] = sub( str, prevPos, startPos - 1 )
-        prevPos = endPos + 1
+        rlength += 1
+        ret[ rlength ] = sub( str, pointer, startPos - 1 )
+        pointer = endPos + 1
 
-    length += 1
-    ret[ length ] = sub( str, prevPos, strLen )
+    rlength += 1
+    ret[ rlength ] = sub( str, pointer )
 
-    return ret, length
+    return ret, rlength
 
 string.Split = split
 
-string.Explode = ( sep, str, withPattern ) ->
-    return split( str, sep, withPattern )
+string.Count = ( str, pattern, withPattern ) ->
+    unless pattern
+        return 0
 
-fastSplit = ( str, separator ) ->
-    unless separator
+    if pattern == ""
+        return len( str )
+
+    withPattern = withPattern ~= true
+    pointer = 1
+    count = 0
+
+    while true
+        startPos, endPos = find( str, pattern, pointer, withPattern )
+        unless startPos
+            break
+
+        count += 1
+        pointer = endPos + 1
+
+    return count
+
+string.Explode = ( pattern, str, withPattern ) ->
+    return split( str, pattern, withPattern )
+
+byteSplit = ( str, ch ) ->
+    unless ch
         return { str }
-
-    if isstring( separator )
-        separator = byte( separator )
 
     result, length = {}, 0
     startPos, endPos = 1, 1
-
     nextByte = byte( str, endPos )
+
     while nextByte
-        if nextByte == separator
+        if nextByte == ch
             length += 1
             result[ length ] = sub( str, startPos, endPos - 1 )
             startPos = endPos + 1
@@ -307,7 +356,26 @@ fastSplit = ( str, separator ) ->
 
     return result, length
 
-string.FastSplit = fastSplit
+string.ByteSplit = byteSplit
+
+byteCount = ( str, ch ) ->
+    unless ch
+        return 0
+
+    count = 0
+    pointer = 1
+    nextByte = byte( str, pointer )
+
+    while nextByte
+        if nextByte == ch
+            count += 1
+
+        pointer += 1
+        nextByte = byte( str, pointer )
+
+    return count
+
+string.ByteCount = byteCount
 
 string.Extract = ( str, pattern, default ) ->
     startPos, endPos, matched = find( str, pattern, 1, false )
@@ -315,6 +383,400 @@ string.Extract = ( str, pattern, default ) ->
         return sub( str, 1, startPos - 1 ) .. sub( str, endPos + 1 ), matched or default
 
     return str, default
+
+do
+
+    import bor, band, lshift, rshift from (bit or bit32)
+    import match from string
+    import tonumber from _G
+    import isuint from math
+
+    string.IsURL = ( str ) ->
+        return match( str, "^[a-z%+]+%:[^ >,;]+" ) ~= nil
+
+    compare = ( a, b ) ->
+        return a == b and 0 or a < b and -1 or 1
+
+    compareIDs = ( value, value2 ) ->
+        if value == value2
+            return 0
+
+        unless value
+            return -1
+
+        unless value2
+            return 1
+
+        number, number2 = tonumber( value ), tonumber( value2 )
+        if number and number2
+            return compare( number, number2 )
+
+        if number
+            return -1
+
+        if number2
+            return 1
+
+        return compare( value, value2 )
+
+    smallerPrerelease = ( first, second ) ->
+        if not first or first == second
+            return false
+
+        unless second
+            return true
+
+        fisrt, fcount = byteSplit( first, 0x2E --[[ . ]] )
+        second, scount = byteSplit( second, 0x2E --[[ . ]] )
+
+        local comparison
+        for index = 1, fcount
+            comparison = compareIDs( fisrt[ index ], second[ index ] )
+            if comparison ~= 0
+                return comparison == -1
+
+        return fcount < scount
+
+    -- Semver lua parser. Based on https://github.com/kikito/semver.lua
+    -- https://github.com/Pika-Software/gpm_legacy/blob/main/lua/gpm/sh_semver.lua
+    class Version
+        __tostring: =>
+            preRelease, build = @prelease, @build
+            if preRelease and build
+                return @major .. "." .. @minor .. "." .. @patch .. "-" .. preRelease .. "+" .. build
+
+            if preRelease
+                return @major .. "." .. @minor .. "." .. @patch .. "-" .. preRelease
+
+            if build
+                return @major .. "." .. @minor .. "." .. @patch .. "+" .. build
+
+            return @major .. "." .. @minor .. "." .. @patch
+
+        __eq: ( other ) =>
+            return @major == other.major and @minor == other.minor and @patch == other.patch and @prerelease == other.prerelease
+
+        __lt: ( other ) =>
+            if @major ~= other.major
+                return @major < other.major
+
+            if @minor ~= other.minor
+                return @minor < other.minor
+
+            if @patch ~= other.patch
+                return @patch < other.patch
+
+            return smallerPrerelease( @prerelease, other.prerelease )
+
+        __pow: ( other ) =>
+            if @major == 0
+                return @ == other
+
+            return @major == other.major and @minor <= other.minor
+
+        -- This works like 'satisfies' (fuzzy matching) in npm.
+        -- https://docs.npmjs.com/cli/v6/using-npm/semver
+        -- A version range is a set of comparators which specify versions that satisfy the range.
+        -- A comparator is composed of an operator and a version. The set of primitive operators is:
+        --   < Less than
+        --   <= Less than or equal to
+        --   > Greater than
+        --   >= Greater than or equal to
+        --   = Equal. If no operator is specified, then equality is assumed, so this operator
+        --     is optional, but MAY be included.
+        -- Comparators can be joined by whitespace to form a comparator set, which is satisfied by
+        -- the intersection of all of the comparators it includes.
+        -- A range is composed of one or more comparator sets, joined by ||. A version matches
+        -- a range if and only if every comparator in at least one of the ||-separated comparator
+        -- sets is satisfied by the version.
+        -- A 'version' is described by the v2.0.0 specification found at https://semver.org/.
+        -- A leading '=' or 'v' character is stripped off and ignored
+        __mod: ( str ) =>
+            -- version range := comparator sets
+            if find( str, "||", 1, true )
+                local pos, part
+                start = 1
+
+                while true
+                    pos = find( str, "||", start, true )
+                    part = sub( str, start, pos and ( pos - 1 ) )
+
+                    if @ % part
+                        return true
+
+                    unless pos
+                        return false
+
+                    start = pos + 2
+
+            -- comparator set := comparators
+            str = gsub( gsub( gsub( str, "%s+", " " ), "^%s+", "" ), "%s+$", "" )
+
+            if find( str, " ", 1, true )
+                local pos, part
+                start = 1
+
+                while true
+                    pos = find( str, " ", start, true )
+                    part = sub( str, start, pos and ( pos - 1 ) )
+
+                    -- Hyphen Ranges: X.Y.Z - A.B.C
+                    -- https://docs.npmjs.com/cli/v6/using-npm/semver#hyphen-ranges-xyz---abc
+                    if pos and sub( str, pos, pos + 2 ) == " - "
+                        unless @ % ( ">=" .. part )
+                            return false
+
+                        start = pos + 3
+                        pos = find( str, " ", start, true )
+                        part = sub( str, start, pos and ( pos - 1 ) )
+
+                        unless @ % ( "<=" .. part )
+                            return false
+
+                    elseif not ( @ % part )
+                        return false
+
+                    unless pos
+                        return true
+
+                    start = pos + 1
+
+                return true
+
+            -- comparators := operator + version
+            str = gsub( gsub( str, "^=", "" ), "^v", "" )
+
+            -- X-Ranges *
+            -- Any of X, x, or * may be used to 'stand in' for one of the numeric values in the [major, minor, patch] tuple.
+            -- https://docs.npmjs.com/cli/v6/using-npm/semver#x-ranges-12x-1x-12-
+            if str == "" or str == "*"
+                return @ % ">=0.0.0"
+
+            pos = find( str, "%d" )
+            unless pos
+                error "Version range must starts with number: " .. str
+
+            -- X-Ranges 1.2.x 1.X 1.2.*
+            -- Any of X, x, or * may be used to 'stand in' for one of the numeric values in the [major, minor, patch] tuple.
+            -- https://docs.npmjs.com/cli/v6/using-npm/semver#x-ranges-12x-1x-12-
+            local operator
+            if pos == 1
+                operator = "="
+            else
+                operator = sub( str, 1, pos - 1 )
+
+            version = gsub( sub( str, pos ), "%.[xX*]", "" )
+
+            xrange = 2 - byteCount( version, 0x2e --[[ . ]] )
+            if xrange < 0
+                xrange = 0
+
+            for i = 1, xrange
+                version = version .. ".0"
+
+            sv = Version( version )
+            if operator == "<"
+                return @ < sv
+
+            -- primitive operators
+            -- https://docs.npmjs.com/cli/v6/using-npm/semver#ranges
+            if operator == "<="
+                if xrange > 0
+                    if xrange == 1
+                        sv = sv\nextMinor!
+                    elseif xrange == 2
+                        sv = sv\nextMajor!
+
+                    return @ < sv
+
+                return @ <= sv
+
+            if operator == ">"
+                if xrange > 0
+                    if xrange == 1
+                        sv = sv\nextMinor!
+                    elseif xrange == 2
+                        sv = sv\nextMajor!
+
+                    return @ >= sv
+
+                return @ > sv
+
+            if operator == ">="
+                return @ >= sv
+
+            if operator == "="
+                if xrange > 0
+                    if @ < sv
+                        return false
+
+                    if xrange == 1
+                        sv = sv\nextMinor!
+                    elseif xrange == 2
+                        sv = sv\nextMajor!
+
+                    return @ < sv
+
+                return @ == sv
+
+            -- Caret Ranges ^1.2.3 ^0.2.5 ^0.0.4
+            -- Allows changes that do not modify the left-most non-zero digit in the [major, minor, patch] tuple.
+            -- In other words, this allows patch and minor updates for versions 1.0.0 and above, patch updates for
+            -- versions 0.X >=0.1.0, and no updates for versions 0.0.X.
+            -- https://docs.npmjs.com/cli/v6/using-npm/semver#caret-ranges-123-025-004
+            if operator == "^"
+                if sv.major == 0 and xrange < 2
+                    if sv.minor == 0 and xrange < 1
+                        return @major == 0 and @minor == 0 and @ >= sv and @ < sv\nextPatch!
+
+                    return @major == 0 and @ >= sv and @ < sv\nextMinor!
+
+                return @major == sv.major and @ >= sv and @ < sv\nextMajor!
+
+            -- Tilde Ranges ~1.2.3 ~1.2 ~1
+            -- Allows patch-level changes if a minor version is specified on the comparator. Allows minor-level changes if not.
+            -- https://docs.npmjs.com/cli/v6/using-npm/semver#tilde-ranges-123-12-1
+            if operator == "~"
+                if @ < sv
+                    return false
+
+                if xrange == 2
+                    return @ < sv\nextMajor!
+
+                return @ < sv\nextMinor!
+
+            error "Invaild operator: '" .. operator .. "'"
+            return
+
+        parsePrerelease: ( str ) =>
+            if str == ""
+                return
+
+            prelease = match( str, "^-(%w[%.%w-]*)$" )
+            if not prelease or match( prelease, "%.%." )
+                error "the pre-release '" .. str .. "' is not valid"
+
+            @prelease = prelease
+            return
+
+        parseBuild: ( str ) =>
+            if str == ""
+                return
+
+            build = match( str, "^%+(%w[%.%w-]*)$" )
+            if not build or match( build, "%.%." )
+                error "the build '" .. str .. "' is not valid"
+
+            @build = build
+            return
+
+        parsePrereleaseAndBuild: ( str ) =>
+            if not str or str == ""
+                return
+
+            prerelease, build = match( str, "^(%-[^+]+)(%+.+)$" )
+            unless prerelease and build
+                switch byte( str, 1 )
+                    when 0x2d --[[ - ]]
+                        @parsePrerelease( str )
+
+                    when 0x2b --[[ + ]]
+                        @parseBuild( str )
+
+                    else
+                        error "the parameter '" .. str .. "' must begin with + or - to denote a pre-release or a build"
+
+                return
+
+            @prelease = prerelease
+            @build = build
+            return
+
+        new: ( major, minor, patch, prerelease, build ) =>
+            unless major
+                error "at least one parameter is needed"
+
+            if isnumber( major )
+                unless isuint( major )
+                    error "major version must be unsigned integer"
+
+                @major = major
+
+                if minor
+                    unless isnumber( minor )
+                        error "minor version must be a number"
+
+                    unless isuint( minor )
+                        error "minor version must be unsigned integer"
+
+                @minor = minor or 0
+
+                if patch
+                    unless isnumber( patch )
+                        error "patch version must be a number"
+
+                    unless isuint( patch )
+                        error "patch version must be unsigned integer"
+
+                @patch = patch or 0
+
+                if isstring( build )
+                    if isstring( prerelease )
+                        @parsePrerelease( prerelease )
+
+                    @parseBuild( build )
+                elseif isnumber( prerelease )
+                    @parsePrereleaseAndBuild( prerelease )
+
+                return
+
+            str = tostring( major )
+
+            major, minor, patch, extra = match( str, "^(%d+)%.?(%d*)%.?(%d*)(.-)$" )
+            unless major
+                error "the major version of '" .. str .. "' is missing"
+
+            @parsePrereleaseAndBuild( extra )
+
+            if minor == ""
+                minor = "0"
+
+            if patch == ""
+                patch = "0"
+
+            @major = tonumber( major )
+            @minor = tonumber( minor )
+            @patch = tonumber( patch )
+            return
+
+        nextMajor: =>
+            return Version( @major + 1, 0, 0 )
+
+        nextMinor: =>
+            return Version( @major, @minor + 1, 0 )
+
+        nextPatch: =>
+            return Version( @major, @minor, @patch + 1 )
+
+        toNumber: =>
+            major = tonumber( @major )
+            if major > 0x3ff
+                error "major version is too large (max 1023)"
+
+            minor = tonumber( @minor )
+            if minor > 0x7ff
+                error "minor version is too large (max 2047)"
+
+            patch = tonumber( @patch )
+            if patch > 0x7ff
+                error "patch version is too large (max 2047)"
+
+            return bor( lshift( patch, 21 ), lshift( minor, 10 ), major )
+
+        @fromNumber: ( uint ) ->
+            return Version( band( uint, 0x3ff ), band( rshift( uint, 10 ), 0x7ff ), band( rshift( uint, 21 ), 0x7ff ) )
+
+    util.Version = Version
 
 local ArgAssert
 do
@@ -539,18 +1001,6 @@ do
 local iscolor
 do
 
-    getmetatable = getmetatable
-
-    environment.iscallable = ( obj ) ->
-        if isfunction( obj )
-            return true
-
-        metatable = getmetatable( obj )
-        if metatable and metatable.__call
-            return true
-
-        return false
-
     metatable = FindMetaTable( "Color" )
 
     iscolor = ( any ) ->
@@ -609,7 +1059,7 @@ do
 
         filePath = concat( buffer, "/", 1, length )
 
-        segments, segmentCount = fastSplit( filePath, 0x2F --[[ / ]] )
+        segments, segmentCount = byteSplit( filePath, 0x2F --[[ / ]] )
         if segmentCount == 0
             return filePath
 
@@ -974,16 +1424,6 @@ do
                 return 0
 
             return ldexp( ldexp( byte3 % 0x80 * 0x10000 + byte2 * 0x100 + byte1, -23 ) + 1, exponent ) * ( byte4 < 0x80 and 1 or -1 )
-
-util.Version = ( number ) ->
-    if isstring( number )
-        return number
-
-    if isnumber( number )
-        version = format( "%06d", number )
-        return sub( version, 0, 2 ) .. "." .. sub( version, 3, 4 ) .. "." .. sub( version, 5 )
-
-    return "unknown"
 
 do
 

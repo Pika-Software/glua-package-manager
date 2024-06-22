@@ -1,7 +1,7 @@
 _G = _G
-import gpm, isstring, istable, error, tostring, tonumber from _G
+import gpm from _G
 import environment from gpm
-
+import isstring, istable, error, tostring, tonumber from environment
 import Open, Find, GetFilePaths from environment.file
 import HasValue, Empty from environment.table
 import lower, gsub, find from string

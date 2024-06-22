@@ -21,14 +21,11 @@
     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
     SOFTWARE.
 --]]
-import TypeError, RuntimeError, iscallable from gpm.environment
+import TypeError, RuntimeError, iscallable, isstring, istable, pcall from gpm.environment
 import create, resume, running, yield from coroutine
 -- import getstack from gpm.environment.debug
 import format, match from string
 import Simple from timer
-isstring = isstring
-istable = istable
-pcall = pcall
 
 getThenable = ( obj ) ->
     thenFunc = obj.Then or obj.next

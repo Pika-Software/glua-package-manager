@@ -1,0 +1,198 @@
+import getmetatable, math from _G
+import abs, atan2, ceil, min, max, random, sqrt, pow, floor, log, pi from math
+
+-- Constants
+export e = math.exp(1)
+export ln10 = log(10)
+export ln2 = log(2)
+export log10e = log(e, 10)
+export log2e = log(e, 2)
+export sqrt1_2 = sqrt(0.5)
+export sqrt2 = sqrt(2)
+
+-- is checks
+export isuint = (n) -> n >= 0 and n % 1 == 0
+export isfloat = (n) -> n % 1 ~= 0
+export isint = (n) -> n % 1 == 0
+
+export isequalwith = (a, b, tolerance) -> abs(a - b) <= tolerance
+export isdivideable = (n, d) -> n % d == 0
+
+export isbool = (n) -> n == 0 or n == 1
+export iseven = (n) -> n % 2 == 0
+export isodd = (n) -> n % 2 == 1
+
+export inf = 1 / 0
+export isinf = (n) -> n == inf
+
+export nan = 0 / 0
+export isnan = (n) -> n == nan
+
+export isfinite = (n) -> not (isinf(n) or isnan(n))
+
+-- Sign
+export sign = (n) -> if n > 0 then 1 else if n < 0 then -1 else 0
+
+-- Rounding
+export round = (n, d) ->
+    if d
+        l = pow(10, d)
+        return floor(n * l + 0.5) / l
+
+    return floor(n + 0.5)
+
+export nearest = (n, d) -> round(n / d) * d
+
+export trunc = (n, d) ->
+    if n < 0
+        if d
+            l = pow(10, d)
+            return ceil(n * l) / l
+
+        return ceil(n)
+
+    if d
+        l = pow(10, d)
+        return floor(n * l) / l
+
+    return floor(n)
+
+-- Logarithms
+export log1p = (n) -> log(n + 1)
+export log2 = (n) -> log(n) / ln2
+
+-- Other
+export rand = (a, b) -> a + (b - a) * random()
+export isascii = (n) -> n >= 0 and n <= 255
+export hypot = (...) ->
+    s = 0
+    for n in *{...}
+        s += pow(n, 2)
+
+    return sqrt(s)
+
+export cbrt = (n) -> pow(n, 1 / 3)
+export timef = (c,s,f) -> (c - s) / (f - s)
+export approach = (a, b, d) ->
+    c = b - a
+    return a + sign(c) * min(abs(c), d)
+
+-- Clamp
+export clamp = (n, a, b) -> min(max(n, a), b)
+export clamp01 = (n) -> clamp(n, 0, 1)
+
+-- Lerp
+export lerp = (d, a, b) -> a + (b - a) * d
+export lerp01 = (d, a, b) -> lerp(a, b, clamp01(d))
+
+-- Inverse Lerp
+export ilerp = (d, a, b) -> (d - a) / (b - a)
+export ilerp01 = (d, a, b) -> ilerp(clamp01(d), a, b)
+
+-- Remap
+export remap = (n, a, b, c, d) -> c + (d - c) * (n - a) / (b - a)
+export remap01 = (n, a, b) -> remap(n, a, b, 0, 1)
+
+-- Snap
+export snap = (n, a) -> floor(n / a + 0.5) * a
+
+-- Degrees and Radians
+export dtor = (n) -> n * pi / 180
+export rtod = (n) -> n * 180 / pi
+
+-- Angle
+export angle = (x1, y1, x2, y2) -> rtod(atan2(y2 - y1, x2 - x1))
+export anorm = (a) -> (a + 180) % 360 - 180
+export adiff = (a1, a2) ->
+    diff = anorm(a1 - a2)
+    if diff < 180
+        return diff
+
+    return diff - 360
+
+-- Magnitude
+export magnitude = (x1, y1, x2, y2) -> sqrt(pow(x2 - x1, 2) + pow(y2 - y1, 2))
+
+-- Normalize
+export direction = (x1, y1, x2, y2) ->
+    diff = magnitude(x1, y1, x2, y2)
+    if diff == 0
+        return 0, 0
+
+    return (x2 - x1) / diff, (y2 - y1) / diff
+
+-- Dot
+export dot = (x1, y1, x2, y2) -> x1 * x2 + y1 * y2
+
+-- Range
+export inrange = (n, a, b) -> n >= a and n <= b
+export trianglesign = (x1, y1, x2, y2, x3, y3) -> (x1 - x3) * (y2 - y3) - (x2 - x3) * (y1 - y3)
+
+export inrect = (x, y, x1, y1, x2, y2) -> inrange(x, x1, x2) and inrange(y, y1, y2)
+export incircle = (x, y, cx, cy, r) -> pow(x - cx, 2) + pow(y - cy, 2) <= pow(r, 2)
+export ontangent = (x, y, x1, y1, x2, y2) -> trianglesign(x, y, x1, y1, x2, y2) == 0
+export intriangle = (x, y, x1, y1, x2, y2, x3, y3) -> trianglesign(x, y, x1, y1, x2, y2) * trianglesign(x, y, x2, y2, x3, y3) > 0
+
+export inpoly = (x, y, poly) ->
+    inside, length = false, #poly
+
+    j = length
+    for i = 1, length
+        px, py, lpx, lpy = poly[i][1], poly[i][2], poly[j][1], poly[j][2]
+        if (py < y and lpy >= y or lpy < y and py >= y) and (px + (y - py) / (lpy - py) * (lpx - px) < x)
+            inside = not inside
+
+        j = i
+
+    return inside
+
+export class Point
+    new: (x, y) =>
+        assert isfinite(x), "x must be finite"
+        assert isfinite(y), "y must be finite"
+        @[1] = x
+        @[2] = y
+
+    __tostring: => "Point(" .. @[1] .. "; " .. @[2] .. ")"
+    __eq: (a, b) => a[1] == b[1] and a[2] == b[2]
+
+    __add: (a, b) => Point(a[1] + b[1], a[2] + b[2])
+    __sub: (a, b) => Point(a[1] - b[1], a[2] - b[2])
+
+    __mul: (a, b) => Point(a[1] * b[1], a[2] * b[2])
+    __div: (a, b) => Point(a[1] / b[1], a[2] / b[2])
+    __unm: (a) => Point(-a[1], -a[2])
+
+    copy: => Point(@[1], @[2])
+
+    unpack: => @[1], @[2]
+
+    angle: (p) => angle(@[1], @[2], p[1], p[2])
+
+    distance: (p) => magnitude(@[1], @[2], p[1], p[2])
+
+    normalize: (p) => @[1], @[2] = direction(@[1], @[2], p[1], p[2])
+
+    direction: (p) => direction(@[1], @[2], p[1], p[2])
+
+    reflect: (n) => @[1], @[2] = @[1] - 2 * n[1] * dot(@[1], @[2], n[1], n[2]), @[2] - 2 * n[2] * dot(@[1], @[2], n[1], n[2])
+
+    scale: (s) => @[1], @[2] = @[1] * s, @[2] * s
+
+    dot: (p) => @[1] * p[1] + @[2] * p[2]
+
+    lerp: (b, d) => @[1], @[2] = lerp(d, @[1], b[1]), lerp(d, @[2], b[2])
+
+    clamp: (a, b) => @[1], @[2] = clamp(@[1], a[1], b[1]), clamp(@[2], a[2], b[2])
+
+    inrect: (c1, c2) => inrect(@[1], @[2], c1[1], c1[2], c2[1], c2[2])
+
+    incircle: (cp, cr) => incircle(@[1], @[2], cp[1], cp[2], cr)
+
+    intriangle: (c1, c2, c3) => intriangle(@[1], @[2], c1[1], c1[2], c2[1], c2[2], c3[1], c3[2])
+
+    ontangent: (c1, c2) => ontangent(@[1], @[2], c1[1], c1[2], c2[1], c2[2])
+
+    inpoly: (poly) => inpoly(@[1], @[2], poly)
+
+export ispoint = (any) -> getmetatable(any) == Point

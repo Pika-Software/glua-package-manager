@@ -82,6 +82,7 @@ if SERVER
         "filesystem.lua"
         "package.lua"
         "loader.lua"
+        "math.lua"
         "init.lua"
         "http.lua"
         "util.lua"

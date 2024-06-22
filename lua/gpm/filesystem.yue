@@ -3,7 +3,7 @@ import gpm, file, CLIENT, SERVER, error from _G
 import environment, Logger from gpm
 
 import async, await, debug, util, path, string, ArgAssert, Promise, Error, LuaCompileError from environment
-import FastSplit, GetPathFromFilename, GetExtensionFromFilename from string
+import ByteSplit, GetPathFromFilename, GetExtensionFromFilename from string
 import Join, Resolve, Fix from path
 import Find from file
 
@@ -120,7 +120,7 @@ do
                     mountedFiles[ filePath ] = true
 
                     -- mounted folders
-                    segments, segmentCount = FastSplit( GetPathFromFilename( filePath ), 0x2F --[[ / ]] )
+                    segments, segmentCount = ByteSplit( GetPathFromFilename( filePath ), 0x2F --[[ / ]] )
                     segmentCount -= 1
 
                     while segmentCount ~= 0
@@ -183,7 +183,7 @@ do
         createDir = ( folderPath, force ) ->
             if force
                 currentPath = nil
-                for folderName in *FastSplit( folderPath, 0x2F --[[ / ]] )
+                for folderName in *ByteSplit( folderPath, 0x2F --[[ / ]] )
                     if folderName
                         if currentPath
                             currentPath ..= "/" .. folderName

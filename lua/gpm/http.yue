@@ -1,8 +1,7 @@
 _G = _G
-import gpm, isstring, isnumber, istable from _G
-
+import gpm from _G
 import environment, Logger from gpm
-import ArgAssert, Promise, http from environment
+import ArgAssert, Promise, http, isstring, isnumber, istable from environment
 
 unless isstring( http.UserAgent )
     http.UserAgent = "GLua Package Manager/" .. gpm.VERSION .. " - Garry's Mod/" .. VERSIONSTR

@@ -21,13 +21,11 @@
     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
     SOFTWARE.
 ]]
-ErrorNoHaltWithStack = ErrorNoHaltWithStack
-import getstack from gpm.environment.debug
+import environment from _G.gpm
+import isstring, tostring, ErrorNoHaltWithStack, ErrorNoHalt from gpm.environment
+import getstack from environment.debug
 import format, rep from string
-ErrorNoHalt = ErrorNoHalt
 import concat from table
-isstring = isstring
-tostring = tostring
 
 export class Error
     name: "Error"
