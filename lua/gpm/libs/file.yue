@@ -479,7 +479,6 @@ if SERVER
         return
 
     addCSLuaFolder = ( folderPath ) ->
-        print "AddCSLuaFolder: " .. folderPath
         files, folders = Find( folderPath .. "*", luaPath )
         for fileName in *files
             filePath = folderPath .. fileName
@@ -728,8 +727,6 @@ do
         _module_0.AsyncWrite = ( filePath, content, gamePath, skipNormalize ) ->
             unless skipNormalize
                 filePath, gamePath = normalizeGamePath( filePath, gamePath )
-
-            print filePath, gamePath
 
             assertWriteAllowed( filePath, gamePath )
 
