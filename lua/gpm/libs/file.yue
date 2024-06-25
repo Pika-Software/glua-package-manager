@@ -1,0 +1,856 @@
+_G = _G
+import gpm, file, CLIENT, SERVER, error from _G
+import environment, Logger from gpm
+
+import async, await, util, path, string, Promise, CodeCompileError, FileSystemError from environment
+import sub, len, ByteSplit, GetPathFromFilename from string
+import IsBinaryModuleInstalled from util
+import resolve from path
+import Find from file
+
+-- Entropia File System Watcher: https://github.com/Pika-Software/gm_efsw
+if SERVER and not _G.efsw and IsBinaryModuleInstalled( "efsw" ) and pcall( require, "efsw" )
+    Logger\Info( "gm_efsw is initialized, package auto-reloading are available." )
+
+_module_0 = {}
+
+local luaPath
+if SERVER
+    luaPath = "lsv"
+elseif CLIENT
+    luaPath = "lcl"
+elseif MENU_DLL
+    luaPath = "LuaMenu"
+else
+    luaPath = "LUA"
+
+_module_0.LuaPath = luaPath
+
+gamePaths = {
+    lua: luaPath
+    data: "DATA"
+    download: "DOWNLOAD"
+}
+
+writeAllowedGamePaths = {
+    "DATA": true
+}
+
+assertWriteAllowed = ( filePath, gamePath ) ->
+    if writeAllowedGamePaths[ gamePath ]
+        return
+
+    error FileSystemError "File '" .. filePath .. "' is not allowed to be written to '" .. gamePath .. "'."
+    return
+
+local normalizeGamePath
+do
+
+    import match from string
+
+    normalizeGamePath = _module_0.NormalizeGamePath = ( absolutePath, gamePath ) ->
+        absolutePath = sub( resolve( absolutePath ), 2 )
+
+        if gamePath
+            return absolutePath, gamePath
+
+        rootFolder, relativePath = match( absolutePath, "^([^/]+)/?(.*)" )
+        if rootFolder
+            gamePath = gamePaths[ rootFolder ]
+            if gamePath
+                return relativePath, gamePath
+
+        return absolutePath, "GAME"
+
+do
+
+    import Time from file
+
+    _module_0.Time = ( filePath, gamePath, skipNormalize ) ->
+        unless skipNormalize
+            filePath, gamePath = normalizeGamePath( filePath, gamePath )
+
+        return Time( filePath, gamePath )
+
+_module_0.Find = ( filePath, gamePath, skipNormalize ) ->
+    unless skipNormalize
+        filePath, gamePath = normalizeGamePath( filePath, gamePath )
+
+    return Find( filePath, gamePath )
+
+do
+
+    import replaceDir, replaceFile from path
+    import Rename from file
+
+    _module_0.Move = ( pathFrom, pathTo, gamePath, skipNormalize ) ->
+        relativeGamePath = gamePath
+
+        unless skipNormalize
+            absolutePath, gamePathFrom = normalizeGamePath( pathFrom, gamePath )
+            relativeGamePath = gamePathFrom
+
+        assertWriteAllowed( absolutePath, relativeGamePath )
+
+        unless skipNormalize
+            relativePath, gamePathTo = normalizeGamePath( pathTo, gamePath )
+            relativeGamePath = gamePathTo
+
+        assertWriteAllowed( relativePath, relativeGamePath )
+
+        return Rename( absolutePath, replaceDir( absolutePath, relativePath ), relativeGamePath )
+
+    --[[
+
+        Usage:
+
+            file.Move( fullPathToFile, newFilePath )
+            file.Move( "/data/test.txt", "/data/folder/" )
+
+    ]]
+
+    _module_0.Rename = ( pathFrom, newName, gamePath, skipNormalize ) ->
+        unless skipNormalize
+            absolutePath, gamePath = normalizeGamePath( pathFrom, gamePath )
+
+        assertWriteAllowed( absolutePath, gamePath )
+
+        return Rename( absolutePath, replaceFile( absolutePath, newName ), gamePath )
+
+    --[[
+
+        Usage:
+
+            file.Rename( fullPathToFile, newFileName )
+            file.Rename( "/data/test.txt", "test2.txt" )
+
+    ]]
+
+luaGamePaths = {
+    "LuaMenu": true
+    "lsv": true
+    "LUA": true
+    "lcl": true
+}
+
+local isFileMounted, isDirMounted
+do
+
+    allowedGamePaths = {
+        "LUA": true
+        "lsv": true
+        "lcl": true
+        "GAME": true
+        "WORKSHOP": true
+        "THIRDPARTY": true
+    }
+
+    mountedFiles = _module_0.MountedFiles = rawget( environment.file, "MountedFiles" ) or {}
+
+    isFileMounted = _module_0.IsFileMounted = ( filePath, gamePath, skipNormalize ) ->
+        unless skipNormalize
+            filePath, gamePath = normalizeGamePath( filePath, gamePath )
+
+        unless allowedGamePaths[ gamePath ]
+            return false
+
+        if luaGamePaths[ gamePath ]
+            filePath = "lua/" .. filePath
+
+        return mountedFiles[ filePath ]
+
+    mountedFolders = _module_0.MountedFolders = rawget( environment.file, "MountedFolders" ) or {}
+
+    isDirMounted = _module_0.IsDirMounted = ( filePath, gamePath, skipNormalize ) ->
+        unless skipNormalize
+            filePath, gamePath = normalizeGamePath( filePath, gamePath )
+
+        unless allowedGamePaths[ gamePath ]
+            return false
+
+        if luaGamePaths[ gamePath ]
+            filePath = "lua/" .. filePath
+
+        return mountedFolders[ filePath ]
+
+    do
+
+        import MountGMA from game
+        import concat from table
+
+        _module_0.MountGMA = ( relativePath ) ->
+            success, files = MountGMA( sub( resolve( relativePath ), 2 ) )
+            if success
+                fileCount = #files
+                for index = 1, fileCount
+                    filePath = files[ index ]
+
+                    -- mounted files
+                    mountedFiles[ filePath ] = true
+
+                    -- mounted folders
+                    segments, segmentCount = ByteSplit( GetPathFromFilename( filePath ), 0x2F --[[ / ]] )
+                    segmentCount -= 1
+
+                    while segmentCount ~= 0
+                        mountedFolders[ concat( segments, "/", 1, segmentCount ) ] = true
+                        segmentCount -= 1
+
+                Logger\Debug( "GMA file '%s' was mounted to GAME with %d files.", relativePath, fileCount )
+
+            return success, files
+
+local isDir, isFile, createDir
+do
+
+    import Delete, Exists, IsDir from file
+
+    _module_0.Exists = ( filePath, gamePath, skipNormalize ) ->
+        unless skipNormalize
+            filePath, gamePath = normalizeGamePath( filePath, gamePath )
+
+        return Exists( filePath, gamePath ) or isFileMounted( filePath, gamePath ) or isDirMounted( filePath, gamePath )
+
+    isDir = _module_0.IsDir = ( filePath, gamePath, skipNormalize ) ->
+        unless skipNormalize
+            filePath, gamePath = normalizeGamePath( filePath, gamePath )
+
+        return IsDir( filePath, gamePath ) or isDirMounted( filePath, gamePath )
+
+    isFile = _module_0.IsFile = ( filePath, gamePath, skipNormalize ) ->
+        unless skipNormalize
+            filePath, gamePath = normalizeGamePath( filePath, gamePath )
+
+        return ( Exists( filePath, gamePath ) and not IsDir( filePath, gamePath ) ) or isFileMounted( filePath, gamePath, true )
+
+    do
+
+        delete = ( filePath, gamePath ) ->
+            if isDir( filePath, gamePath )
+                files, folders = Find( filePath .. "/*", gamePath )
+                for folderName in *folders
+                    delete( filePath .. "/" .. folderName, gamePath )
+
+                for fileName in *files
+                    Delete( filePath .. "/" .. fileName, gamePath )
+
+                return Delete( filePath, gamePath )
+
+            return Delete( filePath, gamePath )
+
+        _module_0.Delete = ( filePath, gamePath, skipNormalize ) ->
+            unless skipNormalize
+                filePath, gamePath = normalizeGamePath( filePath, gamePath )
+
+            return delete( filePath, gamePath )
+
+    do
+
+        import CreateDir from file
+
+        createDir = _module_0.CreateDir = ( folderPath, force ) ->
+            folderPath = sub( resolve( folderPath ), 2 )
+
+            if force
+                local currentPath
+                for folderName in *ByteSplit( folderPath, 0x2F --[[ / ]] )
+                    if folderName
+                        if currentPath
+                            currentPath ..= "/" .. folderName
+                        else
+                            currentPath = folderName
+
+                        if IsDir( currentPath, "DATA" )
+                            continue
+
+                        Delete( currentPath, "DATA" )
+                        CreateDir( currentPath )
+
+                return currentPath
+
+            CreateDir( folderPath )
+            return folderPath
+
+    do
+
+        import Size from file
+
+        size = ( filePath, gamePath ) ->
+            if isDir( filePath, gamePath )
+                bytes = 0
+
+                files, folders = Find( filePath .. "/*", gamePath )
+                for fileName in *files
+                    bytes += Size( filePath .. "/" .. fileName, gamePath )
+
+                for folderName in *folders
+                    bytes += size( filePath .. "/" .. folderName, gamePath )
+
+                return bytes
+
+            return Size( filePath, gamePath )
+
+        _module_0.Size = ( filePath, gamePath, skipNormalize ) ->
+            unless skipNormalize
+                filePath, gamePath = normalizeGamePath( filePath, gamePath )
+
+            return size( filePath, gamePath )
+
+do
+
+    getFolderContents = ( folderPath, gamePath, result, length ) ->
+        files, folders = Find( folderPath .. "*", gamePath )
+        unless files
+            return result, length
+
+        for fileName in *files
+            length += 1
+            result[ length ] = folderPath .. fileName
+
+        for folderName in *folders
+            result, length = getFolderContents( folderPath .. folderName .. "/", gamePath, result, length )
+
+        return result, length
+
+    _module_0.GetFolderContents = ( folderPath, gamePath, skipNormalize ) ->
+        unless skipNormalize
+            folderPath, gamePath = normalizeGamePath( folderPath, gamePath )
+
+        result, length = {}, 0
+
+        if folderPath == "" or isDir( folderPath, gamePath, true )
+            if folderPath ~= ""
+                folderPath ..= "/"
+
+            return getFolderContents( folderPath, gamePath, result, length )
+
+        return result, length
+
+local append, read, write
+do
+
+    local open
+    do
+
+        import Open from file
+
+        open = _module_0.Open = ( filePath, fileMode, gamePath, skipNormalize ) ->
+            unless skipNormalize
+                filePath, gamePath = normalizeGamePath( filePath, gamePath )
+
+            return Open( filePath, fileMode, gamePath )
+
+    File = FindMetaTable( "File" )
+    import Close, Read, Write from File
+
+    do
+
+        import ReadULong, WriteULong, ReadByte, WriteByte, EndOfFile, Seek, Skip, Tell from File
+
+        File.SkipEmpty = ( fileHandle ) ->
+            while not EndOfFile( fileHandle )
+                if ReadByte( fileHandle ) ~= 0
+                    Skip( fileHandle, -1 )
+                    break
+
+        File.ReadString = ( fileHandle ) ->
+            startPos, length = Tell( fileHandle ), 0
+            while not EndOfFile( fileHandle ) and ReadByte( fileHandle ) ~= 0
+                length += 1
+
+            Seek( fileHandle, startPos )
+            data = Read( fileHandle, length )
+            Skip( fileHandle, 1 )
+            return data
+
+        File.WriteString = ( fileHandle, str ) ->
+            Write( fileHandle, str )
+            WriteByte( fileHandle, 0 )
+            return
+
+        if File.ReadUInt64 == nil
+            File.ReadUInt64 = ( fileHandle ) ->
+                number = ReadULong( fileHandle )
+                Skip( fileHandle, 4 )
+                return number
+
+        if File.WriteUInt64 == nil
+            File.WriteUInt64 = ( fileHandle, number ) ->
+                WriteULong( fileHandle, number )
+                WriteULong( fileHandle, 0 )
+                return
+
+    append = _module_0.Append = ( filePath, content, gamePath ) ->
+        fileHandle = open( filePath, "ab", gamePath )
+        if fileHandle
+            Write( fileHandle, content )
+            Close( fileHandle )
+            return true
+
+        return false
+
+    read = _module_0.Read = ( filePath, gamePath, length ) ->
+        fileHandle = open( filePath, "rb", gamePath )
+        if fileHandle
+            return Read( fileHandle, length ), Close( fileHandle )
+
+    write = _module_0.Write = ( filePath, content, gamePath ) ->
+        fileHandle = open( filePath, "wb", gamePath )
+        if fileHandle
+            Write( fileHandle, content )
+            Close( fileHandle )
+            return true
+
+        return false
+
+local isCompilable
+do
+
+    import moonloader from environment
+    import getExtension from path
+
+    supportedExtensions = { moon: true, yue: true, lua: true }
+    cacheExts = { "yue", "moon" }
+    cacheCount = #cacheExts
+
+    if moonloader
+        import PreCacheFile from moonloader
+
+        isCompilable = _module_0.IsCompilable = ( filePath, doPreCache ) ->
+            if sub( filePath, 1, 4 ) ~= "/lua"
+                return false
+
+            extension = getExtension( filePath )
+            if extension
+                if supportedExtensions[ extension ]
+                    filePath = sub( filePath, 1, len( filePath ) - ( len( extension ) + 1 ) )
+                else
+                    return false
+
+            filePath = sub( filePath, 6 )
+
+            for index = 1, cacheCount
+                preCachePath = filePath .. "." .. cacheExts[ index ]
+                if isFile( preCachePath, luaPath, true )
+                    if doPreCache
+                        if PreCacheFile( preCachePath )
+                            Logger\Debug( "Pre-compiling '%s' into Lua completed successfully.", preCachePath )
+                        else
+                            error CodeCompileError "Pre-compiling '" .. preCachePath .. "' file in Lua failed."
+
+                    return true
+
+            return isFile( filePath .. ".lua", luaPath, true )
+
+    else
+
+        isCompilable = _module_0.IsCompilable = ( filePath ) ->
+            if sub( filePath, 1, 4 ) ~= "/lua"
+                return false
+
+            extension = getExtension( filePath )
+            if extension
+                if supportedExtensions[ extension ]
+                    filePath = sub( filePath, 1, len( filePath ) - ( len( extension ) + 1 ) )
+                else
+                    return false
+
+            return isFile( sub( filePath, 6 ) .. ".lua", luaPath, true )
+
+if SERVER
+
+    import getCurrentFile, getFile from path
+    import AddCSLuaFile from _G
+
+    _module_0.AddCSLuaFile = ( filePath = "" ) ->
+        if filePath == ""
+            filePath = getFile( getCurrentFile! )
+
+        filePath = resolve( filePath )
+
+        if sub( filePath, 1, 4 ) ~= "/lua"
+            error CodeCompileError "Couldn't AddCSLuaFile file '" .. filePath .. "' - Invalid path"
+
+        if isCompilable( filePath, true )
+            AddCSLuaFile( sub( filePath, 6 ) )
+            return
+
+        error CodeCompileError "Couldn't AddCSLuaFile file '" .. filePath .. "' - File not found"
+        return
+
+    addCSLuaFolder = ( folderPath ) ->
+        print "AddCSLuaFolder: " .. folderPath
+        files, folders = Find( folderPath .. "*", luaPath )
+        for fileName in *files
+            filePath = folderPath .. fileName
+            if isCompilable( "/lua/" .. filePath, true )
+                AddCSLuaFile( filePath )
+
+        for folderName in *folders
+            addCSLuaFolder( folderPath .. folderName .. "/" )
+
+    _module_0.AddCSLuaFolder = ( folderPath = "" ) ->
+        folderPath = resolve( folderPath )
+        if sub( folderPath, 1, 4 ) ~= "/lua"
+            error CodeCompileError "Couldn't AddCSLuaFolder folder '" .. folderPath .. "' - Invalid path"
+
+        return addCSLuaFolder( sub( folderPath, 6 ) )
+
+import efsw from _G
+
+if istable( efsw )
+    import Watch, Unwatch from efsw
+
+    observedFiles = _module_0.ObservedFiles = rawget( environment.file, "ObservedFiles" ) or {}
+
+    hashIdentifier = ( filePath, gamePath ) ->
+        return gamePath .. ":///" .. filePath
+
+    watch = _module_0.Watch = ( filePath, gamePath, skipNormalize ) ->
+        unless skipNormalize
+            filePath, gamePath = normalizeGamePath( filePath, gamePath )
+
+        identifier = hashIdentifier( filePath, gamePath )
+
+        if observedFiles[ identifier ]
+            return false
+
+        observedFiles[ identifier ] = Watch( filePath, gamePath )
+
+        if isDir( filePath, gamePath, true )
+            filePath ..= "/"
+
+            files, folders = Find( filePath .. "*", gamePath )
+            for fileName in *files
+                watch( filePath .. fileName, gamePath )
+
+            for folderName in *folders
+                watch( filePath .. folderName, gamePath )
+
+        return true
+
+    unWatch = _module_0.UnWatch = ( filePath, gamePath, skipNormalize ) ->
+        unless skipNormalize
+            filePath, gamePath = normalizeGamePath( filePath, gamePath )
+
+        identifier = hashIdentifier( filePath, gamePath )
+
+        watchID = observedFiles[ identifier ]
+        unless watchID
+            return false
+
+        observedFiles[ identifier ] = nil
+        Unwatch( watchID )
+
+        if isDir( filePath, gamePath, true )
+            filePath ..= "/"
+
+            files, folders = Find( filePath .. "*", gamePath )
+            for fileName in *files
+                unWatch( filePath .. fileName, gamePath )
+
+            for folderName in *folders
+                unWatch( filePath .. folderName, gamePath )
+
+        return true
+
+else
+
+    _module_0.Watch = ->
+        return false
+
+    _module_0.Unwatch = ->
+        return false
+
+local asyncRead
+do
+
+    functions = {
+        { "Append", false },
+        { "Write", false },
+        { "Read", false }
+    }
+
+    do
+
+        sources = {
+            {
+                "Name": "gm_asyncio"
+                "Fetch": -> IsBinaryModuleInstalled( "asyncio" )
+                "Install": ->
+                    require( "asyncio" )
+
+                    return {
+                        "Append": asyncio.AsyncAppend
+                        "Read": asyncio.AsyncRead
+                        "Write": asyncio.AsyncWrite
+                    }
+            },
+            {
+                "Name": "async_write"
+                "Fetch": -> IsBinaryModuleInstalled( "async_write" )
+                "Install": ->
+                    require( "async_write" )
+
+                    return {
+                        "Append": file.AsyncAppen
+                        "Write": file.AsyncWrite
+                    }
+            },
+            {
+                "Name": "Garry's Mod Async"
+                "Fetch": -> not MENU_DLL
+                "Install": ->
+                    return {
+                        "Read": file.AsyncRead
+                    }
+            },
+            {
+                "Name": "Garry's Mod"
+                "Install": ->
+                    return {
+                        "Append": ( fileName, content, gamePath, func ) ->
+                            state = append( fileName, content, true ) and 0 or -1
+                            func( fileName, "DATA", state )
+                            return state
+
+                        "Read": ( fileName, gamePath, func ) ->
+                            content = read( fileName, gamePath )
+                            state = content == nil and -1 or 0
+                            func( fileName, gamePath, state, content )
+                            return state
+
+                        "Write": ( fileName, content, gamePath, func ) ->
+                            state = write( fileName, content, "wb", true ) and 0 or -1
+                            func( fileName, "DATA", state )
+                            return state
+                    }
+            }
+        }
+
+        functionsNeed = #functions
+
+        for source in *sources
+            if not source.Fetch or source.Fetch!
+                result = source.Install!
+
+                installed = 0
+                for data in *functions
+                    if data[ 2 ]
+                        continue
+
+                    name = data[ 1 ]
+                    unless result[ name ]
+                        continue
+
+                    functions[ name ] = result[ name ]
+                    functionsNeed -= 1
+                    data[ 2 ] = true
+                    installed += 1
+
+                if installed > 0
+                    Logger\Info "'%s' was connected as filesystem API.", source.Name
+
+                if functionsNeed < 1
+                    break
+
+    FSASYNC = _module_0.FSASYNC = {
+        [ -8 ]: "Filename not part of the specified file system, try a different one."
+        [ -7 ]: "Failure for a reason that might be temporary, you might retry, but not immediately."
+        [ -6 ]: "Read parameters invalid for unbuffered IO."
+        [ -5 ]: "Hard subsystem failure."
+        [ -4 ]: "Read error on file."
+        [ -3 ]: "Out of memory for file read."
+        [ -2 ]: "Caller's provided id is not recognized."
+        [ -1 ]: "Filename could not be opened (bad path, not exist, etc)."
+        [  0 ]: "Operation is successful."
+        [  1 ]: "File is properly queued, waiting for service."
+        [  2 ]: "File is being accessed."
+        [  3 ]: "File was aborted by caller."
+        [  4 ]: "File is not yet queued."
+    }
+
+    do
+
+        import Append from functions
+
+        _module_0.AsyncAppend = ( filePath, content, gamePath, skipNormalize ) ->
+            unless skipNormalize
+                filePath, gamePath = normalizeGamePath( filePath, gamePath )
+
+            assertWriteAllowed( filePath, gamePath )
+
+            promise = Promise!
+
+            state = Append( filePath, content, ( iFilePath, iGamePath, iState ) ->
+                if iState == 0
+                    promise\Resolve( { fileName: iFilePath, gamePath: iGamePath } )
+                    return
+
+                promise\Reject( FileSystemError FSASYNC[ iState ] )
+                return
+            gamePath )
+
+            if state ~= 0
+                promise\Reject( FileSystemError FSASYNC[ state ] )
+
+            return promise
+
+    do
+
+        import Read from functions
+
+        asyncRead = ( filePath, gamePath, skipNormalize ) ->
+            unless skipNormalize
+                filePath, gamePath = normalizeGamePath( filePath, gamePath )
+
+            promise = Promise!
+
+            state = Read filePath, gamePath, ( _, __, iState, iContent ) ->
+                if iState == 0
+                    promise\Resolve( iContent )
+                    return
+
+                promise\Reject( FileSystemError FSASYNC[ iState ] )
+                return
+
+            if state ~= 0
+                promise\Reject( FileSystemError FSASYNC[ state ] )
+
+            return promise
+
+        _module_0.AsyncRead = asyncRead
+
+    do
+
+        import Write from functions
+
+        _module_0.AsyncWrite = ( filePath, content, gamePath, skipNormalize ) ->
+            unless skipNormalize
+                filePath, gamePath = normalizeGamePath( filePath, gamePath )
+
+            print filePath, gamePath
+
+            assertWriteAllowed( filePath, gamePath )
+
+            promise = Promise!
+
+            state = Write( filePath, content, ( iFilePath, iGamePath, iState ) ->
+                if iState == 0
+                    promise\Resolve( { fileName: iFilePath, gamePath: iGamePath } )
+                    return
+
+                promise\Reject( FileSystemError FSASYNC[ iState ] )
+                return
+            gamePath )
+
+            if state ~= 0
+                promise\Reject( FileSystemError FSASYNC[ state ] )
+
+            return promise
+
+local compileLua
+do
+
+    import CompileLuaString, CompileLuaFile from util
+
+    asyncCompile = async ( filePath, gamePath, handleError ) ->
+        if CLIENT and isFileMounted( filePath, gamePath, true )
+            if luaGamePaths[ gamePath ]
+                filePath = "lua/" .. filePath
+
+            gamePath = "WORKSHOP"
+
+        content = await asyncRead( filePath, gamePath, true )
+        unless content
+            error CodeCompileError "File '" .. filePath .. "' cannot be read."
+
+        local func
+        func = CompileLuaString( content, filePath, handleError )
+        if not func and luaGamePaths[ gamePath ]
+            func = CompileLuaFile( filePath )
+
+        if func
+            return func
+
+        error CodeCompileError "File '" .. filePath .. "' cannot be compiled."
+        return
+
+    compileLua = _module_0.CompileLua = ( filePath, gamePath, handleError, skipNormalize ) ->
+        unless skipNormalize
+            filePath, gamePath = normalizeGamePath( filePath, gamePath )
+
+        return asyncCompile( filePath, gamePath, handleError )
+
+local compileMoon
+do
+
+    import CompileMoonString from util
+
+    asyncCompile = async ( filePath, gamePath, handleError ) ->
+        content = await asyncRead( filePath, gamePath, true )
+        unless content
+            error CodeCompileError "File '" .. filePath .. "' cannot be read."
+
+        func = CompileMoonString( content, filePath, handleError )
+        if func
+            return func
+
+        error CodeCompileError "File '" .. filePath .. "' cannot be compiled."
+        return
+
+    compileMoon = _module_0.CompileMoon = ( filePath, gamePath, handleError, skipNormalize ) ->
+        unless skipNormalize
+            filePath, gamePath = normalizeGamePath( filePath, gamePath )
+
+        return asyncCompile( filePath, gamePath, handleError )
+
+local compileYue
+do
+
+    import CompileYueString from util
+
+    asyncCompile = async ( filePath, gamePath, handleError, yueConfig ) ->
+        content = await asyncRead( filePath, gamePath, true )
+        unless content
+            error CodeCompileError "File '" .. filePath .. "' cannot be read."
+
+        func = CompileYueString( content, filePath, handleError, yueConfig )
+        if func
+            return func
+
+        error CodeCompileError "File '" .. filePath .. "' cannot be compiled."
+        return
+
+    compileYue = _module_0.CompileYue = ( filePath, gamePath, handleError, yueConfig, skipNormalize ) ->
+        unless skipNormalize
+            filePath, gamePath = normalizeGamePath( filePath, gamePath )
+
+        return asyncCompile( filePath, gamePath, handleError, yueConfig )
+
+do
+
+    import stripExtension from path
+
+    _module_0.Compile = ( fullPath, gamePath, handleError, yueConfig, skipNormalize ) ->
+        filePath = stripExtension( fullPath )
+
+        unless skipNormalize
+            filePath, gamePath = normalizeGamePath( filePath, gamePath )
+
+        compilePath = filePath .. ".lua"
+        if isFile( compilePath, gamePath, true )
+            return compileLua( compilePath, gamePath, handleError, true )
+
+        compilePath = filePath .. ".moon"
+        if isFile( compilePath, gamePath, true )
+            return compileMoon( compilePath, gamePath, handleError, true )
+
+        compilePath = filePath .. ".yue"
+        if isFile( compilePath, gamePath, true )
+            return compileYue( compilePath, gamePath, handleError, yueConfig, true )
+
+        error CodeCompileError "File '" .. fullPath .. "' cannot be compiled."
+        return
+
+return _module_0

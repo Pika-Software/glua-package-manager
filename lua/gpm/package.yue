@@ -11,6 +11,7 @@ import async, await, debug,
 
 import format from string
 import Environment, Link from environment.metaworks
+import getDirectory from environment.path
 import getfpathi from debug
 
 class InvalidPackageConfigurationError extends Error
@@ -48,8 +49,9 @@ class Module
         unless isstring( url )
             error InvalidModuleConfigurationError "url is " .. type( url ) .. ", expected URL"
 
+        :pathname = url
         @name = getfpathi( location ) or "unknown"
-        setfenv( location, setmetatable({ _MODULE: @ }, { __index: env, __newindex: env }) )
+        setfenv( location, setmetatable({ __module: @, __filename: pathname, __dirname: getDirectory( pathname ) }, { __index: env, __newindex: env }) )
         return
 
 gpm.Module = Module
@@ -87,7 +89,7 @@ class Package
         version = @version = metadata.version or "0.1.0"
         packages[ name ][ version ] = @
 
-        env = @env = Environment( environment, { :_G, _PACKAGE: @ } )
+        env = @env = Environment( environment, { :_G, __package: @ } )
         @entry = Module( location, url, env )
         @packages = {}
 
@@ -101,24 +103,24 @@ ispackage = environment.ispackage = ( any ) ->
     metatable = getmetatable( any )
     return metatable and metatable.__class == Package
 
-gpm.ParsePackageMeta = async ( metaPath ) ->
-    func = await file.Compile( metaPath, "LUA" )
+-- gpm.ParsePackageMeta = async ( metaPath ) ->
+--     func = await file.Compile( metaPath, "LUA" )
 
-    metadata = {}
-    setfenv( func, metadata )
+--     metadata = {}
+--     setfenv( func, metadata )
 
-    success, result = pcall( func )
-    unless success
-        error InvalidPackageConfigurationError result
+--     success, result = pcall( func )
+--     unless success
+--         error InvalidPackageConfigurationError result
 
-    if istable( result )
-        table.Merge( metadata, result )
+--     if istable( result )
+--         table.Merge( metadata, result )
 
-    table.LowerKeyNames( metadata )
-    return metadata
+--     table.LowerKeyNames( metadata )
+--     return metadata
 
-gpm.ParsePackage = async ( importPath ) ->
-    return Package( await( gpm.ParsePackageMeta( importPath ) ), importPath )
+-- gpm.ParsePackage = async ( importPath ) ->
+--     return Package( await( gpm.ParsePackageMeta( importPath ) ), importPath )
 
 --[[
     gpm.PACKAGE_LOAD_TASKS = {}

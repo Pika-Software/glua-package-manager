@@ -157,61 +157,20 @@ unless istable( gpm.Types )
         } )
     }
 
-string = rawget( environment, "string" )
-unless istable( string )
-    string = environment.string = setmetatable( {}, { __index: _G.string } )
-
-table = rawget( environment, "table" )
-unless istable( table )
-    table = environment.table = setmetatable( {}, { __index: _G.table } )
-
-math = rawget( environment, "math" )
-unless istable( math )
-    math = environment.math = setmetatable( {}, { __index: _G.math } )
-
--- math extensions
-for key, value in pairs( include( "math.lua" ) )
-    math[ key ] = value
-
-debug = rawget( environment, "debug" )
-unless istable( debug )
-    debug = environment.debug = setmetatable( {}, { __index: _G.debug } )
-
-http = rawget( environment, "http" )
-unless istable( http )
-    http = environment.http = setmetatable( {}, { __index: _G.http } )
-
-util = rawget( environment, "util" )
-unless istable( util )
-    util = environment.util = setmetatable( {}, { __index: _G.util } )
+math = environment.math = setmetatable( include( "libs/math.lua" ), { __index: _G.math } )
+string = environment.string = setmetatable( {}, { __index: _G.string } )
+table = environment.table = setmetatable( {}, { __index: _G.table } )
+debug = environment.debug = setmetatable( {}, { __index: _G.debug } )
+http = environment.http = setmetatable( {}, { __index: _G.http } )
+util = environment.util = setmetatable( {}, { __index: _G.util } )
 
 -- Aliases
 string.StartsWith = string.StartsWith or string.StartWith
-table.unpack = unpack
-
-debug.fempty = ->
-
 util.CompileLuaString = _G.CompileString
 util.CompileLuaFile = _G.CompileFile
+table.unpack = _G.unpack
 
-do
-
-    -- gm_error
-    for key, value in pairs( include( "libs/error.lua" ) )
-        environment[ key ] = value
-
-    import Error from environment
-
-    class environment.NotImplementedError extends Error
-
-    class LuaCompileError extends Error
-    environment.LuaCompileError = LuaCompileError
-
-    util.CompileMoonString = ->
-        error LuaCompileError "Attempt to compile MoonScript failed, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader."
-
-    util.CompileYueString = ->
-        error LuaCompileError "Attempt to compile Yuescript failed, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader."
+debug.fempty = ->
 
 import byte, char, sub, gsub, format, len, find from string
 import concat, remove from table
@@ -1017,73 +976,7 @@ do
 
 do
 
-    path = rawget( environment, "path" )
-    unless istable( path )
-        path = environment.path = {}
-
-    do
-
-        import StripExtension from string
-
-        path.ReplaceExtension = ( filePath, newExtension ) ->
-            return StripExtension( filePath ) .. "." .. newExtension
-
-    fix = ( filePath ) ->
-        return gsub( gsub( filePath, "[/\\]+", "/" ), "^/+", "" ), nil
-
-    path.Fix = fix
-
-    localizeLua = ( filePath ) ->
-        return gsub( gsub( fix( filePath ), "^.-lua/", "" ), "^.-gamemode/", "" ), nil
-
-    path.LocalizeLua = localizeLua
-
-    path.Join = ( ... ) ->
-        return fix( concat( { ... }, "/" ) )
-
-    path.Resolve = ( ... ) ->
-        buffer, length = {}, 0
-        args = { ... }
-
-        for index = 1, #args
-            arg = tostring( args[ index ] )
-            if byte( arg, 1 ) == 0x2F --[[ / ]]
-                length = 1
-                if byte( args[ 1 ], 1 ) == 0x2F --[[ / ]]
-                    buffer[ length ] = arg
-                else
-                    buffer[ length ] = sub( arg, 2 )
-            else
-                length += 1
-                buffer[ length ] = arg
-
-        filePath = concat( buffer, "/", 1, length )
-
-        segments, segmentCount = byteSplit( filePath, 0x2F --[[ / ]] )
-        if segmentCount == 0
-            return filePath
-
-        for index = 1, length
-            buffer[ index ] = nil
-
-        length = 0
-
-        for index = 1, segmentCount
-            segment = segments[ index ]
-            if segment ~= "."
-                if segment == ".."
-                    if length ~= 0
-                        length -= 1
-                else
-                    length += 1
-                    buffer[ length ] = segment
-
-        if length == 0
-            return ""
-
-        return concat( buffer, "/", 1, length )
-
-    getfmain = ->
+    getfmain = debug.getfmain = ->
         for level = 2, 16
             info = getinfo( level, "fS" )
             unless info
@@ -1092,19 +985,21 @@ do
             if info.what == "main"
                 return info.func
 
-    debug.getfmain = getfmain
+    lff = ( a, b ) -> b
 
-    getfpathi = ( location ) ->
+    getfpathi = debug.getfpathi = ( location ) ->
         info = getinfo( location, "S" )
         if info.what == "main"
-            return localizeLua( fix( sub( info.source, 2 ) ) )
+            return "/" .. gsub( gsub( sub( info.source, 2 ), "^(.-)(lua/.*)$", lff ), "^(.-)([%w_]+/gamemode/.*)$", lff )
 
-    debug.getfpathi = getfpathi
+        return "/"
 
     debug.getfpath = ->
         main = getfmain!
         if main
             return getfpathi( main )
+
+        return "/"
 
 do
 
@@ -1163,45 +1058,125 @@ do
 
 class util.Stack
     __tostring: =>
-        return format( "Stack: %p [%d/%d]", @, @Pointer, @Length )
+        return format( "Stack: %p [%d/%d]", @, @pointer, @size )
 
-    new: ( length ) =>
-        @Length = ( isnumber( length ) and length > 0 ) and length or -1
-        @Pointer = 0
+    new: ( size ) =>
+        @size = ( isnumber( size ) and size > 0 ) and size or -1
+        @pointer = 0
 
     isEmpty: =>
-        return @Pointer == 0
+        return @pointer == 0
 
     isFull: =>
-        return @Pointer == @Length
+        return @pointer == @size
 
     peek: =>
-        return @[ @Pointer ]
+        return @[ @pointer ]
 
     push: ( value ) =>
-        pointer = @Pointer
-        if pointer ~= @Length
+        pointer = @pointer
+        if pointer ~= @size
             pointer += 1
             @[ pointer ] = value
-            @Pointer = pointer
+            @pointer = pointer
 
         return pointer
 
     pop: =>
-        pointer = @Pointer
+        pointer = @pointer
         if pointer == 0
             return nil
 
-        @Pointer = pointer - 1
+        @pointer = pointer - 1
         value = @[ pointer ]
         @[ pointer ] = nil
         return value
 
     empty: =>
-        for index = 1, @Pointer
+        for index = 1, @pointer
             @[ index ] = nil
 
-        @Pointer = 0
+        @pointer = 0
+
+--[[
+
+    Queue References:
+        https://github.com/darkwark/queue-lua
+        https://en.wikipedia.org/wiki/Queue_(abstract_data_type)
+
+--]]
+
+class util.Queue
+    __tostring: =>
+        return format( "Queue: %p [%d/%d]", @, @pointer, @size )
+
+    new: ( size ) =>
+        @size = ( isnumber( size ) and size > 0 ) and size or -1
+        @front = 1
+        @rear = 0
+
+    length: =>
+        return ( @rear - @front ) + 1
+
+    isEmpty: =>
+        return @rear == 0
+
+    isFull: =>
+        return @length! == @size
+
+    enqueue: ( value ) =>
+        if @isFull!
+            return
+
+        rear = @rear + 1
+        @rear = rear
+        @[ rear ] = value
+
+    dequeue: =>
+        if @isEmpty!
+            return nil
+
+        front = @front
+        value = @[ front ]
+        @[ front ] = nil
+
+        front += 1
+        @front = front
+
+        if ( front * 2 ) >= @rear
+            @optimize!
+
+        return value
+
+    get: ( index ) =>
+        return @[ @front + index ]
+
+    set: ( index, value ) =>
+        @[ @front + index ] = value
+
+    optimize: =>
+        pointer, buffer = 1, {}
+
+        for index = @front, @rear
+            buffer[ pointer ] = @[ index ]
+            @[ index ] = nil
+            pointer += 1
+
+        for index = 1, pointer
+            @[ index ] = buffer[ index ]
+
+        @front = 1
+        @rear = pointer - 1
+
+    peek: =>
+        return @[ @front ]
+
+    empty: =>
+        for index = @front, @rear
+            @[ index ] = nil
+
+    @__base.push = @__base.enqueue
+    @__base.pop = @__base.dequeue
 
 do
 
@@ -1213,31 +1188,31 @@ do
 
     class util.ByteStream
         __tostring: =>
-            return format( "ByteStream: %p [%d/%d]", @, @Pointer, @Length )
+            return format( "ByteStream: %p [%d/%d]", @, @pointer, @length )
 
         new: ( data ) =>
             if isstring( data )
-                @Length = len( data )
+                @length = len( data )
                 @Data = data
             else
-                @Length = 0
+                @length = 0
                 @Data = ""
 
-            @Pointer = 0
+            @pointer = 0
 
         Close: =>
-            @Pointer = 0
+            @pointer = 0
 
         Flush: =>
-            @Pointer = 0
-            @Length = 0
+            @pointer = 0
+            @length = 0
             @Data = ""
 
         Size: =>
-            return @Length
+            return @length
 
         Tell: =>
-            return @Pointer
+            return @pointer
 
         Seek: ( pointer ) =>
             if pointer
@@ -1245,13 +1220,13 @@ do
 
                 if pointer < 0
                     pointer = 0
-                elseif pointer > @Length
-                    pointer = @Length
+                elseif pointer > @length
+                    pointer = @length
 
             else
                 pointer = 0
 
-            @Pointer = pointer
+            @pointer = pointer
             return pointer
 
         Skip: ( bytes ) =>
@@ -1260,10 +1235,10 @@ do
             else
                 bytes = 1
 
-            return @Seek( @Pointer + bytes )
+            return @Seek( @pointer + bytes )
 
         EndOfFile: =>
-            return @Pointer >= @Length
+            return @pointer >= @length
 
         -- Binary data
         Read: ( bytes ) =>
@@ -1271,20 +1246,20 @@ do
             if bytes <= 0 or @EndOfFile!
                 return
 
-            pointer = @Pointer
+            pointer = @pointer
             @Skip( bytes )
 
             return sub( @Data, pointer + 1, pointer + bytes )
 
         Write: ( data ) =>
-            length, size = @Length, len( data )
-            @Data = sub( @Data, 1, @Pointer ) .. data .. sub( @Data, @Pointer + 1, length )
-            @Length = length + size
+            length, size = @length, len( data )
+            @Data = sub( @Data, 1, @pointer ) .. data .. sub( @Data, @pointer + 1, length )
+            @length = length + size
             return @Skip( size )
 
         -- String
         ReadString: =>
-            pointer, length = @Pointer, @Length
+            pointer, length = @pointer, @length
             if pointer >= length
                 return
 
@@ -1339,7 +1314,7 @@ do
         WriteUInt: ( number, bytes ) =>
             ArgAssert( bytes, 2, "number" )
             if bytes == 0
-                return @Pointer
+                return @pointer
 
             for index = 1, bytes
                 buffer[ index ] = char( band( number, 0xFF ) )
@@ -1427,145 +1402,9 @@ do
 
 do
 
-    import Exists from file
-
-    util.IsLuaModuleInstalled = ( name ) ->
-        return Exists( "includes/modules/" .. name .. ".lua", "LUA" )
-
-do
-
     import Simple from timer
 
     util.NextTick = ( func, a, b, c, d, e, f ) ->
         return Simple 0, ->
             func( a, b, c, d, e, f )
             return
-
-if SERVER
-
-    import Fix, ReplaceExtension from environment.path
-    import AddCSLuaFile from _G
-    import Find from file
-
-    addCSLuaFolder = ( folderPath ) ->
-        folderPath = Fix( folderPath .. "/" )
-
-        files, folders = Find( folderPath .. "*", "lsv" )
-        for folderName in *folders
-            addCSLuaFolder( folderPath .. folderName )
-
-        for fileName in *files
-            AddCSLuaFile( folderPath .. ReplaceExtension( fileName, "lua" ) )
-
-    util.AddCSLuaFolder = addCSLuaFolder
-
-do
-
-    Color = Color
-
-    colors = gpm.Colors
-    unless istable( colors )
-        colors = gpm.Colors = {
-            SecondaryText: Color( 150, 150, 150 )
-            PrimaryText: Color( 200, 200, 200 )
-            White: Color( 255, 255, 255 )
-            Info: Color( 70, 135, 255 )
-            Warn: Color( 255, 130, 90 )
-            Error: Color( 250, 55, 40 )
-            Debug: Color( 0, 200, 150 )
-            gpm: Color( 180, 180, 255 )
-        }
-
-    :PrimaryText, :SecondaryText, :Info, :Warn, :Error, :Debug, :White = colors
-
-    unless isstring( gpm.RealmName )
-        if MENU_DLL
-            gpm.RealmName, colors.Realm = "Menu", Color( 75, 175, 80 )
-        elseif CLIENT
-            gpm.RealmName, colors.Realm = "Client", Color( 225, 170, 10 )
-        elseif SERVER
-            gpm.RealmName, colors.Realm = "Server", Color( 5, 170, 250 )
-        else
-            gpm.RealmName, colors.Realm = "Unknown", White
-
-    local log
-    do
-
-        import date from os
-        MsgC = MsgC
-
-        realmName = "[" .. string.upper( gpm.RealmName ) .. "] "
-        realmColor = colors.Realm
-
-        log = ( color, level, str, ... ) =>
-            ArgAssert( color, 1, "Color" )
-            ArgAssert( level, 2, "string" )
-            MsgC( SecondaryText, date( "%d-%m-%Y %H:%M:%S " ), realmColor, realmName, color, level, SecondaryText, " --> ", @color, @name, SecondaryText, " : ", @text_color, format( str, ... ), "\n" )
-            return
-
-    debugFilter = ->
-        return gpm.Developer > 0
-
-    class Logger
-        __tostring: =>
-            return format( "Logger: %p [%s]", @, @name )
-
-        new: ( name, color, func ) =>
-            @name = isstring( name ) and name or "unknown"
-            @color = iscolor( color ) and color or White
-            @debug_filter = isfunction( func ) and func or debugFilter
-            @text_color = PrimaryText
-
-        -- Logger Name
-        GetName: =>
-            return @name
-
-        SetName: ( str ) =>
-            ArgAssert( str, 1, "string" )
-            @name = str
-
-        -- Logger Color
-        GetColor: =>
-            return @color
-
-        SetColor: ( color ) =>
-            ArgAssert( color, 1, "Color" )
-            @color = color
-
-        -- Logger Text Color
-        GetTextColor: =>
-            return @text_color
-
-        SetTextColor: ( color ) =>
-            ArgAssert( color, 1, "Color" )
-            @text_color = color
-
-        -- Logger Debug Filter
-        GetDebugFilter: =>
-            return @debug_filter
-
-        SetDebugFilter: ( func ) =>
-            ArgAssert( func, 1, "function" )
-            @debug_filter = func
-
-        -- Logger Functions
-        Log: log
-
-        Info: ( ... ) =>
-            log( @, Info, " INFO ", ... )
-
-        Warn: ( ... ) =>
-            log( @, Warn, " WARN ", ... )
-
-        Error: ( ... ) =>
-            log( @, Error, "ERROR ", ... )
-
-        Loaded: ( ... ) =>
-            log( @, Debug, "LOADED", ... )
-
-        Debug: ( ... ) =>
-            if @debug_filter( ... )
-                log( @, Debug, "DEBUG ", ... )
-
-    gpm.Logger = Logger( "gpm@" .. gpm.VERSION, colors.gpm )
-    util.Logger = Logger

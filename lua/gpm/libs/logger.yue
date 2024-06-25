@@ -1,0 +1,90 @@
+import MsgC, Color, string, os, setmetatable, rawget, rawset, tonumber from _G
+import format, gsub from string
+import Queue from gpm.util
+import date from os
+
+secondary_text = Color( 150, 150, 150 )
+primary_text = Color( 200, 200, 200 )
+white = Color( 255, 255, 255 )
+info = Color( 70, 135, 255 )
+warn = Color( 255, 130, 90 )
+error = Color( 250, 55, 40 )
+debug = Color( 0, 200, 150 )
+
+local state, state_color
+if MENU_DLL
+    state = "Main Menu"
+    state_color = Color( 75, 175, 80 )
+elseif CLIENT
+    state = "Client"
+    state_color = Color( 225, 170, 10 )
+elseif SERVER
+    state = "Server"
+    state_color = Color( 5, 170, 250 )
+else
+    state = "Unknown"
+    state_color = white
+
+state = "[" .. state .. "] "
+
+imeta = {
+    __index: ( args, key ) ->
+        str = rawget( args, tonumber( key ) or 0 )
+        rawset( args, key, str )
+        return str
+}
+
+queue = Queue( 256 )
+
+timer.Create "GLua Package Manager::Logger", 1 / 10, 0, ->
+    data = queue\dequeue!
+    unless data
+        return
+
+    MsgC( secondary_text, date( "%d-%m-%Y %H:%M:%S " ), state_color, state, data[ 1 ], data[ 2 ], secondary_text, " --> ", data[ 3 ], data[ 4 ], secondary_text, " : ", data[ 5 ], data[ 6 ] .. "\n" )
+    return
+
+log = ( color, level, str, ... ) =>
+    if @interpolation
+        queue\enqueue( { color, level, @title_color, @title, @text_color, gsub( str, "{([0-9]+)}", setmetatable( {...}, imeta ) ) } )
+        return
+
+    queue\enqueue( { color, level, @title_color, @title, @text_color, format( str, ... ) } )
+    return
+
+developer = GetConVar( "developer" )
+
+debugFilter = ->
+    return developer\GetInt! > 0
+
+export default class Logger
+    __tostring: =>
+        return format( "Logger: %p [%s]", @, @title )
+
+    new: ( @title = "unknown", @title_color = white, @interpolation = true, @debug_filter = debugFilter ) =>
+        @text_color = primary_text
+
+    Log: log
+
+    Info: ( ... ) =>
+        log( @, info, " INFO ", ... )
+        return
+
+    Warn: ( ... ) =>
+        log( @, warn, " WARN ", ... )
+        return
+
+    Error: ( ... ) =>
+        log( @, error, "ERROR ", ... )
+        return
+
+    Loaded: ( ... ) =>
+        log( @, debug, "LOADED", ... )
+        return
+
+    Debug: ( ... ) =>
+        if @debug_filter( ... )
+            log( @, debug, "DEBUG ", ... )
+
+        return
+

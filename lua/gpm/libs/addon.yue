@@ -1,15 +1,10 @@
-_G = _G
 import gpm from _G
 import environment from gpm
-import isstring, istable, error, tostring, tonumber from environment
-import Open, Find, GetFilePaths from environment.file
+import AddonError, ArgAssert, isstring, istable, error, tostring, tonumber from environment
+import Open, Find, GetFolderContents from environment.file
 import HasValue, Empty from environment.table
 import lower, gsub, find from string
-import ArgAssert from environment
 import CRC from util
-
-class AddonError extends environment.Error
-environment.AddonError = AddonError
 
 export GetAll = engine.GetAddons
 
@@ -21,12 +16,12 @@ export Get = ( wsid ) ->
 export FileFind = ( filePath, wsid ) ->
     data = Get( wsid )
     if data
-        return Find( filePath, data.title )
+        return Find( filePath, data.title, true )
 
 export GetFiles = ( wsid, filePath ) ->
     data = Get( wsid )
     if data
-        return GetFilePaths( filePath or "", data.title )
+        return GetFolderContents( filePath or "", data.title, true )
 
 -- Addon types
 export Types = {
@@ -216,7 +211,7 @@ export class Addon
         ArgAssert( str, 1, "string" )
         @steam_id = str
 
-    Open: ( filePath, gamePath, fileMode ) =>
+    Open: ( filePath, fileMode, gamePath ) =>
         @Close!
 
         if istable( filePath )
@@ -324,7 +319,7 @@ export class Addon
         Empty( @required )
         Empty( @files )
 
-        @Open( filePath, gamePath, "rb" )
+        @Open( filePath, "rb", gamePath )
         @Parse( doCRCs )
 
         if readFiles
@@ -373,7 +368,7 @@ export class Addon
             else
                 error AddonError "gma is empty"
 
-        fileHandle = @Open( filePath, gamePath, "wb" )
+        fileHandle = @Open( filePath, "wb", gamePath )
         unless fileHandle
             error AddonError "file read handler is missing, opening is impossible"
 
@@ -419,7 +414,7 @@ export class Addon
                 error AddonError "file content must be a string (" .. data.file_path .. ")"
 
         if doCRCs
-            fileHandle = @Open( filePath, gamePath, "rb" )
+            fileHandle = @Open( filePath, "rb", gamePath )
             unless fileHandle
                 error AddonError "file read handler is missing, opening is impossible"
 
@@ -427,7 +422,7 @@ export class Addon
             @stored_crc = fileCRC
             @real_crc = fileCRC
 
-            fileHandle = @Open( filePath, gamePath, "ab" )
+            fileHandle = @Open( filePath, "ab", gamePath )
             unless fileHandle
                 error AddonError "file read handler is missing, opening is impossible"
 

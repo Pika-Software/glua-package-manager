@@ -67,6 +67,11 @@ export class Error
         ErrorNoHalt concat( lines, "\n", 1, length )
         return
 
+export class NotImplementedError extends Error
+export class CodeCompileError extends Error
+export class FileSystemError extends Error
+export class WebClientError extends Error
 export class RuntimeError extends Error
+export class AddonError extends Error
 export class RangeError extends Error
 export class TypeError extends Error

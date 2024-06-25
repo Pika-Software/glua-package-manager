@@ -1,21 +1,16 @@
-_G = _G
 import gpm, pairs, tostring from _G
-
 import environment from gpm
-import await, async, file from environment
+
+import await, async, file, FileSystemError from environment
 
 import time from environment.os
 import fempty from environment.debug
 import match, sub from environment.string
-import AsyncRead, AsyncWrite, MountGMA from file
 import DecompressDeflate from environment.deflate
 import ByteStream, MD5, CRC from environment.util
 import Addon, IsFilePathAllowed from environment.addon
+import AsyncRead, AsyncWrite, MountGMA, NormalizeGamePath from file
 
-class MountError extends environment.Error
-environment.MountError = MountError
-
--- file.DecompressDeflate( fileHandle, doCRC ) - zip files iterator
 iterateZipFiles = file.IterateZipFiles = ( fileHandle, doCRC ) ->
     unless fileHandle
         return fempty
@@ -55,7 +50,7 @@ iterateZipFiles = file.IterateZipFiles = ( fileHandle, doCRC ) ->
         return fileName, data
 
 file.Delete( "gpm/mount" )
-file.CreateDir( "gpm/mount" )
+file.CreateDir( "gpm/mount", true )
 
 mountZIPData = file.MountZIPData = async ( data, uniqueName ) ->
     gma = Addon!
@@ -89,19 +84,19 @@ mountZIPData = file.MountZIPData = async ( data, uniqueName ) ->
     gma\Write( bs, nil, false )
 
     filePath = "gpm/mount/" .. gma\GetTitle! .. ".gma"
-    await AsyncWrite( filePath, bs.Data )
+    await AsyncWrite( filePath, bs.Data, "DATA", true )
 
-    ok, result = MountGMA( "data/" .. filePath )
-    if ok
-        return result
+    ok, result = MountGMA( "/data/" .. filePath )
+    unless ok
+        error FileSystemError result
 
-    error MountError result
-    return
+    return result
 
-file.MountZIP = async ( filePath ) ->
-    ok, result = await AsyncRead( filePath )
-    if ok
-        return await mountZIPData( result, "file://" .. filePath )
+asyncMount = async ( filePath, gamePath ) ->
+    return await mountZIPData( await( AsyncRead( filePath, gamePath, true ) ), "file:///" .. filePath )
 
-    error MountError result
-    return
+file.MountZIP = ( filePath, gamePath, skipNormalize ) ->
+    unless skipNormalize
+        filePath, gamePath = NormalizeGamePath( filePath, gamePath )
+
+    return asyncMount( filePath, gamePath )

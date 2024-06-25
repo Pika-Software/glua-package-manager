@@ -4,6 +4,28 @@ SERVER = SERVER
 unless istable( gpm )
     global gpm = { VERSION: "2.0.0" }
 
+if SERVER
+
+    import AddCSLuaFile from _G
+
+    files = file.Find( "gpm/libs/*", "lsv" )
+    for fileName in *files
+        AddCSLuaFile( "gpm/libs/" .. fileName )
+
+    files = file.Find( "gpm/libs/3rd-party/*", "lsv" )
+    for fileName in *files
+        AddCSLuaFile( "gpm/libs/3rd-party/" .. fileName )
+
+    files = file.Find( "gpm/sources/*", "lsv" )
+    for fileName in *files
+        AddCSLuaFile( "gpm/sources/" .. fileName )
+
+    AddCSLuaFile( "gpm/moonloader.lua" )
+    AddCSLuaFile( "gpm/package.lua" )
+    AddCSLuaFile( "gpm/loader.lua" )
+    AddCSLuaFile( "gpm/init.lua" )
+    AddCSLuaFile( "gpm/util.lua" )
+
 import gpm from _G
 gpm.StartTime = SysTime!
 
@@ -41,12 +63,6 @@ do
 
     print( string.format( "\n                                     ___          __            \n                                   /'___`\\      /'__`\\          \n     __    _____     ___ ___      /\\_\\ /\\ \\    /\\ \\/\\ \\         \n   /'_ `\\ /\\ '__`\\ /' __` __`\\    \\/_/// /__   \\ \\ \\ \\ \\        \n  /\\ \\L\\ \\\\ \\ \\L\\ \\/\\ \\/\\ \\/\\ \\      // /_\\ \\ __\\ \\ \\_\\ \\   \n  \\ \\____ \\\\ \\ ,__/\\ \\_\\ \\_\\ \\_\\    /\\______//\\_\\\\ \\____/   \n   \\/___L\\ \\\\ \\ \\/  \\/_/\\/_/\\/_/    \\/_____/ \\/_/ \\/___/    \n     /\\____/ \\ \\_\\                                          \n     \\_/__/   \\/_/                %s                        \n\n  GitHub: https://github.com/Pika-Software\n  Discord: https://discord.gg/Gzak99XGvv\n  Website: https://pika-soft.ru\n  Developers: Pika Software\n  License: MIT\n", splash ) )
 
-gpm.Developer = cvars.Number( "developer", 0 )
-
-cvars.AddChangeCallback( "developer", ( _, __, value ) ->
-    gpm.Developer = tonumber( value ) or 0
-"gLua Package Manager" )
-
 environment = gpm.environment
 unless istable( environment )
     environment = gpm.environment = {}
@@ -66,31 +82,20 @@ do
     setmetatable( gpm, { __index: environment } )
 
 include( "gpm/util.lua" )
-logger = gpm.Logger
 
-if SERVER
+local logger
+do
 
-    import AddCSLuaFolder from gpm.util
-    AddCSLuaFile = AddCSLuaFile
+    const Logger = include( "libs/logger.lua" )
+    logger = gpm.Logger = Logger( "gpm@" .. gpm.VERSION, Color( 180, 180, 255 ), false )
+    environment.util.Logger = Logger
 
-    AddCSLuaFolder( "gpm/sources" )
-    AddCSLuaFolder( "gpm/libs" )
+environment.path = include( "libs/path.lua" )
 
-    clientSideFiles = {
-        "filesystem-zip.lua"
-        "moonloader.lua"
-        "filesystem.lua"
-        "package.lua"
-        "loader.lua"
-        "math.lua"
-        "init.lua"
-        "http.lua"
-        "util.lua"
-    }
+for key, value in pairs( include( "libs/error.lua" ) )
+    environment[ key ] = value
 
-    for index = 1, #clientSideFiles
-        AddCSLuaFile( "gpm/" .. clientSideFiles[ index ] )
-
+environment.metaworks = include( "libs/metaworks.lua" )
 environment.ipa = include( "libs/3rd-party/ip.lua" )
 
 deflate = include( "libs/3rd-party/deflate.lua" )
@@ -103,12 +108,6 @@ environment.async = promise.async
 environment.await = promise.await
 environment.Promise = promise
 
-environment.metaworks = include( "libs/metaworks.lua" )
-
-include( "moonloader.lua" )
-include( "filesystem.lua" )
-include( "http.lua" )
-
 url = include( "libs/url.lua" )
 -- environment.IsQueryStringParser = url.IsQueryStringParser
 -- environment.QueryStringParser = url.QueryStringParser
@@ -119,13 +118,20 @@ environment.http.DecodeURI = url.decodeURI
 environment.isurl = url.IsURL
 environment.URL = url.URL
 
+include( "moonloader.lua" )
+
+environment.file = setmetatable( include( "libs/file.lua" ), { __index: _G.file } )
+include( "libs/http.lua" )
+
 environment.addon = include( "libs/addon.lua" )
-include( "filesystem-zip.lua" )
+include( "libs/zip.lua" )
+
 include( "package.lua" )
 include( "loader.lua" )
 
-for fileName in *environment.file.Find( "gpm/sources/*.lua", "LUA" )
-    include( "sources/" .. fileName )
+-- TODO: Rewrite FS INSIDE SOURCES
+-- for fileName in *environment.file.Find( "gpm/sources/*.lua", "LUA" )
+--     include( "sources/" .. fileName )
 
 if SERVER
     include( "test.lua" )
