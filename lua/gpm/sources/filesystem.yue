@@ -186,43 +186,49 @@ do
 
 do
 
+    scheme2path = {
+        "lua": "LUA"
+    }
+
     class LuaSourceHandler extends BaseSourceHandler
         FetchInfo: async ( url ) =>
-            return ( url.hostname or "" ) .. ( url.pathname or "" )
+            :scheme = url
+            gamePath = scheme2path[ scheme ] or scheme
+            filePath = sub( url.pathname, 2 )
 
-        Install: async ( url, filePath, _, __, parentEnvironment ) =>
-            local func
-
-            switch GetExtensionFromFilename( filePath )
-                when nil
-                    func = await Compile( filePath, "LUA" )
+            return switch getExtension( filePath )
+                when ""
+                    await Compile( filePath, gamePath, true, yueConfig, true )
 
                 when "lua"
-                    unless Exists( filePath, "LUA" )
+                    unless IsFile( filePath, gamePath, true )
                         error ModuleLoadError "File '" .. filePath .. "' cannot be found."
 
-                    func = await CompileLua( filePath, "LUA" )
+                    await CompileLua( filePath, gamePath, true, true )
 
                 when "moon"
-                    unless Exists( filePath, "LUA" )
+                    unless IsFile( filePath, gamePath, true )
                         error ModuleLoadError "File '" .. filePath .. "' cannot be found."
 
-                    func = await CompileMoon( filePath, "LUA" )
+                    await CompileMoon( filePath, gamePath, true, true )
 
                 when "yue"
-                    unless Exists( filePath, "LUA" )
+                    unless IsFile( filePath, gamePath, true )
                         error ModuleLoadError "File '" .. filePath .. "' cannot be found."
 
-                    func = await CompileYue( filePath, "LUA" )
+                    await CompileYue( filePath, gamePath, true, yueConfig, true )
 
+        Install: async ( url, func, _, __, env ) =>
             unless func
-                error ModuleLoadError "File '" .. filePath .. "' cannot be compiled."
+                error ModuleLoadError "File '" .. url.pathname .. "' cannot be compiled."
                 return
 
-            Module( func, url.href, parentEnvironment )
+            Module( func, url, env )
+
+            -- TODO: Review error handling
             return func!
 
     class LuaSource extends BaseSource
 
-    ls = LuaSource( "lua", "moon", "yue" )
+    ls = LuaSource( "lua", "lcl", "lsv" )
     ls\RegisterHandler( LuaSourceHandler! )

@@ -6,7 +6,7 @@ import environment from gpm
 import async, await, debug,
     string, file,
     table, istable, rawset,
-    Error, type,
+    Error, type, isurl,
     isstring from environment
 
 import format from string
@@ -46,7 +46,7 @@ class Module
         return format( "Module: %p [%s]", @, @name )
 
     new: ( @location, @url, @env = _G ) =>
-        unless isstring( url )
+        unless isurl( url )
             error InvalidModuleConfigurationError "url is " .. type( url ) .. ", expected URL"
 
         :pathname = url

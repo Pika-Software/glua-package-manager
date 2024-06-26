@@ -22,7 +22,7 @@
     SOFTWARE.
 ]]
 import environment from _G.gpm
-import isstring, tostring, ErrorNoHaltWithStack, ErrorNoHalt from gpm.environment
+import isstring, tostring, ErrorNoHaltWithStack, ErrorNoHalt, getmetatable from gpm.environment
 import getstack from environment.debug
 import format, rep from string
 import concat from table
@@ -66,6 +66,17 @@ export class Error
 
         ErrorNoHalt concat( lines, "\n", 1, length )
         return
+
+export iserror = ( any ) ->
+    meta = getmetatable( any )
+    unless meta
+        return false
+
+    cls = meta.__class
+    unless cls
+        return false
+
+    return cls == Error or cls.__parent == Error
 
 export class NotImplementedError extends Error
 export class CodeCompileError extends Error

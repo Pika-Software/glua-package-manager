@@ -1,5 +1,6 @@
-include = include
-SERVER = SERVER
+_G = _G
+import include, SERVER from _G
+import Find from file
 
 unless istable( gpm )
     global gpm = { VERSION: "2.0.0" }
@@ -8,15 +9,15 @@ if SERVER
 
     import AddCSLuaFile from _G
 
-    files = file.Find( "gpm/libs/*", "lsv" )
+    files = Find( "gpm/libs/*", "lsv" )
     for fileName in *files
         AddCSLuaFile( "gpm/libs/" .. fileName )
 
-    files = file.Find( "gpm/libs/3rd-party/*", "lsv" )
+    files = Find( "gpm/libs/3rd-party/*", "lsv" )
     for fileName in *files
         AddCSLuaFile( "gpm/libs/3rd-party/" .. fileName )
 
-    files = file.Find( "gpm/sources/*", "lsv" )
+    files = Find( "gpm/sources/*", "lsv" )
     for fileName in *files
         AddCSLuaFile( "gpm/sources/" .. fileName )
 
@@ -129,9 +130,8 @@ include( "libs/zip.lua" )
 include( "package.lua" )
 include( "loader.lua" )
 
--- TODO: Rewrite FS INSIDE SOURCES
--- for fileName in *environment.file.Find( "gpm/sources/*.lua", "LUA" )
---     include( "sources/" .. fileName )
+for fileName in *Find( "gpm/sources/*.lua", "lsv" )
+    include( "sources/" .. fileName )
 
 if SERVER
     include( "test.lua" )

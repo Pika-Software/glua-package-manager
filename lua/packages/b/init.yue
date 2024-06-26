@@ -7,7 +7,7 @@
 -- require "https://gist.githubusercontent.com/dankmolot/edbab85edb6281a72082f53b98232caf/raw/c0ff1c7287503ea5decdd91b2e0b2b2bfa8d2038/example.lua"
 
 print "data:", data
-print "url:", _MODULE.url
+print "url:", __module.url.href
 print "pkg:", _PKG
 print "abc:", abc, "_G.abc:", _G.abc
 

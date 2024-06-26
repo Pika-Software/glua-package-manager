@@ -58,28 +58,28 @@ export stripFile = ( filePath ) ->
     for index = len( filePath ), 1, -1
         ch = byte( filePath, index )
         if ch == 0x2F --[[ / ]] or ch == 0x5C --[[ \ ]]
-            return sub( filePath, 1, index )
+            return sub( filePath, 1, index ), sub( filePath, index + 1 )
 
-    return ""
+    return "", filePath
 
 export stripDir = ( filePath ) ->
     for index = len( filePath ), 1, -1
         ch = byte( filePath, index )
         if ch == 0x2F --[[ / ]] or ch == 0x5C --[[ \ ]]
-            return sub( filePath, index + 1 )
+            return sub( filePath, index + 1 ), sub( filePath, 1, index )
 
-    return filePath
+    return filePath, ""
 
 export stripExtension = ( filePath ) ->
     for index = len( filePath ), 1, -1
 		ch = byte( filePath, index )
 		if ch == 0x2F --[[ / ]] or ch == 0x5C --[[ \ ]]
-            return filePath
+            return filePath, ""
 
         if ch == 0x2E --[[ . ]]
-            return sub( filePath, 1, index - 1 )
+            return sub( filePath, 1, index - 1 ), sub( filePath, index + 1 )
 
-    return filePath
+    return filePath, ""
 
 export replaceFile = ( filePath, newFile ) ->
     return stripFile( filePath ) .. newFile

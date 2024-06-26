@@ -26,13 +26,13 @@ else
 
 _module_0.LuaPath = luaPath
 
-gamePaths = {
-    lua: luaPath
-    data: "DATA"
-    download: "DOWNLOAD"
+luaExtensions = _module_0.LuaExtensions = {
+    lua: true
+    yue: true
+    moon: true
 }
 
-writeAllowedGamePaths = {
+writeAllowedGamePaths = _module_0.WriteAllowedGamePaths = {
     "DATA": true
 }
 
@@ -48,6 +48,12 @@ do
 
     import match from string
 
+    dir2path = {
+        lua: luaPath
+        data: "DATA"
+        download: "DOWNLOAD"
+    }
+
     normalizeGamePath = _module_0.NormalizeGamePath = ( absolutePath, gamePath ) ->
         absolutePath = sub( resolve( absolutePath ), 2 )
 
@@ -56,7 +62,7 @@ do
 
         rootFolder, relativePath = match( absolutePath, "^([^/]+)/?(.*)" )
         if rootFolder
-            gamePath = gamePaths[ rootFolder ]
+            gamePath = dir2path[ rootFolder ]
             if gamePath
                 return relativePath, gamePath
 
@@ -409,7 +415,6 @@ do
     import moonloader from environment
     import getExtension from path
 
-    supportedExtensions = { moon: true, yue: true, lua: true }
     cacheExts = { "yue", "moon" }
     cacheCount = #cacheExts
 
@@ -422,7 +427,7 @@ do
 
             extension = getExtension( filePath )
             if extension
-                if supportedExtensions[ extension ]
+                if luaExtensions[ extension ]
                     filePath = sub( filePath, 1, len( filePath ) - ( len( extension ) + 1 ) )
                 else
                     return false
@@ -450,7 +455,7 @@ do
 
             extension = getExtension( filePath )
             if extension
-                if supportedExtensions[ extension ]
+                if luaExtensions[ extension ]
                     filePath = sub( filePath, 1, len( filePath ) - ( len( extension ) + 1 ) )
                 else
                     return false
@@ -829,25 +834,27 @@ do
 
     import stripExtension from path
 
-    _module_0.Compile = ( fullPath, gamePath, handleError, yueConfig, skipNormalize ) ->
-        filePath = stripExtension( fullPath )
-
+    _module_0.Compile = ( filePath, gamePath, handleError, yueConfig, skipNormalize ) ->
         unless skipNormalize
             filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
-        compilePath = filePath .. ".lua"
-        if isFile( compilePath, gamePath, true )
-            return compileLua( compilePath, gamePath, handleError, true )
+        withoutExtension, extension = stripExtension( filePath )
+        if extension ~= "" and not luaExtensions[ extension ]
+            return compileLua( filePath, gamePath, handleError, true )
 
-        compilePath = filePath .. ".moon"
-        if isFile( compilePath, gamePath, true )
-            return compileMoon( compilePath, gamePath, handleError, true )
-
-        compilePath = filePath .. ".yue"
+        compilePath = withoutExtension .. ".yue"
         if isFile( compilePath, gamePath, true )
             return compileYue( compilePath, gamePath, handleError, yueConfig, true )
 
-        error CodeCompileError "File '" .. fullPath .. "' cannot be compiled."
+        compilePath = withoutExtension .. ".moon"
+        if isFile( compilePath, gamePath, true )
+            return compileMoon( compilePath, gamePath, handleError, true )
+
+        compilePath = withoutExtension .. ".lua"
+        if isFile( compilePath, gamePath, true )
+            return compileLua( compilePath, gamePath, handleError, true )
+
+        error CodeCompileError "File '" .. filePath .. "' cannot be compiled."
         return
 
 return _module_0
