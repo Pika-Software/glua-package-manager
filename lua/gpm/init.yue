@@ -110,10 +110,10 @@ environment.await = promise.await
 environment.Promise = promise
 
 url = include( "libs/url.lua" )
--- environment.IsQueryStringParser = url.IsQueryStringParser
--- environment.QueryStringParser = url.QueryStringParser
 environment.http.EncodeURIComponent = url.encodeURIComponent
 environment.http.DecodeURIComponent = url.decodeURIComponent
+environment.IsURLSearchParams = url.IsURLSearchParams
+environment.URLSearchParams = url.URLSearchParams
 environment.http.EncodeURI = url.encodeURI
 environment.http.DecodeURI = url.decodeURI
 environment.isurl = url.IsURL

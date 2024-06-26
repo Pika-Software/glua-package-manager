@@ -24,7 +24,7 @@
 import type, tostring, tonumber, rawget, rawset, getmetatable, pairs from _G
 import byte, char, sub, gsub, lower, format from string
 import rshift, lshift, band, bor from (bit or bit32)
-import concat from table
+import concat, remove from table
 import floor from math
 
 -- a quirky way to check if number have metatable
@@ -919,6 +919,46 @@ parseQuery = (str, startPos, endPos, isSpecial, stateOverride) =>
     encodeSet = isSpecial and SPECIAL_QUERY_ENCODE_SET or QUERY_ENCODE_SET
     @query = percentEncode(sub(str, startPos, endPos), encodeSet)
 
+-- This methods parses given query string to a list of name-value tuple
+parseQueryString = (str, output=[]) ->
+    pointer = startPos = 1
+    name = value = nil
+    containsPlus = false
+    count = 0
+    while true
+        ch = byte(str, pointer)
+        if ch == 0x26 --[['&']] or not ch -- EOF
+            value = sub(str, startPos, pointer - 1)
+            if containsPlus
+                value = gsub(name, "%+", " ")
+                containsPlus = false
+
+            unless name
+                name = value
+                value = nil
+
+            if name != "" or value
+                name = percentDecode(name, DECODE_LOOKUP_TABLE)
+                value = value and percentDecode(value, DECODE_LOOKUP_TABLE) or nil
+                count += 1
+                output[count] = [name, value]
+
+            name = value = nil
+            startPos = pointer + 1
+            if not ch -- EOF
+                break
+        elseif ch == 0x3D -- '='
+            name = sub(str, startPos, pointer - 1)
+            startPos = pointer + 1
+            if containsPlus
+                name = gsub(name, "%+", " ")
+                containsPlus = false
+        elseif ch == 0x2B --[['+']]
+            containsPlus = true
+
+        pointer += 1
+    return output
+
 parseFragment = (str, startPos, endPos) =>
     @fragment = percentEncode(sub(str, startPos, endPos), FRAGMENT_ENCODE_SET)
 
@@ -988,6 +1028,31 @@ serializeHost = (host) ->
         return concat(address, ".")
     return host
 
+serializeQuery = (query) ->
+    unless istable(query)
+        return query
+
+    output, length = {}, 0
+
+    for t in *query
+        if length > 0
+            length += 1
+            output[length] = "&"
+
+        length += 1
+        output[length] = t[1] and percentEncode(t[1], QUERY_ENCODE_SET, true) or ""
+
+        value = t[2] and percentEncode(t[2], QUERY_ENCODE_SET, true) or ""
+        if value != ""
+            length += 1
+            output[length] = "="
+
+            length += 1
+            output[length] = value
+
+    if length != 0
+        return concat(output, "", 1, length)
+
 export serialize = (excludeFragment) =>
     scheme = @scheme
     hostname = @hostname
@@ -996,39 +1061,69 @@ export serialize = (excludeFragment) =>
     fragment = @fragment
     isOpaque = isstring(path)
 
-    output = []
+    output, length = [], 0
+
     if scheme
-        output[] = scheme
-        output[] = ":"
+        length += 1
+        output[length] = scheme
+
+        length += 1
+        output[length] = ":"
+
     if hostname
-        output[] = "//"
+        length += 1
+        output[length] = "//"
+
         username = @username
         password = @password
+
         if username or password
-            output[] = username
+            length += 1
+            output[length] = username
+
             if password and password != ""
-                output[] = ":"
-                output[] = password
-            output[] = "@"
-        output[] = serializeHost(hostname)
+                length += 1
+                output[length] = ":"
+
+                length += 1
+                output[length] = password
+
+            length += 1
+            output[length] = "@"
+
+        length += 1
+        output[length] = serializeHost(hostname)
+
         if port := @port
-            output[] = ":"
-            output[] = tostring(port)
+            length += 1
+            output[length] = ":"
+
+            length += 1
+            output[length] = tostring(port)
+
     elseif path and not isOpaque and #path > 1 and path[1] == ""
-        output[] = "./"
+        length += 1
+        output[length] = "./"
 
     if path
-        output[] = isOpaque and path or "/" .. concat(path, "/")
+        length += 1
+        output[length] = isOpaque and path or "/" .. concat(path, "/")
 
     if query
-        output[] = "?"
-        output[] = query
+        length += 1
+        output[length] = "?"
+
+        length += 1
+        output[length] = tostring(query)
 
     if fragment and excludeFragment != true
-        output[] = "#"
-        output[] = fragment
+        length += 1
+        output[length] = "#"
 
-    return concat(output, "")
+        length += 1
+        output[length] = fragment
+
+    return concat(output, "", 1, length)
 
 getOrigin = =>
     switch @scheme
@@ -1051,6 +1146,111 @@ serializeOrigin = =>
             output = output .. ":" .. port
         return output
 
+export class URLSearchParams
+    new: (query, @url) =>
+        if isstring query
+            if byte(query, 1) == 0x3F --[['?']]
+                query = sub(query, 2)
+
+            parseQueryString(query, @) -- will parse query string into URLSearchParams itself
+        elseif istable query
+            for i = 1, #query do @[i] = query[i]
+
+        if @url
+            -- yeah, URLState.query may be a string or URLSearchParams
+            -- when we access URL.searchParams, it will look for URLState.query
+            @url.state.query = @
+
+    __tostring: => serializeQuery(@)
+
+    update = =>
+        if @url
+            @url.query = @ -- trigger cache reset with query setter
+
+    append: (list, name, value) ->
+        list[] = [name, value]
+        update(list)
+
+    delete: (list, name, value) ->
+        for i = #list, 1, -1
+            t = list[i]
+            if t[1] == name and (not value or t[2] == value)
+                remove(list, i)
+        update(list)
+
+    get: (list, name) ->
+        for t in *list
+            if t[1] == name
+                return t[2]
+
+    getAll: (list, name) ->
+        values = []
+        for t in *list
+            if t[1] == name
+                values[] = t[2]
+        return values
+
+    has: (list, name, value) ->
+        for t in *list
+            if t[1] == name and (not value or t[2] == value)
+                return true
+        return false
+
+    set: (list, name, value) ->
+        for i = 1, #list
+            t = list[i]
+            if t[1] == name
+                -- replace first value
+                t[2] = value
+                -- remove all other values
+                for i = #list, i + 1, -1
+                    if list[i][1] == name
+                        remove(list, i)
+                update(list)
+                return
+        -- if name is not found, append new value
+        list[] = [name, value]
+        update(list)
+
+    sort: (list) ->
+        for i = 1, #list - 1
+            jMin = i
+            for j = i + 1, #list
+                if list[j][1] < list[jMin][1]
+                    jMin = j
+
+            if jMin != i
+                old = list[i]
+                list[i] = list[jMin]
+                list[jMin] = old
+        update(list)
+
+    iterator: (list) ->
+        i = 0
+        return ->
+            i += 1
+            t = list[i]
+            if t then return t[1], t[2]
+
+    keys: (list) ->
+        i = 0
+        return ->
+            i += 1
+            t = list[i]
+            if t then return t[1]
+
+    values: (list) ->
+        i = 0
+        return ->
+            i += 1
+            t = list[i]
+            if t then return t[2]
+
+
+export IsURLSearchParams = ( any ) ->
+    metatable = getmetatable( any )
+    return metatable and metatable.__class == URLSearchParams
+
 export class URL
     new: (str, base) =>
         state = @state = {}
@@ -1067,10 +1267,13 @@ export class URL
         rawset(@, "_host", nil)
         rawset(@, "_hostname", nil)
         rawset(@, "_pathname", nil)
+        rawset(@, "_query", nil)
 
     cacheValue = (key, value) =>
         rawset(@, key, value)
         return value
+
+    __tostring: => @href
 
     __index: (key) =>
         state = rawget(@, "state")
@@ -1079,6 +1282,8 @@ export class URL
         if STATE_FIELDS[key]
             switch key
                 when "hostname" then return rawget(@, "_hostname") or cacheValue(@, "_hostname", serializeHost(state.hostname))
+                when "query"
+                    return rawget(@, "_query") or cacheValue(@, "_query", IsURLSearchParams(state.query) and tostring(state.query) or state.query)
                 else return state[key]
 
         -- Special fields
@@ -1095,9 +1300,12 @@ export class URL
                 if not istable(state.path) then return state.path
                 return cacheValue(@, "_pathname", "/" .. concat(state.path, "/"))
             when "search"
-                if not state.query or state.query == "" then return ""
-                return "?" .. state.query
-            when "searchParams" then return -- TODO
+                query = @query -- get cached query, or serialize it
+                if not query or query == "" then return ""
+                return "?" .. query
+            when "searchParams"
+                if IsURLSearchParams(state.query) then return state.query
+                return URLSearchParams(state.query, @)
             when "hash"
                 if not state.fragment or state.fragment == "" then return ""
                 return "#" .. state.fragment
@@ -1120,13 +1328,11 @@ export class URL
                 when "hostname"
                     if isstring(state.path)
                         return
-                    resetCache(@)
                     parseHost(state, value, 1, #value, state.scheme and SPECIAL_SCHEMAS[state.scheme], "hostname")
                 when "port"
                     if not state.hostname or state.hostname == "" or state.scheme == "file"
                         return
 
-                    resetCache(@)
                     if not value or value == ""
                         state.port = nil
                         return
@@ -1162,6 +1368,7 @@ export class URL
                 resetCache(@)
                 leadingSymbol = byte(value, 1) == 0x3F --[['?']]
                 parseQuery(state, value, leadingSymbol and 2 or 1, #value, state.scheme and SPECIAL_SCHEMAS[state.scheme], true)
+            when "searchParams" then return -- readonly field
             when "hash"
                 if not value or value == ""
                     state.fragment = nil
