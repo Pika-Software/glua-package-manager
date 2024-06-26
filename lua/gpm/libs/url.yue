@@ -1114,7 +1114,7 @@ export serialize = (excludeFragment) =>
         output[length] = "?"
 
         length += 1
-        output[length] = tostring(query)
+        output[length] = tostring(query) or ""
 
     if fragment and excludeFragment != true
         length += 1
