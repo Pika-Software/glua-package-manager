@@ -3,9 +3,9 @@ import environment, Module from gpm
 import await, async, SourceError, ModuleLoadError from environment
 
 import Base64Decode, JSONToTable, CompileLuaString, CompileMoonString, CompileYueString from environment.util
-import GetExtensionFromFilename from environment.string
 import BaseSource, BaseSourceHandler from gpm.loader
 import MountZIPData from environment.file
+import getExtension from environment.path
 import insert from environment.table
 import Fetch from environment.http
 
@@ -128,7 +128,7 @@ class RepositoryHandler extends BaseSourceHandler
                             when "base64"
                                 json.content = Base64Decode( json.content )
 
-                        switch GetExtensionFromFilename( currentPath )
+                        switch getExtension( currentPath )
                             when "lua"
                                 func = await CompileLuaString( json.content, url.href )
                                 unless func
