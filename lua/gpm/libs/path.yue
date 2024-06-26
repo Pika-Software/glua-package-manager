@@ -289,8 +289,12 @@ export resolve = (...) ->
 -- Returns the relative path from "from" to "to"
 -- If no relative path can be solved, then "to" is returned
 export relative = ( pathFrom, pathTo ) ->
-    fromRoot, fromDir, fromBaseName = splitPath( resolve( pathFrom ) )
-    toRoot, toDir, toBaseName = splitPath( resolve( pathTo ) )
+    pathFrom = resolve( pathFrom )
+    pathTo = resolve( pathTo )
+
+    fromRoot, fromDir, fromBaseName = splitPath( pathFrom )
+    toRoot, toDir, toBaseName = splitPath( pathTo )
+
     unless pathsEqual( fromRoot, toRoot )
         return pathTo
 
