@@ -1,5 +1,5 @@
-import MsgC, Color, string, os, setmetatable, rawget, rawset, tonumber from _G
-import format, gsub from string
+import MsgC, Color, string, os, tostring from _G
+import format, gsub, sub, len from string
 import Queue from gpm.util
 import date from os
 
@@ -27,13 +27,6 @@ else
 
 state = "[" .. state .. "] "
 
-imeta = {
-    __index: ( args, key ) ->
-        str = rawget( args, tonumber( key ) or 0 )
-        rawset( args, key, str )
-        return str
-}
-
 queue = Queue( 256 )
 
 timer.Create "GLua Package Manager::Logger", 1 / 10, 0, ->
@@ -46,10 +39,26 @@ timer.Create "GLua Package Manager::Logger", 1 / 10, 0, ->
 
 log = ( color, level, str, ... ) =>
     if @interpolation
-        queue\enqueue( { color, level, @title_color, @title, @text_color, gsub( str, "{([0-9]+)}", setmetatable( {...}, imeta ) ) } )
-        return
+        args = {...}
+        for index = 1, #args
+            args[ tostring( index ) ] = tostring( args[ index ] )
 
-    queue\enqueue( { color, level, @title_color, @title, @text_color, format( str, ... ) } )
+        str = gsub( str, "{([0-9]+)}", args )
+    else
+        str = format( str, ... )
+
+    title = @title
+
+    titleLength = len( title )
+    if titleLength > 64
+        title = sub( title, 1, 64 )
+        titleLength = 64
+        @title = title
+
+    if ( len( str ) + titleLength ) > 950
+        str = sub( str, 1, 950 - titleLength ) .. "..."
+
+    queue\enqueue( { color, level, @title_color, title, @text_color, str } )
     return
 
 developer = GetConVar( "developer" )
@@ -87,4 +96,3 @@ export default class Logger
             log( @, debug, "DEBUG ", ... )
 
         return
-
