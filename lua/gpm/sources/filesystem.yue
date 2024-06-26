@@ -1,5 +1,5 @@
 _G = _G
-import gpm from _G
+import gpm, error from _G
 import environment, Module from gpm
 import async, await, file, ModuleLoadError, MountError, SourceError from environment
 import Compile, CompileLua, CompileMoon, CompileYue, IsFile from file

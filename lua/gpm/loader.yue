@@ -125,9 +125,9 @@ getFileURL = ( any ) ->
 
 loader.GetFileURL = getFileURL
 
-loader.FetchInfo = async ( url ) ->
+loader.FetchInfo = async ( url, ... ) ->
     url = getFileURL( url )
-    return findSource( url.scheme )\FetchInfo( url )
+    return findSource( url.scheme )\FetchInfo( url, ... )
 
 asyncImport = async ( url, base = "lua:", pkg, env, info ) ->
     fileURL = getFileURL( parse( url, base ) )

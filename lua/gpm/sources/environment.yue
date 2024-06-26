@@ -1,0 +1,34 @@
+_G = _G
+import gpm, error from _G
+import environment from gpm
+import async from environment
+import gsub from environment.string
+import GetValue from environment.table
+import BaseSource, BaseSourceHandler from gpm.loader
+
+class EnvironmentHandler extends BaseSourceHandler
+    FetchInfo: async =>
+        return
+
+    Install: async ( url, __, ___, parent, env ) =>
+        switch url.scheme
+            when "gpm"
+                return GetValue( environment, gsub( url.pathname, "/", "." ) )
+
+            when "env"
+                if parent
+                    if name := url.searchParams\get( "package" )
+                        pkg = parent.packages[ name ]
+                        unless pkg
+                            error ModuleLoadError "Package '" .. name .. "' not found."
+
+                        return GetValue( pkg.env, gsub( url.pathname, "/", "." ) )
+
+                return GetValue( env, gsub( url.pathname, "/", "." ) )
+
+            else
+                return GetValue( _G, gsub( url.pathname, "/", "." ) )
+
+class EnvironmentSource extends BaseSource
+
+EnvironmentSource( "glua", "env", "gpm" )\RegisterHandler( EnvironmentHandler! )
