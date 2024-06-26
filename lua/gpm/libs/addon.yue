@@ -4,6 +4,7 @@ import AddonError, ArgAssert, isstring, istable, error, tostring, tonumber from 
 import Open, Find, GetFolderContents from environment.file
 import HasValue, Empty from environment.table
 import lower, gsub, find from string
+import equal from environment.path
 import CRC from util
 
 export GetAll = engine.GetAddons
@@ -480,7 +481,7 @@ export class Addon
         ::removed::
 
         for index = 1, length
-            if files[ index ].file_path == filePath
+            if equal( files[ index ].file_path, filePath )
                 remove( files, index )
                 length -= 1
                 goto removed

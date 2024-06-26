@@ -89,22 +89,18 @@ do
     import replaceDir, replaceFile from path
     import Rename from file
 
-    _module_0.Move = ( pathFrom, pathTo, gamePath, skipNormalize ) ->
-        relativeGamePath = gamePath
+    _module_0.Move = ( pathFrom, pathTo, gamePathFrom, gamePathTo, skipNormalize ) ->
+        unless skipNormalize
+            pathFrom, gamePathFrom = normalizeGamePath( pathFrom, gamePathFrom )
+
+        assertWriteAllowed( pathFrom, gamePathFrom )
 
         unless skipNormalize
-            absolutePath, gamePathFrom = normalizeGamePath( pathFrom, gamePath )
-            relativeGamePath = gamePathFrom
+            pathTo, gamePathTo = normalizeGamePath( pathTo, gamePathTo )
 
-        assertWriteAllowed( absolutePath, relativeGamePath )
+        assertWriteAllowed( pathTo, gamePathTo )
 
-        unless skipNormalize
-            relativePath, gamePathTo = normalizeGamePath( pathTo, gamePath )
-            relativeGamePath = gamePathTo
-
-        assertWriteAllowed( relativePath, relativeGamePath )
-
-        return Rename( absolutePath, replaceDir( absolutePath, relativePath ), relativeGamePath )
+        return Rename( pathFrom, replaceDir( pathFrom, pathTo ), gamePathFrom, gamePathTo )
 
     --[[
 
@@ -115,13 +111,13 @@ do
 
     ]]
 
-    _module_0.Rename = ( pathFrom, newName, gamePath, skipNormalize ) ->
+    _module_0.Rename = ( filePath, newName, gamePath, skipNormalize ) ->
         unless skipNormalize
-            absolutePath, gamePath = normalizeGamePath( pathFrom, gamePath )
+            filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
-        assertWriteAllowed( absolutePath, gamePath )
+        assertWriteAllowed( filePath, gamePath )
 
-        return Rename( absolutePath, replaceFile( absolutePath, newName ), gamePath )
+        return Rename( filePath, replaceFile( filePath, newName ), gamePath )
 
     --[[
 
@@ -374,13 +370,13 @@ do
             WriteByte( fileHandle, 0 )
             return
 
-        if File.ReadUInt64 == nil
+        unless File.ReadUInt64
             File.ReadUInt64 = ( fileHandle ) ->
                 number = ReadULong( fileHandle )
                 Skip( fileHandle, 4 )
                 return number
 
-        if File.WriteUInt64 == nil
+        unless File.WriteUInt64
             File.WriteUInt64 = ( fileHandle, number ) ->
                 WriteULong( fileHandle, number )
                 WriteULong( fileHandle, 0 )

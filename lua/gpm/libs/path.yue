@@ -125,7 +125,7 @@ export isAbsolute = ( filePath ) ->
 import os from jit
 export isSpecial = os == "Windows" or os == "OSX"
 
-pathsEqual = ( a, b ) ->
+export equal = ( a, b ) ->
     if isSpecial
         return a and b and lower( a ) == lower( b )
 
@@ -145,7 +145,7 @@ export splitPath = ( filePath ) ->
         filePath = sub( filePath, 1, -len( trailingSlashes ) - 1 )
 
     baseName = match( filePath, "[^/]+$" )
-    return root, ( baseName and sub( filePath, 1, -len( baseName ) - 1 ) or filePath ), baseName or ""
+    return root, baseName and sub( filePath, 1, -len( baseName ) - 1 ) or filePath, baseName or ""
 
 -- returns the directory name of a path,
 -- similar to the Unix dirname command.
@@ -295,7 +295,7 @@ export relative = ( pathFrom, pathTo ) ->
     fromRoot, fromDir, fromBaseName = splitPath( pathFrom )
     toRoot, toDir, toBaseName = splitPath( pathTo )
 
-    unless pathsEqual( fromRoot, toRoot )
+    unless equal( fromRoot, toRoot )
         return pathTo
 
     fromParts, fromLength = splitBySeparators( fromDir .. fromBaseName )
@@ -304,7 +304,7 @@ export relative = ( pathFrom, pathTo ) ->
     commonLength = 0
     for index = 1, fromLength
         part = fromParts[ index ]
-        unless pathsEqual( part, toParts[ index ] )
+        unless equal( part, toParts[ index ] )
             break
 
         commonLength += 1

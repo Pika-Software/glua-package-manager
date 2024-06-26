@@ -4,6 +4,7 @@ import environment from gpm
 import await, async, file, FileSystemError from environment
 
 import time from environment.os
+import equal from environment.path
 import fempty from environment.debug
 import match, sub from environment.string
 import DecompressDeflate from environment.deflate
@@ -64,7 +65,7 @@ mountZIPData = file.MountZIPData = async ( data, uniqueName ) ->
         if isInFolder ~= false
             current = match( fileName, "^(.-)/" )
             if last
-                isInFolder = last == current
+                isInFolder = equal( last, current )
 
             last = current
 
