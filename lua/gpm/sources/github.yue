@@ -124,43 +124,49 @@ class RepositoryHandler extends BaseSourceHandler
                         unless json
                             error SourceError "Unable to parse JSON response."
 
+                        :content = json
+
                         switch json.encoding
                             when "base64"
-                                json.content = Base64Decode( json.content )
+                                content = Base64Decode( content )
 
                         switch getExtension( currentPath )
                             when "lua"
-                                func = await CompileLuaString( json.content, url.href )
+                                func = await CompileLuaString( content, url.href, true )
                                 unless func
                                     error ModuleLoadError "File '" .. url.href .. "' cannot be compiled."
                                     return
 
-                                Module( func, url.href, env )
+                                Module( func, url, env )
                                 return func!
 
                             when "moon"
-                                func = await CompileMoonString( json.content, url.href )
+                                func = await CompileMoonString( content, url.href, true )
                                 unless func
                                     error ModuleLoadError "File '" .. url.href .. "' cannot be compiled."
                                     return
 
-                                Module( func, url.href, env )
+                                Module( func, url, env )
                                 return func!
 
                             when "yue"
-                                func = await CompileYueString( json.content, url.href )
+                                yueConfig = {}
+                                for key, value in url.searchParams\iterator!
+                                    yueConfig[ key ] = value
+
+                                func = await CompileYueString( content, url.href, true, yueConfig )
                                 unless func
                                     error ModuleLoadError "File '" .. url.href .. "' cannot be compiled."
                                     return
 
-                                Module( func, url.href, env )
+                                Module( func, url, env )
                                 return func!
 
                             when "json"
-                                return JSONToTable( json.content, true, false )
+                                return JSONToTable( content, true, false )
 
 
-                        return json.content
+                        return content
 
                     break
 

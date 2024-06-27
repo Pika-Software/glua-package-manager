@@ -28,7 +28,7 @@ do
 
     class BinarySource extends BaseSource
 
-    BinarySource( "binary", "dll" )\RegisterHandler( BinarySourceHandler! )
+    BinarySource( "dll" )\RegisterHandler( BinarySourceHandler! )
 
 do
 
@@ -93,12 +93,12 @@ do
             gamePath = scheme2path[ scheme ] or scheme
             filePath = sub( url.pathname, 2 )
 
-            yueConfig = {}
-            for key, value in url.searchParams\iterator!
-                yueConfig[ key ] = value
-
             return switch getExtension( filePath )
                 when ""
+                    yueConfig = {}
+                    for key, value in url.searchParams\iterator!
+                        yueConfig[ key ] = value
+
                     await Compile( filePath, gamePath, true, yueConfig, true )
 
                 when "lua"
@@ -116,6 +116,10 @@ do
                 when "yue"
                     unless IsFile( filePath, gamePath, true )
                         error ModuleLoadError "File '" .. filePath .. "' cannot be found."
+
+                    yueConfig = {}
+                    for key, value in url.searchParams\iterator!
+                        yueConfig[ key ] = value
 
                     await CompileYue( filePath, gamePath, true, yueConfig, true )
 
