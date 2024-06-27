@@ -7,51 +7,24 @@ import sub from environment.string
 import BaseSource, BaseSourceHandler from gpm.loader
 import getExtension, equal from environment.path
 
---[[
-
-    Concept:
-
-    package source
-        npm like behavior ( i guess ) ( returns package object )
-
-        Single File Package:
-            package://pkg1.lua ( obviously /autorun files )
-
-        Package:
-            package://pkg2
-                ||
-                ||
-                package.lua
-                    ||
-                    ||
-                    init.lua
-
-]]
-
 do
 
     import IsBinaryModuleInstalled from environment.util
     import require from _G
 
     class BinarySourceHandler extends BaseSourceHandler
-        FetchInfo: async ( url ) =>
-            :hostname = url
-            if not hostname or hostname == ""
+        Install: async ( url ) =>
+            name = url.hostname
+            if not name or name == ""
                 error SourceError "Binary module name is not specified!"
+                return
 
-            return {
-                installed: IsBinaryModuleInstalled( hostname ),
-                name: hostname
-            }
+            unless IsBinaryModuleInstalled( name )
+                error SourceError "Binary module " .. name .. " is not installed locally!"
+                return
 
-        Install: async ( _, info ) =>
-            :name = info
-            if info.installed
-                require( name )
-                return _G[ name ]
-
-            error SourceError "Binary module " .. name .. " is not installed locally!"
-            return
+            require( name )
+            return _G[ name ]
 
     class BinarySource extends BaseSource
 
@@ -65,11 +38,8 @@ do
         ShouldHandle: ( url ) =>
             return getExtension( url.pathname ) == "gma"
 
-        FetchInfo: async ( url ) =>
-            return url.pathname
-
-        Install: async ( _, filePath ) =>
-            ok, result = MountGMA( filePath )
+        Install: async ( url ) =>
+            ok, result = MountGMA( url.pathname )
             if ok
                 return result
 
@@ -80,11 +50,8 @@ do
         ShouldHandle: ( url ) =>
             return getExtension( url.pathname ) == "zip"
 
-        FetchInfo: async ( url ) =>
-            return url.pathname
-
-        Install: async ( _, filePath ) =>
-            return await MountZIP( filePath )
+        Install: async ( url ) =>
+            return await MountZIP( url.pathname )
 
     class LuaHandler extends BaseSourceHandler
         ShouldHandle: ( url ) =>

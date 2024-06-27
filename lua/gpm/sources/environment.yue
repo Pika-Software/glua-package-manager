@@ -7,10 +7,7 @@ import GetValue from environment.table
 import BaseSource, BaseSourceHandler from gpm.loader
 
 class EnvironmentHandler extends BaseSourceHandler
-    FetchInfo: async =>
-        return
-
-    Install: async ( url, __, ___, parent, env ) =>
+    Install: async ( url, _, __, parent, env ) =>
         switch url.scheme
             when "gpm"
                 return GetValue( environment, gsub( url.pathname, "/", "." ) )

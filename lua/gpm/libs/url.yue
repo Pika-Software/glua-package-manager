@@ -1109,7 +1109,7 @@ export serialize = (excludeFragment) =>
         length += 1
         output[length] = isOpaque and path or "/" .. concat(path, "/")
 
-    if query
+    if query and #query != 0
         length += 1
         output[length] = "?"
 

@@ -66,13 +66,15 @@ registerSource = ( scheme, source ) ->
 
 loader.RegisterSource = registerSource
 
+defaultFetchInfo = async ( url, parent_url, parent_pkg, parent_env ) =>
+    error NotImplementedError "Source:FetchInfo( url, parent_url, parent_pkg, parent_env )"
+    return
+
 class loader.BaseSourceHandler
     __tostring: =>
         return format( "%s: %p", @@__name or "unknown source handler", @ )
 
-    FetchInfo: async ( url, parent_url, parent_pkg, parent_env ) =>
-        error NotImplementedError "Source:FetchInfo( url, parent_url, parent_pkg, parent_env )"
-        return
+    FetchInfo: defaultFetchInfo
 
     Install: async ( url, info, parent_url, parent_pkg, parent_env ) =>
         error NotImplementedError "Source:Install( url, info, parent_url, parent_pkg, parent_env )"
@@ -127,13 +129,15 @@ loader.GetFileURL = getFileURL
 
 loader.FetchInfo = async ( url, ... ) ->
     url = getFileURL( url )
-    return findSource( url.scheme )\FetchInfo( url, ... )
+    source = findSource( url.scheme )
+    if source.FetchInfo ~= defaultFetchInfo
+        return source\FetchInfo( url, ... )
 
 asyncImport = async ( url, base = "lua:", pkg, env, info ) ->
     fileURL = getFileURL( parse( url, base ) )
     source = findSource( fileURL.scheme )
 
-    unless info
+    if not info and source.FetchInfo ~= defaultFetchInfo
         info = await source\FetchInfo( fileURL, base, pkg, env )
 
     return source\Install( fileURL, info, base, pkg, env )
