@@ -2,15 +2,20 @@ _G = _G
 import gpm, error from _G
 import environment from gpm
 import async from environment
-import gsub from environment.string
+import ByteReplace from environment.string
 import GetValue from environment.table
 import BaseSource, BaseSourceHandler from gpm.loader
 
 class EnvironmentHandler extends BaseSourceHandler
     Install: async ( url, _, __, parent, env ) =>
+        :pathname = url
+
         switch url.scheme
             when "gpm"
-                return GetValue( environment, gsub( url.pathname, "/", "." ) )
+                if pathname == "*"
+                    return environment
+
+                return GetValue( environment, ByteReplace( pathname, 0x2F --[[ / ]], "." ) )
 
             when "env"
                 if parent
@@ -19,12 +24,21 @@ class EnvironmentHandler extends BaseSourceHandler
                         unless pkg
                             error ModuleLoadError "Package '" .. name .. "' not found."
 
-                        return GetValue( pkg.env, gsub( url.pathname, "/", "." ) )
+                        if pathname == "*"
+                            return pkg.env
 
-                return GetValue( env, gsub( url.pathname, "/", "." ) )
+                        return GetValue( pkg.env, ByteReplace( pathname, 0x2F --[[ / ]], "." ) )
+
+                if pathname == "*"
+                    return env
+
+                return GetValue( env, ByteReplace( pathname, 0x2F --[[ / ]], "." ) )
 
             else
-                return GetValue( _G, gsub( url.pathname, "/", "." ) )
+                if pathname == "*"
+                    return _G
+
+                return GetValue( _G, ByteReplace( pathname, 0x2F --[[ / ]], "." ) )
 
 class EnvironmentSource extends BaseSource
 

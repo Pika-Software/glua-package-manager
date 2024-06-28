@@ -165,7 +165,6 @@ http = environment.http = setmetatable( {}, { __index: _G.http } )
 util = environment.util = setmetatable( {}, { __index: _G.util } )
 
 -- Aliases
-string.StartsWith = string.StartsWith or string.StartWith
 util.CompileLuaString = _G.CompileString
 util.CompileLuaFile = _G.CompileFile
 table.unpack = _G.unpack
@@ -238,7 +237,10 @@ do
         Functions[ length + 1 ] = { func, typeIndex }
         return typeIndex
 
-split = ( str, pattern, withPattern ) ->
+-- string
+string.StartsWith = string.StartsWith or string.StartWith
+
+split = string.Split = ( str, pattern, withPattern ) ->
     unless pattern
         return { str }
 
@@ -267,8 +269,6 @@ split = ( str, pattern, withPattern ) ->
 
     return ret, rlength
 
-string.Split = split
-
 string.Count = ( str, pattern, withPattern ) ->
     unless pattern
         return 0
@@ -293,7 +293,7 @@ string.Count = ( str, pattern, withPattern ) ->
 string.Explode = ( pattern, str, withPattern ) ->
     return split( str, pattern, withPattern )
 
-byteSplit = ( str, ch ) ->
+byteSplit = string.ByteSplit = ( str, ch ) ->
     unless ch
         return { str }
 
@@ -315,9 +315,7 @@ byteSplit = ( str, ch ) ->
 
     return result, length
 
-string.ByteSplit = byteSplit
-
-byteCount = ( str, ch ) ->
+byteCount = string.ByteCount = ( str, ch ) ->
     unless ch
         return 0
 
@@ -334,14 +332,36 @@ byteCount = ( str, ch ) ->
 
     return count
 
-string.ByteCount = byteCount
-
 string.Extract = ( str, pattern, default ) ->
     startPos, endPos, matched = find( str, pattern, 1, false )
     if startPos
         return sub( str, 1, startPos - 1 ) .. sub( str, endPos + 1 ), matched or default
 
     return str, default
+
+string.Left = ( str, num ) ->
+    return sub( str, 1, num )
+
+string.Right = ( str, num ) ->
+    return sub( str, -num )
+
+string.ByteReplace = ( str, searchable, replaceable ) ->
+    for i = 1, len( str )
+        if byte( str, i ) == searchable
+            str = sub( str, 1, i - 1 ) .. replaceable .. sub( str, i + 1 )
+
+    return str
+
+string.Replace = ( str, searchable, replaceable, withPattern ) ->
+    if withPattern
+        return gsub( str, searchable, replaceable )
+
+    startPos, endPos = find( str, searchable, 1, true )
+    while startPos
+        str = sub( str, 1, startPos - 1 ) .. replaceable .. sub( str, endPos + 1 )
+        startPos, endPos = find( str, searchable, endPos + 1, true )
+
+    return str
 
 do
 
