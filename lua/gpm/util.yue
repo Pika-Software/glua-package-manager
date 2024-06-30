@@ -169,11 +169,12 @@ util.CompileLuaString = _G.CompileString
 util.CompileLuaFile = _G.CompileFile
 table.unpack = _G.unpack
 
-debug.fempty = ->
-
 import byte, char, sub, gsub, format, len, find from string
 import concat, remove from table
 import getinfo from debug
+
+-- Make jit happy <3
+debug.fempty = ->
 
 debug.getstack = ( startPos ) ->
     stack, length = {}, 0
@@ -187,6 +188,33 @@ debug.getstack = ( startPos ) ->
         stack[ length ] = info
 
     return stack, length
+
+do
+
+    getfmain = debug.getfmain = ->
+        for level = 2, 16
+            info = getinfo( level, "fS" )
+            unless info
+                break
+
+            if info.what == "main"
+                return info.func
+
+    lff = ( a, b ) -> b
+
+    getfpathi = debug.getfpathi = ( location ) ->
+        info = getinfo( location, "S" )
+        if info.what == "main"
+            return "/" .. gsub( gsub( sub( info.source, 2 ), "^(.-)(lua/.*)$", lff ), "^(.-)([%w_]+/gamemode/.*)$", lff )
+
+        return "/"
+
+    debug.getfpath = ->
+        main = getfmain!
+        if main
+            return getfpathi( main )
+
+        return "/"
 
 -- Custom variable types
 do
@@ -774,11 +802,12 @@ do
                 return value
 
         elseif istable( expected )
-            for index = 1, #expected
+            length = #expected
+            for index = 1, length
                 if valueType == expected[ index ]
                     return value
 
-            expected = "[ " .. concat( expected, "/" ) .. " ]"
+            expected = "[ " .. concat( expected, "/", 1, length ) .. " ]"
 
         error "bad argument #" .. argNum .. " to \'" .. ( getinfo( 2, "n" ).name or "unknown" ) .. "\' (" .. expected .. " expected, got " .. valueType .. ")", errorlevel or 3
 
@@ -993,33 +1022,6 @@ do
 
     environment.AddType( "Color", iscolor )
     environment.iscolor = iscolor
-
-do
-
-    getfmain = debug.getfmain = ->
-        for level = 2, 16
-            info = getinfo( level, "fS" )
-            unless info
-                break
-
-            if info.what == "main"
-                return info.func
-
-    lff = ( a, b ) -> b
-
-    getfpathi = debug.getfpathi = ( location ) ->
-        info = getinfo( location, "S" )
-        if info.what == "main"
-            return "/" .. gsub( gsub( sub( info.source, 2 ), "^(.-)(lua/.*)$", lff ), "^(.-)([%w_]+/gamemode/.*)$", lff )
-
-        return "/"
-
-    debug.getfpath = ->
-        main = getfmain!
-        if main
-            return getfpathi( main )
-
-        return "/"
 
 do
 
@@ -1419,6 +1421,25 @@ do
                 return 0
 
             return ldexp( ldexp( byte3 % 0x80 * 0x10000 + byte2 * 0x100 + byte1, -23 ) + 1, exponent ) * ( byte4 < 0x80 and 1 or -1 )
+
+-- class TaskManager
+--     new: =>
+--         @tasks = {}
+
+--     Add: ( name, promise ) =>
+--         @tasks[] = { name, promise }
+--         return
+
+--     Remove: ( name ) =>
+--         tasks = @tasks
+
+--         for index = 1, #tasks
+
+
+--         return
+
+
+
 
 do
 

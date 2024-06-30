@@ -12,7 +12,7 @@ class EnvironmentHandler extends BaseSourceHandler
 
         switch url.scheme
             when "gpm"
-                if pathname == "*"
+                if pathname == "*" or pathname == ""
                     return environment
 
                 return GetValue( environment, ByteReplace( pathname, 0x2F --[[ / ]], "." ) )
@@ -24,18 +24,18 @@ class EnvironmentHandler extends BaseSourceHandler
                         unless pkg
                             error ModuleLoadError "Package '" .. name .. "' not found."
 
-                        if pathname == "*"
+                        if pathname == "*" or pathname == ""
                             return pkg.env
 
                         return GetValue( pkg.env, ByteReplace( pathname, 0x2F --[[ / ]], "." ) )
 
-                if pathname == "*"
+                if pathname == "*" or pathname == ""
                     return env
 
                 return GetValue( env, ByteReplace( pathname, 0x2F --[[ / ]], "." ) )
 
             else
-                if pathname == "*"
+                if pathname == "*" or pathname == ""
                     return _G
 
                 return GetValue( _G, ByteReplace( pathname, 0x2F --[[ / ]], "." ) )

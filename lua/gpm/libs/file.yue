@@ -1,10 +1,12 @@
 _G = _G
-import gpm, file, CLIENT, SERVER, error from _G
-import environment, Logger from gpm
+import file, CLIENT, SERVER, error from _G
+import environment, Logger from _G.gpm
 
-import async, await, util, path, string, Promise, CodeCompileError, FileSystemError from environment
-import sub, len, ByteSplit, GetPathFromFilename from string
+import async, await, debug, util, path, string, Promise, CodeCompileError, FileSystemError from environment
 import IsBinaryModuleInstalled from util
+import sub, len, ByteSplit from string
+import concat from environment.table
+import fempty from debug
 import resolve from path
 import Find from file
 
@@ -177,8 +179,8 @@ do
 
     do
 
+        import getDirectory from path
         import MountGMA from game
-        import concat from table
 
         _module_0.MountGMA = ( relativePath ) ->
             success, files = MountGMA( sub( resolve( relativePath ), 2 ) )
@@ -191,7 +193,7 @@ do
                     mountedFiles[ filePath ] = true
 
                     -- mounted folders
-                    segments, segmentCount = ByteSplit( GetPathFromFilename( filePath ), 0x2F --[[ / ]] )
+                    segments, segmentCount = ByteSplit( getDirectory( filePath ), 0x2F --[[ / ]] )
                     segmentCount -= 1
 
                     while segmentCount ~= 0
@@ -343,11 +345,11 @@ do
             return Open( filePath, fileMode, gamePath )
 
     File = FindMetaTable( "File" )
-    import Close, Read, Write from File
+    import Close, Read, Write, EndOfFile from File
 
     do
 
-        import ReadULong, WriteULong, ReadByte, WriteByte, EndOfFile, Seek, Skip, Tell from File
+        import ReadULong, WriteULong, ReadByte, WriteByte, Seek, Skip, Tell from File
 
         File.SkipEmpty = ( fileHandle ) ->
             while not EndOfFile( fileHandle )
@@ -382,8 +384,8 @@ do
                 WriteULong( fileHandle, 0 )
                 return
 
-    append = _module_0.Append = ( filePath, content, gamePath ) ->
-        fileHandle = open( filePath, "ab", gamePath )
+    append = _module_0.Append = ( filePath, content, gamePath, skipNormalize ) ->
+        fileHandle = open( filePath, "ab", gamePath, skipNormalize )
         if fileHandle
             Write( fileHandle, content )
             Close( fileHandle )
@@ -391,19 +393,76 @@ do
 
         return false
 
-    read = _module_0.Read = ( filePath, gamePath, length ) ->
-        fileHandle = open( filePath, "rb", gamePath )
+    read = _module_0.Read = ( filePath, gamePath, length, skipNormalize ) ->
+        fileHandle = open( filePath, "rb", gamePath, skipNormalize )
         if fileHandle
             return Read( fileHandle, length ), Close( fileHandle )
 
-    write = _module_0.Write = ( filePath, content, gamePath ) ->
-        fileHandle = open( filePath, "wb", gamePath )
+    write = _module_0.Write = ( filePath, content, gamePath, skipNormalize ) ->
+        fileHandle = open( filePath, "wb", gamePath, skipNormalize )
         if fileHandle
             Write( fileHandle, content )
             Close( fileHandle )
             return true
 
         return false
+
+    do
+
+        import ReadLine from File
+
+        readLines = _module_0.Lines = ( filePath, gamePath, skipNormalize ) ->
+            fileHandle = open( filePath, "rb", gamePath, skipNormalize )
+            if fileHandle
+                lines, length = {}, 0
+
+                while not EndOfFile( fileHandle )
+                    length += 1
+                    lines[ length ] = ReadLine( fileHandle )
+
+                Close( fileHandle )
+                pointer = 0
+
+                return ->
+                    pointer += 1
+                    return lines[ pointer ], pointer
+
+            return fempty
+
+        import getinfo from debug
+        import gsub, match from string
+
+        debug.getfcode = ( location ) ->
+            info = getinfo( location )
+            :linedefined = info
+            if linedefined < 0
+                return info.source
+
+            :lastlinedefined = info
+            lines, length = {}, 0
+
+            for str, line in readLines( gsub( info.source, "^@", "/" ), nil )
+                if line >= linedefined
+                    length += 1
+                    lines[ length ] = str
+
+                if line >= lastlinedefined
+                    break
+
+            if length == 0
+                return ""
+
+            spaces = match( lines[ 1 ], "^%s+" )
+            if spaces
+                spLength = len( spaces )
+                spLength1 = spLength + 1
+
+                for index = 1, length
+                    str = lines[ index ]
+                    if sub( str, 1, spLength ) == spaces
+                        lines[ index ] = sub( str, spLength1 )
+
+            return concat( lines, "", 1, length )
 
 local isCompilable
 do
@@ -556,11 +615,8 @@ if istable( efsw )
 
 else
 
-    _module_0.Watch = ->
-        return false
-
-    _module_0.Unwatch = ->
-        return false
+    _module_0.Watch = fempty
+    _module_0.Unwatch = fempty
 
 local asyncRead
 do
@@ -700,7 +756,7 @@ do
 
         import Read from functions
 
-        asyncRead = ( filePath, gamePath, skipNormalize ) ->
+        asyncRead = _module_0.AsyncRead = ( filePath, gamePath, skipNormalize ) ->
             unless skipNormalize
                 filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
@@ -718,8 +774,6 @@ do
                 promise\Reject( FileSystemError FSASYNC[ state ] )
 
             return promise
-
-        _module_0.AsyncRead = asyncRead
 
     do
 
@@ -746,6 +800,17 @@ do
                 promise\Reject( FileSystemError FSASYNC[ state ] )
 
             return promise
+
+do
+
+    func = async ( promise ) ->
+        lines, pointer = ByteSplit( await( promise ), 0xa --[[ \n ]] ), 0
+        return ->
+            pointer += 1
+            return lines[ pointer ], pointer
+
+    _module_0.AsyncLines = ( filePath, gamePath, skipNormalize ) ->
+        return func( asyncRead( filePath, gamePath, skipNormalize ) )
 
 local compileLua
 do
