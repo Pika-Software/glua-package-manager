@@ -9,15 +9,15 @@ if SERVER
 
     import AddCSLuaFile from _G
 
-    files = Find( "gpm/libs/*", "lsv" )
+    files = Find( "gpm/libs/*.lua", "lsv" )
     for fileName in *files
         AddCSLuaFile( "gpm/libs/" .. fileName )
 
-    files = Find( "gpm/libs/3rd-party/*", "lsv" )
+    files = Find( "gpm/libs/3rd-party/*.lua", "lsv" )
     for fileName in *files
         AddCSLuaFile( "gpm/libs/3rd-party/" .. fileName )
 
-    files = Find( "gpm/sources/*", "lsv" )
+    files = Find( "gpm/sources/*.lua", "lsv" )
     for fileName in *files
         AddCSLuaFile( "gpm/sources/" .. fileName )
 
