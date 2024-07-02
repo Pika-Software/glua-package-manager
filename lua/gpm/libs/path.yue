@@ -1,7 +1,9 @@
+_G = _G
+import environment from _G.gpm
 -- Based on https://github.com/luvit/luvit/blob/master/deps/path/base.lua
-import byte, sub, len, lower, match, gsub, ByteSplit from string
+import byte, sub, len, lower, match, gsub, ByteSplit from environment.string
+import getfmain, getfpathi from environment.debug
 import concat, insert, remove from table
-import getfmain, getfpathi from gpm.debug
 import getfenv, rawget from _G
 
 export getFile = ( path ) ->
