@@ -167,10 +167,11 @@ util = environment.util = setmetatable( {}, { __index: _G.util } )
 -- Aliases
 util.CompileLuaString = _G.CompileString
 util.CompileLuaFile = _G.CompileFile
-table.unpack = _G.unpack
+environment.throw = error
 
 import byte, char, sub, gsub, format, len, find from string
 import concat, remove from table
+import max, min from math
 import getinfo from debug
 
 -- Make jit happy <3
@@ -267,6 +268,21 @@ do
 
 -- string
 string.StartsWith = string.StartsWith or string.StartWith
+string.slice = sub
+
+string.indexOf = ( str, searchable, position, withPattern ) ->
+    unless searchable
+        return 0
+
+    if searchable == ""
+        return 1
+
+    position = max( position or 1, 1 )
+
+    if position > len( str )
+        return -1
+
+    return find( str, searchable, position, withPattern ~= true ) or -1, nil
 
 split = string.Split = ( str, pattern, withPattern ) ->
     unless pattern
@@ -573,10 +589,7 @@ do
                 operator = sub( str, 1, pos - 1 )
 
             version = gsub( sub( str, pos ), "%.[xX*]", "" )
-
-            xrange = 2 - byteCount( version, 0x2e --[[ . ]] )
-            if xrange < 0
-                xrange = 0
+            xrange = max( 2 - byteCount( version, 0x2e --[[ . ]] ), 0 )
 
             for i = 1, xrange
                 version = version .. ".0"
@@ -813,6 +826,15 @@ do
 
     environment.ArgAssert = ArgAssert
 
+table.unpack = table.unpack or _G.unpack
+
+unless table.pack
+
+    import select from _G
+
+    table.pack = ( ... ) ->
+        return { n: select( "#", ... ), ... }
+
 table.HasValue = ( tbl, any, isSequential ) ->
 	if isSequential
 		for index = 1, #tbl
@@ -859,7 +881,7 @@ table.GetValues = ( tbl ) ->
 
 do
 
-    next = next
+    import next from _G
 
     table.IsEmpty = ( tbl ) ->
         return next( tbl ) == nil
@@ -990,7 +1012,7 @@ do
 
     import lower from string
 
-    lowerKeyNames = ( tbl ) ->
+    lowerKeyNames = table.LowerKeyNames = ( tbl ) ->
         for key, value in pairs( tbl )
             if istable( value )
                 value = lowerKeyNames( value )
@@ -1003,8 +1025,6 @@ do
                 tbl[ lowerKeyNames( key ) ] = value
 
         return tbl
-
-    table.LowerKeyNames = lowerKeyNames
 
 local iscolor
 do
@@ -1239,12 +1259,7 @@ do
         Seek: ( pointer ) =>
             if pointer
                 ArgAssert( pointer, 2, "number" )
-
-                if pointer < 0
-                    pointer = 0
-                elseif pointer > @length
-                    pointer = @length
-
+                pointer = min( max( pointer, 0 ), @length )
             else
                 pointer = 0
 
@@ -1375,9 +1390,9 @@ do
             if uint == nil
                 return
 
-            max = 0x100 ^ abs( bytes )
-            if uint >= ( max / 2 )
-                return uint - max
+            limit = 0x100 ^ abs( bytes )
+            if uint >= ( limit / 2 )
+                return uint - limit
 
             return uint
 

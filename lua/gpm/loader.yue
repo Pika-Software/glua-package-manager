@@ -1,7 +1,7 @@
 _G = _G
 import gpm from _G
 import environment from gpm
-import isurl, isstring, rawget, getfenv, URL from environment
+import string, file, isurl, isstring, rawget, getfenv, URL from environment
 import async, await, reject from environment.Promise
 import getfmain, getfpathi from environment.debug
 import NotImplementedError from environment
@@ -28,7 +28,7 @@ unless istable( loader )
 
 do
 
-    import format, IsURL from environment.string
+    import format, IsURL from string
 
     --[[
 
@@ -125,14 +125,14 @@ do
         if source.FetchInfo ~= defaultFetchInfo
             return source\FetchInfo( url, ... )
 
-    asyncImport = loader.AsyncImport = async ( url, parentURL = "file:///lua/", parent, env, info ) ->
-        url = getFileURL( URL( url, parentURL ) )
+    asyncImport = loader.AsyncImport = async ( url, base = "file:///lua/", parent, env, info ) ->
+        url = getFileURL( URL( url, base ) )
         source = findSource( url.scheme )
 
         if not info and source.FetchInfo ~= defaultFetchInfo
-            info = await source\FetchInfo( url, parentURL, parent, env )
+            info = await source\FetchInfo( url, base, parent, env )
 
-        return source\Install( url, info, parentURL, parent, env )
+        return source\Install( url, info, base, parent, env )
 
     loader.GetModule = ->
         if func := getfmain!
@@ -161,20 +161,20 @@ do
                     return mdl.env
 
     gpm.Import = ( url, should_await ) ->
-        local parentURL, parent, env
+        local base, parent, env
         if func := getfmain!
             if fenv := getfenv( func )
                 mdl = rawget( fenv, "__module" )
                 if mdl
-                    parentURL, env = mdl.url, mdl.env
+                    base, env = mdl.url, mdl.env
                     if env
                         parent = env.__package
 
-            unless parentURL
+            unless base
                 if folderPath := getfpathi( func )
-                    parentURL = URL( "file:" .. folderPath )
+                    base = URL( "file:" .. folderPath )
 
-        result = asyncImport( url, parentURL, parent, env, nil )
+        result = asyncImport( url, base, parent, env, nil )
         if should_await ~= false
             return await( result )
 
@@ -182,63 +182,6 @@ do
 
     -- TODO: Temporary solution
     environment.require = gpm.Import
-
---[[
-
--- Simple module loader that takes url and tries to get module entry
-loader.LoadURL = async ( urlStr, parentPackage ) ->
-    url = URL.parse( urlStr )
-    :scheme = url
-
-    local entry_fn
-    if scheme == "lua"
-        entry_fn = await file.Compile( url.pathname, "LUA" )
-        unless entry_fn
-            error ModuleLoadError "failed to compile file " .. url.pathname
-
-    elseif scheme == "http" or scheme == "https"
-        ext = string.GetExtensionFromFilename( url.pathname )
-        if ext ~= "lua"
-            error ModuleLoadError "unsupported web url: " .. url.href
-
-        req = await Fetch( url.href )
-        unless req and req.status == 200 and req.body
-            error ModuleLoadError "failed to fetch " .. url.href
-
-        entry_fn = CompileString( req.body, url.href )
-        unless entry_fn
-            error ModuleLoadError "failed to compile file " .. url.href
-    else
-        error ModuleLoadError "unsupported url: " .. url.href
-
-    -- Package environment
-    env = parentPackage and parentPackage\GetEnvironment! or CreateEnvironment!
-
-    -- Func environment
-    return setfenv( entry_fn, setmetatable(
-            {
-                _PKG: parentPackage
-                _URL: url.href
-            },
-            {
-                __index: env
-                __newindex: env
-            }
-        )
-    )
-
-resolvePackagePath = ( currentPath, specifier ) ->
-    local filePath
-    if currentPath == ""
-        filePath = path.Resolve( "packages", specifier )
-    else
-        filePath = path.Resolve( currentPath, "packages", specifier )
-
-    if file.Exists( filePath, "LUA" )
-        return filePath
-
-    if currentPath ~= ""
-        return resolvePackagePath( sub( string.GetPathFromFilename( currentPath ), 1, -2 ), specifier )
 
 -- Resolves specifier as it is package specifier
 -- See https://nodejs.org/api/esm.html#resolution-algorithm-specification PACKAGE_RESOLVE

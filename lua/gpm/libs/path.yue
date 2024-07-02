@@ -1,100 +1,100 @@
 -- Based on https://github.com/luvit/luvit/blob/master/deps/path/base.lua
-import byte, sub, len, lower, match, gsub, gmatch from string
+import byte, sub, len, lower, match, gsub, ByteSplit from string
 import concat, insert, remove from table
 import getfmain, getfpathi from gpm.debug
 import getfenv, rawget from _G
 
-export getFile = ( filePath ) ->
-    for index = len( filePath ), 1, -1
-		ch = byte( filePath, index )
+export getFile = ( path ) ->
+    for index = len( path ), 1, -1
+		ch = byte( path, index )
 		if ch == 0x2F --[[ / ]] or ch == 0x5C --[[ \ ]]
-            return sub( filePath, index + 1 )
+            return sub( path, index + 1 )
 
     return ""
 
-export getFileName = ( filePath ) ->
+export getFileName = ( path ) ->
     local dotPosition
-    for index = len( filePath ), 1, -1
-		ch = byte( filePath, index )
+    for index = len( path ), 1, -1
+		ch = byte( path, index )
         if ch == 0x2E --[[ . ]]
             unless dotPosition
                 dotPosition = index
         elseif ch == 0x2F --[[ / ]] or ch == 0x5C --[[ \ ]]
             if dotPosition
-                return sub( filePath, index + 1, dotPosition - 1 )
+                return sub( path, index + 1, dotPosition - 1 )
 
-            return sub( filePath, index + 1 )
+            return sub( path, index + 1 )
 
     return ""
 
-export getDirectory = ( filePath ) ->
-    for index = len( filePath ), 1, -1
-        ch = byte( filePath, index )
+export getDirectory = ( path ) ->
+    for index = len( path ), 1, -1
+        ch = byte( path, index )
         if ch == 0x2F --[[ / ]] or ch == 0x5C --[[ \ ]]
-            return sub( filePath, 1, index )
+            return sub( path, 1, index )
 
     return ""
 
-export getFilePath = ( filePath ) ->
-    for index = len( filePath ), 1, -1
-        ch = byte( filePath, index )
+export getFilePath = ( path ) ->
+    for index = len( path ), 1, -1
+        ch = byte( path, index )
         if ch == 0x2F --[[ / ]] or ch == 0x5C --[[ \ ]]
-            return sub( filePath, 1, index )
+            return sub( path, 1, index )
 
     return ""
 
-export getExtension = ( filePath ) ->
-    for index = len( filePath ), 1, -1
-		ch = byte( filePath, index )
+export getExtension = ( path ) ->
+    for index = len( path ), 1, -1
+		ch = byte( path, index )
 		if ch == 0x2F --[[ / ]] or ch == 0x5C --[[ \ ]]
             break
 
 		if ch == 0x2E --[[ . ]]
-            return sub( filePath, index + 1 )
+            return sub( path, index + 1 )
 
     return ""
 
-export stripFile = ( filePath ) ->
-    for index = len( filePath ), 1, -1
-        ch = byte( filePath, index )
+export stripFile = ( path ) ->
+    for index = len( path ), 1, -1
+        ch = byte( path, index )
         if ch == 0x2F --[[ / ]] or ch == 0x5C --[[ \ ]]
-            return sub( filePath, 1, index ), sub( filePath, index + 1 )
+            return sub( path, 1, index ), sub( path, index + 1 )
 
-    return "", filePath
+    return "", path
 
-export stripDir = ( filePath ) ->
-    for index = len( filePath ), 1, -1
-        ch = byte( filePath, index )
+export stripDir = ( path ) ->
+    for index = len( path ), 1, -1
+        ch = byte( path, index )
         if ch == 0x2F --[[ / ]] or ch == 0x5C --[[ \ ]]
-            return sub( filePath, index + 1 ), sub( filePath, 1, index )
+            return sub( path, index + 1 ), sub( path, 1, index )
 
-    return filePath, ""
+    return path, ""
 
-export stripExtension = ( filePath ) ->
-    for index = len( filePath ), 1, -1
-		ch = byte( filePath, index )
+export stripExtension = ( path ) ->
+    for index = len( path ), 1, -1
+		ch = byte( path, index )
 		if ch == 0x2F --[[ / ]] or ch == 0x5C --[[ \ ]]
-            return filePath, ""
+            return path, ""
 
         if ch == 0x2E --[[ . ]]
-            return sub( filePath, 1, index - 1 ), sub( filePath, index + 1 )
+            return sub( path, 1, index - 1 ), sub( path, index + 1 )
 
-    return filePath, ""
+    return path, ""
 
-export replaceFile = ( filePath, newFile ) ->
-    return stripFile( filePath ) .. newFile
+export replaceFile = ( path, newFile ) ->
+    return stripFile( path ) .. newFile
 
-export replaceDir = ( filePath, newDir ) ->
+export replaceDir = ( path, newDir ) ->
     if byte( newDir, len( newDir ) ) ~= 0x2F --[[ / ]]
         newDir ..= "/"
 
-    return newDir .. stripDir( filePath )
+    return newDir .. stripDir( path )
 
-export replaceExtension = ( filePath, newExtension ) ->
-    return stripExtension( filePath ) .. "." .. newExtension
+export replaceExtension = ( path, newExtension ) ->
+    return stripExtension( path ) .. "." .. newExtension
 
-export fix = ( filePath ) ->
-    return gsub( filePath, "[/\\]+", "/" ), nil
+export fix = ( path ) ->
+    return gsub( path, "[/\\]+", "/" ), nil
 
 export getCurrentFile = ->
     if func := getfmain!
@@ -119,8 +119,8 @@ export getCurrentDirectory = ->
 export delimiter = ":"
 export sep = "/"
 
-export isAbsolute = ( filePath ) ->
-    return byte( filePath, 1 ) == 0x2F --[[ / ]]
+export isAbsolute = ( path ) ->
+    return byte( path, 1 ) == 0x2F --[[ / ]]
 
 import os from jit
 export isSpecial = os == "Windows" or os == "OSX"
@@ -132,69 +132,41 @@ export equal = ( a, b ) ->
     return a == b
 
 -- Split a filename into [root, dir, basename]
-export splitPath = ( filePath ) ->
+export splitPath = ( path ) ->
     local root
-    if isAbsolute( filePath )
-        filePath = sub( filePath, 2 )
+    if isAbsolute( path )
+        path = sub( path, 2 )
         root = "/"
     else
         root = ""
 
-    trailingSlashes = match( filePath, "[/]*$" )
-    if trailingSlashes
-        filePath = sub( filePath, 1, -len( trailingSlashes ) - 1 )
+    basename, dir = stripDir( path )
+    return root, dir, basename
 
-    baseName = match( filePath, "[^/]+$" )
-    return root, baseName and sub( filePath, 1, -len( baseName ) - 1 ) or filePath, baseName or ""
+export dirname = ( path ) ->
+    path = getDirectory( path )
+    if path == ""
+        return "."
 
--- returns the directory name of a path,
--- similar to the Unix dirname command.
--- Trailing directory separators are ignored, see path.sep.
-export dirname = ( filePath ) ->
-    if byte( filePath, len( filePath ) ) == 0x2F --[[ / ]]
-        filePath = sub( filePath, 1, -2 )
+    return path
 
-    root, dir = splitPath( filePath )
-    if dir ~= ""
-        return root .. sub( dir, 1, len( dir ) - 1 )
+export basename = ( path, stripSuffix ) ->
+    path = getFile( path )
+    if stripSuffix
+        return stripExtension( path )
 
-    if root ~= ""
-        return root
+    return path, ""
 
-    return "."
+export extname = getExtension
 
-export basename = ( filePath, expectedExt ) ->
-    _, __, base = splitPath( filePath )
-    if expectedExt
-        extPos = find( base, gsub( expectedExt, "%.", "%." ) .. "$")
-        if extPos
-            base = sub( base, 1, extPos - 1 )
-
-    return base
-
-export extname = ( filePath ) ->
-    baseName = basename( filePath )
-    if baseName == ".."
-        return ""
-
-    return match( baseName, ".(%.[^.]*)$" ) or ""
-
-splitBySeparators = ( filePath ) ->
-    result, length = {}, 0
-    for part in gmatch( filePath, "[^/]+" )
-        length += 1
-        result[ length ] = part
-
-    return result, length
-
-export normalize = ( filePath ) ->
-    isAbs = isAbsolute( filePath )
-    trailingSlashes = byte( filePath, len( filePath ) ) == 0x2F --[[ / ]]
+export normalize = ( path ) ->
+    isAbs = isAbsolute( path )
+    trailingSlashes = byte( path, len( path ) ) == 0x2F --[[ / ]]
 
     if isAbs
-        filePath = sub( filePath, 2 )
+        path = sub( path, 2 )
 
-    parts, length = splitBySeparators( filePath )
+    parts, length = ByteSplit( path, 0x2F --[[ / ]] )
 
     -- Modifies an array of path parts in place by interpreting "." and ".." segments
     skip = 0
@@ -221,21 +193,21 @@ export normalize = ( filePath ) ->
             length += 1
             skip -= 1
 
-    filePath = concat( parts, "/", 1, length )
+    path = concat( parts, "/", 1, length )
 
-    if filePath == ""
+    if path == ""
         if isAbs
             return "/"
 
         return "."
 
     if trailingSlashes
-        filePath ..= "/"
+        path ..= "/"
 
     if isAbs
-        filePath = "/" .. filePath
+        path = "/" .. path
 
-    return filePath
+    return path
 
 export join = ( ... ) ->
     parts, length = {}, 0
@@ -268,7 +240,7 @@ export join = ( ... ) ->
 -- Works backwards, joining the arguments until it resolves to an absolute path.
 -- If an absolute path is not resolved, then the current working directory is
 -- prepended
-export resolve = (...) ->
+export resolve = ( ... ) ->
     resolvedPath = ""
     isAbs = false
     paths = {...}
@@ -298,8 +270,8 @@ export relative = ( pathFrom, pathTo ) ->
     unless equal( fromRoot, toRoot )
         return pathTo
 
-    fromParts, fromLength = splitBySeparators( fromDir .. fromBaseName )
-    toParts, toLength = splitBySeparators( toDir .. toBaseName )
+    fromParts, fromLength = ByteSplit( fromDir .. fromBaseName, 0x2F --[[ / ]] )
+    toParts, toLength = ByteSplit( toDir .. toBaseName, 0x2F --[[ / ]] )
 
     commonLength = 0
     for index = 1, fromLength
@@ -325,13 +297,13 @@ export relative = ( pathFrom, pathTo ) ->
     │          dir        │    base    │
     ├──────┬              ├──────┬─────┤
     │ root │              │ name │ ext │
-    "  /    home/user/dir / file  .txt "
+    "  /    home/user/dir/  file  .txt "
     └──────┴──────────────┴──────┴─────┘
     (All spaces in the "" line should be ignored. They are purely for formatting.)
 
 ]]
-export parse = ( filePath ) ->
-    root, dir, base = splitPath( filePath )
+export parse = ( path ) ->
+    root, dir, base = splitPath( path )
 
     name, ext = match( base, "^(.+)%.(.+)$" )
     if name
