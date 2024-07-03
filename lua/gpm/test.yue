@@ -204,7 +204,8 @@ bench = (name, fn) ->
 
 main = async ->
     -- gpm.Import( "dll://asyncio" )
-    -- gpm.Import( "lua://packages/b/init" )
+    -- PrintTable gpm.Import( "file:/addons/NikNaks-main.zip")
+    -- gpm.Import( "file:/lua/packages/b/init" )
     -- PrintTable gpm.Import( "file://addons/160250458.gma")
     -- gpm.Import( "github://Nak2/NikNaks/main/lua/includes/modules/niknaks.lua" )
     -- gpm.Import( "package:package_v2" )

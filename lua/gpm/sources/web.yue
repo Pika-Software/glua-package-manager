@@ -1,9 +1,9 @@
 import gpm, pairs from _G
-import environment, Module from gpm
 import await, async, string, file, util, ModuleLoadError, SourceError from environment
 
 import AsyncImport, BaseSource, BaseSourceHandler from gpm.loader
 import AsyncWrite, MountZIPData from file
+import Module from environment.package
 import Fetch from environment.http
 import MD5 from util
 import time from os

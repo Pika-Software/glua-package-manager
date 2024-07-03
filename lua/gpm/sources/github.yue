@@ -1,11 +1,12 @@
 import gpm from _G
-import environment, Module from gpm
+import environment from gpm
 import await, async, SourceError, ModuleLoadError from environment
 
 import Base64Decode, JSONToTable, CompileLuaString, CompileMoonString, CompileYueString from environment.util
 import BaseSource, BaseSourceHandler from gpm.loader
 import MountZIPData from environment.file
 import getExtension from environment.path
+import Module from environment.package
 import insert from environment.table
 import Fetch from environment.http
 
