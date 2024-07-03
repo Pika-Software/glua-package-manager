@@ -1,5 +1,7 @@
 _G = _G
 
+-- TODO: Move this crap to loader.yue
+
 import gpm, setmetatable, setfenv from _G
 import environment from gpm
 
@@ -12,13 +14,26 @@ import async, await, debug,
 import format from string
 import Environment, Link from environment.metaworks
 import getDirectory from environment.path
+import Version from environment.util
 import getfpathi from debug
 
-class InvalidPackageConfigurationError extends Error
-environment.InvalidPackageConfigurationError = InvalidPackageConfigurationError
+:package = gpm
+unless istable( package )
+    package = gpm.package = {}
 
-class InvalidModuleConfigurationError extends Error
-environment.InvalidModuleConfigurationError = InvalidModuleConfigurationError
+packages = gpm.Packages
+unless istable( packages )
+    packages = gpm.Packages = setmetatable( {}, { __newindex: debug.fempty, __index: ( key ) =>
+        tbl = {}
+        rawset( @, key, tbl )
+        return tbl
+    } )
+
+-- class InvalidPackageConfigurationError extends Error
+-- environment.InvalidPackageConfigurationError = InvalidPackageConfigurationError
+
+-- class InvalidModuleConfigurationError extends Error
+-- environment.InvalidModuleConfigurationError = InvalidModuleConfigurationError
 
 --[[
     Packages: {
@@ -54,7 +69,7 @@ class Module
         setfenv( location, setmetatable({ __module: @, __filename: pathname, __dirname: getDirectory( pathname ) }, { __index: env, __newindex: env }) )
         return
 
-gpm.Module = Module
+package.Module = Module
 
 --[[
 
@@ -67,69 +82,145 @@ gpm.Module = Module
 
 ]]
 
-packages = gpm.Packages
-unless istable( packages )
-    packages = gpm.Packages = setmetatable( {}, { __newindex: debug.fempty, __index: ( key ) =>
-        tbl = {}
-        rawset( @, key, tbl )
-        return tbl
-    } )
-
 local ispackage
+
+-- class Package
+--     __tostring: =>
+--         return format( "Package: %p [%s@%s]", @, @name, @version )
+
+--     new: ( location, url, parent, metadata ) =>
+--         unless istable( metadata )
+--             error InvalidPackageConfigurationError "metadata is " .. type( metadata ) .. ", expected table"
+
+--         name = @name = metadata.name or getfpathi( location ) or "unknown"
+--         version = @version = metadata.version or "0.1.0"
+--         packages[ name ][ version ] = @
+
+--         env = @env = Environment( environment, { :_G, __package: @ } )
+--         @entry = Module( location, url, env )
+--         @packages = {}
+
+--         if ispackage( parent )
+--             parent.packages[] = @
+--             Link( parent.env, env )
+
+import isAbsolute, normalize from environment.path
 
 class Package
     __tostring: =>
         return format( "Package: %p [%s@%s]", @, @name, @version )
 
-    new: ( location, url, parent, metadata ) =>
-        unless istable( metadata )
-            error InvalidPackageConfigurationError "metadata is " .. type( metadata ) .. ", expected table"
+    new: ( metadata, filePath ) =>
+        unless isstring( filePath )
+            error PackageError "filePath is " .. type( filePath ) .. ", expected string"
 
-        name = @name = metadata.name or getfpathi( location ) or "unknown"
-        version = @version = metadata.version or "0.1.0"
+        unless istable( metadata )
+            @path = filePath
+            @exists = false
+            return
+
+        name = metadata.name
+        unless isstring( name )
+            name = match( filePath, "packages/(.+)/package.lua$" )
+
+        @name = name
+
+        --[[
+
+            TODO: !!!!
+
+            CONCEPT: {
+                exports: {
+                    client: "./client.lua",
+                    server: "./server.lua",
+                    menu: "./menu.lua"
+                }
+
+                exports: {
+                    ".": {
+                        client: "./client.lua",
+                        server: "./server.lua",
+                        menu: "./menu.lua"
+                    },
+                    "./mdl": "./mdl.lua"
+                }
+
+                exports: {
+                    ".": "./init.lua",
+                    "./mdl": "./mdl.lua",
+                    "./test": "./test.lua"
+                }
+
+            }
+
+        ]]
+
+        -- :exports = metadata
+        -- if istable( exports )
+        --     local isSingleExport
+
+            -- for key, value in *exports
+            --     if key
+
+        -- if isstring( main )
+        --     main = {
+        --         ["client"]: main,
+        --         ["server"]: main,
+        --         ["menu"]: main
+        --     }
+        -- elseif istable( main )
+        --     import client, server, menu from main
+        --     main = {
+        --         ["client"]: isstring( client ) and client or nil,
+        --         ["server"]: isstring( server ) and server or nil,
+        --         ["menu"]: isstring( menu ) and menu or nil
+        --     }
+        -- else
+        --     main = "init.lua"
+
+        -- if CLIENT
+        --     main = main.client
+        -- elseif MENU_DLL
+        --     main = main.menu
+        -- else
+        --     main = main.server
+
+        -- main = path.normalize( main )
+
+        -- if path.isAbsolute( main )
+        --     error PackageError "package main is absolute path, expected relative path"
+
+        -- @main = main
+
+        version = metadata.version
+        unless isstring( version )
+            version = "0.1.0"
+
+        version = Version( version )
+        @version = version
+
         packages[ name ][ version ] = @
 
-        env = @env = Environment( environment, { :_G, __package: @ } )
-        @entry = Module( location, url, env )
-        @packages = {}
+        -- This is required to be used in getPackageScopeConfig.
+        :optionalFilePath = metadata
+        unless isstring( optionalFilePath )
+            optionalFilePath = nil
 
-        if ispackage( parent )
-            parent.packages[] = @
-            Link( parent.env, env )
+        @path = optionalFilePath or filePath
+        @imports = metadata.imports
+        @exports = metadata.exports
+        @exists = true
 
-gpm.Package = Package
+    Install: async ( _export ) =>
+        -- func = await AsyncImport( @main )
+
+package.Package = Package
 
 ispackage = environment.ispackage = ( any ) ->
     metatable = getmetatable( any )
     return metatable and metatable.__class == Package
 
--- gpm.ParsePackageMeta = async ( metaPath ) ->
---     func = await file.Compile( metaPath, "LUA" )
 
---     metadata = {}
---     setfenv( func, metadata )
+-- resolve with export
+-- https://github.com/nodejs/node/blob/3c5681de8cc37c4a486bf3ec80b62d5ce459ea3f/lib/internal/modules/esm/resolve.js#L466
 
---     success, result = pcall( func )
---     unless success
---         error InvalidPackageConfigurationError result
-
---     if istable( result )
---         table.Merge( metadata, result )
-
---     table.LowerKeyNames( metadata )
---     return metadata
-
--- gpm.ParsePackage = async ( importPath ) ->
---     return Package( await( gpm.ParsePackageMeta( importPath ) ), importPath )
-
---[[
-    gpm.PACKAGE_LOAD_TASKS = {}
-
-    loadAsyncDataInner = async () ->
-        -- ...
-
-    gpm.LoadAsyncData = (url) ->
-        if not gpm.PACKAGE_LOAD_TASKS[url]
-            gpm.PACKAGE_LOAD_TASKS[url] = loadAsyncDataInner url
-        return gpm.PACKAGE_LOAD_TASKS[url]
-]]

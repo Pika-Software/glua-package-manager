@@ -1,7 +1,7 @@
 _G = _G
 import gpm from _G
 import environment from gpm
-import string, file, isurl, isstring, rawget, getfenv, URL from environment
+import string, file, path, isurl, isstring, rawget, getfenv, URL from environment
 import async, await, reject from environment.Promise
 import getfmain, getfpathi from environment.debug
 import NotImplementedError from environment
@@ -185,159 +185,389 @@ do
 
 -- Resolves specifier as it is package specifier
 -- See https://nodejs.org/api/esm.html#resolution-algorithm-specification PACKAGE_RESOLVE
-loader.PackageResolve = async ( specifier, parentURL, parentPackage ) ->
-    local packageName
-    if specifier == ""
-        error InvalidModuleSpecifierError specifier
+import CompileLuaString, CompileMoonString, CompileYueString, Version, JSONToTable from environment.util
+import sub, byte, find, match, len, ByteSplit from string
+import IsFile, IsDir, LuaPath from environment.file
+import ModuleError, PackageError from environment
+import getDirectory from environment.path
+import concat from environment.table
 
-    if string.StartsWith( specifier, "@" )
-        unless match( specifier, "/" ) -- check if specifier even has /
-            error InvalidModuleSpecifierError specifier
+-- const invalidSegmentRegEx = /(^|\\|\/)((\.|%2e)(\.|%2e)?|(n|%6e|%4e)(o|%6f|%4f)(d|%64|%44)(e|%65|%45)(_|%5f)(m|%6d|%4d)(o|%6f|%4f)(d|%64|%44)(u|%75|%55)(l|%6c|%4c)(e|%65|%45)(s|%73|%53))?(\\|\/|$)/i
+-- const deprecatedInvalidSegmentRegEx = /(^|\\|\/)((\.|%2e)(\.|%2e)?|(n|%6e|%4e)(o|%6f|%4f)(d|%64|%44)(e|%65|%45)(_|%5f)(m|%6d|%4d)(o|%6f|%4f)(d|%64|%44)(u|%75|%55)(l|%6c|%4c)(e|%65|%45)(s|%73|%53))(\\|\/|$)/i
+-- const patternRegEx = /\*/g
 
-        packageName = match( specifier, "(@[^/]*/[^/]*)" )
-    else
-        packageName = match( specifier, "([^/]*)" )
+-- LOOKUP_PACKAGE_SCOPE(url)
+lookupPackageScope = loader.LookupPackageScope = ( url ) ->
+    filePath = ByteSplit( sub( getDirectory( url.pathname ), 2, -2 ), 0x2F --[[ / ]] )
 
-    if sub( packageName, 1, 1 ) == "." or match( packageName, "[\\%%]" )
-        error InvalidModuleSpecifierError specifier
+    for index = #filePath, 1, -1
+        if filePath[ index ] == "packages"
+            return
 
-    packageSubPath = "." .. sub( specifier, len( packageName ) + 1 )
-    if sub( packageSubPath, -1 ) == "/"
-        error InvalidModuleSpecifierError specifier
+        packagesPath = concat( filePath, "/", 2, index ) .. "/"
+        if IsFile( packagesPath .. "package.lua", LuaPath, true )
+            return URL( "file:/lua/" .. packagesPath )
 
-    -- TODO make PACKAGE_SELF_RESOLVE
-    -- if specifier := packageSelfResolve packageName, packageSubPath, parentURL
-    --     return specifier
+isConditionalExportsMainSugar = ( exports, packageInfoPath, base ) ->
+    unless exports
+        return false
 
-    parentPath = URL.parse( parentURL )\getPath!
-    if parentPath == ""
-        parentPath = "./"
+    if isstring( exports )
+        return true
 
-    packagePath = resolvePackagePath( parentPath, specifier )
-    if packagePath
-        pkg = await gpm.ParsePackage( path.Join( packagePath, "package.lua" ) ) -- TODO: lookup package in global table
+    unless istable( exports )
+        return false
 
-        -- TODO: If pmeta is not null and pmeta.exports is not null or undefined, then
-        -- Return the result of PACKAGE_EXPORTS_RESOLVE(packagePath, packageSubpath, pjson.exports, defaultConditions).
-        urlStr = "lua:" .. path.Join( pkg.dir, pkg.entry )
+    -- if table.IsSequential( exports )
+    --     return true
 
-        if packageSubPath ~= "." or pkg.entry
-            if parentPackage
-                return loader.LoadURL( urlStr, parentPackage )
+    isConditionalSugar = false
+    i = 0
 
-            return pkg\LoadURL( urlStr )
+    for key in *table.GetKeys( exports )
+        const curIsConditionalSugar = key == "" or byte( key, 1 ) ~= 0x2E --[[ . ]]
 
-    error ModuleNotFoundError specifier
+        if i == 0
+            isConditionalSugar = curIsConditionalSugar
+        elseif isConditionalSugar ~= curIsConditionalSugar
+            error PackageError "Invalid package config " .. packageInfoPath .. ( base and ( " while importing " .. base.pathname ) or "" ) .. '"exports" cannot contain some keys starting with \'.\' and some not. The exports object must either be an object of package subpath keys or an object of main entry condition name keys only.'
+
+        i += 1
+
+    return isConditionalSugar
+
+-- PACKAGE_EXPORTS_RESOLVE(packageURL, subpath, exports, conditions)
+packageExportsResolve = loader.PackageExportsResolve = ( packageURL, subpath, exports, conditions ) ->
+    -- if isConditionalExportsMainSugar( exports, packageJSONUrl, base )
+
     return
 
--- Simplest vanilla lua `require` implementation
--- Not uses package or any other fancy stuff
--- package.path is hardcoded into it :p
-do
 
-    templates = {
-        ".lua"
-        "/init.lua"
-    }
+-- PACKAGE_SELF_RESOLVE(packageName, packageSubpath, base)
+packageSelfResolve = loader.PackageSelfResolve = ( packageName, packageSubPath, base ) ->
+    packageURL = lookupPackageScope( base )
+    unless packageURL
+        return
 
-    length = #templates
+    return URL( packageURL.scheme .. "://" .. packageName .. packageSubPath )
+
+-- https://github.com/nodejs/node/blob/6671f7ef6fa923a254fc1c48a84c7a9203420c32/lib/internal/modules/esm/resolve.js#L744
+parsePackageName = ( specifier, base ) ->
+    separatorIndex = string.indexOf( specifier, "/" )
+    validPackageName = true
+    isScoped = false
+
+    if byte( specifier, 1 ) == 0x40 --[[ @ ]]
+        isScoped = true
+
+        if separatorIndex == -1 or len( specifier ) == 0
+            validPackageName = false
+        else
+            separatorIndex = string.indexOf( specifier, '/', separatorIndex + 1 )
+
+    const packageName = separatorIndex == -1 and specifier or sub( specifier, 1, separatorIndex )
+
+    -- Package name cannot have leading . and cannot have percent-encoding or \\ separators.
+    if string.match( packageName, "^[.%\\]" )
+        validPackageName = false
+
+    unless validPackageName
+        error ModuleError "Invalid module " .. specifier .. " is not a valid package name" .. ( base and ( " imported from " .. base.pathname ) or "" )
+
+    return packageName, '.' .. ( separatorIndex == -1 and '' or sub( specifier, separatorIndex ) ), isScoped
+
+deserializePackageInfo = ( filePath, info ) ->
+    unless istable( info )
+        return {
+            path: filePath,
+            exists: false
+        }
+
+    name = info.name
+    unless isstring( name )
+        name = match( filePath, "packages/(.+)/package.lua$" )
+
+    main = info.main
+    if isstring( main )
+        main = {
+            ["client"]: main,
+            ["server"]: main,
+            ["menu"]: main
+        }
+    elseif istable( main )
+        import client, server, menu from main
+        main = {
+            ["client"]: isstring( client ) and client or nil,
+            ["server"]: isstring( server ) and server or nil,
+            ["menu"]: isstring( menu ) and menu or nil
+        }
+    else
+        main = "init.lua"
 
     if CLIENT
-        length += 1
-        templates[ length ] = "/cl_init.lua"
+        main = main.client
+    elseif MENU_DLL
+        main = main.menu
+    else
+        main = main.server
 
-    length += 1
-    templates[ length ] = "/shared.lua"
+    main = path.normalize( main )
 
-    loader.RequireResolve = async ( specifier, parentURL, parentPackage ) ->
-        specifier = gsub( specifier, "%.", "/" )
-        url = URL.parse( parentURL )
+    if path.isAbsolute( main )
+        error PackageError "package main is absolute path, expected relative path"
 
-        for index = 1, length
-            success, entry = saveAwait loader.LoadURL( url\resolve( specifier .. templates[ index ] ), parentPackage )
-            if success and entry
-                return entry
+    version = info.version
+    unless isstring( version )
+        version = "0.1.0"
 
--- Simple URL resolver based on https://nodejs.org/api/esm.html#resolution-algorithm-specification
--- without packageResolve since it is more advanced and not needed for now
-loader.ResolveURL = ( specifier, parentURL ) ->
-    url = URL.parse( specifier )
-    if url.scheme
-        return url\format!
+    version = Version( version )
 
-    -- parent-url: lua:/example/foo.lua
-    -- url: ../config.lua
-    -- result: lua:/config.lua
-    if find( url.pathname, "%.?%.?/", 1, false )
-        -- If specifier is relative path then resolve it against parentURL
-        return URL.resolve( parentURL, url.pathname )\format!
+    -- This is required to be used in getPackageScopeConfig.
+    if info.optionalFilePath
+        filePath = info.optionalFilePath
 
--- Resolves specifier and returns a promise with entry function
-loader.Resolve = async ( specifier, parentURL = "lua:", parentPackage ) ->
-    -- First lets try to resolve as URL
-    resolved = loader.ResolveURL( specifier, parentURL )
-    if resolved
-        return loader.LoadURL( resolved, parentPackage )
+    return { :name, :main, :version, imports: info.imports, exports: info.exports, exists: true, path: filePath }
 
-    -- Try to resolve as vanilla `require`
-    entry = await loader.RequireResolve( specifier, parentURL, parentPackage )
-    if entry
-        return entry
+-- https://github.com/nodejs/node/blob/6671f7ef6fa923a254fc1c48a84c7a9203420c32/lib/internal/modules/package_json_reader.js#L131
+getPackageScopeConfig = ( resolved ) ->
+    const result = modulesBinding.getPackageScopeConfig( resolved.href )
 
-    -- Try to resolve as package
-    return loader.PackageResolve( specifier, parentURL, parentPackage )
+    if istable( result ) -- and table.IsSequential( result )
+        return deserializePackageInfo( resolved.href, result )
 
--- loader.AsyncImport = async ( specifier, parentURL, parentPackage ) ->
---     entry_fn = await loader.Resolve( specifier, parentURL, parentPackage )
---     entry_fn = async entry_fn -- convert entry to async function
---     return entry_fn!
+    -- This means that the response is a string and it is the path to the package.json file
+    return {
+        exists: false,
+        path: result
+    }
 
---]]
+readPackageInfo = async ( filePath, specifier, base, isESM ) ->
+    filePath, gamePath = file.NormalizeGamePath( filePath )
+    withoutExtension, extension = path.stripExtension( filePath )
+    if file.IsFile( withoutExtension .. ".yue", gamePath, true )
+        extension = "yue"
+    elseif file.IsFile( withoutExtension .. ".moon", gamePath, true )
+        extension = "moon"
 
--- loader.GetParentURL = ->
---     if func := getfmain!
---         -- Get URL from func env
---         env = getfenv( func )
---         if value := env and rawget( env, "_URL" )
---             return value
+    filePath = withoutExtension .. "." .. extension
+    content = await file.AsyncRead( filePath, gamePath, true )
 
---         -- Try to resolve URL from func source
---         if folderPath := getfpathi( func )
---             url = parse( folderPath )
---             url.protocol or= "lua"
---             return url.href
+    if extension == "lua"
+        firstByte = byte( content, 1 )
+        if firstByte == 0x5b --[['[']] or firstByte == 0x7b --[['{']]
+            info = JSONToTable( content )
+            if info
+                return deserializePackageInfo( filePath, table.LowerKeyNames( info ) )
 
---     return "lua:" -- default fallback
+    func = switch extension
+        when "yue"
+            CompileYueString( content, filePath, true )
+        when "moon"
+            CompileMoonString( content, filePath, true )
+        else
+            CompileLuaString( content, filePath, true )
 
--- loader.GetPackage = ->
---     if func := getfmain!
---         env = getfenv( func )
---         return env and rawget( env, "_PKG" )
+    if func
+        info = {}
+        setfenv( func, info )
+        success, result = pcall( func )
+        if success
+            if istable( result )
+                table.Merge( info, result )
 
--- loader.GetEnvironment = ->
---     if func := getfmain!
---         env = getfenv( func )
---         return env and rawget( env, "_ENV" )
+            return deserializePackageInfo( filePath, table.LowerKeyNames( info ) )
 
-gpm.Import = ( url, should_await ) ->
-    local env, pkg, base
-    if func := getfmain!
-        if fenv := getfenv( func )
-            mdl = rawget( fenv, "__module" )
-            if mdl
-                env, base = mdl.env, mdl.url
-                pkg = env.__package
+        error PackageError "Cannot read package info: " .. result
 
-        unless base
-            if folderPath := getfpathi( func )
-                url = parse( folderPath )
-                url.protocol or= "lua"
-                base = url.href
+    error PackageError "File '" .. filePath .. "' cannot be compiled."
+    return
 
-    result = asyncImport( url, base, pkg, env, nil )
-    if should_await ~= false
-        return await( result )
+-- packageExportsResolve = ( packageJSONUrl, packageSubpath, packageConfig, base, conditions ) ->
+--     let { exports } = packageConfig;
+--     if (isConditionalExportsMainSugar(exports, packageJSONUrl, base)) {
+--         exports = { '.': exports };
+--     }
 
-    return result
+--     if (ObjectPrototypeHasOwnProperty(exports, packageSubpath) &&
+--         !StringPrototypeIncludes(packageSubpath, '*') &&
+--         !StringPrototypeEndsWith(packageSubpath, '/')) {
+--         const target = exports[packageSubpath];
+--         const resolveResult = resolvePackageTarget(
+--         packageJSONUrl, target, '', packageSubpath, base, false, false, false,
+--         conditions,
+--         );
 
-environment.require = gpm.Import
+--         if (resolveResult == null) {
+--         throw exportsNotFound(packageSubpath, packageJSONUrl, base);
+--         }
+
+--         return resolveResult;
+--     }
+
+--     let bestMatch = '';
+--     let bestMatchSubpath;
+--     const keys = ObjectGetOwnPropertyNames(exports);
+--     for (let i = 0; i < keys.length; i++) {
+--         const key = keys[i];
+--         const patternIndex = StringPrototypeIndexOf(key, '*');
+--         if (patternIndex !== -1 &&
+--             StringPrototypeStartsWith(packageSubpath,
+--                                     StringPrototypeSlice(key, 0, patternIndex))) {
+--         // When this reaches EOL, this can throw at the top of the whole function:
+--         //
+--         // if (StringPrototypeEndsWith(packageSubpath, '/'))
+--         //   throwInvalidSubpath(packageSubpath)
+--         //
+--         // To match "imports" and the spec.
+--         if (StringPrototypeEndsWith(packageSubpath, '/')) {
+--             emitTrailingSlashPatternDeprecation(packageSubpath, packageJSONUrl,
+--                                                 base);
+--         }
+--         const patternTrailer = StringPrototypeSlice(key, patternIndex + 1);
+--         if (packageSubpath.length >= key.length &&
+--             StringPrototypeEndsWith(packageSubpath, patternTrailer) &&
+--             patternKeyCompare(bestMatch, key) === 1 &&
+--             StringPrototypeLastIndexOf(key, '*') === patternIndex) {
+--             bestMatch = key;
+--             bestMatchSubpath = StringPrototypeSlice(
+--             packageSubpath, patternIndex,
+--             packageSubpath.length - patternTrailer.length);
+--         }
+--         }
+--     }
+
+--     if (bestMatch) {
+--         const target = exports[bestMatch];
+--         const resolveResult = resolvePackageTarget(
+--         packageJSONUrl,
+--         target,
+--         bestMatchSubpath,
+--         bestMatch,
+--         base,
+--         true,
+--         false,
+--         StringPrototypeEndsWith(packageSubpath, '/'),
+--         conditions);
+
+--         if (resolveResult == null) {
+--         throw exportsNotFound(packageSubpath, packageJSONUrl, base);
+--         }
+--         return resolveResult;
+--     }
+
+--     throw exportsNotFound(packageSubpath, packageJSONUrl, base);
+
+--[[
+-- packageJSONUrl, target, '', packageSubpath, base, false, false, false, conditions,
+
+function resolvePackageTarget(packageJSONUrl, target, subpath, packageSubpath, base, pattern, internal, isPathMap, conditions) {
+    if (typeof target === 'string') {
+        return resolvePackageTargetString(
+        target, subpath, packageSubpath, packageJSONUrl, base, pattern, internal,
+        isPathMap, conditions);
+    } else if (ArrayIsArray(target)) {
+        if (target.length === 0) {
+        return null;
+        }
+
+        let lastException;
+        for (let i = 0; i < target.length; i++) {
+        const targetItem = target[i];
+        let resolveResult;
+        try {
+            resolveResult = resolvePackageTarget(
+            packageJSONUrl, targetItem, subpath, packageSubpath, base, pattern,
+            internal, isPathMap, conditions);
+        } catch (e) {
+            lastException = e;
+            if (e.code === 'ERR_INVALID_PACKAGE_TARGET') {
+            continue;
+            }
+            throw e;
+        }
+        if (resolveResult === undefined) {
+            continue;
+        }
+        if (resolveResult === null) {
+            lastException = null;
+            continue;
+        }
+        return resolveResult;
+        }
+        if (lastException == null) {
+        return lastException;
+        }
+        throw lastException;
+    } else if (typeof target === 'object' && target !== null) {
+        const keys = ObjectGetOwnPropertyNames(target);
+        for (let i = 0; i < keys.length; i++) {
+        const key = keys[i];
+        if (isArrayIndex(key)) {
+            throw new ERR_INVALID_PACKAGE_CONFIG(
+            fileURLToPath(packageJSONUrl), base,
+            '"exports" cannot contain numeric property keys.');
+        }
+        }
+        for (let i = 0; i < keys.length; i++) {
+        const key = keys[i];
+        if (key === 'default' || conditions.has(key)) {
+            const conditionalTarget = target[key];
+            const resolveResult = resolvePackageTarget(
+            packageJSONUrl, conditionalTarget, subpath, packageSubpath, base,
+            pattern, internal, isPathMap, conditions);
+            if (resolveResult === undefined) { continue; }
+            return resolveResult;
+        }
+        }
+        return undefined;
+    } else if (target === null) {
+        return null;
+    }
+    throw invalidPackageTarget(packageSubpath, target, packageJSONUrl, internal,
+                                base);
+}
+]]
+
+-- PACKAGE_RESOLVE(packageSpecifier, base)
+packageResolve = loader.PackageResolve = async ( specifier, base, conditions ) ->
+    -- if (BuiltinModule.canBeRequiredWithoutScheme(specifier)) {
+    --     return new URL('node:' + specifier);
+    -- }
+
+    const packageName, packageSubpath, isScoped = parsePackageName( specifier, base )
+
+    -- ResolveSelf
+    -- const packageConfig = packageJsonReader.getPackageScopeConfig( base )
+
+    packageURL = URL( "./packages/" .. packageName .. '/package.lua', base )
+    filePath = packageURL.pathname
+    local lastPath
+
+    repeat
+        --                                  start, end - package.lua
+        if file.IsDir( sub( filePath, 1, len( filePath ) - 12 ) )
+            -- Package match.
+            const packageConfig = await readPackageInfo( filePath, specifier, base, true )
+            if packageConfig.exports
+                return packageExportsResolve( packageURL, packageSubpath, packageConfig, base, conditions )
+
+            if byte( packageSubpath, 1 ) == 0x2E --[[ . ]]
+                return legacyMainResolve( packageURL, packageConfig, base )
+
+            return URL( packageSubpath, packageURL )
+
+        lastPath = filePath
+        packageURL = URL( ( isScoped and "../../../../../packages/" or "../../../../packages/" ) .. packageName .. "/package.lua", packageURL )
+        filePath = packageURL.pathname
+
+        -- Cross-platform root check.
+    until len( filePath ) == len( lastPath )
+
+    -- eslint can't handle the above code.
+    -- eslint-disable-next-line no-unreachable
+    error ModuleError "Cannot find package '" .. packageName .. "' imported from " .. base.pathname
+    return
+
+packageResolve( "package_v2", URL( "file:/lua/packages/b/" ) )\Then( print, environment.Error.display )
+
+
