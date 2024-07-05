@@ -288,33 +288,7 @@ deserializePackageInfo = ( filePath, info ) ->
         name = match( filePath, "packages/(.+)/package.lua$" )
 
     main = info.main
-    if isstring( main )
-        main = {
-            ["client"]: main,
-            ["server"]: main,
-            ["menu"]: main
-        }
-    elseif istable( main )
-        import client, server, menu from main
-        main = {
-            ["client"]: isstring( client ) and client or nil,
-            ["server"]: isstring( server ) and server or nil,
-            ["menu"]: isstring( menu ) and menu or nil
-        }
-    else
-        main = "init.lua"
-
-    if CLIENT
-        main = main.client
-    elseif MENU_DLL
-        main = main.menu
-    else
-        main = main.server
-
-    main = path.normalize( main )
-
-    if path.isAbsolute( main )
-        error PackageError "package main is absolute path, expected relative path"
+    exports = info.exports
 
     version = info.version
     unless isstring( version )
@@ -326,7 +300,7 @@ deserializePackageInfo = ( filePath, info ) ->
     if info.optionalFilePath
         filePath = info.optionalFilePath
 
-    return { :name, :main, :version, imports: info.imports, exports: info.exports, exists: true, path: filePath }
+    return { :name, :main, :version, imports: info.imports, :exports, exists: true, path: filePath }
 
 -- https://github.com/nodejs/node/blob/6671f7ef6fa923a254fc1c48a84c7a9203420c32/lib/internal/modules/package_json_reader.js#L131
 getPackageScopeConfig = ( resolved ) ->
@@ -574,6 +548,7 @@ class ESM
 
     -- ESM_RESOLVE(specifier, parentURL)
     resolve: async ( specifier, parentURL ) =>
+        @specifier = specifier
         @parentURL = parentURL
 
         local resolved
@@ -589,9 +564,22 @@ class ESM
             resolved = packageResolve( @, specifier, parentURL )
 
         local format
-        -- TODO: resolve format
+        if resolved.scheme == "file"
+            if string.find( resolved.href, "%2F", 1, true ) or string.find( resolved.href, "%5C", 1, true )
+                error PackageError "resolved specifier '#{specifier}' contains invalid characters '%2F' or '%5C'"
+            if file.IsDir( resolved.pathname )
+                error PackageError "resolved specifier '#{specifier}' is a directory"
+            if not file.IsFile( resolved.pathname )
+                error PackageError "resolved specifier '#{specifier}' not found"
 
-        return resolved, format
+            -- Set resolved to the real path of resolved, maintaining the same URL querystring and fragment components.
+            -- ???
+
+            format = esmFileFormat( @, resolved ) 
+        else
+            -- get content type
+
+        return { :resolved, :format, package: @pjson }
 
     -- PACKAGE_RESOLVE(packageSpecifier, parentURL)
     packageResolve = ( packageSpecifier, parentURL ) =>
@@ -625,7 +613,7 @@ class ESM
             if packageURL.scheme == "file" and not file.IsDir( packageURL.pathname ) -- If the folder at packageURL does not exist, then
                 continue
 
-            pjson = readPackageJSON( @, packageURL )
+            pjson = @pjson = readPackageJSON( @, packageURL )
             if pjson and pjson.exports
                 return packageExportsResolve( @, packageURL, packageSubpath, pjson.exports )
             elseif packageSubpath == "."
@@ -640,9 +628,68 @@ class ESM
     packageSelfResolve = ( packageName, packageSubpath, base ) =>
         -- TODO: lookup if packageName equals to package name
 
+    exportsStartsWithDot = ( exports, packageURL ) =>
+        if istable( exports )
+            local state
+            for k, _ in pairs exports
+                statsWithDot = string.StartsWith( k, "." )
+                if state == nil
+                    state = statsWithDot
+                elseif state != statsWithDot
+                    error PackageError "'#{packageURL}' exports are invalid"
+            return state
+        -- otherwise exports must be a string
+        return string.StartsWith( exports, "." )
+
     -- PACKAGE_EXPORTS_RESOLVE(packageURL, subpath, exports, conditions)
-    packageExportsResolve = ( packageURL, subpath, exports, conditions ) =>
-        -- TODO:
+    packageExportsResolve = ( packageURL, subpath, exports ) =>
+        startsWithDot = exportsStartsWithDot( exports, packageURL )
+
+        if subpath == "."
+            local mainExport
+            if isstring( exports ) or not startsWithDot
+                mainExport = exports
+            elseif istable( exports ) and startsWithDot
+                mainExport = exports["."]
+            
+            if mainExport
+                if resolved := packageTargetResolve( @, packageURL, mainExport, nil, false )
+                    return resolved
+
+        error PackageError "no exports found for '#{subpath}' in '#{packageURL}'"
+
+    -- PACKAGE_TARGET_RESOLVE(packageURL, target, patternMatch, isImports, conditions)
+    packageTargetResolve = ( packageURL, target, patternMatch, isImports ) =>
+        if isstring( target )
+            if not string.StartsWith( target, "./" )
+                if isImports == false or string.StartsWith( target, "/" ) or string.StartsWith( target, "../" ) or URL.canParse( target )
+                    error PackageError "invalid target '#{target}' for '#{packageURL}'"
+                if isstring patternMatch
+                    return packageResolve( @, string.gsub(target, "*", patternMatch), packageURL )
+                return packageResolve( @, target, packageURL )
+            
+            -- TODO: If target split on "/" or "\" contains any "", ".", "..", or "node_modules" segments after the first "." segment, case insensitive and including percent encoded variants, throw an Invalid Package Target error.
+
+            resolvedTarget = URL( target, packageURL )
+            if patternMatch == nil
+                return resolvedTarget
+
+            -- TODO: If patternMatch split on "/" or "\" contains any "", ".", "..", or "node_modules" segments, case insensitive and including percent encoded variants, throw an Invalid Module Specifier error.
+            resolvedTarget.pathname = string.gsub( resolvedTarget.pathname, "*", patternMatch )
+            return resolvedTarget
+        elseif istable( target )
+            -- TODO
+        elseif target == nil
+            return nil
+
+        error PackageError "invalid target '#{target}' for '#{packageURL}'"
+
+    esmFileFormat = ( resolved ) =>
+        ext = path.extname resolved.pathname
+        if ext == "lua"
+            return "lua"
+        elseif ext == "json"
+            return "json"
 
     -- READ_PACKAGE_JSON(packageURL)
     readPackageJSON = ( packageURL ) =>
@@ -656,7 +703,9 @@ class ESM
 
 test = async ->
     -- package resovle
-    print "resolve ->", await ESM.resolve( "package_v2", URL( "file:/lua/packages/b/init.lua" ) )
+    :resolved, :format, :package = await ESM.resolve( "exports", URL( "file:/lua/packages/b/" ) )
+    print "resolve ->", resolved, format
+    PrintTable package
     return
 
 

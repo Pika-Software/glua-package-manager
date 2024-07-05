@@ -1,0 +1,4 @@
+export exports = {
+    ".": "main.lua",
+    "./example": "example.lua",
+}
