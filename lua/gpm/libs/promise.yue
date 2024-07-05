@@ -21,7 +21,7 @@
     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
     SOFTWARE.
 --]]
-import TypeError, RuntimeError, iscallable, isstring, istable, pcall from gpm.environment
+import TypeError, RuntimeError, iscallable, isstring, istable, pcall, xpcall from gpm.environment
 import create, resume, running, yield from coroutine
 -- import getstack from gpm.environment.debug
 import format, match from string
@@ -359,26 +359,25 @@ race = ( promises ) ->
 
     return p
 
+asyncHandleError = ( err ) ->
+    if isstring err
+        file, line, message = string.match err, "^([A-Za-z0-9%-_/.]+):(%d+): (.*)"
+        if file and line
+            err = RuntimeError message, file, line, 5
+    return err
+
 async = ( func ) ->
     return ( ... ) ->
         p = Promise!
 
-        resume( create( ( ... ) ->
-            success, result = pcall( func, ... )
+        co = create (...) ->
+            success, result = xpcall( func, asyncHandleError, ... )
             if success
-                p\Resolve( result )
-                return
+                p\Resolve result
+            else
+                p\Reject result
 
-            -- TODO: save stacktrace and pass it to reject
-            if isstring( result )
-                file, line, message = match( result, "^([A-Za-z0-9%-_/.]+):(%d+): (.*)" )
-                if file and line
-                    result = RuntimeError( message, file, line, 5 )
-
-            p\Reject( result )
-            return
-        ), ... )
-
+        resume( co, ... )
         return p
 
 safeAwait = ( p ) ->
@@ -502,13 +501,9 @@ class Promise
 
     Then: thenFunc
 
-    Catch: ( on_rejected ) =>
-        thenFunc( @, nil, on_rejected, nil )
-        return
+    Catch: ( on_rejected ) => thenFunc( @, nil, on_rejected, nil )
 
-    Finally: ( on_finally ) =>
-        thenFunc( @, nil, nil, on_finally )
-        return
+    Finally: ( on_finally ) => thenFunc( @, nil, nil, on_finally )
 
     @Resolve: resolvedPromise
 
