@@ -267,6 +267,7 @@ do
         return typeIndex
 
 -- string
+-- TODO: Make byte string startswith? (test it and make)
 string.StartsWith = string.StartsWith or string.StartWith
 string.slice = sub
 
