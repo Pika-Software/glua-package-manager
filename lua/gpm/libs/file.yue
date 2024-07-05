@@ -57,6 +57,7 @@ do
     }
 
     normalizeGamePath = _module_0.NormalizeGamePath = ( absolutePath, gamePath ) ->
+        -- FIXME: '/test/' becomes 'test///', but should be 'test/'
         absolutePath = sub( resolve( absolutePath ), 2 )
 
         if gamePath
