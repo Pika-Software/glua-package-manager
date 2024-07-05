@@ -1,2 +1,0 @@
-class ESMResolver
-    -- This is a class that resolves packages using ESM Resolution Algorithm
