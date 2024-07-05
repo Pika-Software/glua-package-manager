@@ -22,7 +22,6 @@ if SERVER
         AddCSLuaFile( "gpm/sources/" .. fileName )
 
     AddCSLuaFile( "gpm/moonloader.lua" )
-    AddCSLuaFile( "gpm/package.lua" )
     AddCSLuaFile( "gpm/loader.lua" )
     AddCSLuaFile( "gpm/init.lua" )
     AddCSLuaFile( "gpm/util.lua" )
@@ -126,8 +125,6 @@ include( "libs/http.lua" )
 
 environment.addon = include( "libs/addon.lua" )
 include( "libs/zip.lua" )
-
-include( "package.lua" )
 include( "loader.lua" )
 
 for fileName in *Find( "gpm/sources/*.lua", "lsv" )
