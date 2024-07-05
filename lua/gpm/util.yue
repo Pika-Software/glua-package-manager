@@ -1437,24 +1437,10 @@ do
 
             return ldexp( ldexp( byte3 % 0x80 * 0x10000 + byte2 * 0x100 + byte1, -23 ) + 1, exponent ) * ( byte4 < 0x80 and 1 or -1 )
 
--- class TaskManager
---     new: =>
---         @tasks = {}
+        -- TODO: Write fload and double functions
 
---     Add: ( name, promise ) =>
---         @tasks[] = { name, promise }
---         return
-
---     Remove: ( name ) =>
---         tasks = @tasks
-
---         for index = 1, #tasks
-
-
---         return
-
-
-
+        -- WriteFloat: ( number ) =>
+        --     return @Write( string_char( floor( number ) % 0x100, floor( number / 0x100 ) % 0x100, floor( number / 0x10000 ) % 0x100, floor( number / 0x1000000 ) ) )
 
 do
 
