@@ -95,8 +95,19 @@ export replaceDir = ( path, newDir ) ->
 export replaceExtension = ( path, newExtension ) ->
     return stripExtension( path ) .. "." .. newExtension
 
-export fix = ( path ) ->
+export fixFileName = ( path ) ->
+    length = len( path )
+
+    if byte( path, length ) == 0x2F --[[ / ]]
+        path = sub( path, 1, length - 1 )
+
+    return path
+
+export fixSlashes = ( path ) ->
     return gsub( path, "[/\\]+", "/" ), nil
+
+export fix = ( path ) ->
+    return fixFileName( fixSlashes( path ) )
 
 export getCurrentFile = ->
     if func := getfmain!
@@ -209,7 +220,7 @@ export normalize = ( path ) ->
     if isAbs
         path = "/" .. path
 
-    return path
+    return fixSlashes( path )
 
 export join = ( ... ) ->
     parts, length = {}, 0
@@ -228,6 +239,7 @@ export join = ( ... ) ->
             while byte( part, 1 ) == 0x2F --[[ / ]]
                 part = sub( part, 2 )
 
+        -- TODO: string.TrimByte( str, byte, dir = 0 ) where dir can be 1 0 -1
         -- Strip trailing slashes on all but last item
         if index < length
             pointer = len( part )
@@ -258,7 +270,7 @@ export resolve = ( ... ) ->
     unless isAbs
         resolvedPath = join( getCurrentDirectory!, resolvedPath )
 
-    return resolvedPath
+    return fixFileName( resolvedPath )
 
 -- Returns the relative path from "from" to "to"
 -- If no relative path can be solved, then "to" is returned
@@ -315,3 +327,5 @@ export parse = ( path ) ->
         ext = ""
 
     return { :root, :dir, :base, :ext, :name }
+
+-- TODO: Make fast and cool "Path" class, to parse path more effective
