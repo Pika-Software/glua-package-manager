@@ -183,6 +183,154 @@ do
     -- TODO: Temporary solution
     environment.require = gpm.Import
 
+do
+
+    class Module
+        __tostring: =>
+            return format( "Module: %p [%s]", @, @name )
+
+        new: ( @location, @url, @env = _G ) =>
+            unless isurl( url )
+                error InvalidModuleConfigurationError "url is " .. type( url ) .. ", expected URL"
+
+            :pathname = url
+            @name = getfpathi( location ) or "unknown"
+            setfenv( location, setmetatable({ __module: @, __filename: pathname, __dirname: getDirectory( pathname ) }, { __index: env, __newindex: env }) )
+            return
+
+    loader.Module = Module
+
+    ismodule = environment.ismodule = ( any ) ->
+        metatable = getmetatable( any )
+        return metatable and metatable.__class == Module
+
+    packages = gpm.Packages
+    unless istable( packages )
+        packages = gpm.Packages = setmetatable( {}, { __newindex: debug.fempty, __index: ( key ) =>
+            tbl = {}
+            rawset( @, key, tbl )
+            return tbl
+        } )
+
+    class Package
+        __tostring: =>
+            return format( "Package: %p [%s@%s]", @, @name, @version )
+
+        new: ( filePath, metadata ) =>
+            unless isstring( filePath )
+                error PackageError "filePath is " .. type( filePath ) .. ", expected string"
+
+            unless istable( metadata )
+                @path = filePath
+                @exists = false
+                return
+
+            -- name
+            :name = metadata
+            unless isstring( name )
+                name = match( filePath, "packages/(.+)/package.lua$" )
+
+            @name = name
+
+            -- description
+            :description = metadata
+            unless isstring( description )
+                description = ""
+
+            @description = description
+
+            -- version
+            :version = metadata
+            unless isstring( version )
+                version = "0.1.0"
+
+            version = Version( version )
+            @version = version
+
+            -- adding package into package list
+            packages[ name ][ version ] = @
+
+            --[[
+
+                TODO: !!!!
+
+                CONCEPT: {
+                    exports: {
+                        client: "./client.lua",
+                        server: "./server.lua",
+                        menu: "./menu.lua"
+                    }
+
+                    exports: {
+                        ".": {
+                            client: "./client.lua",
+                            server: "./server.lua",
+                            menu: "./menu.lua"
+                        },
+                        "./mdl": "./mdl.lua"
+                    }
+
+                    exports: {
+                        ".": "./init.lua",
+                        "./mdl": "./mdl.lua",
+                        "./test": "./test.lua"
+                    }
+
+                }
+
+            ]]
+
+            -- :exports = metadata
+            -- if istable( exports )
+            --     local isSingleExport
+
+                -- for key, value in *exports
+                --     if key
+
+            -- if isstring( main )
+            --     main = {
+            --         ["client"]: main,
+            --         ["server"]: main,
+            --         ["menu"]: main
+            --     }
+            -- elseif istable( main )
+            --     import client, server, menu from main
+            --     main = {
+            --         ["client"]: isstring( client ) and client or nil,
+            --         ["server"]: isstring( server ) and server or nil,
+            --         ["menu"]: isstring( menu ) and menu or nil
+            --     }
+            -- else
+            --     main = "init.lua"
+
+            -- if CLIENT
+            --     main = main.client
+            -- elseif MENU_DLL
+            --     main = main.menu
+            -- else
+            --     main = main.server
+
+            -- main = path.normalize( main )
+
+            -- if path.isAbsolute( main )
+            --     error PackageError "package main is absolute path, expected relative path"
+
+            -- This is required to be used in getPackageScopeConfig.
+            :optionalFilePath = metadata
+            unless isstring( optionalFilePath )
+                optionalFilePath = nil
+
+            @path = optionalFilePath or filePath
+            @imports = metadata.imports
+            @exports = metadata.exports
+            @exists = true
+
+    package.Package = Package
+
+    ispackage = environment.ispackage = ( any ) ->
+        metatable = getmetatable( any )
+        return metatable and metatable.__class == Package
+
 -- Resolves specifier as it is package specifier
 -- See https://nodejs.org/api/esm.html#resolution-algorithm-specification PACKAGE_RESOLVE
 import CompileLuaString, CompileMoonString, CompileYueString, Version, JSONToTable from environment.util
@@ -317,6 +465,7 @@ getPackageScopeConfig = ( resolved ) ->
 
 readPackageInfo = async ( filePath, specifier, base, isESM ) ->
     filePath, gamePath = file.NormalizeGamePath( filePath )
+
     withoutExtension, extension = path.stripExtension( filePath )
     if file.IsFile( withoutExtension .. ".yue", gamePath, true )
         extension = "yue"
@@ -575,7 +724,7 @@ class ESM
             -- Set resolved to the real path of resolved, maintaining the same URL querystring and fragment components.
             -- ???
 
-            format = esmFileFormat( @, resolved ) 
+            format = esmFileFormat( @, resolved )
         else
             -- get content type
 
@@ -596,7 +745,7 @@ class ESM
             packageName = string.match( packageSpecifier, "(.-/.-)/" ) or packageSpecifier -- Set packageName to the substring of packageSpecifier until the second "/" separator or the end of the string.
             if not packageName -- If packageSpecifier does not contain a "/" separator, then
                 error PackageError "invalid specifier '#{packageSpecifier}'"
-            
+
         if string.StartsWith( packageSpecifier, "." ) or string.find( packageSpecifier, "%", 1, true ) or string.find( packageSpecifier, "\\", 1, true )
             error PackageError "invalid specifier '#{packageSpecifier}'"
 
@@ -621,9 +770,9 @@ class ESM
                     return URL( pjson.main, packageURL )
             else
                 return URL( packageSubpath, packageURL )
-        
+
         error PackageError "module not found: '#{packageSpecifier}' from '#{@parentURL}'"
-    
+
     -- PACKAGE_SELF_RESOLVE(packageName, packageSubpath, parentURL)
     packageSelfResolve = ( packageName, packageSubpath, base ) =>
         -- TODO: lookup if packageName equals to package name
@@ -651,7 +800,7 @@ class ESM
                 mainExport = exports
             elseif istable( exports ) and startsWithDot
                 mainExport = exports["."]
-            
+
             if mainExport
                 if resolved := packageTargetResolve( @, packageURL, mainExport, nil, false )
                     return resolved
@@ -667,7 +816,7 @@ class ESM
                 if isstring patternMatch
                     return packageResolve( @, string.gsub(target, "*", patternMatch), packageURL )
                 return packageResolve( @, target, packageURL )
-            
+
             -- TODO: If target split on "/" or "\" contains any "", ".", "..", or "node_modules" segments after the first "." segment, case insensitive and including percent encoded variants, throw an Invalid Package Target error.
 
             resolvedTarget = URL( target, packageURL )
