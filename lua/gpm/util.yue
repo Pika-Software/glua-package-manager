@@ -267,9 +267,13 @@ do
         return typeIndex
 
 -- string
--- TODO: Make byte string startswith? (test it and make)
-string.StartsWith = string.StartsWith or string.StartWith
 string.slice = sub
+
+string.StartsWith = ( str, startStr ) ->
+	return sub( str, 1, len( startStr ) ) == startStr
+
+string.EndsWith = ( str, endStr ) ->
+	return endStr == "" or sub( str, len( str ) - len( endStr ) ) == endStr
 
 string.indexOf = ( str, searchable, position, withPattern ) ->
     unless searchable
@@ -338,8 +342,34 @@ string.Count = ( str, pattern, withPattern ) ->
 string.Explode = ( pattern, str, withPattern ) ->
     return split( str, pattern, withPattern )
 
-byteSplit = string.ByteSplit = ( str, ch ) ->
-    unless ch
+string.StartsWithBytes = ( str, ... ) ->
+    bytes = { ... }
+
+    for index = 1, #bytes
+        if bytes[ index ] ~= byte( str, index )
+            return false
+
+    return true
+
+string.EndsWithBytes = ( str, ... ) ->
+    bytes = { ... }
+
+    length = #bytes
+    if length == 0
+        return true
+
+    diff = len( str ) - length
+    if diff < 0
+        return false
+
+    for index = 1, length
+        if bytes[ index ] ~= byte( str, diff + index )
+            return false
+
+    return true
+
+byteSplit = string.ByteSplit = ( str, bt ) ->
+    unless bt
         return { str }
 
     result, length = {}, 0
@@ -347,7 +377,7 @@ byteSplit = string.ByteSplit = ( str, ch ) ->
     nextByte = byte( str, endPos )
 
     while nextByte
-        if nextByte == ch
+        if nextByte == bt
             length += 1
             result[ length ] = sub( str, startPos, endPos - 1 )
             startPos = endPos + 1
@@ -360,8 +390,8 @@ byteSplit = string.ByteSplit = ( str, ch ) ->
 
     return result, length
 
-byteCount = string.ByteCount = ( str, ch ) ->
-    unless ch
+byteCount = string.ByteCount = ( str, bt ) ->
+    unless bt
         return 0
 
     count = 0
@@ -369,7 +399,7 @@ byteCount = string.ByteCount = ( str, ch ) ->
     nextByte = byte( str, pointer )
 
     while nextByte
-        if nextByte == ch
+        if nextByte == bt
             count += 1
 
         pointer += 1
