@@ -96,7 +96,6 @@ environment.path = include( "libs/path.lua" )
 for key, value in pairs( include( "libs/error.lua" ) )
     environment[ key ] = value
 
-environment.metaworks = include( "libs/metaworks.lua" )
 environment.ipa = include( "libs/3rd-party/ip.lua" )
 
 deflate = include( "libs/3rd-party/deflate.lua" )
@@ -135,9 +134,5 @@ if SERVER
     include( "test.lua" )
 
 logger\Info( "Start-up time: %.4f sec.", SysTime! - gpm.StartTime )
-
--- Locking environment and gpm tables from changes
-getmetatable( environment ).__newindex = environment.debug.fempty
-getmetatable( gpm ).__newindex = environment.debug.fempty
 
 return gpm
