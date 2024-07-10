@@ -433,7 +433,7 @@ deserializePackageInfo = ( filePath, info ) ->
 
     name = info.name
     unless isstring( name )
-        name = match( filePath, "packages/(.+)/package.lua$" )
+        name = match( filePath, "packages/(.+)/package..+$" )
 
     main = info.main
     exports = info.exports
@@ -779,8 +779,17 @@ class ESM
         error PackageError "module not found: '#{packageSpecifier}' from '#{@parentURL}'"
 
     -- PACKAGE_SELF_RESOLVE(packageName, packageSubpath, parentURL)
-    packageSelfResolve = ( packageName, packageSubpath, base ) =>
-        -- TODO: lookup if packageName equals to package name
+    packageSelfResolve = ( packageName, packageSubpath, parentURL ) =>
+        packageURL = lookupPackageScope( @, parentURL )
+        if not packageURL
+            return
+        
+        pjson = @pjson = readPackageJSON( @, packageURL )
+        if not pjson or not pjson.exports
+            return
+        
+        if pjson.name == packageName    
+            return packageExportsResolve( @, packageURL, packageSubpath, pjson.exports )
 
     exportsStartsWithDot = ( exports, packageURL ) =>
         if istable( exports )
@@ -834,6 +843,9 @@ class ESM
         if matchObj[matchKey] and not string.find( matchKey, "*", 1, true )
             target = matchObj[matchKey]
             return packageTargetResolve( @, packageURL, target, nil, isImports )
+
+        -- TODO: Implement pattern matching
+        error PackageError "pattern matching is not implemented"
 
     -- PACKAGE_TARGET_RESOLVE(packageURL, target, patternMatch, isImports, conditions)
     packageTargetResolve = ( packageURL, target, patternMatch, isImports ) =>
@@ -918,7 +930,7 @@ class ESM
 
 test = async ->
     -- package resovle
-    :resolved, :format, :package = await ESM.resolve( "#something", URL( "file:/lua/packages/imports/" ) )
+    :resolved, :format, :package = await ESM.resolve( "exports/example", URL( "file:/lua/packages/exports/" ) )
     print "resolve ->", resolved, format
     PrintTable package
     return
