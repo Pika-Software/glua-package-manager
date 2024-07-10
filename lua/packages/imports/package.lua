@@ -1,0 +1,3 @@
+imports = {
+    ["#something"] = "exports/example"
+}

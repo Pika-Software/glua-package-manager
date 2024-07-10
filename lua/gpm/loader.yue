@@ -691,6 +691,7 @@ packageResolve = loader.PackageResolve = async ( specifier, base, conditions ) -
     error ModuleError "Cannot find package '" .. packageName .. "' imported from " .. base.pathname
     return
 
+-- TODO: after this works as specs intended, optimize it and make better!
 class ESM
     DEFAULT_CONDITIONS = {
         [SERVER and "server" or CLIENT and "client" or MENU_DLL and "menu" or "default"]: true,
@@ -711,7 +712,7 @@ class ESM
         elseif string.StartsWith( specifier, "/" ) or string.StartsWith( specifier, "./" ) or string.StartsWith( specifier, "../" )
             resolved = URL( specifier, parentURL )
         elseif string.StartsWith( specifier, "#" )
-            resolved = packageImportsResolve( specifier, parentURL )
+            resolved = packageImportsResolve( @, specifier, parentURL )
         else
             -- specifier is now a bare specifier
             resolved = packageResolve( @, specifier, parentURL )
@@ -815,8 +816,18 @@ class ESM
         error PackageError "no exports found for '#{subpath}' in '#{packageURL}'"
 
     -- PACKAGE_IMPORTS_RESOLVE(specifier, parentURL, conditions)
-    packageImportsResolve: ( specifier, parentURL ) =>
-        -- TODO
+    packageImportsResolve = ( specifier, parentURL ) =>
+        if specifier == "#" or string.StartsWith( specifier, "#/" )
+            error PackageError "invalid import specifier '#{specifier}'"
+        
+        packageURL = lookupPackageScope( @, parentURL )
+        if packageURL
+            pjson = @pjson = readPackageJSON( @, packageURL )
+            if pjson and pjson.imports
+                if resolved := packageImportsExportsResolve( @, specifier, pjson.imports, packageURL, true )
+                    return resolved
+
+        error PackageError "imports are not defined for #{specifier} in #{packageURL or parentURL}"
 
     -- PACKAGE_IMPORTS_EXPORTS_RESOLVE(matchKey, matchObj, packageURL, isImports)
     packageImportsExportsResolve = ( matchKey, matchObj, packageURL, isImports ) =>
@@ -854,6 +865,7 @@ class ESM
                     elseif p == "default"
                         defaultValue = targetValue
 
+                -- resolving "default" at the end because tables in lua are unordered
                 if defaultValue
                     return packageTargetResolve( @, packageURL, defaultValue, patternMatch, isImports )
                 return nil
@@ -878,6 +890,22 @@ class ESM
         elseif ext == "json"
             return "json"
 
+    -- LOOKUP_PACKAGE_SCOPE(url)
+    lookupPackageScope = ( url ) =>
+        if url.scheme != "file"
+            error PackageError "unable to lookup package scope for '#{url}' (not a file:/// URL)"
+
+        local scopeURL = URL( "./package.lua", url )
+        while scopeURL.path[1] != "package.lua" -- not filesystem root
+            if scopeURL.path[ #scopeURL.path - 1 ] == "packages"
+                return
+
+            if file.IsFile( scopeURL.pathname )
+                return URL( "./", scopeURL )
+            
+            scopeURL = URL( "../package.lua", scopeURL )
+            
+
     -- READ_PACKAGE_JSON(packageURL)
     readPackageJSON = ( packageURL ) =>
         pjsonPath = path.join( packageURL.pathname, "package.lua" )
@@ -890,7 +918,7 @@ class ESM
 
 test = async ->
     -- package resovle
-    :resolved, :format, :package = await ESM.resolve( "exports/example", URL( "file:/lua/packages/b/" ) )
+    :resolved, :format, :package = await ESM.resolve( "#something", URL( "file:/lua/packages/imports/" ) )
     print "resolve ->", resolved, format
     PrintTable package
     return
