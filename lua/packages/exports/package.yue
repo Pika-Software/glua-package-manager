@@ -1,4 +1,6 @@
-export exports = {
-    ".": "main.lua",
-    "./example": "example.lua",
+global *
+
+exports = {
+    ".": "./main.lua",
+    "./example": "./example.lua",
 }
