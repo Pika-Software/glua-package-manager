@@ -433,7 +433,7 @@ deserializePackageInfo = ( filePath, info ) ->
 
     name = info.name
     unless isstring( name )
-        name = match( filePath, "packages/(.+)/package..+$" )
+        name = match( filePath, "packages/(.+)/package%..+$" )
 
     main = info.main
     exports = info.exports
