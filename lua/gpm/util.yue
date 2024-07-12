@@ -454,6 +454,37 @@ byteCount = string.ByteCount = ( str, bt ) ->
 
     return count
 
+string.TrimByte = ( str, bt, dir = 0 ) ->
+    startPos, endPos = 1, len( str )
+
+    switch dir
+        when -1
+            while byte( str, endPos ) == bt
+                endPos -= 1
+
+                if endPos == 0
+                    return ""
+        when 1
+            while byte( str, startPos ) == bt
+                startPos += 1
+
+                if startPos == endPos
+                    return ""
+        else
+            while byte( str, startPos ) == bt
+                startPos += 1
+
+                if startPos == endPos
+                    return ""
+
+            while byte( str, endPos ) == bt
+                endPos -= 1
+
+                if endPos == 0
+                    return ""
+
+    return sub( str, startPos, endPos )
+
 string.Extract = ( str, pattern, default ) ->
     startPos, endPos, matched = find( str, pattern, 1, false )
     if startPos

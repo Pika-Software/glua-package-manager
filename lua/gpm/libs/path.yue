@@ -1,7 +1,7 @@
 _G = _G
 import environment from _G.gpm
 -- Based on https://github.com/luvit/luvit/blob/master/deps/path/base.lua
-import byte, sub, len, lower, match, gsub, ByteSplit from environment.string
+import byte, sub, len, lower, match, gsub, ByteSplit, TrimByte from environment.string
 import getfmain, getfpathi from environment.debug
 import concat, insert, remove from table
 import getfenv, rawget from _G
@@ -236,16 +236,11 @@ export join = ( ... ) ->
 
         -- Strip leading slashes on all but first item
         if index > 1
-            while byte( part, 1 ) == 0x2F --[[ / ]]
-                part = sub( part, 2 )
+            part = TrimByte( part, 0x2F --[[ / ]], 1 )
 
-        -- TODO: string.TrimByte( str, byte, dir = 0 ) where dir can be 1 0 -1
         -- Strip trailing slashes on all but last item
         if index < length
-            pointer = len( part )
-            while byte( part, pointer ) == 0x2F --[[ / ]]
-                pointer -= 1
-                part = sub( part, 1, pointer )
+            part = TrimByte( part, 0x2F --[[ / ]], -1 )
 
         parts[ index ] = part
 
@@ -327,5 +322,3 @@ export parse = ( path ) ->
         ext = ""
 
     return { :root, :dir, :base, :ext, :name }
-
--- TODO: Make fast and cool "Path" class, to parse path more effective

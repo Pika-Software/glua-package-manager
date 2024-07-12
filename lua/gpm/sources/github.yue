@@ -163,7 +163,6 @@ class RepositoryHandler extends BaseSourceHandler
                             when "json"
                                 return JSONToTable( content, true, false )
 
-
                         return content
 
                     break

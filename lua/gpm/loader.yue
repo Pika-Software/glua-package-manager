@@ -5,7 +5,6 @@ import string, file, path, isurl, isstring, rawget, getfenv, URL from environmen
 import async, await, reject from environment.Promise
 import getfmain, getfpathi from environment.debug
 import NotImplementedError, SourceError, ArgAssert from environment
--- import Fetch from environment.http
 
 :loader = gpm
 unless istable( loader )
@@ -14,11 +13,10 @@ unless istable( loader )
 -- Resolves specifier as it is package specifier
 -- See https://nodejs.org/api/esm.html#resolution-algorithm-specification PACKAGE_RESOLVE
 import CompileLuaString, CompileMoonString, CompileYueString, Version, Logger, JSONToTable from environment.util
-import sub, byte, find, match, len, ByteSplit, format from string
-import IsFile, IsDir, LuaPath from environment.file
+import sub, byte, find, match, gsub, format, StartsWith from string
+import AsyncRead, IsFile, IsDir, LuaPath, NormalizeGamePath from environment.file
 import ModuleError, PackageError from environment
 import getDirectory from environment.path
-import concat from environment.table
 
 local Package
 do
@@ -57,52 +55,82 @@ do
             return tbl
         } )
 
-    class Package
-        __tostring: =>
+    base = {
+        __tostring: => -- 2
             return format( "Package: %p [%s@%s]", @, @name, @version )
+    }
 
-        new: ( filePath, info ) =>
-            unless istable( info )
-                return {
-                    path: filePath,
-                    exists: false
-                }
+    base.__index = base
 
-            @exists = true
+    Package = loader.Package = setmetatable(
+        {
+            __name: "Package"
+            __base: base
 
-            name = info.name
-            unless isstring( name )
-                name = match( filePath, "packages/(.+)/package%..+$" )
+            __init: ( filePath, info ) =>
+                unless istable( info )
+                    return {
+                        path: filePath,
+                        exists: false
+                    }
 
-            @name = name
+                name = info.name
+                unless isstring( name )
+                    name = match( filePath, "packages/(.+)/package%..+$" )
 
-            @exports = info.exports
-            @imports = info.imports
+                @name = name
 
-            version = info.version
-            unless isstring( version )
-                version = "0.1.0"
+                version = info.version
+                unless isstring( version )
+                    version = "0.1.0"
 
-            @version = Version( version )
-            @path = filePath
+                version = @version = Version( version )
 
-            -- local logger
+                pkg = packages[ name ][ version ]
+                if pkg
+                    return pkg
 
-            -- params = info.logger
-            -- if params
-            --     logger = Logger( name .. "@" .. version, params.color, params.interpolation )
-            -- else
-            --     logger = Logger( name .. "@" .. version )
+                packages[ name ][ version ] = @
 
-            -- @logger = logger
+                @exports = info.exports
+                @imports = info.imports
+                @path = filePath
+                @exists = true
 
-            @env = setmetatable({ __package: @, Logger: logger }, { __index: environment, __newindex: _G })
+                local logger
 
-            description = info.description
-            if isstring( description )
-                @description = description
+                params = info.logger
+                if params
+                    logger = Logger( name .. "@" .. version\__tostring!, params.color, params.interpolation )
+                else
+                    logger = Logger( name .. "@" .. version\__tostring! )
 
-    loader.Package = Package
+                @logger = logger
+
+                @env = setmetatable({ __package: @, Logger: logger }, { __index: environment, __newindex: _G })
+
+                :description = info
+                if description and isstring( description )
+                    @description = description
+
+                :license = info
+                if license and isstring( license )
+                    @license = license
+
+                :homepage = info
+                if homepage and isstring( homepage )
+                    @homepage = homepage
+
+        },
+        {
+            __index: base
+            __call: ( cls, ... ) ->
+                obj = setmetatable( {}, base )
+                return cls.__init( obj, ... ) or obj
+        }
+    )
+
+    base.__class = Package
 
     environment.ispackage = ( any ) ->
         metatable = getmetatable( any )
@@ -123,12 +151,13 @@ class ESM
         @parentURL = parentURL
 
         local resolved
+
         -- resolve
         if isurl( specifier ) or URL.canParse( specifier )
             resolved = URL( specifier )
-        elseif string.StartsWith( specifier, "/" ) or string.StartsWith( specifier, "./" ) or string.StartsWith( specifier, "../" )
+        elseif StartsWith( specifier, "/" ) or StartsWith( specifier, "./" ) or StartsWith( specifier, "../" )
             resolved = URL( specifier, parentURL )
-        elseif string.StartsWith( specifier, "#" )
+        elseif StartsWith( specifier, "#" )
             resolved = packageImportsResolve( @, specifier, parentURL )
         else
             -- specifier is now a bare specifier
@@ -145,14 +174,14 @@ class ESM
         -- If packageSpecifier is a Node.js builtin module name, then
         -- 1. Return the string "node:" concatenated with packageSpecifier.
 
-        if not string.StartsWith( packageSpecifier, "@" )
-            packageName = string.match( packageSpecifier, "(.-)/" ) or packageSpecifier -- Set packageName to the substring of packageSpecifier until the first "/" separator or the end of the string.
+        if not StartsWith( packageSpecifier, "@" )
+            packageName = match( packageSpecifier, "(.-)/" ) or packageSpecifier -- Set packageName to the substring of packageSpecifier until the first "/" separator or the end of the string.
         else
-            packageName = string.match( packageSpecifier, "(.-/.-)/" ) or packageSpecifier -- Set packageName to the substring of packageSpecifier until the second "/" separator or the end of the string.
+            packageName = match( packageSpecifier, "(.-/.-)/" ) or packageSpecifier -- Set packageName to the substring of packageSpecifier until the second "/" separator or the end of the string.
             if not packageName -- If packageSpecifier does not contain a "/" separator, then
                 error PackageError "invalid specifier '#{packageSpecifier}'"
 
-        if string.StartsWith( packageSpecifier, "." ) or string.find( packageSpecifier, "%", 1, true ) or string.find( packageSpecifier, "\\", 1, true )
+        if StartsWith( packageSpecifier, "." ) or string.find( packageSpecifier, "%", 1, true ) or string.find( packageSpecifier, "\\", 1, true )
             error PackageError "invalid specifier '#{packageSpecifier}'"
 
         packageSubpath = "." .. string.sub( packageSpecifier, #packageName + 1 )
@@ -161,11 +190,11 @@ class ESM
             return selfURL
 
         local packageURL
-        while not packageURL or packageURL.path[1] != "packages" -- While parentURL is not the file system root
+        while not packageURL or packageURL.path[1] ~= "packages" -- While parentURL is not the file system root
             packageURL = URL( "packages/" .. packageName .. "/", parentURL ) -- Let packageURL be the URL resolution of "node_modules/" concatenated with packageSpecifier, relative to parentURL.
             parentURL = URL( "..", parentURL ) -- Set parentURL to the parent folder URL of parentURL.
 
-            if packageURL.scheme == "file" and not file.IsDir( packageURL.pathname ) -- If the folder at packageURL does not exist, then
+            if packageURL.scheme == "file" and not IsDir( packageURL.pathname ) -- If the folder at packageURL does not exist, then
                 continue
 
             pjson = @pjson = readPackageJSON( @, packageURL )
@@ -194,14 +223,14 @@ class ESM
         if istable( exports )
             local state
             for k, _ in pairs exports
-                statsWithDot = string.StartsWith( k, "." )
+                statsWithDot = StartsWith( k, "." )
                 if state == nil
                     state = statsWithDot
-                elseif state != statsWithDot
+                elseif state ~= statsWithDot
                     error PackageError "'#{packageURL}' exports are invalid"
             return state
         -- otherwise exports must be a string
-        return string.StartsWith( exports, "." )
+        return StartsWith( exports, "." )
 
     -- PACKAGE_EXPORTS_RESOLVE(packageURL, subpath, exports, conditions)
     packageExportsResolve = ( packageURL, subpath, exports ) =>
@@ -226,7 +255,7 @@ class ESM
 
     -- PACKAGE_IMPORTS_RESOLVE(specifier, parentURL, conditions)
     packageImportsResolve = ( specifier, parentURL ) =>
-        if specifier == "#" or string.StartsWith( specifier, "#/" )
+        if specifier == "#" or StartsWith( specifier, "#/" )
             error PackageError "invalid import specifier '" .. specifier .. "'"
 
         packageURL = lookupPackageScope( @, parentURL )
@@ -252,11 +281,13 @@ class ESM
     -- PACKAGE_TARGET_RESOLVE(packageURL, target, patternMatch, isImports, conditions)
     packageTargetResolve = ( packageURL, target, patternMatch, isImports ) =>
         if isstring( target )
-            if not string.StartsWith( target, "./" )
-                if isImports == false or string.StartsWith( target, "/" ) or string.StartsWith( target, "../" ) or URL.canParse( target )
+            if not StartsWith( target, "./" )
+                if isImports == false or StartsWith( target, "/" ) or StartsWith( target, "../" ) or URL.canParse( target )
                     error PackageError "invalid target '#{target}' for '#{packageURL}'"
-                if isstring patternMatch
-                    return packageResolve( @, string.gsub(target, "*", patternMatch), packageURL )
+
+                if isstring( patternMatch )
+                    return packageResolve( @, gsub( target, "*", patternMatch ), packageURL )
+
                 return packageResolve( @, target, packageURL )
 
             -- TODO: If target split on "/" or "\" contains any "", ".", "..", or "node_modules" segments after the first "." segment, case insensitive and including percent encoded variants, throw an Invalid Package Target error.
@@ -266,7 +297,7 @@ class ESM
                 return resolvedTarget
 
             -- TODO: If patternMatch split on "/" or "\" contains any "", ".", "..", or "node_modules" segments, case insensitive and including percent encoded variants, throw an Invalid Module Specifier error.
-            resolvedTarget.pathname = string.gsub( resolvedTarget.pathname, "*", patternMatch )
+            resolvedTarget.pathname = gsub( resolvedTarget.pathname, "*", patternMatch )
             return resolvedTarget
         elseif istable( target )
             if #target == 0 -- object
@@ -281,32 +312,38 @@ class ESM
                 -- resolving "default" at the end because tables in lua are unordered
                 if defaultValue
                     return packageTargetResolve( @, packageURL, defaultValue, patternMatch, isImports )
+
                 return nil
-            else -- array
-                local success, resolved
-                for targetValue in *target
-                    success, resolved = pcall( packageTargetResolve, @, packageURL, targetValue, patternMatch, isImports )
-                    if success and resolved
-                        return resolved
-                if not success
-                    error resolved
-                return nil
+
+            -- array
+            local success, resolved
+            for targetValue in *target
+                success, resolved = pcall( packageTargetResolve, @, packageURL, targetValue, patternMatch, isImports )
+                if success and resolved
+                    return resolved
+
+            unless success
+                error resolved
+                return
+
+            return nil
         elseif target == nil
             return nil
 
         error PackageError "invalid target '#{target}' for '#{packageURL}'"
+        return
 
     -- LOOKUP_PACKAGE_SCOPE(url)
     lookupPackageScope = ( url ) =>
-        if url.scheme != "file"
+        if url.scheme ~= "file"
             error PackageError "unable to lookup package scope for '#{url}' (not a file:/// URL)"
 
         local scopeURL = URL( "./package.lua", url )
-        while scopeURL.path[1] != "package.lua" -- not filesystem root
+        while scopeURL.path[1] ~= "package.lua" -- not filesystem root
             if scopeURL.path[ #scopeURL.path - 1 ] == "packages"
                 return
 
-            if file.IsFile( scopeURL.pathname )
+            if IsFile( scopeURL.pathname )
                 return URL( "./", scopeURL )
 
             scopeURL = URL( "../package.lua", scopeURL )
@@ -314,19 +351,19 @@ class ESM
     -- READ_PACKAGE_JSON(packageURL)
     readPackageJSON = ( packageURL ) =>
         pjsonPath = path.join( packageURL.pathname, "package.lua" )
-        unless file.IsFile( pjsonPath )
+        unless IsFile( pjsonPath )
             return
 
-        filePath, gamePath = file.NormalizeGamePath( pjsonPath )
+        filePath, gamePath = NormalizeGamePath( pjsonPath )
 
         withoutExtension, extension = path.stripExtension( filePath )
-        if file.IsFile( withoutExtension .. ".yue", gamePath, true )
+        if IsFile( withoutExtension .. ".yue", gamePath, true )
             extension = "yue"
-        elseif file.IsFile( withoutExtension .. ".moon", gamePath, true )
+        elseif IsFile( withoutExtension .. ".moon", gamePath, true )
             extension = "moon"
 
         filePath = withoutExtension .. "." .. extension
-        content = await file.AsyncRead( filePath, gamePath, true )
+        content = await AsyncRead( filePath, gamePath, true )
 
         if extension == "lua"
             firstByte = byte( content, 1 )
@@ -368,11 +405,12 @@ class Require
     resolve: async ( modname, base ) =>
         unless base
             error ModuleError "`require` cannot be used outside of modules"
-        if base.scheme != "file"
+
+        if base.scheme ~= "file"
             error NotImplementedError "cannot use `require` from `#{base}`"
 
         isOpaque = isRequireSyntax( modname )
-        filePath = string.gsub( modname, "%.", "/" )
+        filePath = gsub( modname, "%.", "/" )
 
         if resolved := isOpaque and resolveFile( @, filePath, base )
             return { :resolved }
@@ -386,13 +424,14 @@ class Require
 
         -- TODO: make better errors
         error resolved -- just return error from ESM
-    
-    isRequireSyntax = ( modname ) -> string.match( modname, "^[%a%d_%-.]+$" )
+        return
+
+    isRequireSyntax = ( modname ) -> match( modname, "^[%a%d_%-.]+$" )
 
     resolveFile = ( filePath, base ) =>
         for pattern in *PACKAGE_PATHS
-            url = URL( string.gsub(pattern, "%?", filePath), base )
-            if file.IsFile( url.pathname )
+            url = URL( gsub( pattern, "%?", filePath ), base )
+            if IsFile( url.pathname )
                 return url
 
 do
