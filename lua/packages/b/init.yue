@@ -1,12 +1,21 @@
--- global cprint = cprint or print
+print = ( ... ) ->
+    tbl = {...}
+    len = #tbl
+    for i = 1, len
+        tbl[ i ] = tostring( tbl[ i ] )
 
--- global print = ( ... ) ->
---     cprint( "[b]", ... )
+    Logger::Info( table.concat(tbl, "\t" ) )
 
--- import data from gpm.Import "async_module"
+import data from gpm.Import "./async_module.lua"
+print "data from async module: ", data
+print "me:", __package
+print "and:", __module
+
+print "realm is:", gpm.Import "exports/gpmv2"
+
 -- gpm.Import "https://gist.githubusercontent.com/dankmolot/edbab85edb6281a72082f53b98232caf/raw/c0ff1c7287503ea5decdd91b2e0b2b2bfa8d2038/example.lua"
 
-gpm.Import( "package:package_v2@0.1.1" )
+-- gpm.Import( "package:package_v2@0.1.1" )
 
 
 -- print "data:", data

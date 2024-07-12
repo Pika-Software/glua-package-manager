@@ -247,6 +247,9 @@ import getinfo from debug
 -- Make jit happy <3
 debug.fempty = ->
 
+debug.fcall = ( func, ... ) ->
+    return func( ... )
+
 debug.getstack = ( startPos ) ->
     stack, length = {}, 0
 
@@ -464,13 +467,6 @@ string.Left = ( str, num ) ->
 string.Right = ( str, num ) ->
     return sub( str, -num )
 
-string.ByteReplace = ( str, searchable, replaceable ) ->
-    for i = 1, len( str )
-        if byte( str, i ) == searchable
-            str = sub( str, 1, i - 1 ) .. replaceable .. sub( str, i + 1 )
-
-    return str
-
 string.Replace = ( str, searchable, replaceable, withPattern ) ->
     if withPattern
         return gsub( str, searchable, replaceable )
@@ -572,7 +568,7 @@ do
     import isuint from math
 
     string.IsURL = ( str ) ->
-        return match( str, "^[a-z%+]+%:[^ >,;]+" ) ~= nil
+        return match( str, "^%l[%l+-.]+%:[^%z\x01-\x20\x7F-\xFF\"<>^`{-}]*$" ) ~= nil
 
     compare = ( a, b ) ->
         return a == b and 0 or a < b and -1 or 1
@@ -1379,8 +1375,8 @@ class util.Queue
 
 do
 
-    import abs, floor, ldexp from math
-    import band, rshift from bit
+    import abs, floor, ldexp, frexp, pow2 from math
+    import band, rshift from (bit or bit32)
 
     buffer = setmetatable( {}, { __mode: "v" } )
     boolean = { [ 0 ]: false, [ 1 ]: true }
@@ -1471,6 +1467,27 @@ do
 
         WriteString: ( str ) =>
             return @Write( str .. "\0" )
+
+        -- Line
+        ReadLine: =>
+            pointer, length = @pointer, @length
+            if pointer >= length
+                return
+
+            bytes, data = 0, @Data
+            for index = pointer, length
+                if byte( data, index + 1 ) == 0xA --[[ \n ]]
+                    break
+
+                bytes += 1
+
+            if bytes == 0
+                return "", @Skip( 1 )
+
+            return @Read( bytes ), @Skip( 1 )
+
+        WriteLine: ( str ) =>
+            return @Write( str .. "\n" )
 
         -- Byte
         ReadByte: =>
@@ -1594,10 +1611,58 @@ do
 
             return ldexp( ldexp( byte3 % 0x80 * 0x10000 + byte2 * 0x100 + byte1, -23 ) + 1, exponent ) * ( byte4 < 0x80 and 1 or -1 )
 
-        -- TODO: Write fload and double functions
+        WriteFloat: ( num ) =>
+            -- TODO: Write this
 
-        -- WriteFloat: ( number ) =>
-        --     return @Write( string_char( floor( number ) % 0x100, floor( number / 0x100 ) % 0x100, floor( number / 0x10000 ) % 0x100, floor( number / 0x1000000 ) ) )
+        -- Double ( https://gist.github.com/Kubuxu/e5e04c028d8aaeab4be8 )
+        ReadDouble: =>
+            binary = @Read( 8 )
+            if not binary or len( binary ) ~= 8
+                return
+
+            bytes = { byte( binary, 1, 8 ) }
+            byte8, byte7 = bytes[ 8 ], bytes[ 7 ]
+
+            sign = 1
+            if byte8 > 127
+                sign = -1
+
+            exponent = ( byte8 % 0x80 ) * 16 + floor( byte7 / 16 )
+            if exponent == 0
+                return 0
+
+            mantissa = byte7 % 16
+            for index = 6, 1, -1
+                mantissa = mantissa * 0x100 + bytes[ index ]
+
+            mantissa = ( ldexp( mantissa, -52 ) + 1 ) * sign
+            return ldexp( mantissa, exponent - 1023 )
+
+        WriteDouble: ( number ) =>
+            if number == 0
+                return char( 0, 0, 0, 0, 0, 0, 0, 0 )
+
+            absNumber = abs( number )
+
+            mantissa, exponent = frexp( absNumber )
+            mantissa = ( mantissa * 2 - 1 ) * 16
+            exponent -= 1
+
+            currentMantissa = floor( mantissa )
+            mantissa -= currentMantissa
+
+            sign = number ~= absNumber and 0x80 or 0
+            exponent = exponent + 1023
+
+            bytes = { 0, 0, 0, 0, 0, 0, ( exponent % 16 ) * 16 + currentMantissa, sign + floor( exponent / 16 ) }
+
+            for index = 6, 1, -1
+                mantissa = mantissa * 0x100
+                currentMantissa = floor( mantissa )
+                mantissa = mantissa - currentMantissa
+                bytes[ index ] = currentMantissa
+
+            return @Write( char( bytes[ 1 ], bytes[ 2 ], bytes[ 3 ], bytes[ 4 ], bytes[ 5 ], bytes[ 6 ], bytes[ 7 ], bytes[ 8 ] ) )
 
 do
 

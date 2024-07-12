@@ -8,3 +8,6 @@
 ### Examples
 - `github://apiKey@user/repository/branch` (download and mount branch to file system)
 - `github://apiKey@user/repository/branch/path/to/my/file.lua` (lua, yue, moon will be compiled, json will returned as table, other formats will be returned as string)
+
+### TODO
+* add concommands to control gpm (install, uninstall, info, cache)

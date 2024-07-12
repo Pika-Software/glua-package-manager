@@ -1,6 +1,6 @@
 import gpm from _G
 import environment from gpm
-import await, async, SourceError, ModuleLoadError from environment
+import await, async, SourceError, ModuleError from environment
 
 import Base64Decode, JSONToTable, CompileLuaString, CompileMoonString, CompileYueString from environment.util
 import BaseSource, BaseSourceHandler from gpm.loader
@@ -135,20 +135,18 @@ class RepositoryHandler extends BaseSourceHandler
                             when "lua"
                                 func = await CompileLuaString( content, url.href, true )
                                 unless func
-                                    error ModuleLoadError "File '" .. url.href .. "' cannot be compiled."
+                                    error ModuleError "File '" .. url.href .. "' cannot be compiled."
                                     return
 
-                                Module( func, url, env )
-                                return func!
+                                return Module( func, url, env )\run!
 
                             when "moon"
                                 func = await CompileMoonString( content, url.href, true )
                                 unless func
-                                    error ModuleLoadError "File '" .. url.href .. "' cannot be compiled."
+                                    error ModuleError "File '" .. url.href .. "' cannot be compiled."
                                     return
 
-                                Module( func, url, env )
-                                return func!
+                                return Module( func, url, env )\run!
 
                             when "yue"
                                 yueConfig = {}
@@ -157,11 +155,10 @@ class RepositoryHandler extends BaseSourceHandler
 
                                 func = await CompileYueString( content, url.href, true, yueConfig )
                                 unless func
-                                    error ModuleLoadError "File '" .. url.href .. "' cannot be compiled."
+                                    error ModuleError "File '" .. url.href .. "' cannot be compiled."
                                     return
 
-                                Module( func, url, env )
-                                return func!
+                                return Module( func, url, env )\run!
 
                             when "json"
                                 return JSONToTable( content, true, false )

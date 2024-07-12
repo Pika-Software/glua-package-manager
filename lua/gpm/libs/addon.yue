@@ -1,7 +1,7 @@
 import gpm from _G
 import environment from gpm
 import AddonError, ArgAssert, isstring, istable, error, tostring, tonumber from environment
-import Open, Find, GetFolderContents from environment.file
+import Open, Find, GetFolderContents, NormalizeGamePath from environment.file
 import HasValue, Empty from environment.table
 import lower, gsub, find from string
 import equal from environment.path
@@ -221,6 +221,8 @@ export class Addon
             @file_handler = filePath
             return filePath
 
+        filePath, gamePath = NormalizeGamePath( filePath, gamePath )
+
         unless filePath
             filePath = @file_path
 
@@ -230,7 +232,7 @@ export class Addon
         ArgAssert( filePath, 1, "string" )
         ArgAssert( gamePath, 2, "string" )
 
-        fileHandle = Open( filePath, fileMode or "rb", gamePath )
+        fileHandle = Open( filePath, fileMode or "rb", gamePath, true )
         unless fileHandle
             error AddonError "file read handler is missing, opening is impossible"
 
@@ -292,7 +294,7 @@ export class Addon
                 break
 
             data = {
-                file_path: fileHandle\ReadString!
+                path: fileHandle\ReadString!
                 :position
             }
 
@@ -316,11 +318,11 @@ export class Addon
         fileHandle\Seek( 0 )
         @real_crc = tonumber( CRC( fileHandle\Read( contentSize ) ) )
 
-    Read: ( filePath, gamePath, readFiles, doCRCs ) =>
+    Read: ( filePath, readFiles, doCRCs ) =>
         Empty( @required )
         Empty( @files )
 
-        @Open( filePath, "rb", gamePath )
+        @Open( filePath, "rb" )
         @Parse( doCRCs )
 
         if readFiles
@@ -356,20 +358,20 @@ export class Addon
             return false, nil
 
         for data in *files
-            unless IsFilePathAllowed( data.file_path )
+            unless IsFilePathAllowed( data.path )
                 return false, data
 
         return true
 
-    Write: ( filePath, gamePath, doCRCs ) =>
+    Write: ( filePath, doCRCs ) =>
         ok, result = @VerifyFiles!
         unless ok
             if result
-                error AddonError "file is not allowed by whitelist (" .. result.file_path .. ")"
+                error AddonError "file is not allowed by whitelist (" .. result.path .. ")"
             else
                 error AddonError "gma is empty"
 
-        fileHandle = @Open( filePath, "wb", gamePath )
+        fileHandle = @Open( filePath, "wb" )
         unless fileHandle
             error AddonError "file read handler is missing, opening is impossible"
 
@@ -397,7 +399,7 @@ export class Addon
             fileHandle\WriteULong( index )
             data = files[ index ]
 
-            fileHandle\WriteString( lower( data.file_path ) )
+            fileHandle\WriteString( lower( data.path ) )
             fileHandle\WriteUInt64( data.size )
 
             if doCRCs
@@ -412,10 +414,10 @@ export class Addon
             if isstring( content )
                 fileHandle\Write( content )
             else
-                error AddonError "file content must be a string (" .. data.file_path .. ")"
+                error AddonError "file content must be a string (" .. data.path .. ")"
 
         if doCRCs
-            fileHandle = @Open( filePath, "rb", gamePath )
+            fileHandle = @Open( filePath, "rb" )
             unless fileHandle
                 error AddonError "file read handler is missing, opening is impossible"
 
@@ -423,7 +425,7 @@ export class Addon
             @stored_crc = fileCRC
             @real_crc = fileCRC
 
-            fileHandle = @Open( filePath, "ab", gamePath )
+            fileHandle = @Open( filePath, "ab" )
             unless fileHandle
                 error AddonError "file read handler is missing, opening is impossible"
 
@@ -481,13 +483,13 @@ export class Addon
         ::removed::
 
         for index = 1, length
-            if equal( files[ index ].file_path, filePath )
+            if equal( files[ index ].path, filePath )
                 remove( files, index )
                 length -= 1
                 goto removed
 
         data = {
-            file_path: filePath
+            path: filePath
             size: #content
             :content
         }

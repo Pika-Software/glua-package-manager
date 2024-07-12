@@ -2,12 +2,13 @@ _G = _G
 import gpm, error from _G
 import environment from gpm
 
-import async, await, file, ModuleLoadError, MountError, SourceError from environment
+import async, await, file, ModuleError, MountError, SourceError from environment
 import Compile, CompileLua, CompileMoon, CompileYue, IsFile from file
-import BaseSource, BaseSourceHandler from gpm.loader
+import BaseSource, BaseSourceHandler, Module from gpm.loader
 import getExtension, equal from environment.path
-import Module from environment.package
 import sub from environment.string
+import MD5 from environment.util
+import time from environment.os
 
 do
 
@@ -16,7 +17,7 @@ do
 
     class BinarySourceHandler extends BaseSourceHandler
         Install: async ( url ) =>
-            name = url.hostname
+            name = url.pathname
             if not name or name == ""
                 error SourceError "Binary module name is not specified!"
                 return
@@ -41,7 +42,21 @@ do
             return getExtension( url.pathname ) == "gma"
 
         Install: async ( url ) =>
-            ok, result = MountGMA( url.pathname )
+            gma = Addon!
+            gma\Read( url.pathname, true, true )
+
+            :files = gma
+            for index = 1, #files
+                data = files[ index ]
+
+                filePath = data.path
+                if find( filePath, "/lua/packages/", 1, true ) ~= nil
+                    data.path = gsub( filePath, "/lua/packages/", "/lua/gpm/vfs/packages/" )
+
+            filePath = "/data/" .. MD5( url.href .. time! )
+            gma\Write( filePath )
+
+            ok, result = MountGMA( filePath )
             if ok
                 return result
 
@@ -68,12 +83,9 @@ do
 
         Install: async ( url, func, _, __, env ) =>
             if func
-                Module( func, url, env )
+                return Module( func, url, env )\run!
 
-                -- TODO: Review error handling
-                return func!
-
-            error ModuleLoadError "File '" .. url.pathname .. "' cannot be compiled."
+            error ModuleError "File '" .. url.pathname .. "' cannot be compiled."
             return
 
     class FileSource extends BaseSource

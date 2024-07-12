@@ -10,6 +10,29 @@ export log2e = log(e, 2)
 export sqrt1_2 = sqrt(0.5)
 export sqrt2 = sqrt(2)
 
+-- power of 2
+pow2cache = setmetatable( {
+    [0]: 1.0
+    [1]: 2.0
+    [2]: 4.0
+    [3]: 8.0
+    [4]: 16.0
+    [5]: 32.0
+    [6]: 64.0
+    [7]: 128.0
+    [8]: 256.0
+    [9]: 512.0
+    [10]: 1024.0
+}, {
+    __index: (n) =>
+        v = pow(2.0, n)
+        rawset(@, n, v)
+        return v
+} )
+
+export pow2 = (n) ->
+    return pow2cache[n]
+
 -- is checks
 export isuint = (n) -> n >= 0 and n % 1 == 0
 export isfloat = (n) -> n % 1 ~= 0

@@ -6,7 +6,7 @@ import await, async, file, FileSystemError from environment
 import time from environment.os
 import equal from environment.path
 import fempty from environment.debug
-import match, sub from environment.string
+import match, sub, find, gsub from string
 import DecompressDeflate from environment.deflate
 import ByteStream, MD5, CRC from environment.util
 import Addon, IsFilePathAllowed from environment.addon
@@ -78,7 +78,11 @@ mountZIPData = file.MountZIPData = async ( data, uniqueName ) ->
 
     for fileName, content in pairs( files )
         if IsFilePathAllowed( fileName )
-            gma\AddFile( fileName, content )
+            filePath = fileName
+            if find( filePath, "/lua/packages/", 1, true ) ~= nil
+                filePath = gsub( filePath, "/lua/packages/", "/lua/gpm/vfs/packages/" )
+
+            gma\AddFile( filePath, content )
 
     bs = ByteStream!
     gma\SetTitle( MD5( uniqueName .. time! ) )

@@ -1,6 +1,6 @@
 import gpm, pairs from _G
 import environment from gpm
-import await, async, string, file, util, ModuleLoadError, SourceError from environment
+import await, async, string, file, util, ModuleError, SourceError from environment
 
 import AsyncImport, BaseSource, BaseSourceHandler from gpm.loader
 import AsyncWrite, MountZIPData from file
@@ -62,11 +62,10 @@ do
                     CompileYueString( luaCode, url.href, true, yueConfig )
 
             unless func
-                error ModuleLoadError "File '" .. url.href .. "' cannot be compiled."
+                error ModuleError "File '" .. url.href .. "' cannot be compiled."
                 return
 
-            Module( func, url, parentEnvironment )
-            return func!
+            return Module( func, url, parentEnvironment )\run!
 
 class TextHandler extends BaseSourceHandler
     ShouldHandle: ( url ) =>
