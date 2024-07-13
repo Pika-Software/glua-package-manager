@@ -9,16 +9,16 @@ if SERVER
 
     import AddCSLuaFile from _G
 
-    files = Find( "gpm/libs/*.lua", "lsv" )
-    for fileName in *files
+    for fileName in *Find( "gpm/libs/*.lua", "lsv" )
         AddCSLuaFile( "gpm/libs/" .. fileName )
 
-    files = Find( "gpm/libs/3rd-party/*.lua", "lsv" )
-    for fileName in *files
+    for fileName in *Find( "gpm/libs/utf8/*.lua", "lsv" )
+        AddCSLuaFile( "gpm/libs/utf8/" .. fileName )
+
+    for fileName in *Find( "gpm/libs/3rd-party/*.lua", "lsv" )
         AddCSLuaFile( "gpm/libs/3rd-party/" .. fileName )
 
-    files = Find( "gpm/sources/*.lua", "lsv" )
-    for fileName in *files
+    for fileName in *Find( "gpm/sources/*.lua", "lsv" )
         AddCSLuaFile( "gpm/sources/" .. fileName )
 
     AddCSLuaFile( "gpm/moonloader.lua" )
@@ -98,6 +98,7 @@ for key, value in pairs( include( "libs/error.lua" ) )
     environment[ key ] = value
 
 environment.ipa = include( "libs/3rd-party/ip.lua" )
+environment.utf8 = include( "libs/utf8/init.lua" )
 
 deflate = include( "libs/3rd-party/deflate.lua" )
 logger\Loaded( "LibDeflate v%s", deflate._VERSION )

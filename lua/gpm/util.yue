@@ -414,8 +414,8 @@ string.Count = ( str, pattern, withPattern ) ->
 string.Explode = ( pattern, str, withPattern ) ->
     return split( str, pattern, withPattern )
 
-byteSplit = string.ByteSplit = ( str, bt ) ->
-    unless bt
+byteSplit = string.ByteSplit = ( str, byte0 ) ->
+    unless byte0
         return { str }
 
     result, length = {}, 0
@@ -423,7 +423,7 @@ byteSplit = string.ByteSplit = ( str, bt ) ->
     nextByte = byte( str, endPos )
 
     while nextByte
-        if nextByte == bt
+        if nextByte == byte0
             length += 1
             result[ length ] = sub( str, startPos, endPos - 1 )
             startPos = endPos + 1
@@ -436,8 +436,8 @@ byteSplit = string.ByteSplit = ( str, bt ) ->
 
     return result, length
 
-byteCount = string.ByteCount = ( str, bt ) ->
-    unless bt
+byteCount = string.ByteCount = ( str, byte0 ) ->
+    unless byte0
         return 0
 
     count = 0
@@ -445,7 +445,7 @@ byteCount = string.ByteCount = ( str, bt ) ->
     nextByte = byte( str, pointer )
 
     while nextByte
-        if nextByte == bt
+        if nextByte == byte0
             count += 1
 
         pointer += 1
@@ -453,30 +453,30 @@ byteCount = string.ByteCount = ( str, bt ) ->
 
     return count
 
-string.TrimByte = ( str, bt, dir = 0 ) ->
+string.TrimByte = ( str, byte0, dir = 0 ) ->
     startPos, endPos = 1, len( str )
 
     switch dir
         when -1
-            while byte( str, endPos ) == bt
+            while byte( str, endPos ) == byte0
                 endPos -= 1
 
                 if endPos == 0
                     return ""
         when 1
-            while byte( str, startPos ) == bt
+            while byte( str, startPos ) == byte0
                 startPos += 1
 
                 if startPos == endPos
                     return ""
         else
-            while byte( str, startPos ) == bt
+            while byte( str, startPos ) == byte0
                 startPos += 1
 
                 if startPos == endPos
                     return ""
 
-            while byte( str, endPos ) == bt
+            while byte( str, endPos ) == byte0
                 endPos -= 1
 
                 if endPos == 0
@@ -1009,7 +1009,8 @@ do
 
     environment.ArgAssert = ArgAssert
 
-table.unpack = table.unpack or _G.unpack
+unless table.unpack
+    table.unpack = _G.unpack
 
 unless table.pack
 
@@ -1017,6 +1018,13 @@ unless table.pack
 
     table.pack = ( ... ) ->
         return { n: select( "#", ... ), ... }
+
+table.Invert = ( tbl ) ->
+    for key, value in pairs( tbl )
+        tbl[ value ] = key
+        tbl[ key ] = nil
+
+    return tbl
 
 table.HasValue = ( tbl, any, isSequential ) ->
 	if isSequential
