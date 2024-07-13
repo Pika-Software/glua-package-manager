@@ -15,7 +15,7 @@ file.CreateDir( "gpm/downloads" )
 local getExtension
 do
 
-    import extname from path
+    import extname from environment.path
 
     luaExtensions = {
         "luac": true
