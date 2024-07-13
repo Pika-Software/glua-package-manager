@@ -235,7 +235,6 @@ http = environment.http = setmetatable( {}, { __index: _G.http } )
 util = environment.util = setmetatable( {}, { __index: _G.util } )
 
 -- Aliases
-util.CompileLuaString = _G.CompileString
 util.CompileLuaFile = _G.CompileFile
 environment.throw = error
 
@@ -1703,3 +1702,21 @@ do
         return Simple 0, ->
             func( a, b, c, d, e, f )
             return
+
+do
+
+    -- https://github.com/willox/gmbc
+    if util.IsBinaryModuleInstalled( "gmbc" )
+        pcall( require, "gmbc" )
+
+    import CompileString, gmbc_load_bytecode from _G
+
+    util.CompileLuaString = ( code, identifier, handleError, ignoreBytecode ) ->
+        if not ignoreBytecode and byte( code, 1 ) == 0x1b
+            if gmbc_load_bytecode
+                return gmbc_load_bytecode( code )
+
+            error "Bytecode compilation is not supported."
+            return
+
+        return CompileString( code, identifier, handleError )

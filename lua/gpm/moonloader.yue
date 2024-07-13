@@ -40,7 +40,7 @@ do
         unless luaCode
             error CodeCompileError msg or "MoonScript compilation failed."
 
-        func = CompileLuaString( luaCode, identifier, handleError == true )
+        func = CompileLuaString( luaCode, identifier, handleError == true, true )
         unless isfunction( func )
             error CodeCompileError msg or "MoonScript compilation failed."
 
@@ -70,7 +70,7 @@ util.CompileYueString = ( yueCode, identifier, handleError, yueConfig ) ->
     unless luaCode
         error CodeCompileError msg or "Yuescript compilation failed."
 
-    func = CompileLuaString( luaCode, identifier, handleError == true )
+    func = CompileLuaString( luaCode, identifier, handleError == true, true )
     unless isfunction( func )
         error CodeCompileError msg or "Yuescript compilation failed."
 

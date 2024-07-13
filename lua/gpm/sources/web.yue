@@ -15,12 +15,22 @@ file.CreateDir( "gpm/downloads" )
 local getExtension
 do
 
-    import GetExtensionFromFilename from string
+    import extname from path
+
+    luaExtensions = {
+        "luac": true
+        "lua": true
+        "lc": true
+    }
 
     getExtension = ( url ) ->
         extension = url.extension
         unless extension
-            extension = url.extension = GetExtensionFromFilename( url.pathname ) or ""
+            extension = extname( url.pathname ) or ""
+            if luaExtensions[ extension ]
+                extension = "lua"
+
+            url.extension = extension
 
         return extension
 
@@ -49,7 +59,7 @@ do
         Install: async ( url, luaCode, _, __, parentEnvironment ) =>
             func = await switch url.extension
                 when "lua"
-                    CompileLuaString( luaCode, url.href, true )
+                    CompileLuaString( luaCode, url.href, true, false )
 
                 when "moon"
                     CompileMoonString( luaCode, url.href, true )

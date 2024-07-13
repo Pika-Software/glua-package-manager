@@ -830,7 +830,7 @@ do
             error CodeCompileError "File '" .. filePath .. "' cannot be read."
 
         local func
-        func = CompileLuaString( content, filePath, handleError )
+        func = CompileLuaString( content, filePath, handleError, false )
         if not func and luaGamePaths[ gamePath ]
             func = CompileLuaFile( filePath )
 

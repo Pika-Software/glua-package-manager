@@ -378,7 +378,7 @@ class ESM
             when "moon"
                 CompileMoonString( content, filePath, true )
             else
-                CompileLuaString( content, filePath, true )
+                CompileLuaString( content, filePath, true, false )
 
         if func
             info = {}

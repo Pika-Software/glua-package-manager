@@ -133,7 +133,7 @@ class RepositoryHandler extends BaseSourceHandler
 
                         switch getExtension( currentPath )
                             when "lua"
-                                func = await CompileLuaString( content, url.href, true )
+                                func = await CompileLuaString( content, url.href, true, false )
                                 unless func
                                     error ModuleError "File '" .. url.href .. "' cannot be compiled."
                                     return
