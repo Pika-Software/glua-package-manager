@@ -529,6 +529,7 @@ do
         :resolved, :package = await resolver( specifier, base )
         source = findSource( resolved.scheme )
 
+
         if package -- if package was found, then it must overwrite current env
             env = package.env
 
@@ -574,11 +575,7 @@ do
         ArgAssert( specifier, 1, "string", 2 )
 
         base, env, parent = loader.GetImportMeta()
-        result = asyncImport( specifier, base, ESM.resolve, parent, env, nil )
-        if should_await ~= false
-            return await( result )
-
-        return result
+        return await asyncImport( specifier, base, ESM.resolve, parent, env, nil )
 
     environment.require = ( modname ) ->
         ArgAssert( modname, 1, "string" )

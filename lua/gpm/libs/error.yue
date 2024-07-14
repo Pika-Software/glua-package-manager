@@ -1,7 +1,7 @@
 --[[
     MIT License
 
-    Copyright (c) 2023 Retro
+    Copyright (c) 2023-2024 Retro
 
     Permission is hereby granted, free of charge, to any person obtaining a copy
     of this software and associated documentation files (the "Software"), to deal
@@ -33,15 +33,11 @@ export class Error
         child.__base.name = child.__name or @name
 
     new: ( @message, @fileName, @lineNumber, stackPos ) =>
-        stack, length = getstack( stackPos or 4 )
-        @stack = stack
-
-        if length == 0
-            return
-
-        first = stack[ 1 ]
-        @fileName or= first.short_src
-        @lineNumber or= first.currentline
+        @stack = stack = Error.captureStack( stackPos or 3 )
+        
+        if first := stack[1]
+            @fileName or= first.short_src
+            @lineNumber or= first.currentline
 
     __tostring: =>
         if @fileName
@@ -67,16 +63,18 @@ export class Error
         ErrorNoHalt concat( lines, "\n", 1, length )
         return
 
-export iserror = ( any ) ->
-    meta = getmetatable( any )
-    unless meta
+    @captureStack: ( stackPos = 1 ) -> gpm.debug.getstack( stackPos )
+
+    @is: ( obj, name = "Error" ) ->
+        meta = getmetatable( obj )
+        cls = meta and meta.__class
+        while cls
+            if cls.__name == name
+                return true
+            cls = cls.__parent
         return false
 
-    cls = meta.__class
-    unless cls
-        return false
-
-    return cls == Error or cls.__parent == Error
+export iserror = Error.is
 
 export class NotImplementedError extends Error
 export class CodeCompileError extends Error
@@ -84,6 +82,7 @@ export class FileSystemError extends Error
 export class WebClientError extends Error
 export class RuntimeError extends Error
 export class PackageError extends Error
+export class PromiseError extends Error
 export class ModuleError extends Error
 export class SourceError extends Error
 export class AddonError extends Error
