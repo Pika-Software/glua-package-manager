@@ -360,10 +360,11 @@ race = ( promises ) ->
     return p
 
 asyncHandleError = ( err ) ->
-    if isstring err
-        file, line, message = string.match err, "^([A-Za-z0-9%-_/.]+):(%d+): (.*)"
+    if isstring( err )
+        file, line, message = match( err, "^([A-Za-z0-9%-_/.]+):(%d+): (.*)" )
         if file and line
-            err = RuntimeError message, file, line, 5
+            err = RuntimeError( message, file, line, 5 )
+
     return err
 
 async = ( func ) ->

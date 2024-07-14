@@ -2,8 +2,7 @@ _G = _G
 import gpm, error from _G
 import environment from gpm
 
-import async, await, file, ModuleError, MountError, SourceError from environment
-import Compile, CompileLua, CompileMoon, CompileYue, IsFile from file
+import async, await, ModuleError, MountError, SourceError from environment
 import BaseSource, BaseSourceHandler, Module from gpm.loader
 import getExtension, equal from environment.path
 import sub from environment.string
@@ -35,7 +34,7 @@ do
 
 do
 
-    import MountGMA, MountZIP from file
+    import Compile, MountGMA, MountZIP from environment.file
 
     class GMAHandler extends BaseSourceHandler
         ShouldHandle: ( url ) =>

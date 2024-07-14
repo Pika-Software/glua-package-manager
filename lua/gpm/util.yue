@@ -1430,7 +1430,7 @@ class util.Queue
 
 do
 
-    import abs, floor, ldexp, frexp, pow2 from math
+    import abs, floor, ldexp, frexp from math
     import band, rshift from (bit or bit32)
 
     buffer = setmetatable( {}, { __mode: "v" } )

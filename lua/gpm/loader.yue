@@ -1,7 +1,7 @@
 _G = _G
 import gpm from _G
 import environment from gpm
-import string, file, path, isurl, isstring, rawget, getfenv, URL from environment
+import path, isurl, isstring, rawget, getfenv, URL from environment
 import async, await, reject from environment.Promise
 import getfmain, getfpathi from environment.debug
 import NotImplementedError, SourceError, ArgAssert from environment
@@ -13,8 +13,8 @@ unless istable( loader )
 -- Resolves specifier as it is package specifier
 -- See https://nodejs.org/api/esm.html#resolution-algorithm-specification PACKAGE_RESOLVE
 import CompileLuaString, CompileMoonString, CompileYueString, Version, Logger, JSONToTable from environment.util
-import sub, byte, find, match, gsub, format, StartsWith from string
-import AsyncRead, IsFile, IsDir, LuaPath, NormalizeGamePath from environment.file
+import AsyncRead, IsFile, IsDir, NormalizeGamePath from environment.file
+import sub, byte, find, match, gsub, format, StartsWith, IsURL from environment.string
 import ModuleError, PackageError from environment
 import getDirectory from environment.path
 
@@ -181,10 +181,10 @@ class ESM
             if not packageName -- If packageSpecifier does not contain a "/" separator, then
                 error PackageError "invalid specifier '#{packageSpecifier}'"
 
-        if StartsWith( packageSpecifier, "." ) or string.find( packageSpecifier, "%", 1, true ) or string.find( packageSpecifier, "\\", 1, true )
+        if StartsWith( packageSpecifier, "." ) or find( packageSpecifier, "%", 1, true ) or find( packageSpecifier, "\\", 1, true )
             error PackageError "invalid specifier '#{packageSpecifier}'"
 
-        packageSubpath = "." .. string.sub( packageSpecifier, #packageName + 1 )
+        packageSubpath = "." .. sub( packageSpecifier, #packageName + 1 )
 
         if selfURL := packageSelfResolve( @, packageName, packageSubpath, parentURL )
             return selfURL
@@ -270,7 +270,7 @@ class ESM
 
     -- PACKAGE_IMPORTS_EXPORTS_RESOLVE(matchKey, matchObj, packageURL, isImports)
     packageImportsExportsResolve = ( matchKey, matchObj, packageURL, isImports ) =>
-        if matchObj[matchKey] and not string.find( matchKey, "*", 1, true )
+        if matchObj[matchKey] and not find( matchKey, "*", 1, true )
             target = matchObj[matchKey]
             return packageTargetResolve( @, packageURL, target, nil, isImports )
 
@@ -436,8 +436,6 @@ class Require
 
 do
 
-    import IsURL from string
-
     sources = loader.Sources
     unless istable( sources )
         sources = loader.Sources = {}
@@ -529,7 +527,7 @@ do
 
     loader.GetURL = (func = getfmain!) ->
         if fpath := func and getfpathi( func )
-            if string.IsURL( fpath )
+            if IsURL( fpath )
                 return URL( fpath )
 
             return URL( "file:///" .. fpath )

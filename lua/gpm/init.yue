@@ -2,8 +2,8 @@ _G = _G
 import include, SERVER from _G
 import Find from file
 
-unless istable( gpm )
-    global gpm = { VERSION: "2.0.0" }
+unless istable( _G.gpm )
+    _G.gpm = { VERSION: "2.0.0" }
 
 if SERVER
 

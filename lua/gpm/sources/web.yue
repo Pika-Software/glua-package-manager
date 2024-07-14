@@ -1,6 +1,6 @@
 import gpm, pairs from _G
 import environment from gpm
-import await, async, string, file, util, ModuleError, SourceError from environment
+import await, async, file, util, ModuleError, SourceError from environment
 
 import AsyncImport, BaseSource, BaseSourceHandler from gpm.loader
 import AsyncWrite, MountZIPData from file
