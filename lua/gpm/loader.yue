@@ -203,7 +203,7 @@ class ESM
 
             return URL( packageSubpath, packageURL )
 
-        error PackageError "module not found: '#{packageSpecifier}' from '#{@parentURL}'"
+        error PackageError "package not found: '#{packageSpecifier}' from '#{@parentURL}'"
         return
 
     -- PACKAGE_SELF_RESOLVE(packageName, packageSubpath, parentURL)
@@ -415,7 +415,7 @@ class Require
         if resolved := isOpaque and resolveFile( @, filePath, base )
             return { :resolved }
 
-        success, resolved = try await ESM.resolve( isOpaque and filePath or isOpaque, base )
+        success, resolved = try await ESM.resolve( isOpaque and filePath or modname, base )
         if success
             return resolved
 
@@ -433,6 +433,22 @@ class Require
             url = URL( gsub( pattern, "%?", filePath ), base )
             if IsFile( url.pathname )
                 return url
+
+class Include
+    -- Just a shortcut so `Include.resolve ...` can be used instead of creating a new instance.
+    @resolve: ( ... ) -> Include!\resolve( ... )
+
+    resolve: async ( fileName, base ) =>
+        if base and base.scheme == "file"
+            resolved = URL( fileName, base )
+            if resolved.path[1] == "lua" and IsFile( resolved.pathname )
+                return { :resolved }
+        
+        resolved = URL( fileName, "file:///lua/" )
+        if resolved.path[1] == "lua" and IsFile( resolved.pathname )
+            return { :resolved }
+
+        return ESM.resolve( fileName, base )
 
 do
 
@@ -555,21 +571,28 @@ do
         return base, env, parent
 
     gpm.Import = ( specifier, should_await ) ->
-        base, env, parent = loader.GetImportMeta()
+        ArgAssert( specifier, 1, "string", 2 )
 
+        base, env, parent = loader.GetImportMeta()
         result = asyncImport( specifier, base, ESM.resolve, parent, env, nil )
         if should_await ~= false
             return await( result )
 
         return result
 
-    -- TODO: Temporary solution
-    -- TODO: make lua-like require
     environment.require = ( modname ) ->
         ArgAssert( modname, 1, "string" )
 
         base, env, parent = loader.GetImportMeta()
         return await asyncImport( modname, base, Require.resolve, parent, env, nil )
+
+    environment.include = ( fileName ) ->
+        ArgAssert( fileName, 1, "string" )
+
+        base, env, parent = loader.GetImportMeta()
+        return await asyncImport( fileName, base, Include.resolve, parent, env, nil )
+
+    environment["import"] = gpm.Import -- just for a .lua users
 
 test = async ->
     gpm.Import "package_v2"
