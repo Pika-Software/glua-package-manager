@@ -346,6 +346,14 @@ do
             return Open( filePath, fileMode, gamePath )
 
     File = FindMetaTable( "File" )
+
+    do
+
+        import getmetatable from _G
+
+        environment.isfile = ( any ) ->
+            return getmetatable( any ) == File
+
     import Close, Read, Write, EndOfFile from File
 
     do
