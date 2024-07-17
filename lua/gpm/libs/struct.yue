@@ -1736,7 +1736,6 @@ do
         return fileDescriptor
 
     api.Read = ( obj, fileDescriptor, data ) ->
-        print obj, fileDescriptor, data
         fileDescriptor = wrapFileDescriptor( fileDescriptor or "" )
         unless IsCursor( fileDescriptor )
             error "bad argument #2 to 'Read' (file or string expected, got " .. type( fileDescriptor ) .. ")", 3
