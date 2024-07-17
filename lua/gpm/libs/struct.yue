@@ -526,21 +526,6 @@ do
 
         }, true )
 
-        registerIO( "n", {
-            Read: ( _, binary ) ->
-                return readInt( nil, binary, 7 )
-
-            Write: ( _, number ) ->
-                return writeInt( nil, number, 7 )
-
-            ReadBits: ( readBit ) ->
-                return readIntBits( readBit, 7 )
-
-            WriteBits: ( writeBit, data ) ->
-                return writeIntBits( writeBit, data, 7 )
-
-        }, true )
-
         -- https://github.com/ToxicFrog/vstruct/blob/master/io/p.lua
         -- signed fixed point
         -- format is pTOTAL_SIZE,FRACTIONAL_SIZE
