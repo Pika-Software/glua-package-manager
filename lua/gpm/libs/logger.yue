@@ -1,6 +1,7 @@
-import MsgC, Color, string, os, tostring from _G
+_G = _G
+import MsgC, Color, string, os, tostring, getmetatable from _G
+import Queue from _G.gpm.environment.util
 import format, gsub, sub, len from string
-import Queue from gpm.util
 import date from os
 
 dateScheme = CreateConVar( "gpm_logger_date", "0", bit.bor( FCVAR_ARCHIVE, FCVAR_REPLICATED ), "Allows the logger to display date.", 0, 1 )\GetBool! and "%d-%m-%Y %H:%M:%S " or "%H:%M:%S "
@@ -72,7 +73,7 @@ developer = GetConVar( "developer" )
 debugFilter = ->
     return developer\GetInt! > 0
 
-export default class Logger
+export class Logger
     __tostring: =>
         return format( "Logger: %p [%s]", @, @title )
 
@@ -102,3 +103,7 @@ export default class Logger
             log( @, debug, "DEBUG ", ... )
 
         return
+
+export IsLogger = ( any ) ->
+    metatable = getmetatable( any )
+    return metatable and metatable.__class == Logger

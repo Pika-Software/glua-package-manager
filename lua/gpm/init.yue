@@ -88,9 +88,13 @@ include( "gpm/util.lua" )
 local logger
 do
 
-    const Logger = include( "libs/logger.lua" )
-    logger = gpm.Logger = Logger( "gpm@" .. gpm.VERSION, Color( 180, 180, 255 ), false )
+    import Logger, IsLogger from include( "libs/logger.lua" )
+    environment.util.RegisterType( "Logger", IsLogger )
+
     environment.util.Logger = Logger
+    environment.IsLogger = IsLogger
+
+    logger = gpm.Logger = Logger( "gpm@" .. gpm.VERSION, Color( 180, 180, 255 ), false )
 
 environment.path = include( "libs/path.lua" )
 
