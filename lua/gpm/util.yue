@@ -981,6 +981,12 @@ do
 
     util.Version = Version
 
+    isVersion = environment.IsVersion = ( any ) ->
+        metatable = getmetatable( any )
+        return metatable and metatable.__class == Version
+
+    util.RegisterType( "Version", isVersion )
+
 local ArgAssert
 do
 
@@ -1005,7 +1011,7 @@ do
 
             expected = "[ " .. concat( expected, "/", 1, length ) .. " ]"
 
-        error "bad argument #" .. argNum .. " to \'" .. ( getinfo( 2, "n" ).name or "unknown" ) .. "\' (" .. expected .. " expected, got " .. valueType .. ")", errorlevel or 3
+        error "bad argument #" .. argNum .. " to \'" .. ( getinfo( 2, "n" ).name or "unknown" ) .. "\' (" .. expected .. " expected, got " .. valueType .. ")", errorlevel or 4
         return nil
 
 unless table.unpack
@@ -1305,47 +1311,57 @@ do
         }
     )
 
-class util.Stack
-    __tostring: =>
-        return format( "Stack: %p [%d/%d]", @, @pointer, @size )
+do
 
-    new: ( size ) =>
-        @size = ( isnumber( size ) and size > 0 ) and size or -1
-        @pointer = 0
+    class Stack
+        __tostring: =>
+            return format( "Stack: %p [%d/%d]", @, @pointer, @size )
 
-    isEmpty: =>
-        return @pointer == 0
+        new: ( size ) =>
+            @size = ( isnumber( size ) and size > 0 ) and size or -1
+            @pointer = 0
 
-    isFull: =>
-        return @pointer == @size
+        isEmpty: =>
+            return @pointer == 0
 
-    peek: =>
-        return @[ @pointer ]
+        isFull: =>
+            return @pointer == @size
 
-    push: ( value ) =>
-        pointer = @pointer
-        if pointer ~= @size
-            pointer += 1
-            @[ pointer ] = value
-            @pointer = pointer
+        peek: =>
+            return @[ @pointer ]
 
-        return pointer
+        push: ( value ) =>
+            pointer = @pointer
+            if pointer ~= @size
+                pointer += 1
+                @[ pointer ] = value
+                @pointer = pointer
 
-    pop: =>
-        pointer = @pointer
-        if pointer == 0
-            return nil
+            return pointer
 
-        @pointer = pointer - 1
-        value = @[ pointer ]
-        @[ pointer ] = nil
-        return value
+        pop: =>
+            pointer = @pointer
+            if pointer == 0
+                return nil
 
-    empty: =>
-        for index = 1, @pointer
-            @[ index ] = nil
+            @pointer = pointer - 1
+            value = @[ pointer ]
+            @[ pointer ] = nil
+            return value
 
-        @pointer = 0
+        empty: =>
+            for index = 1, @pointer
+                @[ index ] = nil
+
+            @pointer = 0
+
+    util.Stack = Stack
+
+    isStack = environment.IsStack = ( any ) ->
+        metatable = getmetatable( any )
+        return metatable and metatable.__class == Stack
+
+    util.RegisterType( "Stack", isStack )
 
 do
 
@@ -1439,49 +1455,81 @@ do
 
 do
 
-    import abs, floor, ldexp, frexp from math
-    import band, rshift from (bit or bit32)
+    struct = include( "libs/struct.lua" )
+    environment.struct = struct
 
-    buffer = setmetatable( {}, { __mode: "v" } )
-    boolean = { [ 0 ]: false, [ 1 ]: true }
+    do
 
-    class util.ByteStream
+        import Read, Write from struct
+
+        string.pack = ( fmt, ... ) ->
+            return Write( fmt, { ... } )
+
+        string.unpack = ( fmt, binary, offset ) ->
+            if offset
+                return unpack( Read( fmt, sub( binary, offset, len( binary ) ) ) )
+
+            return unpack( Read( fmt, binary ) )
+
+        string.packsize = struct.SizeOf
+
+    import reverse from string
+    import io from struct
+
+    local readInt, writeInt
+    do
+        int = io.i
+        readInt, writeInt = int.Read, int.Write
+
+    local readUInt, writeUInt
+    do
+        uint = io.I
+        readUInt, writeUInt = uint.Read, uint.Write
+
+    local readFloat, writeFloat
+    do
+        float = io.f
+        readFloat, writeFloat = float.Read, float.Write
+
+    local readDouble, writeDouble
+    do
+        double = io.d
+        readDouble, writeDouble = double.Read, double.Write
+
+    local readQuad, writeQuad
+    do
+        quad = io.q
+        readQuad, writeQuad = quad.Read, quad.Write
+
+    setEndianness = io.endianness.Set
+
+    class ByteStream extends struct.Cursor
         __tostring: =>
-            return format( "ByteStream: %p [%d/%d]", @, @pointer, @length )
+            return format( "ByteStream: %p [%d/%d]", @, @position, @size )
 
-        new: ( data ) =>
-            if isstring( data )
-                @length = len( data )
-                @Data = data
-            else
-                @length = 0
-                @Data = ""
-
-            @pointer = 0
-
-        Close: =>
-            @pointer = 0
-
-        Flush: =>
-            @pointer = 0
-            @length = 0
-            @Data = ""
+        EndOfFile: =>
+            return @position >= @size
 
         Size: =>
-            return @length
+            return @size
 
         Tell: =>
-            return @pointer
+            return @position
 
-        Seek: ( pointer ) =>
-            if pointer
-                ArgAssert( pointer, 2, "number" )
-                pointer = min( max( pointer, 0 ), @length )
+        Close: =>
+            @Flush!
+            @position = 0
+
+        Seek: ( bytes ) =>
+            if bytes
+                ArgAssert( bytes, 2, "number" )
+                bytes = min( max( bytes, 0 ), @size )
             else
-                pointer = 0
+                bytes = 0
 
-            @pointer = pointer
-            return pointer
+            @Flush!
+            @position = bytes
+            return bytes
 
         Skip: ( bytes ) =>
             if bytes
@@ -1489,36 +1537,37 @@ do
             else
                 bytes = 1
 
-            return @Seek( @pointer + bytes )
+            return @Seek( @position + bytes )
 
-        EndOfFile: =>
-            return @pointer >= @length
-
-        -- Binary data
+        -- Byte read
         Read: ( bytes ) =>
+            :position, :size = @
+
+            if bytes == "*a" or bytes == nil
+                bytes = size
+
             ArgAssert( bytes, 2, "number" )
-            if bytes <= 0 or @EndOfFile!
-                return
 
-            pointer = @pointer
-            @Skip( bytes )
+            if bytes > 0
+                if position >= size
+                    return nil, "eof"
 
-            return sub( @Data, pointer + 1, pointer + bytes )
+                return sub( @data, position + 1, @Skip( bytes ) )
 
-        Write: ( data ) =>
-            length, size = @length, len( data )
-            @Data = sub( @Data, 1, @pointer ) .. data .. sub( @Data, @pointer + 1, length )
-            @length = length + size
-            return @Skip( size )
+            if bytes < 0
+                if position <= 0
+                    return nil, "sof"
+
+                return reverse( sub( @data, position + 1, @Skip( bytes ) ) )
 
         -- String
         ReadString: =>
-            pointer, length = @pointer, @length
-            if pointer >= length
+            :position, :size = @
+            if position >= size
                 return
 
-            bytes, data = 0, @Data
-            for index = pointer, length
+            bytes, data = 0, @data
+            for index = position, size
                 if byte( data, index + 1 ) == 0
                     break
 
@@ -1534,12 +1583,12 @@ do
 
         -- Line
         ReadLine: =>
-            pointer, length = @pointer, @length
-            if pointer >= length
+            :position, :size = @
+            if position >= size
                 return
 
-            bytes, data = 0, @Data
-            for index = pointer, length
+            bytes, data = 0, @data
+            for index = position, size
                 if byte( data, index + 1 ) == 0xA --[[ \n ]]
                     break
 
@@ -1558,175 +1607,119 @@ do
             if @EndOfFile!
                 return
 
-            return byte( @Data, @Skip( 1 ) )
+            return byte( @data, @Skip( 1 ) )
 
         WriteByte: ( number ) =>
             return @Write( char( number ) )
 
         -- Boolean
         ReadBool: =>
-            return boolean[ @ReadByte! or -1 ]
+            switch @ReadByte!
+                when 0
+                    return false
+
+                when 1
+                    return true
+
+            return nil
 
         WriteBool: ( bool ) =>
             return @WriteByte( bool and 1 or 0 )
 
         -- UInt
-        ReadUInt: ( bytes ) =>
-            ArgAssert( bytes, 2, "number" )
-            if bytes == 0
-                return
+        ReadUInt: ( bytes, endianness ) =>
+            setEndianness( endianness or "little" )
+            return readUInt( nil, @Read( bytes ), bytes )
 
-            uint = 0
-            for index = 1, bytes
-                number = @ReadByte!
-                if number == nil
-                    return
-
-                uint += number * 0x100 ^ ( index - 1 )
-
-            return uint
-
-        WriteUInt: ( number, bytes ) =>
-            ArgAssert( bytes, 2, "number" )
-            if bytes == 0
-                return @pointer
-
-            for index = 1, bytes
-                buffer[ index ] = char( band( number, 0xFF ) )
-                number = rshift( number, 8 )
-
-            return @Write( concat( buffer, "", 1, bytes ) )
+        WriteUInt: ( number, bytes, endianness ) =>
+            setEndianness( endianness or "little" )
+            return @Write( writeUInt( nil, number, bytes ) )
 
         -- UShort
-        ReadUShort: =>
-            return @ReadUInt( 2 )
+        ReadUShort: ( endianness ) =>
+            return @ReadUInt( 2, endianness )
 
-        WriteUShort: ( number ) =>
-            return @WriteUInt( number, 2 )
+        WriteUShort: ( number, endianness ) =>
+            return @WriteUInt( number, 2, endianness )
 
         -- ULong
-        ReadULong: =>
-            return @ReadUInt( 4 )
+        ReadULong: ( endianness ) =>
+            return @ReadUInt( 4, endianness )
 
-        WriteULong: ( number ) =>
-            return @WriteUInt( number, 4 )
+        WriteULong: ( number, endianness ) =>
+            return @WriteUInt( number, 4, endianness )
 
         -- UInt64
-        ReadUInt64: =>
-            return @ReadUInt( 8 )
+        ReadUInt64: ( endianness ) =>
+            return @ReadUInt( 8, endianness )
 
-        WriteUInt64: ( number ) =>
-            @WriteUInt( number, 8 )
+        WriteUInt64: ( number, endianness ) =>
+            @WriteUInt( number, 8, endianness )
 
         -- Int
-        ReadInt: ( bytes ) =>
-            ArgAssert( bytes, 2, "number" )
-            if bytes == 0
-                return
+        ReadInt: ( bytes, endianness ) =>
+            setEndianness( endianness or "little" )
+            return readInt( nil, @Read( bytes ), bytes )
 
-            uint = @ReadUInt( bytes )
-            if uint == nil
-                return
-
-            limit = 0x100 ^ abs( bytes )
-            if uint >= ( limit / 2 )
-                return uint - limit
-
-            return uint
-
-        WriteInt: ( number, bytes ) =>
-            for index = 1, bytes
-                buffer[ index ] = char( number % 0x100 )
-                number = floor( number / 0x100 )
-
-            return @Write( concat( buffer, "", 1, bytes ) )
+        WriteInt: ( number, bytes, endianness ) =>
+            setEndianness( endianness or "little" )
+            return @Write( writeInt( nil, number, bytes ) )
 
         -- Short
-        ReadShort: =>
-            return @ReadInt( 2 )
+        ReadShort: ( endianness ) =>
+            return @ReadInt( 2, endianness )
 
-        WriteShort: ( number ) =>
-            return @WriteInt( number, 2 )
+        WriteShort: ( number, endianness ) =>
+            return @WriteInt( number, 2, endianness )
 
         -- Long
-        ReadLong: =>
-            return @ReadInt( 4 )
+        ReadLong: ( endianness ) =>
+            return @ReadInt( 4, endianness )
 
-        WriteLong: ( number ) =>
-            return @WriteInt( number, 4 )
+        WriteLong: ( number, endianness ) =>
+            return @WriteInt( number, 4, endianness )
 
         -- Int64
-        ReadInt64: =>
-            return @ReadInt( 8 )
+        ReadInt64: ( endianness ) =>
+            return @ReadInt( 8, endianness )
 
-        WriteInt64: ( number ) =>
-            return @WriteInt( number, 8 )
+        WriteInt64: ( number, endianness ) =>
+            return @WriteInt( number, 8, endianness )
 
         -- Float
-        ReadFloat: =>
-            binary = @Read( 4 )
-            if not binary or len( binary ) ~= 4
-                return
+        ReadFloat: ( endianness ) =>
+            setEndianness( endianness or "little" )
+            return readFloat( nil, @Read( 4 ), 4 )
 
-            byte1, byte2, byte3, byte4 = byte( binary, 1, 4 )
-            exponent = byte4 % 0x80 * 2 + floor( byte3 / 0x80 ) - 0x7F
-            if exponent == 0x7F
-                return 0
+        WriteFloat: ( number, endianness ) =>
+            setEndianness( endianness or "little" )
+            return @Write( writeFloat( nil, number, 4 ) )
 
-            return ldexp( ldexp( byte3 % 0x80 * 0x10000 + byte2 * 0x100 + byte1, -23 ) + 1, exponent ) * ( byte4 < 0x80 and 1 or -1 )
+        -- Double
+        ReadDouble: ( endianness ) =>
+            setEndianness( endianness or "little" )
+            return readDouble( nil, @Read( 8 ), 8 )
 
-        WriteFloat: ( num ) =>
-            -- TODO: Write this
+        WriteDouble: ( number, endianness ) =>
+            setEndianness( endianness or "little" )
+            return @Write( writeDouble( nil, number, 8 ) )
 
-        -- Double ( https://gist.github.com/Kubuxu/e5e04c028d8aaeab4be8 )
-        ReadDouble: =>
-            binary = @Read( 8 )
-            if not binary or len( binary ) ~= 8
-                return
+        -- Quad
+        ReadQuad: ( endianness ) =>
+            setEndianness( endianness or "little" )
+            return readQuad( nil, @Read( 16 ), 16 )
 
-            bytes = { byte( binary, 1, 8 ) }
-            byte8, byte7 = bytes[ 8 ], bytes[ 7 ]
+        WriteQuad: ( number, endianness ) =>
+            setEndianness( endianness or "little" )
+            return @Write( writeQuad( nil, number, 16 ) )
 
-            sign = 1
-            if byte8 > 127
-                sign = -1
+    util.ByteStream = ByteStream
 
-            exponent = ( byte8 % 0x80 ) * 16 + floor( byte7 / 16 )
-            if exponent == 0
-                return 0
+    isByteStream = environment.IsByteStream = ( any ) ->
+        metatable = getmetatable( any )
+        return metatable and metatable.__class == ByteStream
 
-            mantissa = byte7 % 16
-            for index = 6, 1, -1
-                mantissa = mantissa * 0x100 + bytes[ index ]
-
-            mantissa = ( ldexp( mantissa, -52 ) + 1 ) * sign
-            return ldexp( mantissa, exponent - 1023 )
-
-        WriteDouble: ( number ) =>
-            if number == 0
-                return char( 0, 0, 0, 0, 0, 0, 0, 0 )
-
-            absNumber = abs( number )
-
-            mantissa, exponent = frexp( absNumber )
-            mantissa = ( mantissa * 2 - 1 ) * 16
-            exponent -= 1
-
-            currentMantissa = floor( mantissa )
-            mantissa -= currentMantissa
-
-            sign = number ~= absNumber and 0x80 or 0
-            exponent = exponent + 1023
-
-            bytes = { 0, 0, 0, 0, 0, 0, ( exponent % 16 ) * 16 + currentMantissa, sign + floor( exponent / 16 ) }
-
-            for index = 6, 1, -1
-                mantissa = mantissa * 0x100
-                currentMantissa = floor( mantissa )
-                mantissa = mantissa - currentMantissa
-                bytes[ index ] = currentMantissa
-
-            return @Write( char( bytes[ 1 ], bytes[ 2 ], bytes[ 3 ], bytes[ 4 ], bytes[ 5 ], bytes[ 6 ], bytes[ 7 ], bytes[ 8 ] ) )
+    util.RegisterType( "ByteStream", isByteStream )
 
 do
 
