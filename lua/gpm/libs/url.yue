@@ -138,7 +138,7 @@ SPECIAL_QUERY_ENCODE_SET = compilePercentEncodeSet(QUERY_ENCODE_SET, "'")
 PATH_ENCODE_SET = compilePercentEncodeSet(QUERY_ENCODE_SET, "?", "`", "{", "}")
 USERINFO_ENCODE_SET = compilePercentEncodeSet(PATH_ENCODE_SET, "/", ":", ";", "=", "@", [0x5B, 0x5E], "|")
 COMPONENT_ENCODE_SET = compilePercentEncodeSet(USERINFO_ENCODE_SET, [0x24, 0x26], "+", ",")
--- URLENCODED_ENCODE_SET = compilePercentEncodeSet(COMPONENT_ENCODE_SET, "!", [0x27, 0x29], "~")
+URLENCODED_ENCODE_SET = compilePercentEncodeSet(COMPONENT_ENCODE_SET, "!", [0x27, 0x29], "~")
 URI_ENCODE_SET = compilePercentEncodeSet(C0_ENCODE_SET, 0x20, 0x22, 0x25, 0x3C, 0x3E, [0x42, 0x59], [0x5B, 0x5E], 0x60, [0x62, 0x79], [0x7B, 0x7D])
 
 export encodeURI = (s) -> percentEncode(s, URI_ENCODE_SET)
@@ -356,7 +356,6 @@ parseIPv6 = (str, startPos, endPos) ->
     pointer = startPos
     pieceIndex = 1
     compress = nil
-    -- dotSeen = false
 
     if byte(str, startPos) == 0x3A -- ':'
         if startPos == endPos --[[ EOF ]] or byte(str, startPos + 1) != 0x3A -- ':'
@@ -590,7 +589,7 @@ parseScheme = (str, startPos, endPos, base, stateOverride) =>
                     if isUrlSpecial and not isSpecial then return
                     if not isUrlSpecial and isSpecial then return
                     if @username or @password or @port and isSpecial == true then return
-                    if isUrlSpecial == true and @hostname ~= "" then return
+                    if isUrlSpecial == true and @hostname != "" then return
 
                 @scheme = scheme
 
@@ -1040,9 +1039,9 @@ serializeQuery = (query) ->
             output[length] = "&"
 
         length += 1
-        output[length] = t[1] and percentEncode(t[1], QUERY_ENCODE_SET, true) or ""
+        output[length] = t[1] and percentEncode(t[1], URLENCODED_ENCODE_SET, true) or ""
 
-        value = t[2] and percentEncode(t[2], QUERY_ENCODE_SET, true) or ""
+        value = t[2] and percentEncode(t[2], URLENCODED_ENCODE_SET, true) or ""
         if value != ""
             length += 1
             output[length] = "="
@@ -1202,12 +1201,11 @@ export class URLSearchParams
             if t[1] == name
                 -- replace first value
                 t[2] = value
-
                 -- remove all other values
                 for j = #list, i + 1, -1
                     if list[j][1] == name
                         remove(list, j)
-
+    
                 update(list)
                 return
 
@@ -1363,7 +1361,7 @@ export class URL
                 parseHost(state, value, 1, #value, state.scheme and SPECIAL_SCHEMAS[state.scheme], "host")
             when "pathname"
                 if isstring(state.path)
-                    return
+                    return -- cannot set pathname when path is opaque
                 resetCache(@)
                 state.path = {}
                 parsePathStart(state, value, 1, #value, state.scheme and SPECIAL_SCHEMAS[state.scheme], true)
