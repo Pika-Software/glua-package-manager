@@ -311,9 +311,9 @@ do
     environment.type = ( value ) ->
         return Names[ typeID( value ) ]
 
-    environment.AddType = ( typeName, func ) ->
-        assert( isstring( typeName ), "bad argument #1 to \'AddType\' (string expected)" )
-        assert( isfunction( func ), "bad argument #2 to \'AddType\' (function expected)" )
+    util.RegisterType = ( typeName, func ) ->
+        assert( isstring( typeName ), "bad argument #1 to \'util.RegisterType\' (string expected)" )
+        assert( isfunction( func ), "bad argument #2 to \'util.RegisterType\' (function expected)" )
 
         typeIndex = 256
 
@@ -986,7 +986,7 @@ do
 
     import type from environment
 
-    ArgAssert = ( value, argNum, expected, errorlevel ) ->
+    ArgAssert = environment.ArgAssert = ( value, argNum, expected, errorlevel ) ->
         valueType = type( value )
 
         if valueType == expected
@@ -1006,8 +1006,7 @@ do
             expected = "[ " .. concat( expected, "/", 1, length ) .. " ]"
 
         error "bad argument #" .. argNum .. " to \'" .. ( getinfo( 2, "n" ).name or "unknown" ) .. "\' (" .. expected .. " expected, got " .. valueType .. ")", errorlevel or 3
-
-    environment.ArgAssert = ArgAssert
+        return nil
 
 unless table.unpack
     table.unpack = _G.unpack
@@ -1231,7 +1230,7 @@ do
 
         return false
 
-    environment.AddType( "Color", iscolor )
+    util.RegisterType( "Color", iscolor )
     environment.iscolor = iscolor
 
 do
@@ -1348,85 +1347,95 @@ class util.Stack
 
         @pointer = 0
 
---[[
+do
 
-    Queue References:
-        https://github.com/darkwark/queue-lua
-        https://en.wikipedia.org/wiki/Queue_(abstract_data_type)
+    --[[
 
---]]
+        Queue References:
+            https://github.com/darkwark/queue-lua
+            https://en.wikipedia.org/wiki/Queue_(abstract_data_type)
 
-class util.Queue
-    __tostring: =>
-        return format( "Queue: %p [%d/%d]", @, @pointer, @size )
+    --]]
 
-    new: ( size ) =>
-        @size = ( isnumber( size ) and size > 0 ) and size or -1
-        @front = 1
-        @rear = 0
+    class Queue
+        __tostring: =>
+            return format( "Queue: %p [%d/%d]", @, @pointer, @size )
 
-    length: =>
-        return ( @rear - @front ) + 1
+        new: ( size ) =>
+            @size = ( isnumber( size ) and size > 0 ) and size or -1
+            @front = 1
+            @rear = 0
 
-    isEmpty: =>
-        return @rear == 0
+        length: =>
+            return ( @rear - @front ) + 1
 
-    isFull: =>
-        return @length! == @size
+        isEmpty: =>
+            return @rear == 0
 
-    enqueue: ( value ) =>
-        if @isFull!
-            return
+        isFull: =>
+            return @length! == @size
 
-        rear = @rear + 1
-        @rear = rear
-        @[ rear ] = value
+        enqueue: ( value ) =>
+            if @isFull!
+                return
 
-    dequeue: =>
-        if @isEmpty!
-            return nil
+            rear = @rear + 1
+            @rear = rear
+            @[ rear ] = value
 
-        front = @front
-        value = @[ front ]
-        @[ front ] = nil
+        dequeue: =>
+            if @isEmpty!
+                return nil
 
-        front += 1
-        @front = front
+            front = @front
+            value = @[ front ]
+            @[ front ] = nil
 
-        if ( front * 2 ) >= @rear
-            @optimize!
+            front += 1
+            @front = front
 
-        return value
+            if ( front * 2 ) >= @rear
+                @optimize!
 
-    get: ( index ) =>
-        return @[ @front + index ]
+            return value
 
-    set: ( index, value ) =>
-        @[ @front + index ] = value
+        get: ( index ) =>
+            return @[ @front + index ]
 
-    optimize: =>
-        pointer, buffer = 1, {}
+        set: ( index, value ) =>
+            @[ @front + index ] = value
 
-        for index = @front, @rear
-            buffer[ pointer ] = @[ index ]
-            @[ index ] = nil
-            pointer += 1
+        optimize: =>
+            pointer, buffer = 1, {}
 
-        for index = 1, pointer
-            @[ index ] = buffer[ index ]
+            for index = @front, @rear
+                buffer[ pointer ] = @[ index ]
+                @[ index ] = nil
+                pointer += 1
 
-        @front = 1
-        @rear = pointer - 1
+            for index = 1, pointer
+                @[ index ] = buffer[ index ]
 
-    peek: =>
-        return @[ @front ]
+            @front = 1
+            @rear = pointer - 1
 
-    empty: =>
-        for index = @front, @rear
-            @[ index ] = nil
+        peek: =>
+            return @[ @front ]
 
-    @__base.push = @__base.enqueue
-    @__base.pop = @__base.dequeue
+        empty: =>
+            for index = @front, @rear
+                @[ index ] = nil
+
+        @__base.push = @__base.enqueue
+        @__base.pop = @__base.dequeue
+
+    util.Queue = Queue
+
+    isQueue = environment.IsQueue = ( any ) ->
+        metatable = getmetatable( any )
+        return metatable and metatable.__class == Queue
+
+    util.RegisterType( "Queue", isQueue )
 
 do
 
