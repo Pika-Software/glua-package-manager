@@ -1455,8 +1455,7 @@ do
 
 do
 
-    struct = include( "libs/struct.lua" )
-    environment.struct = struct
+    struct = environment.struct = include( "libs/struct.lua" )
 
     do
 

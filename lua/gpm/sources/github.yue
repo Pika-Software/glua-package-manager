@@ -70,7 +70,7 @@ class RepositoryHandler extends BaseSourceHandler
         info.user = user
         return info
 
-    Install: async ( url, info, _, __, env ) =>
+    Install: async ( url, info, _, env ) =>
         unless info.path
             response = await Fetch( "https://api.github.com/repos/" .. info.user .. "/" .. info.repository .. "/zipball/" .. info.branch, info.headers )
             if response.status ~= 200

@@ -56,26 +56,26 @@ do
 
             return result.body
 
-        Install: async ( url, luaCode, _, __, parentEnvironment ) =>
+        Install: async ( url, content, _, env ) =>
             func = await switch url.extension
-                when "lua"
-                    CompileLuaString( luaCode, url.href, true, false )
-
-                when "moon"
-                    CompileMoonString( luaCode, url.href, true )
-
                 when "yue"
                     yueConfig = {}
                     for key, value in url.searchParams\iterator!
                         yueConfig[ key ] = value
 
-                    CompileYueString( luaCode, url.href, true, yueConfig )
+                    CompileYueString( content, url.href, true, yueConfig )
+
+                when "moon"
+                    CompileMoonString( content, url.href, true )
+
+                else
+                    CompileLuaString( content, url.href, true, false )
 
             unless func
                 error ModuleError "File '" .. url.href .. "' cannot be compiled."
                 return
 
-            return Module( func, url, parentEnvironment )\run!
+            return Module( func, url, env )\run!
 
 class TextHandler extends BaseSourceHandler
     ShouldHandle: ( url ) =>

@@ -80,7 +80,7 @@ do
 
             return await Compile( url.pathname, nil, true, yueConfig )
 
-        Install: async ( url, func, _, __, env ) =>
+        Install: async ( url, func, _, env ) =>
             if func
                 return Module( func, url, env )\run!
 

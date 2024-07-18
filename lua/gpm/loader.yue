@@ -1,10 +1,10 @@
 _G = _G
-import gpm from _G
+import gpm, getmetatable, setmetatable from _G
 import environment from gpm
-import path, isurl, isstring, rawget, getfenv, URL from environment
+
+import debug, isurl, isstring, ArgAssert, URL, NotImplementedError from environment
 import async, await, reject from environment.Promise
-import getfmain, getfpathi from environment.debug
-import NotImplementedError, SourceError, ArgAssert from environment
+import getfpathi from debug
 
 :loader = gpm
 unless istable( loader )
@@ -16,7 +16,7 @@ import CompileLuaString, CompileMoonString, CompileYueString, Version, Logger, J
 import AsyncRead, IsFile, IsDir, NormalizeGamePath from environment.file
 import sub, byte, find, match, gsub, format, StartsWith, IsURL from environment.string
 import ModuleError, PackageError from environment
-import getDirectory from environment.path
+import getDirectory, join, stripExtension from environment.path
 
 local Package
 do
@@ -350,13 +350,13 @@ class ESM
 
     -- READ_PACKAGE_JSON(packageURL)
     readPackageJSON = ( packageURL ) =>
-        pjsonPath = path.join( packageURL.pathname, "package.lua" )
+        pjsonPath = join( packageURL.pathname, "package.lua" )
         unless IsFile( pjsonPath )
             return
 
         filePath, gamePath = NormalizeGamePath( pjsonPath )
 
-        withoutExtension, extension = path.stripExtension( filePath )
+        withoutExtension, extension = stripExtension( filePath )
         if IsFile( withoutExtension .. ".yue", gamePath, true )
             extension = "yue"
         elseif IsFile( withoutExtension .. ".moon", gamePath, true )
@@ -443,7 +443,7 @@ class Include
             resolved = URL( fileName, base )
             if resolved.path[1] == "lua" and IsFile( resolved.pathname )
                 return { :resolved }
-        
+
         resolved = URL( fileName, "file:///lua/" )
         if resolved.path[1] == "lua" and IsFile( resolved.pathname )
             return { :resolved }
@@ -451,6 +451,8 @@ class Include
         return ESM.resolve( fileName, base )
 
 do
+
+    import SourceError from environment
 
     sources = loader.Sources
     unless istable( sources )
@@ -471,11 +473,11 @@ do
         __tostring: =>
             return format( "%s: %p", @@__name or "unknown source handler", @ )
 
-        FetchInfo: async ( url, parent_url, parent_pkg, parent_env ) =>
+        FetchInfo: async ( url, base, env, parent ) =>
             return nil
 
-        Install: async ( url, info, parent_url, parent_pkg, parent_env ) =>
-            error NotImplementedError "Source:Install( url, info, parent_url, parent_pkg, parent_env )"
+        Install: async ( url, info, base, env, parent ) =>
+            error NotImplementedError "Source:Install( url, info, base, env, parent )"
             return
 
     class loader.BaseSource
@@ -498,11 +500,11 @@ do
 
             return reject SourceError "No handler found for URL '#{url}' (" .. name .. ")"
 
-        FetchInfo: ( url, parent_url, parent_pkg, parent_env ) =>
-            return @CallHandler( "FetchInfo", url, parent_url, parent_pkg, parent_env )
+        FetchInfo: ( url, base, env, parent ) =>
+            return @CallHandler( "FetchInfo", url, base, env, parent )
 
-        Install: ( url, info, parent_url, parent_pkg, parent_env ) =>
-            return @CallHandler( "Install", url, info, parent_url, parent_pkg, parent_env )
+        Install: ( url, info, base, env, parent ) =>
+            return @CallHandler( "Install", url, info, base, env, parent )
 
     parseFileURL = loader.ParseFileURL = ( any ) ->
         if isurl( any )
@@ -521,75 +523,90 @@ do
 
         return url
 
-    loader.FetchInfo = async ( url, ... ) ->
+    loader.FetchInfo = async ( url, base, env, parent ) ->
         url = getFileURL( url )
-        return findSource( url.scheme )\FetchInfo( url, ... )
+        return findSource( url.scheme )\FetchInfo( url, base, env, parent )
 
-    asyncImport = loader.AsyncImport = async ( specifier, base = URL("file:///lua/"), resolver, parent, env, info ) ->
+    asyncImport = loader.AsyncImport = async ( specifier, resolver, info, base = URL( "file:///lua/" ), env, parent ) ->
         :resolved, :package = await resolver( specifier, base )
-        source = findSource( resolved.scheme )
-
 
         if package -- if package was found, then it must overwrite current env
-            env = package.env
+            env = package.env or env
+
+        source = findSource( resolved.scheme )
 
         unless info
-            info = await source\FetchInfo( resolved, base, parent, env )
+            info = await source\FetchInfo( resolved, base, env, parent )
 
-        return source\Install( resolved, info, base, parent, env )
+        return source\Install( resolved, info, base, env, parent )
 
-    loader.GetModule = (func = getfmain!) ->
-        if fenv := func and getfenv( func )
-            return rawget( fenv, "__module" )
+    local getImportMeta
+    do
 
-    loader.GetURL = (func = getfmain!) ->
-        if fpath := func and getfpathi( func )
-            if IsURL( fpath )
-                return URL( fpath )
+        import getfmain from debug
 
-            return URL( "file:///" .. fpath )
+        local getModule
+        do
 
-    loader.GetFolder = (func = getfmain!) -> -- not compatible with urls
-        if fpath := func and getfpathi( func )
-            return getDirectory( fpath )
+            import rawget, getfenv from _G
 
-    loader.GetParentURL = (m = loader.GetModule!) -> m and m.url or nil
+            getModule = loader.GetModule = ( func = getfmain! ) ->
+                if fenv := func and getfenv( func )
+                    return rawget( fenv, "__module" )
 
-    loader.GetEnvironment = (m = loader.GetModule!) -> m and m.env or nil
+        getURL = loader.GetURL = ( func = getfmain! ) ->
+            if fpath := func and getfpathi( func )
+                if IsURL( fpath )
+                    return URL( fpath )
 
-    loader.GetPackage = (env = loader.GetEnvironment!) -> env and env.__package or nil
+                return URL( "file:///" .. fpath )
 
-    loader.GetImportMeta = ->
-        local base, parent, env
-        if fmain := getfmain!
-            if m := loader.GetModule( fmain )
-                base = loader.GetParentURL( m )
-                env = loader.GetEnvironment( m )
-                parent = loader.GetPackage( env )
+        loader.GetFolder = ( func = getfmain! ) -> -- not compatible with urls
+            if fpath := func and getfpathi( func )
+                return getDirectory( fpath )
 
-            base or= loader.GetURL( fmain )
+        getParentURL = loader.GetParentURL = ( m = getModule! ) ->
+            return m and m.url or nil
 
-        return base, env, parent
+        getEnvironment = loader.GetEnvironment = ( m = getModule! ) ->
+            return m and m.env or nil
 
-    gpm.Import = ( specifier, should_await ) ->
-        ArgAssert( specifier, 1, "string", 2 )
+        getPackage = loader.GetPackage = ( env = getEnvironment! ) ->
+            return env and env.__package or nil
 
-        base, env, parent = loader.GetImportMeta()
-        return await asyncImport( specifier, base, ESM.resolve, parent, env, nil )
+        getImportMeta = loader.GetImportMeta = ->
+            local base, parent, env
+            if fmain := getfmain!
+                if m := getModule( fmain )
+                    base = getParentURL( m )
+                    env = getEnvironment( m )
+                    parent = getPackage( env )
+
+                base or= getURL( fmain )
+
+            return base, env, parent
+
+    do
+
+        import_fn = gpm.Import = ( specifier, should_await ) ->
+            ArgAssert( specifier, 1, "string", 2 )
+
+            if should_await
+                return await asyncImport( specifier, ESM.resolve, nil, getImportMeta! )
+
+            return asyncImport( specifier, ESM.resolve, nil, getImportMeta! )
+
+        -- just for a .lua users
+        environment.import = ( specifier, should_await ) ->
+            return import_fn( specifier, should_await or true )
 
     environment.require = ( modname ) ->
         ArgAssert( modname, 1, "string" )
-
-        base, env, parent = loader.GetImportMeta()
-        return await asyncImport( modname, base, Require.resolve, parent, env, nil )
+        return await asyncImport( modname, Require.resolve, nil, getImportMeta! )
 
     environment.include = ( fileName ) ->
         ArgAssert( fileName, 1, "string" )
-
-        base, env, parent = loader.GetImportMeta()
-        return await asyncImport( fileName, base, Include.resolve, parent, env, nil )
-
-    environment["import"] = gpm.Import -- just for a .lua users
+        return await asyncImport( fileName, Include.resolve, nil, getImportMeta! )
 
 test = async ->
     gpm.Import "package_v2"
