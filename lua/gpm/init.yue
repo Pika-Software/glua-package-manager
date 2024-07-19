@@ -22,7 +22,7 @@ if SERVER
         AddCSLuaFile( "gpm/sources/" .. fileName )
 
     AddCSLuaFile( "gpm/moonloader.lua" )
-    AddCSLuaFile( "gpm/classes.yue" )
+    AddCSLuaFile( "gpm/classes.lua" )
     AddCSLuaFile( "gpm/loader.lua" )
     AddCSLuaFile( "gpm/init.lua" )
     AddCSLuaFile( "gpm/util.lua" )
