@@ -121,15 +121,21 @@ environment.await = promise.await
 environment.Promise = promise
 
 -- gm_url
-url = include( "libs/url.lua" )
-environment.http.EncodeURIComponent = url.encodeURIComponent
-environment.http.DecodeURIComponent = url.decodeURIComponent
-environment.IsURLSearchParams = url.IsURLSearchParams
-environment.URLSearchParams = url.URLSearchParams
-environment.http.EncodeURI = url.encodeURI
-environment.http.DecodeURI = url.decodeURI
-environment.isurl = url.IsURL
-environment.URL = url.URL
+do
+
+    url = include( "libs/url.lua" )
+
+    environment.IsURLSearchParams = url.IsURLSearchParams
+    environment.URLSearchParams = url.URLSearchParams
+    environment.isurl = url.IsURL
+    environment.URL = url.URL
+
+    import http from environment
+
+    http.EncodeURIComponent = url.encodeURIComponent
+    http.DecodeURIComponent = url.decodeURIComponent
+    http.EncodeURI = url.encodeURI
+    http.DecodeURI = url.decodeURI
 
 include( "moonloader.lua" )
 
