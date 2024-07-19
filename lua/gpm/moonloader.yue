@@ -14,7 +14,7 @@ util.CompileYueString = ->
 if util.IsBinaryModuleInstalled( "moonloader" )
     local ok, msg = pcall( require, "moonloader" )
     if ok and istable( moonloader )
-        Logger\Loaded( "gm_moonloader v%s", util.Version( moonloader._VERSION ) )
+        Logger\Loaded( "gm_moonloader v%s", moonloader._VERSION )
     else
         Logger\Error( "gm_moonloader startup error: %s", msg or "unknown error" )
         return

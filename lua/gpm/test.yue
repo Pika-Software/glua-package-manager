@@ -35,7 +35,7 @@ main = async ->
     -- print "=== Loading `#{specifier}` #{CurTime()} ==="
 
     -- entry = await gpm.loader.Resolve specifier
-    -- print "Entry is #{entry} (#{entry and debug.getfpathi(entry) or "???"})"
+    -- print "Entry is #{entry} (#{entry and debug.getfpath(entry) or "???"})"
     -- if entry
     --     print "return:", await entry!
 
@@ -44,7 +44,7 @@ main = async ->
     --     gpm.Logger\Info "Loading package `#{pkg}`..."
     --     gpm.Import "lua://" .. pkg.dir .. pkg.entry
 
-    return
+    -- return
     -- print "fetching info..."
     -- info = await gpm.FetchInfo "package_v2"
     -- print "info: #{info}"
