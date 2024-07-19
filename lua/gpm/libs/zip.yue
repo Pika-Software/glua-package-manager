@@ -8,47 +8,64 @@ import equal from environment.path
 import fempty from environment.debug
 import match, sub, find, gsub from string
 import DecompressDeflate from environment.deflate
-import ByteStream, MD5, CRC from environment.util
+import CRC32, ByteStream, MD5 from environment.util
 import Addon, IsFilePathAllowed from environment.addon
 import AsyncRead, AsyncWrite, MountGMA, NormalizeGamePath from file
 
+-- https://medium.com/@felixstridsberg/the-zip-file-format-6c8a160d1c34
 iterateZipFiles = file.IterateZipFiles = ( fileHandle, doCRC ) ->
     unless fileHandle
         return fempty
+
+    doCRC = doCRC == true
 
     return ->
         if fileHandle\Read( 4 ) ~= "PK\x03\x04"
             return
 
+        data = {}
+
         fileHandle\Skip( 4 )
 
         compressionMethod = fileHandle\ReadUShort!
-        fileHandle\Skip( 4 )
 
-        crc = fileHandle\ReadULong!
+        data.time = fileHandle\ReadUShort!
+        data.date = fileHandle\ReadUShort!
+
+        crc32 = fileHandle\ReadULong!
+        data.crc = crc32
+
         compressedSize = fileHandle\ReadULong!
-        fileHandle\Skip( 4 )
+        data.size = fileHandle\ReadULong!
 
-        fileNameLen = fileHandle\ReadUShort!
-        extraLen = fileHandle\ReadUShort!
-        fileName = fileHandle\Read( fileNameLen )
-        fileHandle\Skip( extraLen )
+        pathLength = fileHandle\ReadUShort!
+        extraLength = fileHandle\ReadUShort!
 
-        local data
+        data.path = fileHandle\Read( pathLength )
+        fileHandle\Skip( extraLength )
+
+        -- TODO: external binary module for other compression methods support
+
+        local content
         switch compressionMethod
             -- Without compression
             when 0
-                data = fileHandle\Read( compressedSize )
+                content = fileHandle\Read( compressedSize )
 
             -- Deflate compression
             when 8
-                compressedData = fileHandle\Read( compressedSize )
-                data = DecompressDeflate( compressedData )
+                content = DecompressDeflate( fileHandle\Read( compressedSize ) )
 
-        if data ~= nil and doCRC ~= false and tostring( crc ) ~= CRC( data )
-            data = nil
+            else
+                error "Unsupported compression method: " .. compressionMethod
 
-        return fileName, data
+        if doCRC and content ~= nil
+            result = CRC32( content )
+            if tostring( crc32 ) ~= result
+                error "CRC-32 mismatch: " .. crc32 .. " != " .. result
+
+        data.content = content
+        return data
 
 file.Delete( "gpm/mount" )
 file.CreateDir( "gpm/mount", true )
@@ -59,11 +76,12 @@ mountZIPData = file.MountZIPData = async ( data, uniqueName ) ->
     local isInFolder, last
     temp = {}
 
-    for fileName, content in iterateZipFiles( ByteStream( data ) )
-        temp[ fileName ] = content
+    for data in iterateZipFiles( ByteStream( data ), true )
+        filePath = data.path
+        temp[ filePath ] = data.content
 
         if isInFolder ~= false
-            current = match( fileName, "^(.-)/" )
+            current = match( filePath, "^(.-)/" )
             if last
                 isInFolder = equal( last, current )
 

@@ -17,6 +17,7 @@ import getinfo from debug
 -- Aliases
 util.CompileLuaFile = _G.CompileFile
 environment.throw = error
+util.CRC32 = util.CRC
 
 local _R
 do
