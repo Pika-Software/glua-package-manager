@@ -1,10 +1,11 @@
 _G = _G
 import environment from _G.gpm
 -- Based on https://github.com/luvit/luvit/blob/master/deps/path/base.lua
-import byte, sub, len, lower, match, gsub, ByteSplit, TrimByte from environment.string
-import getfmain, getfpathi from environment.debug
+import byte, sub, len, lower, match, gsub, ByteSplit, TrimByte, IsURL from environment.string
+import getfmain, getfpath from environment.debug
 import concat, insert, remove from table
 import getfenv, rawget from _G
+import URL from environment
 
 export getFile = ( path ) ->
     for index = len( path ), 1, -1
@@ -109,23 +110,29 @@ export fixSlashes = ( path ) ->
 export fix = ( path ) ->
     return fixFileName( fixSlashes( path ) )
 
-export getCurrentFile = ->
-    if func := getfmain!
+export getCurrentFile = ( func = getfmain! ) ->
+    if func
         if fenv := getfenv( func )
-            if mdl := rawget( fenv, "__module" )
-                return rawget( mdl, "__filename" )
+            if m := rawget( fenv, "__module" )
+                return m.file
 
-        return getfpathi( func )
+        fpath = getfpath( func )
+        if IsURL( fpath )
+            return URL( fpath ).pathname
 
-    return "/"
+        return "/" .. fpath
 
-export getCurrentDirectory = ->
-    if func := getfmain!
+export getCurrentDirectory = ( func = getfmain! ) ->
+    if func
         if fenv := getfenv( func )
-            if mdl := rawget( fenv, "__module" )
-                return rawget( mdl, "__dirname" )
+            if m := rawget( fenv, "__module" )
+                return m.dir
 
-        return getDirectory( getfpathi( func ) )
+        fpath = getfpath( func )
+        if IsURL( fpath )
+            return getDirectory( URL( fpath ).pathname )
+
+        return getDirectory( "/" .. fpath )
 
     return "/"
 
