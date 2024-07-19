@@ -6,7 +6,7 @@ print = ( ... ) ->
 
     Logger::Info( table.concat(tbl, "\t" ) )
 
-import data from gpm.Import "./async_module.lua"
+import data from include "./async_module.lua"
 print "data from async module: ", data
 print "me:", __package
 print "and:", __module
