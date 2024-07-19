@@ -22,6 +22,7 @@ if SERVER
         AddCSLuaFile( "gpm/sources/" .. fileName )
 
     AddCSLuaFile( "gpm/moonloader.lua" )
+    AddCSLuaFile( "gpm/classes.yue" )
     AddCSLuaFile( "gpm/loader.lua" )
     AddCSLuaFile( "gpm/init.lua" )
     AddCSLuaFile( "gpm/util.lua" )
@@ -85,35 +86,41 @@ do
 
 include( "gpm/util.lua" )
 
-local logger
-do
-
-    import Logger, IsLogger from include( "libs/logger.lua" )
-    environment.util.RegisterType( "Logger", IsLogger )
-
-    environment.util.Logger = Logger
-    environment.IsLogger = IsLogger
-
-    logger = gpm.Logger = Logger( "gpm@" .. gpm.VERSION, Color( 180, 180, 255 ), false )
+logger = gpm.Logger = include( "libs/logger.lua" )( "gpm@" .. gpm.VERSION, Color( 180, 180, 255 ), false )
 
 environment.path = include( "libs/path.lua" )
 
-for key, value in pairs( include( "libs/error.lua" ) )
-    environment[ key ] = value
+do
 
-environment.ipa = include( "libs/3rd-party/ip.lua" )
+    import pairs from _G
+
+    -- gm_error
+    for key, value in pairs( include( "libs/error.lua" ) )
+        environment[ key ] = value
+
+    -- math extensions
+    import math from environment
+
+    for key, value in pairs( include( "libs/math.lua" ) )
+        math[ key ] = value
+
+environment.ipaml = include( "libs/3rd-party/ip.lua" )
 environment.utf8 = include( "libs/utf8/init.lua" )
+environment.struct = include( "libs/struct.lua" )
 
+-- LibDeflate
 deflate = include( "libs/3rd-party/deflate.lua" )
 logger\Loaded( "LibDeflate v%s", deflate._VERSION )
 environment.deflate = deflate
 
+-- gm_promise
 promise = include( "libs/promise.lua" )
 logger\Loaded( "gm_promise v%s", promise.VERSION )
 environment.async = promise.async
 environment.await = promise.await
 environment.Promise = promise
 
+-- gm_url
 url = include( "libs/url.lua" )
 environment.http.EncodeURIComponent = url.encodeURIComponent
 environment.http.DecodeURIComponent = url.decodeURIComponent
@@ -128,8 +135,10 @@ include( "moonloader.lua" )
 
 environment.file = setmetatable( include( "libs/file.lua" ), { __index: _G.file } )
 include( "libs/http.lua" )
+include( "classes.lua" )
 
 environment.addon = include( "libs/addon.lua" )
+
 include( "libs/zip.lua" )
 include( "loader.lua" )
 

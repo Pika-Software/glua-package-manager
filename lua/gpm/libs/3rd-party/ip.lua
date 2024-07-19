@@ -1,5 +1,5 @@
 --
--- IP address manipulation library in Lua
+-- IP address manipulation library in Lua (IPAML)
 --
 -- @author    leite (xico@simbio.se)
 -- @license   MIT

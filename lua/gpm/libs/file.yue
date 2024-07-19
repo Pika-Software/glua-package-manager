@@ -345,7 +345,7 @@ do
 
             return Open( filePath, fileMode, gamePath )
 
-    File = FindMetaTable( "File" )
+    File = util.FindMetaTable( "File" )
 
     do
 

@@ -1,114 +1,273 @@
 _G = _G
-import gpm, pairs, error, istable, tostring from _G
-import environment from gpm
+import pairs, error, rawget, getmetatable, setmetatable, istable from _G
+import environment from _G.gpm
+
+string = environment.string = setmetatable( rawget( environment, "string" ) or {}, { __index: _G.string } )
+table = environment.table = setmetatable( rawget( environment, "table" ) or {}, { __index: _G.table } )
+debug = environment.debug = setmetatable( rawget( environment, "debug" ) or {}, { __index: _G.debug } )
+math = environment.math = setmetatable( rawget( environment, "math" ) or {}, { __index: _G.math } )
+http = environment.http = setmetatable( rawget( environment, "http" ) or {}, { __index: _G.http } )
+util = environment.util = setmetatable( rawget( environment, "util" ) or {}, { __index: _G.util } )
+
+import byte, sub, gsub, format, len, find from string
+import concat, remove from table
+import max, min from math
+import getinfo from debug
+
+-- Aliases
+util.CompileLuaFile = _G.CompileFile
+environment.throw = error
+
+local _R
+do
+
+    import FindMetaTable, RegisterMetaTable, rawset from _G
+    _R = debug.getregistry and debug.getregistry! or {}
+
+    static = {
+        "unknown": -1
+        "nil": 0
+        "boolean": 1
+        "light userdata": 2
+        "number": 3
+        "string": 4
+        "table": 5
+        "function": 6
+        "userdata": 7
+        "thread": 8
+        "Entity": 9
+        "Vector": 10
+        "Angle": 11
+        "PhysObj": 12
+        "ISave": 13
+        "IRestore": 14
+        "CTakeDamageInfo": 15
+        "CEffectData": 16
+        "CMoveData": 17
+        "CRecipientFilter": 18
+        "CUserCmd": 19
+        "IMaterial": 21
+        "Panel": 22
+        "CLuaParticle": 23
+        "CLuaEmitter": 24
+        "ITexture": 25
+        "bf_read": 26
+        "ConVar": 27
+        "IMesh": 28
+        "VMatrix": 29
+        "CSoundPatch": 30
+        "pixelvis_handle_t": 31
+        "dlight_t": 32
+        "IVideoWriter": 33
+        "File": 34
+        "CLuaLocomotion": 35
+        "PathFollower": 36
+        "CNavArea": 37
+        "IGModAudioChannel": 38
+        "CNavLadder": 39
+        "CNewParticleEffect": 40
+        "ProjectedTexture": 41
+        "PhysCollide": 42
+        "SurfaceInfo": 43
+        "Color": 255
+    }
+
+    setmetatable( _R, {
+        __index: ( tbl, key ) ->
+            value = FindMetaTable( key )
+            rawset( tbl, key, value )
+
+            if index := static[ key ]
+                rawset( value, "MetaID", index )
+            else
+                rawset( value, "MetaID", value.MetaID or -1 )
+
+            rawset( value, "MetaName", key )
+            return value
+
+        __newindex: ( tbl, key, value ) ->
+            value = FindMetaTable( key ) or value
+
+            if RegisterMetaTable
+                RegisterMetaTable( key, value )
+
+            rawset( tbl, key, value )
+
+            if index := static[ key ]
+                rawset( value, "MetaID", index )
+            else
+                rawset( value, "MetaID", value.MetaID or -1 )
+
+            rawset( value, "MetaName", key )
+            return nil
+    } )
+
+    debug.getregistry = ->
+        return _R
 
 do
 
-    import debug from _G
+    import type from _G
+    :TypeID = _G
 
-    local register
-    do
+    type_fn = environment.type = ( any ) ->
+        metatable = getmetatable( any )
+        if metatable
+            if name := rawget( metatable, "MetaName" )
+                return name
 
-        _R = debug.getregistry!
+        return type( any )
 
-        register = _G.RegisterMetaTable or ( name, metatable ) ->
-            _R[ name ] = metatable
+    -- js like type
+    environment.typeof = ( any, ... ) ->
+        return type_fn( any ), ...
 
-    import getmetatable, setmetatable from debug
+    if isfunction( TypeID )
+        environment.TypeID = ( any ) ->
+            metatable = getmetatable( any )
+            if metatable
+                if id := rawget( metatable, "MetaID" )
+                    return id
 
-    object = nil
+            return TypeID( any )
 
-    metatable = getmetatable( object )
-    if metatable == nil
-        metatable = {}
-        setmetatable( object, metatable )
+    else
 
-    register( "nil", metatable )
+        environment.TypeID = ( any ) ->
+            metatable = getmetatable( any )
+            if metatable
+                if id := rawget( metatable, "MetaID" )
+                    return id
 
-    object = 0
+            -- TYPE_TABLE
+            return 5
 
-    metatable = getmetatable( object )
-    if metatable == nil
-        metatable = {}
-        setmetatable( object, metatable )
-
-    register( "number", metatable )
-
-    object = ""
-
-    metatable = getmetatable( object )
-    if metatable == nil
-        metatable = {}
-        setmetatable( object, metatable )
-
-    register( "string", metatable )
-
-    object = false
-
-    metatable = getmetatable( object )
-    if metatable == nil
-        metatable = {}
-        setmetatable( object, metatable )
-
-    register( "boolean", metatable )
-
-    object = ->
-
-    metatable = getmetatable( object )
-    if getmetatable( object ) == nil
-        metatable = {}
-        setmetatable( object, metatable )
-
-    register( "function", metatable )
-
-    object = coroutine.create( object )
-
-    metatable = getmetatable( object )
-    if metatable == nil
-        metatable = {}
-        setmetatable( object, metatable )
-
-    register( "thread", metatable )
-
-import getmetatable, setmetatable from _G
-
-local isstring, isnumber, isbool, isfunction
+:isbool, :isnumber, :isstring, :isfunction = _G
 do
 
-    :isstring, :isnumber, :isbool, :isfunction = _G
+    getmetatabled = debug.getmetatable or getmetatable
+    setmetatabled = debug.setmetatable or setmetatable
     import type from _G
 
-    if stringMeta := getmetatable("")
-        isstring = (v) -> getmetatable(v) == stringMeta
+    -- nil
+    object = nil
+    do
 
-    unless isstring
-        isstring = (v) -> type(v) == "string"
+        metatable = getmetatabled( object )
+        if metatable == nil
+            metatable = {}
+            setmetatabled( object, metatable )
 
-    environment.isstring = isstring
+        _R[ "nil" ] = metatable
+        rawset( metatable, "MetaName", "nil" )
+        rawset( metatable, "MetaID", 0 )
 
-    if numberMeta := getmetatable(0)
-        isnumber = (v) -> getmetatable(v) == numberMeta
+    -- boolean
+    object = false
+    do
 
-    unless isnumber
-        isnumber = (v) -> type(v) == "number"
+        metatable = getmetatabled( object )
+        if metatable == nil
+            metatable = {}
+            setmetatabled( object, metatable )
 
-    environment.isnumber = isnumber
+        _R[ "boolean" ] = metatable
+        rawset( metatable, "MetaName", "boolean" )
+        rawset( metatable, "MetaID", 1 )
 
-    if boolMeta := getmetatable(false)
-        isbool = (v) -> getmetatable(v) == boolMeta
+        isbool = ( any ) ->
+            return getmetatable( any ) == metatable
 
     unless isbool
-        isbool = (v) -> type(v) == "boolean"
+        isbool = ( any ) ->
+            return type( any ) == "boolean"
 
     environment.isbool = isbool
 
-    if functionMeta := getmetatable(->)
-        isfunction = (v) -> getmetatable(v) == functionMeta
+    -- number
+    object = 0
+    do
+
+        metatable = getmetatabled( object )
+        if metatable == nil
+            metatable = {}
+            setmetatabled( object, metatable )
+
+        _R[ "number" ] = metatable
+        rawset( metatable, "MetaName", "number" )
+        rawset( metatable, "MetaID", 3 )
+
+        isnumber = ( any ) ->
+            return getmetatable( any ) == metatable
+
+    unless isnumber
+        isnumber = ( any ) ->
+            return type( any ) == "number"
+
+    environment.isnumber = isnumber
+
+    -- string
+    object = ""
+    do
+
+        metatable = getmetatabled( object )
+        if metatable == nil
+            metatable = {}
+            setmetatabled( object, metatable )
+
+        _R[ "string" ] = metatable
+        rawset( metatable, "MetaName", "string" )
+        rawset( metatable, "MetaID", 4 )
+
+        isstring = ( any ) ->
+            return getmetatable( any ) == metatable
+
+    unless isstring
+        isstring = ( any ) ->
+            return type( any ) == "string"
+
+    environment.isstring = isstring
+
+    -- function
+    object = ->
+    do
+
+        metatable = getmetatabled( object )
+        if metatable == nil
+            metatable = {}
+            setmetatabled( object, metatable )
+
+        _R[ "function" ] = metatable
+        rawset( metatable, "MetaName", "function" )
+        rawset( metatable, "MetaID", 6 )
+
+        isfunction = ( any ) ->
+            return getmetatable( any ) == metatable
 
     unless isfunction
-        isfunction = (v) -> type(v) == "function"
+        isfunction = ( any ) ->
+            return type( any ) == "function"
 
     environment.isfunction = isfunction
+
+    -- Make jit happy <3
+    debug.fempty = object
+
+    -- thread
+    object = coroutine.create( object )
+    do
+
+        metatable = getmetatabled( object )
+        if metatable == nil
+            metatable = {}
+            setmetatabled( object, metatable )
+
+        _R[ "thread" ] = metatable
+        rawset( metatable, "MetaName", "thread" )
+        rawset( metatable, "MetaID", 8 )
+
+        environment.isthread = ( any ) ->
+            return getmetatable( any ) == metatable
 
 environment.iscallable = ( obj ) ->
     if isfunction( obj )
@@ -120,131 +279,17 @@ environment.iscallable = ( obj ) ->
 
     return false
 
-unless istable( gpm.Types )
-    gpm.Types = {
-        Functions: {}
+environment.FindMetaTable = util.FindMetaTable = ( name ) ->
+    assert( isstring( name ), "bad argument #1 to \'util.FindMetaTable\' (string expected)" )
+    return _R[ name ]
 
-        Indexes: setmetatable( {
-            "unknown": -1
-            "nil": 0
-            "boolean": 1
-            "light userdata": 2
-            "number": 3
-            "string": 4
-            "table": 5
-            "function": 6
-            "userdata": 7
-            "thread": 8
-            "Entity": 9
-            "Vector": 10
-            "Angle": 11
-            "PhysObj": 12
-            "ISave": 13
-            "IRestore": 14
-            "CTakeDamageInfo": 15
-            "CEffectData": 16
-            "CMoveData": 17
-            "CRecipientFilter": 18
-            "CUserCmd": 19
-            "IMaterial": 21
-            "Panel": 22
-            "CLuaParticle": 23
-            "CLuaEmitter": 24
-            "ITexture": 25
-            "bf_read": 26
-            "ConVar": 27
-            "IMesh": 28
-            "VMatrix": 29
-            "CSoundPatch": 30
-            "pixelvis_handle_t": 31
-            "dlight_t": 32
-            "IVideoWriter": 33
-            "File": 34
-            "CLuaLocomotion": 35
-            "PathFollower": 36
-            "CNavArea": 37
-            "IGModAudioChannel": 38
-            "CNavLadder": 39
-            "CNewParticleEffect": 40
-            "ProjectedTexture": 41
-            "PhysCollide": 42
-            "SurfaceInfo": 43
-            "Color": 255
-        }, {
-            __index: ->
-                return -1
-        } )
+environment.RegisterMetaTable = util.RegisterMetaTable = ( name, metatable ) ->
+    assert( isstring( name ), "bad argument #1 to \'util.RegisterMetaTable\' (string expected)" )
+    assert( istable( metatable ), "bad argument #2 to \'util.RegisterMetaTable\' (metatable expected)" )
+    _R[ name ] = metatable
 
-        Names: setmetatable( {
-            [ -1 ]: "unknown"
-            [ 0 ]: "nil"
-            [ 1 ]: "boolean"
-            [ 2 ]: "light userdata"
-            [ 3 ]: "number"
-            [ 4 ]: "string"
-            [ 5 ]: "table"
-            [ 6 ]: "function"
-            [ 7 ]: "userdata"
-            [ 8 ]: "thread"
-            [ 9 ]: "Entity"
-            [ 10 ]: "Vector"
-            [ 11 ]: "Angle"
-            [ 12 ]: "PhysObj"
-            [ 13 ]: "ISave"
-            [ 14 ]: "IRestore"
-            [ 15 ]: "CTakeDamageInfo"
-            [ 16 ]: "CEffectData"
-            [ 17 ]: "CMoveData"
-            [ 18 ]: "CRecipientFilter"
-            [ 19 ]: "CUserCmd"
-            [ 21 ]: "IMaterial"
-            [ 22 ]: "Panel"
-            [ 23 ]: "CLuaParticle"
-            [ 24 ]: "CLuaEmitter"
-            [ 25 ]: "ITexture"
-            [ 26 ]: "bf_read"
-            [ 27 ]: "ConVar"
-            [ 28 ]: "IMesh"
-            [ 29 ]: "VMatrix"
-            [ 30 ]: "CSoundPatch"
-            [ 31 ]: "pixelvis_handle_t"
-            [ 32 ]: "dlight_t"
-            [ 33 ]: "IVideoWriter"
-            [ 34 ]: "File"
-            [ 35 ]: "CLuaLocomotion"
-            [ 36 ]: "PathFollower"
-            [ 37 ]: "CNavArea"
-            [ 38 ]: "IGModAudioChannel"
-            [ 39 ]: "CNavLadder"
-            [ 40 ]: "CNewParticleEffect"
-            [ 41 ]: "ProjectedTexture"
-            [ 42 ]: "PhysCollide"
-            [ 43 ]: "SurfaceInfo"
-            [ 255 ]: "Color"
-        }, {
-            __index: ->
-                return "unknown"
-        } )
-    }
-
-math = environment.math = setmetatable( include( "libs/math.lua" ), { __index: _G.math } )
-string = environment.string = setmetatable( {}, { __index: _G.string } )
-table = environment.table = setmetatable( {}, { __index: _G.table } )
-debug = environment.debug = setmetatable( {}, { __index: _G.debug } )
-http = environment.http = setmetatable( {}, { __index: _G.http } )
-util = environment.util = setmetatable( {}, { __index: _G.util } )
-
--- Aliases
-util.CompileLuaFile = _G.CompileFile
-environment.throw = error
-
-import byte, char, sub, gsub, format, len, find from string
-import concat, remove from table
-import max, min from math
-import getinfo from debug
-
--- Make jit happy <3
-debug.fempty = ->
+    metatable = _R[ name ]
+    return metatable and metatable.MetaID or -1
 
 debug.fcall = ( func, ... ) ->
     return func( ... )
@@ -262,81 +307,51 @@ debug.getstack = ( startPos ) ->
 
     return stack, length
 
+debug.getfmain = ->
+    for level = 2, 16
+        info = getinfo( level, "fS" )
+        unless info
+            break
+
+        if info.what == "main"
+            return info.func
+
 do
-
-    getfmain = debug.getfmain = ->
-        for level = 2, 16
-            info = getinfo( level, "fS" )
-            unless info
-                break
-
-            if info.what == "main"
-                return info.func
 
     lff = ( a, b ) -> b
 
-    getfpathi = debug.getfpathi = ( location ) ->
+    debug.getfpath = ( location ) ->
         info = getinfo( location, "S" )
         if info.what == "main"
-            return "/" .. gsub( gsub( sub( info.source, 2 ), "^(.-)(lua/.*)$", lff ), "^(.-)([%w_]+/gamemode/.*)$", lff )
+            return gsub( gsub( sub( info.source, 2 ), "^(.-)(lua/.*)$", lff ), "^(.-)([%w_]+/gamemode/.*)$", lff )
 
-        return "/"
+        return ""
 
-    debug.getfpath = ->
-        main = getfmain!
-        if main
-            return getfpathi( main )
-
-        return "/"
-
--- Custom variable types
 do
 
-    metadataTypes = { [ TYPE_USERDATA ]: true, [ TYPE_TABLE ]: true }
-    import Names, Indexes, Functions from gpm.Types
-    TypeID = TypeID
+    import type from environment
 
-    typeID = ( value ) ->
-        typeIndex = TypeID( value )
+    environment.ArgAssert = ( value, num, expected, errorlevel = 3 ) ->
+        name = type( value )
 
-        if metadataTypes[ typeIndex ]
-            for funcData in *Functions
-                if funcData and funcData[ 1 ]( value )
-                    return funcData[ 2 ]
+        if name == expected
+            return value
 
-        return typeIndex
+        elseif isfunction( expected )
+            ok, expected = expected( value, num, name )
+            if ok
+                return value
 
-    environment.TypeID = typeID
+        elseif istable( expected )
+            length = #expected
+            for index = 1, length
+                if name == expected[ index ]
+                    return value
 
-    environment.type = ( value ) ->
-        return Names[ typeID( value ) ]
+            expected = "[ " .. concat( expected, "/", 1, length ) .. " ]"
 
-    util.RegisterType = ( typeName, func ) ->
-        assert( isstring( typeName ), "bad argument #1 to \'util.RegisterType\' (string expected)" )
-        assert( isfunction( func ), "bad argument #2 to \'util.RegisterType\' (function expected)" )
-
-        typeIndex = 256
-
-        for index, name in pairs( Names )
-            if typeName == name
-                typeIndex = index
-                break
-            elseif index >= typeIndex
-                typeIndex = index + 1
-
-        Names[ typeIndex ] = typeName
-        Indexes[ typeName ] = typeIndex
-
-        length = #Functions
-        for index = 1, length
-            funcData = Functions[ index ]
-            if funcData and funcData[ 2 ] == typeIndex
-                remove( Functions, index )
-                length -= 1
-                break
-
-        Functions[ length + 1 ] = { func, typeIndex }
-        return typeIndex
+        error( "bad argument #" .. num .. " to \'" .. ( getinfo( 2, "n" ).name or "unknown" ) .. "\' (" .. expected .. " expected, got " .. name .. ")", errorlevel )
+        return nil
 
 -- string
 string.slice = sub
@@ -361,34 +376,39 @@ string.indexOf = ( str, searchable, position, withPattern ) ->
 
     return find( str, searchable, position, withPattern ~= true ) or -1, nil
 
-split = string.Split = ( str, pattern, withPattern ) ->
-    unless pattern
-        return { str }
+do
 
-    if pattern == ""
-        ret = {}
-        for i = 1, len( str )
-            ret[ i ] = sub( str, i, i )
+    split = string.Split = ( str, pattern, withPattern ) ->
+        unless pattern
+            return { str }
 
-        return ret
+        if pattern == ""
+            ret = {}
+            for i = 1, len( str )
+                ret[ i ] = sub( str, i, i )
 
-    withPattern = withPattern ~= true
-    ret, rlength = {}, 0
-    pointer = 1
+            return ret
 
-    while true
-        startPos, endPos = find( str, pattern, pointer, withPattern )
-        unless startPos
-            break
+        withPattern = withPattern ~= true
+        ret, rlength = {}, 0
+        pointer = 1
+
+        while true
+            startPos, endPos = find( str, pattern, pointer, withPattern )
+            unless startPos
+                break
+
+            rlength += 1
+            ret[ rlength ] = sub( str, pointer, startPos - 1 )
+            pointer = endPos + 1
 
         rlength += 1
-        ret[ rlength ] = sub( str, pointer, startPos - 1 )
-        pointer = endPos + 1
+        ret[ rlength ] = sub( str, pointer )
 
-    rlength += 1
-    ret[ rlength ] = sub( str, pointer )
+        return ret, rlength
 
-    return ret, rlength
+    string.Explode = ( pattern, str, withPattern ) ->
+        return split( str, pattern, withPattern )
 
 string.Count = ( str, pattern, withPattern ) ->
     unless pattern
@@ -411,10 +431,7 @@ string.Count = ( str, pattern, withPattern ) ->
 
     return count
 
-string.Explode = ( pattern, str, withPattern ) ->
-    return split( str, pattern, withPattern )
-
-byteSplit = string.ByteSplit = ( str, byte0 ) ->
+string.ByteSplit = ( str, byte0 ) ->
     unless byte0
         return { str }
 
@@ -436,7 +453,7 @@ byteSplit = string.ByteSplit = ( str, byte0 ) ->
 
     return result, length
 
-byteCount = string.ByteCount = ( str, byte0 ) ->
+string.ByteCount = ( str, byte0 ) ->
     unless byte0
         return 0
 
@@ -510,517 +527,16 @@ string.Replace = ( str, searchable, replaceable, withPattern ) ->
 
 do
 
-    import rawget, rawset from _G
-
-    class LinkedTable
-        new: ( object, read, write ) =>
-            setmetatable( @, {
-                "__index": read ~= false and object or nil
-                "__newindex": write == true and object or nil
-            } )
-
-    util.LinkedTable = LinkedTable
-
-    metatable = {
-        __index: ( tbl, key ) ->
-            links = rawget( tbl, "__indexes" )
-            for index = 1, #links
-                value = links[ index ][ key ]
-                if value ~= nil
-                    if getmetatable( value ) == nil
-                        value = LinkedTable( value, true )
-                        rawset( tbl, key, value )
-                        return value
-
-                    return value
-    }
-
-    import insert, RemoveByValue, GetValue, SetValue from table
-    import setfenv from debug
-
-    class util.MultiIndexTable
-        new: ( link, @value = {} ) =>
-            rawset( value, "__indexes", {} )
-            setmetatable( value, metatable )
-            rawset( value, "__mit", @ )
-
-            if link
-                @Link( link )
-
-            return
-
-        GetLinks: =>
-            return rawget( @value, "__indexes" )
-
-        GetBase: =>
-            return @value
-
-        SetBase: ( tbl ) =>
-            rawset( tbl, "__indexes", rawget( @value, "__indexes" ) or {} )
-            setmetatable( tbl, metatable )
-            rawset( tbl, "__mit", @ )
-            @value = tbl
-
-        Get: ( keyPath ) =>
-            return GetValue( @value, keyPath )
-
-        Set: ( keyPath, any ) =>
-            :value = @
-            if isfunction( any )
-                setfenv( any, value )
-
-            return SetValue( value, keyPath, any )
-
-        Link: ( tbl ) =>
-            :value = @
-            insert( rawget( value, "__indexes" ), 1, tbl )
-            return value
-
-        UnLink: ( tbl ) =>
-            :value = @
-            RemoveByValue( rawget( value, "__indexes" ), tbl, true )
-            return value
-
-        ClearLinks: =>
-            :value = @
-
-            indexes = rawget( value, "__indexes" )
-            for index = 1, #indexes
-                indexes[ index ] = nil
-
-            return value
-
-do
-
-    import bor, band, lshift, rshift from (bit or bit32)
     import match from string
-    import tonumber from _G
-    import isuint from math
 
     string.IsURL = ( str ) ->
         return match( str, "^%l[%l+-.]+%:[^%z\x01-\x20\x7F-\xFF\"<>^`{-}]*$" ) ~= nil
-
-    compare = ( a, b ) ->
-        return a == b and 0 or a < b and -1 or 1
-
-    compareIDs = ( value, value2 ) ->
-        if value == value2
-            return 0
-
-        unless value
-            return -1
-
-        unless value2
-            return 1
-
-        number, number2 = tonumber( value ), tonumber( value2 )
-        if number and number2
-            return compare( number, number2 )
-
-        if number
-            return -1
-
-        if number2
-            return 1
-
-        return compare( value, value2 )
-
-    smallerPrerelease = ( first, second ) ->
-        if not first or first == second
-            return false
-
-        unless second
-            return true
-
-        fisrt, fcount = byteSplit( first, 0x2E --[[ . ]] )
-        second, scount = byteSplit( second, 0x2E --[[ . ]] )
-
-        local comparison
-        for index = 1, fcount
-            comparison = compareIDs( fisrt[ index ], second[ index ] )
-            if comparison ~= 0
-                return comparison == -1
-
-        return fcount < scount
-
-    -- Semver lua parser. Based on https://github.com/kikito/semver.lua
-    -- https://github.com/Pika-Software/gpm_legacy/blob/main/lua/gpm/sh_semver.lua
-    class Version
-        __tostring: =>
-            preRelease, build = @prelease, @build
-            if preRelease and build
-                return @major .. "." .. @minor .. "." .. @patch .. "-" .. preRelease .. "+" .. build
-
-            if preRelease
-                return @major .. "." .. @minor .. "." .. @patch .. "-" .. preRelease
-
-            if build
-                return @major .. "." .. @minor .. "." .. @patch .. "+" .. build
-
-            return @major .. "." .. @minor .. "." .. @patch
-
-        __eq: ( other ) =>
-            return @major == other.major and @minor == other.minor and @patch == other.patch and @prerelease == other.prerelease
-
-        __lt: ( other ) =>
-            if @major ~= other.major
-                return @major < other.major
-
-            if @minor ~= other.minor
-                return @minor < other.minor
-
-            if @patch ~= other.patch
-                return @patch < other.patch
-
-            return smallerPrerelease( @prerelease, other.prerelease )
-
-        __pow: ( other ) =>
-            if @major == 0
-                return @ == other
-
-            return @major == other.major and @minor <= other.minor
-
-        -- This works like 'satisfies' (fuzzy matching) in npm.
-        -- https://docs.npmjs.com/cli/v6/using-npm/semver
-        -- A version range is a set of comparators which specify versions that satisfy the range.
-        -- A comparator is composed of an operator and a version. The set of primitive operators is:
-        --   < Less than
-        --   <= Less than or equal to
-        --   > Greater than
-        --   >= Greater than or equal to
-        --   = Equal. If no operator is specified, then equality is assumed, so this operator
-        --     is optional, but MAY be included.
-        -- Comparators can be joined by whitespace to form a comparator set, which is satisfied by
-        -- the intersection of all of the comparators it includes.
-        -- A range is composed of one or more comparator sets, joined by ||. A version matches
-        -- a range if and only if every comparator in at least one of the ||-separated comparator
-        -- sets is satisfied by the version.
-        -- A 'version' is described by the v2.0.0 specification found at https://semver.org/.
-        -- A leading '=' or 'v' character is stripped off and ignored
-        __mod: ( str ) =>
-            -- version range := comparator sets
-            if find( str, "||", 1, true )
-                local pos, part
-                start = 1
-
-                while true
-                    pos = find( str, "||", start, true )
-                    part = sub( str, start, pos and ( pos - 1 ) )
-
-                    if @ % part
-                        return true
-
-                    unless pos
-                        return false
-
-                    start = pos + 2
-
-            -- comparator set := comparators
-            str = gsub( gsub( gsub( str, "%s+", " " ), "^%s+", "" ), "%s+$", "" )
-
-            if find( str, " ", 1, true )
-                local pos, part
-                start = 1
-
-                while true
-                    pos = find( str, " ", start, true )
-                    part = sub( str, start, pos and ( pos - 1 ) )
-
-                    -- Hyphen Ranges: X.Y.Z - A.B.C
-                    -- https://docs.npmjs.com/cli/v6/using-npm/semver#hyphen-ranges-xyz---abc
-                    if pos and sub( str, pos, pos + 2 ) == " - "
-                        unless @ % ( ">=" .. part )
-                            return false
-
-                        start = pos + 3
-                        pos = find( str, " ", start, true )
-                        part = sub( str, start, pos and ( pos - 1 ) )
-
-                        unless @ % ( "<=" .. part )
-                            return false
-
-                    elseif not ( @ % part )
-                        return false
-
-                    unless pos
-                        return true
-
-                    start = pos + 1
-
-                return true
-
-            -- comparators := operator + version
-            str = gsub( gsub( str, "^=", "" ), "^v", "" )
-
-            -- X-Ranges *
-            -- Any of X, x, or * may be used to 'stand in' for one of the numeric values in the [major, minor, patch] tuple.
-            -- https://docs.npmjs.com/cli/v6/using-npm/semver#x-ranges-12x-1x-12-
-            if str == "" or str == "*"
-                return @ % ">=0.0.0"
-
-            pos = find( str, "%d" )
-            unless pos
-                error "Version range must starts with number: " .. str
-
-            -- X-Ranges 1.2.x 1.X 1.2.*
-            -- Any of X, x, or * may be used to 'stand in' for one of the numeric values in the [major, minor, patch] tuple.
-            -- https://docs.npmjs.com/cli/v6/using-npm/semver#x-ranges-12x-1x-12-
-            local operator
-            if pos == 1
-                operator = "="
-            else
-                operator = sub( str, 1, pos - 1 )
-
-            version = gsub( sub( str, pos ), "%.[xX*]", "" )
-            xrange = max( 2 - byteCount( version, 0x2e --[[ . ]] ), 0 )
-
-            for i = 1, xrange
-                version = version .. ".0"
-
-            sv = Version( version )
-            if operator == "<"
-                return @ < sv
-
-            -- primitive operators
-            -- https://docs.npmjs.com/cli/v6/using-npm/semver#ranges
-            if operator == "<="
-                if xrange > 0
-                    if xrange == 1
-                        sv = sv\nextMinor!
-                    elseif xrange == 2
-                        sv = sv\nextMajor!
-
-                    return @ < sv
-
-                return @ <= sv
-
-            if operator == ">"
-                if xrange > 0
-                    if xrange == 1
-                        sv = sv\nextMinor!
-                    elseif xrange == 2
-                        sv = sv\nextMajor!
-
-                    return @ >= sv
-
-                return @ > sv
-
-            if operator == ">="
-                return @ >= sv
-
-            if operator == "="
-                if xrange > 0
-                    if @ < sv
-                        return false
-
-                    if xrange == 1
-                        sv = sv\nextMinor!
-                    elseif xrange == 2
-                        sv = sv\nextMajor!
-
-                    return @ < sv
-
-                return @ == sv
-
-            -- Caret Ranges ^1.2.3 ^0.2.5 ^0.0.4
-            -- Allows changes that do not modify the left-most non-zero digit in the [major, minor, patch] tuple.
-            -- In other words, this allows patch and minor updates for versions 1.0.0 and above, patch updates for
-            -- versions 0.X >=0.1.0, and no updates for versions 0.0.X.
-            -- https://docs.npmjs.com/cli/v6/using-npm/semver#caret-ranges-123-025-004
-            if operator == "^"
-                if sv.major == 0 and xrange < 2
-                    if sv.minor == 0 and xrange < 1
-                        return @major == 0 and @minor == 0 and @ >= sv and @ < sv\nextPatch!
-
-                    return @major == 0 and @ >= sv and @ < sv\nextMinor!
-
-                return @major == sv.major and @ >= sv and @ < sv\nextMajor!
-
-            -- Tilde Ranges ~1.2.3 ~1.2 ~1
-            -- Allows patch-level changes if a minor version is specified on the comparator. Allows minor-level changes if not.
-            -- https://docs.npmjs.com/cli/v6/using-npm/semver#tilde-ranges-123-12-1
-            if operator == "~"
-                if @ < sv
-                    return false
-
-                if xrange == 2
-                    return @ < sv\nextMajor!
-
-                return @ < sv\nextMinor!
-
-            error "Invaild operator: '" .. operator .. "'"
-            return
-
-        parsePrerelease: ( str ) =>
-            if str == ""
-                return
-
-            prelease = match( str, "^-(%w[%.%w-]*)$" )
-            if not prelease or match( prelease, "%.%." )
-                error "the pre-release '" .. str .. "' is not valid"
-
-            @prelease = prelease
-            return
-
-        parseBuild: ( str ) =>
-            if str == ""
-                return
-
-            build = match( str, "^%+(%w[%.%w-]*)$" )
-            if not build or match( build, "%.%." )
-                error "the build '" .. str .. "' is not valid"
-
-            @build = build
-            return
-
-        parsePrereleaseAndBuild: ( str ) =>
-            if not str or str == ""
-                return
-
-            prerelease, build = match( str, "^(%-[^+]+)(%+.+)$" )
-            unless prerelease and build
-                switch byte( str, 1 )
-                    when 0x2d --[[ - ]]
-                        @parsePrerelease( str )
-
-                    when 0x2b --[[ + ]]
-                        @parseBuild( str )
-
-                    else
-                        error "the parameter '" .. str .. "' must begin with + or - to denote a pre-release or a build"
-
-                return
-
-            @prelease = prerelease
-            @build = build
-            return
-
-        new: ( major, minor, patch, prerelease, build ) =>
-            unless major
-                error "at least one parameter is needed"
-
-            if isnumber( major )
-                unless isuint( major )
-                    error "major version must be unsigned integer"
-
-                @major = major
-
-                if minor
-                    unless isnumber( minor )
-                        error "minor version must be a number"
-
-                    unless isuint( minor )
-                        error "minor version must be unsigned integer"
-
-                @minor = minor or 0
-
-                if patch
-                    unless isnumber( patch )
-                        error "patch version must be a number"
-
-                    unless isuint( patch )
-                        error "patch version must be unsigned integer"
-
-                @patch = patch or 0
-
-                if isstring( build )
-                    if isstring( prerelease )
-                        @parsePrerelease( prerelease )
-
-                    @parseBuild( build )
-                elseif isnumber( prerelease )
-                    @parsePrereleaseAndBuild( prerelease )
-
-                return
-
-            str = tostring( major )
-
-            major, minor, patch, extra = match( str, "^(%d+)%.?(%d*)%.?(%d*)(.-)$" )
-            unless major
-                error "the major version of '" .. str .. "' is missing"
-
-            @parsePrereleaseAndBuild( extra )
-
-            if minor == ""
-                minor = "0"
-
-            if patch == ""
-                patch = "0"
-
-            @major = tonumber( major )
-            @minor = tonumber( minor )
-            @patch = tonumber( patch )
-            return
-
-        nextMajor: =>
-            return Version( @major + 1, 0, 0 )
-
-        nextMinor: =>
-            return Version( @major, @minor + 1, 0 )
-
-        nextPatch: =>
-            return Version( @major, @minor, @patch + 1 )
-
-        toNumber: =>
-            major = tonumber( @major )
-            if major > 0x3ff
-                error "major version is too large (max 1023)"
-
-            minor = tonumber( @minor )
-            if minor > 0x7ff
-                error "minor version is too large (max 2047)"
-
-            patch = tonumber( @patch )
-            if patch > 0x7ff
-                error "patch version is too large (max 2047)"
-
-            return bor( lshift( patch, 21 ), lshift( minor, 10 ), major )
-
-        @fromNumber: ( uint ) ->
-            return Version( band( uint, 0x3ff ), band( rshift( uint, 10 ), 0x7ff ), band( rshift( uint, 21 ), 0x7ff ) )
-
-    util.Version = Version
-
-    isVersion = environment.IsVersion = ( any ) ->
-        metatable = getmetatable( any )
-        return metatable and metatable.__class == Version
-
-    util.RegisterType( "Version", isVersion )
-
-local ArgAssert
-do
-
-    import type from environment
-
-    ArgAssert = environment.ArgAssert = ( value, argNum, expected, errorlevel ) ->
-        valueType = type( value )
-
-        if valueType == expected
-            return value
-
-        elseif isfunction( expected )
-            expected = expected( value, argNum, valueType )
-            unless isstring( expected )
-                return value
-
-        elseif istable( expected )
-            length = #expected
-            for index = 1, length
-                if valueType == expected[ index ]
-                    return value
-
-            expected = "[ " .. concat( expected, "/", 1, length ) .. " ]"
-
-        error "bad argument #" .. argNum .. " to \'" .. ( getinfo( 2, "n" ).name or "unknown" ) .. "\' (" .. expected .. " expected, got " .. valueType .. ")", errorlevel or 4
-        return nil
 
 unless table.unpack
     table.unpack = _G.unpack
 
 unless table.pack
-
     import select from _G
-
     table.pack = ( ... ) ->
         return { n: select( "#", ... ), ... }
 
@@ -1222,12 +738,12 @@ do
 
         return tbl
 
-local iscolor
 do
 
-    metatable = FindMetaTable( "Color" )
+    metatable = util.FindMetaTable( "Color" )
+    environment.TYPE_COLOR = metatable.TypeID
 
-    iscolor = ( any ) ->
+    environment.iscolor = ( any ) ->
         if getmetatable( any ) == metatable
             return true
 
@@ -1236,81 +752,7 @@ do
 
         return false
 
-    util.RegisterType( "Color", iscolor )
-    environment.iscolor = iscolor
-
-do
-
-    -- https://github.com/luvit/luvit/blob/master/deps/http-codec.lua
-    -- https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
-    -- https://en.wikipedia.org/wiki/List_of_HTTP_status_codes
-    http.StatusCodes = setmetatable(
-        {
-            [ 100 ]: "Continue"
-            [ 101 ]: "Switching Protocols"
-            [ 102 ]: "Processing"               -- RFC 2518, obsoleted by RFC 4918
-            [ 200 ]: "OK"
-            [ 201 ]: "Created"
-            [ 202 ]: "Accepted"
-            [ 203 ]: "Non-Authoritative Information"
-            [ 204 ]: "No Content"
-            [ 205 ]: "Reset Content"
-            [ 206 ]: "Partial Content"
-            [ 207 ]: "Multi-Status"               -- RFC 4918
-            [ 208 ]: "Already Reported",
-            [ 300 ]: "Multiple Choices"
-            [ 301 ]: "Moved Permanently"
-            [ 302 ]: "Moved Temporarily"
-            [ 303 ]: "See Other"
-            [ 304 ]: "Not Modified"
-            [ 305 ]: "Use Proxy"
-            [ 307 ]: "Temporary Redirect"
-            [ 400 ]: "Bad Request"
-            [ 401 ]: "Unauthorized"
-            [ 402 ]: "Payment Required"
-            [ 403 ]: "Forbidden"
-            [ 404 ]: "Not Found"
-            [ 405 ]: "Method Not Allowed"
-            [ 406 ]: "Not Acceptable"
-            [ 407 ]: "Proxy Authentication Required"
-            [ 408 ]: "Request Time-out"
-            [ 409 ]: "Conflict"
-            [ 410 ]: "Gone"
-            [ 411 ]: "Length Required"
-            [ 412 ]: "Precondition Failed"
-            [ 413 ]: "Request Entity Too Large"
-            [ 414 ]: "Request-URI Too Large"
-            [ 415 ]: "Unsupported Media Type"
-            [ 416 ]: "Requested Range Not Satisfiable"
-            [ 417 ]: "Expectation Failed"
-            [ 418 ]: "I'm a teapot"                       -- RFC 2324
-            [ 422 ]: "Unprocessable Entity"               -- RFC 4918
-            [ 423 ]: "Locked"                             -- RFC 4918
-            [ 424 ]: "Failed Dependency"                  -- RFC 4918
-            [ 425 ]: "Unordered Collection"               -- RFC 4918
-            [ 426 ]: "Upgrade Required"                   -- RFC 2817
-            [ 428 ]: "Precondition Required"              -- RFC 6585
-            [ 429 ]: "Too Many Requests"                  -- RFC 6585
-            [ 431 ]: "Request Header Fields Too Large"    -- RFC 6585
-            [ 500 ]: "Internal Server Error"
-            [ 501 ]: "Not Implemented"
-            [ 502 ]: "Bad Gateway"
-            [ 503 ]: "Service Unavailable"
-            [ 504 ]: "Gateway Time-out"
-            [ 505 ]: "HTTP Version not supported"
-            [ 506 ]: "Variant Also Negotiates"            -- RFC 2295
-            [ 507 ]: "Insufficient Storage"               -- RFC 4918
-            [ 508 ]: "Loop Detected",
-            [ 509 ]: "Bandwidth Limit Exceeded"
-            [ 510 ]: "Not Extended"                       -- RFC 2774
-            [ 511 ]: "Network Authentication Required"     -- RFC 6585
-        },
-        {
-            __index: ->
-                return "Unknown"
-        }
-    )
-
+-- Stack
 do
 
     class Stack
@@ -1361,8 +803,9 @@ do
         metatable = getmetatable( any )
         return metatable and metatable.__class == Stack
 
-    util.RegisterType( "Stack", isStack )
+    util.RegisterMetaTable( "Stack", Stack.__base )
 
+-- Queue
 do
 
     --[[
@@ -1451,274 +894,7 @@ do
         metatable = getmetatable( any )
         return metatable and metatable.__class == Queue
 
-    util.RegisterType( "Queue", isQueue )
-
-do
-
-    struct = environment.struct = include( "libs/struct.lua" )
-
-    do
-
-        import Read, Write from struct
-
-        string.pack = ( fmt, ... ) ->
-            return Write( fmt, { ... } )
-
-        string.unpack = ( fmt, binary, offset ) ->
-            if offset
-                return unpack( Read( fmt, sub( binary, offset, len( binary ) ) ) )
-
-            return unpack( Read( fmt, binary ) )
-
-        string.packsize = struct.SizeOf
-
-    import reverse from string
-    import io from struct
-
-    local readInt, writeInt
-    do
-        int = io.i
-        readInt, writeInt = int.Read, int.Write
-
-    local readUInt, writeUInt
-    do
-        uint = io.I
-        readUInt, writeUInt = uint.Read, uint.Write
-
-    local readFloat, writeFloat
-    do
-        float = io.f
-        readFloat, writeFloat = float.Read, float.Write
-
-    local readDouble, writeDouble
-    do
-        double = io.d
-        readDouble, writeDouble = double.Read, double.Write
-
-    local readQuad, writeQuad
-    do
-        quad = io.q
-        readQuad, writeQuad = quad.Read, quad.Write
-
-    setEndianness = io.endianness.Set
-
-    class ByteStream extends struct.Cursor
-        __tostring: =>
-            return format( "ByteStream: %p [%d/%d]", @, @position, @size )
-
-        EndOfFile: =>
-            return @position >= @size
-
-        Size: =>
-            return @size
-
-        Tell: =>
-            return @position
-
-        Close: =>
-            @Flush!
-            @position = 0
-
-        Seek: ( bytes ) =>
-            if bytes
-                ArgAssert( bytes, 2, "number" )
-                bytes = min( max( bytes, 0 ), @size )
-            else
-                bytes = 0
-
-            @Flush!
-            @position = bytes
-            return bytes
-
-        Skip: ( bytes ) =>
-            if bytes
-                ArgAssert( bytes, 2, "number" )
-            else
-                bytes = 1
-
-            return @Seek( @position + bytes )
-
-        -- Byte read
-        Read: ( bytes ) =>
-            :position, :size = @
-
-            if bytes == "*a" or bytes == nil
-                bytes = size
-
-            ArgAssert( bytes, 2, "number" )
-
-            if bytes > 0
-                if position >= size
-                    return nil, "eof"
-
-                return sub( @data, position + 1, @Skip( bytes ) )
-
-            if bytes < 0
-                if position <= 0
-                    return nil, "sof"
-
-                return reverse( sub( @data, position + 1, @Skip( bytes ) ) )
-
-        -- String
-        ReadString: =>
-            :position, :size = @
-            if position >= size
-                return
-
-            bytes, data = 0, @data
-            for index = position, size
-                if byte( data, index + 1 ) == 0
-                    break
-
-                bytes += 1
-
-            if bytes == 0
-                return
-
-            return @Read( bytes ), @Skip( 1 )
-
-        WriteString: ( str ) =>
-            return @Write( str .. "\0" )
-
-        -- Line
-        ReadLine: =>
-            :position, :size = @
-            if position >= size
-                return
-
-            bytes, data = 0, @data
-            for index = position, size
-                if byte( data, index + 1 ) == 0xA --[[ \n ]]
-                    break
-
-                bytes += 1
-
-            if bytes == 0
-                return "", @Skip( 1 )
-
-            return @Read( bytes ), @Skip( 1 )
-
-        WriteLine: ( str ) =>
-            return @Write( str .. "\n" )
-
-        -- Byte
-        ReadByte: =>
-            if @EndOfFile!
-                return
-
-            return byte( @data, @Skip( 1 ) )
-
-        WriteByte: ( number ) =>
-            return @Write( char( number ) )
-
-        -- Boolean
-        ReadBool: =>
-            switch @ReadByte!
-                when 0
-                    return false
-
-                when 1
-                    return true
-
-            return nil
-
-        WriteBool: ( bool ) =>
-            return @WriteByte( bool and 1 or 0 )
-
-        -- UInt
-        ReadUInt: ( bytes, endianness ) =>
-            setEndianness( endianness or "little" )
-            return readUInt( nil, @Read( bytes ), bytes )
-
-        WriteUInt: ( number, bytes, endianness ) =>
-            setEndianness( endianness or "little" )
-            return @Write( writeUInt( nil, number, bytes ) )
-
-        -- UShort
-        ReadUShort: ( endianness ) =>
-            return @ReadUInt( 2, endianness )
-
-        WriteUShort: ( number, endianness ) =>
-            return @WriteUInt( number, 2, endianness )
-
-        -- ULong
-        ReadULong: ( endianness ) =>
-            return @ReadUInt( 4, endianness )
-
-        WriteULong: ( number, endianness ) =>
-            return @WriteUInt( number, 4, endianness )
-
-        -- UInt64
-        ReadUInt64: ( endianness ) =>
-            return @ReadUInt( 8, endianness )
-
-        WriteUInt64: ( number, endianness ) =>
-            @WriteUInt( number, 8, endianness )
-
-        -- Int
-        ReadInt: ( bytes, endianness ) =>
-            setEndianness( endianness or "little" )
-            return readInt( nil, @Read( bytes ), bytes )
-
-        WriteInt: ( number, bytes, endianness ) =>
-            setEndianness( endianness or "little" )
-            return @Write( writeInt( nil, number, bytes ) )
-
-        -- Short
-        ReadShort: ( endianness ) =>
-            return @ReadInt( 2, endianness )
-
-        WriteShort: ( number, endianness ) =>
-            return @WriteInt( number, 2, endianness )
-
-        -- Long
-        ReadLong: ( endianness ) =>
-            return @ReadInt( 4, endianness )
-
-        WriteLong: ( number, endianness ) =>
-            return @WriteInt( number, 4, endianness )
-
-        -- Int64
-        ReadInt64: ( endianness ) =>
-            return @ReadInt( 8, endianness )
-
-        WriteInt64: ( number, endianness ) =>
-            return @WriteInt( number, 8, endianness )
-
-        -- Float
-        ReadFloat: ( endianness ) =>
-            setEndianness( endianness or "little" )
-            return readFloat( nil, @Read( 4 ), 4 )
-
-        WriteFloat: ( number, endianness ) =>
-            setEndianness( endianness or "little" )
-            return @Write( writeFloat( nil, number, 4 ) )
-
-        -- Double
-        ReadDouble: ( endianness ) =>
-            setEndianness( endianness or "little" )
-            return readDouble( nil, @Read( 8 ), 8 )
-
-        WriteDouble: ( number, endianness ) =>
-            setEndianness( endianness or "little" )
-            return @Write( writeDouble( nil, number, 8 ) )
-
-        -- Quad
-        ReadQuad: ( endianness ) =>
-            setEndianness( endianness or "little" )
-            return readQuad( nil, @Read( 16 ), 16 )
-
-        WriteQuad: ( number, endianness ) =>
-            setEndianness( endianness or "little" )
-            return @Write( writeQuad( nil, number, 16 ) )
-
-    util.ByteStream = ByteStream
-
-    isByteStream = environment.IsByteStream = ( any ) ->
-        metatable = getmetatable( any )
-        return metatable and metatable.__class == ByteStream
-
-    util.RegisterType( "ByteStream", isByteStream )
+    util.RegisterMetaTable( "Queue", Queue.__base )
 
 do
 

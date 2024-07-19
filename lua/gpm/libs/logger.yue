@@ -1,8 +1,9 @@
 _G = _G
-import MsgC, Color, string, os, tostring, getmetatable from _G
-import Queue from _G.gpm.environment.util
-import format, gsub, sub, len from string
-import date from os
+import MsgC, Color, tostring, getmetatable from _G
+import format, gsub, sub, len from _G.string
+import environment from _G.gpm
+import util from environment
+import date from _G.os
 
 dateScheme = CreateConVar( "gpm_logger_date", "0", bit.bor( FCVAR_ARCHIVE, FCVAR_REPLICATED ), "Allows the logger to display date.", 0, 1 )\GetBool! and "%d-%m-%Y %H:%M:%S " or "%H:%M:%S "
 
@@ -34,7 +35,7 @@ else
 
 state = "[" .. state .. "] "
 
-queue = Queue( 256 )
+queue = util.Queue( 256 )
 
 timer.Create "GLua Package Manager::Logger", 1 / 100, 0, ->
     data = queue\dequeue!
@@ -73,7 +74,7 @@ developer = GetConVar( "developer" )
 debugFilter = ->
     return developer\GetInt! > 0
 
-export class Logger
+export default class Logger
     __tostring: =>
         return format( "Logger: %p [%s]", @, @title )
 
@@ -104,6 +105,10 @@ export class Logger
 
         return
 
-export IsLogger = ( any ) ->
+util.Logger = Logger
+
+environment.IsLogger = ( any ) ->
     metatable = getmetatable( any )
     return metatable and metatable.__class == Logger
+
+util.RegisterMetaTable( "Logger", Logger.__base )
