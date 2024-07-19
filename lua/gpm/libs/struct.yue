@@ -490,6 +490,24 @@ do
 
         }, true )
 
+        registerIO( "T", {
+            Size: ->
+                return 4
+
+            Read: ( _, binary ) ->
+                return readUInt( nil, binary, 4 )
+
+            Write: ( _, number ) ->
+                return writeUInt( nil, number, 4 )
+
+            ReadBits: ( readBit ) ->
+                return readUIntBits( readBit, 4 )
+
+            WriteBits: ( writeBit, data ) ->
+                return writeUIntBits( writeBit, data, 4 )
+
+        }, true )
+
         registerIO( "l", {
             Size: ->
                 return 8
@@ -508,6 +526,8 @@ do
 
         }, true )
 
+        setAlias( "l", "j" )
+
         registerIO( "L", {
             Size: ->
                 return 8
@@ -525,6 +545,8 @@ do
                 return writeUIntBits( writeBit, data, 8 )
 
         }, true )
+
+        setAlias( "L", "J" )
 
         -- https://github.com/ToxicFrog/vstruct/blob/master/io/p.lua
         -- signed fixed point
@@ -585,6 +607,12 @@ do
             assert( number > -129 and number < 128, "signed byte overflow" )
             return char( number + 0x80 )
 
+        ReadBits: ( readBit, size ) ->
+            return readUIntBits( readBit, size ) - ( pow2[ size ] * 0.5 )
+
+        WriteBits: ( writeBit, data, size ) ->
+            return writeUIntBits( writeBit, data + ( pow2[ size ] * 0.5 ), size )
+
     }, true )
 
     -- unsigned byte
@@ -600,20 +628,23 @@ do
             assert( number > 0 and number < 256, "unsigned byte overflow" )
             return char( number )
 
+        ReadBits: readUIntBits
+        WriteBits: writeUIntBits
+
     }, true )
 
     -- https://github.com/ToxicFrog/vstruct/blob/master/io/b.lua
     -- boolean
-    registerIO( "bit", {
+    registerIO( "o", {
         Read: ( _, buffer ) ->
             return match( buffer, "%Z" ) and true or false
 
         ReadBits: ( readBit, size ) ->
-            bits = {}
-            for index = 1, size
-                bits[ index ] = readBit! == 1
+            number = 0
+            for _ = 1, size
+                number += readBit!
 
-            return bits
+            return number > 0
 
         Write: ( _, data, size ) ->
             return writeUInt( nil, data and 1 or 0, size )
@@ -985,6 +1016,8 @@ do
                     return writeBitmask( nil, bits, 8 )
 
             }, true )
+
+            setAlias( "d", "n" )
 
         -- quad
         do
@@ -1795,6 +1828,7 @@ do
             return obj
 
 -- https://github.com/ToxicFrog/vstruct/blob/master/init.lua
+local read, write, sizeOf
 do
 
     local records
@@ -1806,11 +1840,11 @@ do
             ArgAssert( fmt, 1, "string" )
             return Compile( nil, fmt )\Read( ... )
 
-        _module_0.Write = ( fmt, ... ) ->
+        write = _module_0.Write = ( fmt, ... ) ->
             ArgAssert( fmt, 1, "string" )
             return Compile( nil, fmt )\Write( ... )
 
-        _module_0.SizeOf = ( fmt ) ->
+        sizeOf = _module_0.SizeOf = ( fmt ) ->
             ArgAssert( fmt, 1, "string" )
             return Compile( nil, fmt ).ast.size
 
@@ -1841,5 +1875,17 @@ do
             length += 1
 
         return array
+
+-- environment.string extension
+string.pack = ( fmt, ... ) ->
+    return write( fmt, { ... } )
+
+string.unpack = ( fmt, binary, offset ) ->
+    if offset
+        return unpack( read( fmt, sub( binary, offset, len( binary ) ) ) )
+
+    return unpack( read( fmt, binary ) )
+
+string.packsize = sizeOf
 
 return _module_0
