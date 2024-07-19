@@ -113,8 +113,8 @@ export fix = ( path ) ->
 export getCurrentFile = ( func = getfmain! ) ->
     if func
         if fenv := getfenv( func )
-            if m := rawget( fenv, "__module" )
-                return m.file
+            if filePath := rawget( fenv, "__filename" )
+                return filePath
 
         fpath = getfpath( func )
         if IsURL( fpath )
@@ -125,8 +125,8 @@ export getCurrentFile = ( func = getfmain! ) ->
 export getCurrentDirectory = ( func = getfmain! ) ->
     if func
         if fenv := getfenv( func )
-            if m := rawget( fenv, "__module" )
-                return m.dir
+            if dirPath := rawget( fenv, "__dirname" )
+                return dirPath
 
         fpath = getfpath( func )
         if IsURL( fpath )
