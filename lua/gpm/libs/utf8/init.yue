@@ -1,7 +1,8 @@
 _G = _G
-import concat, unpack from _G.gpm.environment.table
+import environment from _G.gpm
+import concat, unpack from environment.table
 import char, byte, sub, gsub, gmatch, len from _G.string
-import band, bor, lshift, rshift from _G.bit
+import band, bor, lshift, rshift from environment.bit
 import min, max from _G.math
 import tonumber from _G
 
@@ -82,7 +83,7 @@ decode = ( str, stringStart, stringLength ) ->
 	-- Validate our continuation bytes
 	for byte0 in *{ byte( str, stringStart + 1, stringEnd ) }
 		-- Invalid continuation byte hit
-		if bit.band( byte0, 0xC0 ) ~= 0x80
+		if band( byte0, 0xC0 ) ~= 0x80
 			return nil
 
 		codePoint = bor( lshift( codePoint, 6 ), band( byte0, 0x3F ) )

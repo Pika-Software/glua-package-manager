@@ -337,10 +337,14 @@ do
     local open
     do
 
+        import ByteStream from util
         import Open from file
 
         open = _module_0.Open = ( filePath, fileMode, gamePath, skipNormalize ) ->
             unless skipNormalize
+                if filePath == "memory" and not gamePath
+                    return ByteStream!
+
                 filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
             return Open( filePath, fileMode, gamePath )
@@ -714,7 +718,7 @@ do
                     installed += 1
 
                 if installed > 0
-                    Logger\Info "'%s' was connected as filesystem API.", source.Name
+                    Logger\Info( "'%s' was connected as filesystem API.", source.Name )
 
                 if functionsNeed < 1
                     break

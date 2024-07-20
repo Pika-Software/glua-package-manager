@@ -12,6 +12,7 @@ local ip = {}
 local concat = table.concat
 local insert = table.insert
 
+local bit = bit
 local rshift = bit.rshift
 local lshift = bit.lshift
 local band = bit.band

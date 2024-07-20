@@ -1,7 +1,7 @@
 import gpm from _G
 import environment from gpm
 import AddonError, ArgAssert, isstring, istable, error, tostring, tonumber from environment
-import Open, Find, GetFolderContents, NormalizeGamePath from environment.file
+import Open, Find, GetFolderContents from environment.file
 import HasValue, Empty from environment.table
 import lower, gsub, find from string
 import equal from environment.path
@@ -212,32 +212,16 @@ export class Addon
         ArgAssert( str, 1, "string" )
         @steam_id = str
 
-    Open: ( filePath, fileMode, gamePath ) =>
+    Open: ( filePath = @file_path, fileMode ) =>
         @Close!
 
-        if istable( filePath )
-            @file_path = "memory"
-            @game_path = "unknown"
-            @file_handler = filePath
-            return filePath
-
-        filePath, gamePath = NormalizeGamePath( filePath, gamePath )
-
-        unless filePath
-            filePath = @file_path
-
-        unless gamePath
-            gamePath = @game_path
-
         ArgAssert( filePath, 1, "string" )
-        ArgAssert( gamePath, 2, "string" )
 
-        fileHandle = Open( filePath, fileMode or "rb", gamePath, true )
+        fileHandle = Open( filePath, fileMode or "rb" )
         unless fileHandle
-            error AddonError "file read handler is missing, opening is impossible"
+            error AddonError "file handler is missing, opening is impossible"
 
         @file_path = filePath
-        @game_path = gamePath
         @file_handler = fileHandle
 
         return fileHandle
@@ -425,10 +409,11 @@ export class Addon
             @stored_crc = fileCRC
             @real_crc = fileCRC
 
-            fileHandle = @Open( filePath, "ab" )
+            fileHandle = @Open( filePath, "wb" )
             unless fileHandle
                 error AddonError "file read handler is missing, opening is impossible"
 
+            fileHandle\Seek( fileHandle\Size! )
             fileHandle\WriteULong( crc )
         else
             fileHandle\WriteULong( 0 )

@@ -22,7 +22,7 @@ if SERVER
         AddCSLuaFile( "gpm/sources/" .. fileName )
 
     AddCSLuaFile( "gpm/moonloader.lua" )
-    AddCSLuaFile( "gpm/classes.lua" )
+    AddCSLuaFile( "gpm/post-util.lua" )
     AddCSLuaFile( "gpm/loader.lua" )
     AddCSLuaFile( "gpm/init.lua" )
     AddCSLuaFile( "gpm/util.lua" )
@@ -138,19 +138,25 @@ do
     http.DecodeURI = url.decodeURI
 
 include( "moonloader.lua" )
+include( "post-util.lua" )
 
 environment.file = setmetatable( include( "libs/file.lua" ), { __index: _G.file } )
 include( "libs/http.lua" )
-include( "classes.lua" )
 
 environment.addon = include( "libs/addon.lua" )
 
 include( "libs/zip.lua" )
 include( "loader.lua" )
 
-for fileName in *Find( "gpm/sources/*.lua", "lsv" )
+-- Plugins
+for fileName in *Find( "gpm/plugins/*.lua", "LUA" )
+    include( "plugins/" .. fileName )
+
+-- Code Sources
+for fileName in *Find( "gpm/sources/*.lua", "LUA" )
     include( "sources/" .. fileName )
 
+-- our little sandbox ( TODO: remove on release )
 if SERVER
     include( "test.lua" )
 

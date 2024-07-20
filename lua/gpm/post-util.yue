@@ -1,16 +1,51 @@
 _G = _G
 import environment from _G.gpm
 
-import math, string, util, ArgAssert from environment
+import math, string, table, util, ArgAssert from environment
 import error, getmetatable from _G
 import byte, sub, len from string
+
+do
+
+    import struct from environment
+
+    -- lua 5.3 string features
+    do
+
+        import Read, Write from struct
+        import unpack from table
+
+        string.pack = ( fmt, ... ) ->
+            return Write( fmt, { ... } )
+
+        string.unpack = ( fmt, binary, offset ) ->
+            if offset
+                return unpack( Read( fmt, sub( binary, offset, len( binary ) ) ) )
+
+            return unpack( Read( fmt, binary ) )
+
+        string.packsize = struct.SizeOf
+
+    import io from struct
+    import Read from io.i
+    import Little from io.endianness
+
+    util.LZMA_PROPS_SIZE = 5
+
+    util.CompressedSize = ( binary ) ->
+        if binary == ""
+            return 0
+
+        Little!
+        return Read( nil, sub( binary, 6, 14 ), 8 )
 
 -- Byte Stream
 do
 
-    import struct from environment
     import char, reverse, format from string
+    import struct, deflate from environment
     import clamp from math
+    import CRC32 from util
     import io from struct
 
     local readInt, writeInt
@@ -40,7 +75,25 @@ do
 
     setEndianness = io.endianness.Set
 
+    noCompression = ( content ) ->
+        return content
+
+    compressionMethods = {
+        -- No compression
+        [ 0 ]: {
+            [1]: noCompression,
+            [2]: noCompression
+        },
+
+        -- Deflate
+        [ 8 ]: {
+            [1]: deflate.CompressDeflate,
+            [2]: deflate.DecompressDeflate
+        }
+    }
+
     class ByteStream extends struct.Cursor
+        @CompressionMethods: compressionMethods
         __tostring: =>
             return format( "ByteStream: %p [%d/%d]", @, @position, @size )
 
@@ -67,6 +120,12 @@ do
             @Flush!
             @position = bytes
             return bytes
+
+        SeekToBegin: =>
+            return @Seek( 0 )
+
+        SeekToEnd: =>
+            return @Seek( @size - @position )
 
         Skip: ( bytes ) =>
             if bytes
@@ -261,6 +320,88 @@ do
             setEndianness( endianness or "little" )
             return @Write( writeQuad( nil, number, 16 ) )
 
+        -- Zip
+        ReadZipFile: =>
+            :position = @
+            if @Read( 4 ) ~= "PK\x03\x04"
+                @Seek( position )
+                return
+
+            data = {}
+
+            @Skip( 4 )
+
+            compressionMethod = data.compression = @ReadUShort!
+
+            data.time = @ReadUShort!
+            data.date = @ReadUShort!
+
+            data.crc32 = @ReadULong!
+
+            compressedSize = @ReadULong!
+            data.size = @ReadULong!
+
+            pathLength = @ReadUShort!
+            extraLength = @ReadUShort!
+
+            data.path = @Read( pathLength )
+            @Skip( extraLength )
+
+            method = compressionMethods[ compressionMethod ]
+            if method
+                data.content = method[2]( @Read( compressedSize ) )
+
+            return data
+
+        WriteZipFile: ( fileName, content, compressionMethod = 0, time = 0, date = 0 ) =>
+            ArgAssert( fileName, 1, "string" )
+            ArgAssert( content, 2, "string" )
+            ArgAssert( compressionMethod, 3, "number" )
+            ArgAssert( time, 4, "number" )
+            ArgAssert( date, 5, "number" )
+
+            -- signature
+            @Write( "PK\x03\x04" )
+
+            -- Version needed to extract (minimum)
+            @WriteUShort( 0 )
+
+            -- General purpose bit flag
+            @WriteUShort( 0 )
+
+            method = compressionMethods[ compressionMethod ]
+            unless method
+                error "Unsupported compression method: " .. compressionMethod
+                return nil
+
+            -- Compression method
+            @WriteUShort( compressionMethod )
+
+            -- Modification time
+            @WriteUShort( time or 0 )
+            @WriteUShort( date or 0 )
+
+            -- CRC-32
+            @WriteULong( tonumber( CRC32( content ), 10 ) )
+            fileSize = len( content )
+
+            content = method[ 1 ]( content )
+
+            -- Compressed size
+            @WriteULong( len( content ) )
+
+            -- Uncompressed size
+            @WriteULong( fileSize )
+
+            -- File name length
+            @WriteUShort( len( fileName ) )
+
+            -- Extra field length
+            @WriteUShort( 0 )
+
+            @Write( fileName )
+            return @Write( content )
+
     util.ByteStream = ByteStream
 
     environment.IsByteStream = ( any ) ->
@@ -273,8 +414,8 @@ do
 do
 
     import match, find, gsub, ByteCount, ByteSplit from string
-    import bor, band, lshift, rshift from ( bit or bit32 )
     import isnumber, tonumber, isstring, tostring from _G
+    import bor, band, lshift, rshift from environment.bit
     import isuint, max from math
 
     compare = ( a, b ) ->
@@ -668,6 +809,7 @@ do
 
     util.RegisterMetaTable( "Version", Version.__base )
 
+-- TODO: Think what to do with this
 do
 
     import rawget, rawset, setmetatable, setfenv, isfunction from _G
@@ -695,7 +837,7 @@ do
                     return value
     }
 
-    import insert, RemoveByValue, GetValue, SetValue from environment.table
+    import insert, RemoveByValue, GetValue, SetValue from table
 
     class util.MultiIndexTable
         new: ( link, @value = {} ) =>

@@ -1205,7 +1205,7 @@ export class URLSearchParams
                 for j = #list, i + 1, -1
                     if list[j][1] == name
                         remove(list, j)
-    
+
                 update(list)
                 return
 

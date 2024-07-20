@@ -63,14 +63,14 @@ do
                 data ..= rep( "\0", position - size )
                 size = len( data )
 
-            newData = concat( buffer, "", 1, length )
-            newDataLength = len( newData )
+            content = concat( buffer, "", 1, length )
 
             for index = 1, length
                 buffer[ index ] = nil
 
-            data = sub( data, 1, position ) .. newData .. sub( data, position + newDataLength + 1, size )
-            @position = position + newDataLength
+            length = len( content )
+            data = sub( data, 1, position ) .. content .. sub( data, position + length + 1, size )
+            @position = position + length
             @data, @size = data, len( data )
 
         Seek: ( whence = "cur", offset = 0 ) =>
@@ -198,12 +198,10 @@ do
             assert( fileDescriptor\Seek( "cur", offset ) )
             return nil
 
-        registerIO( "seekf", {
+        registerIO( "+", {
             Read: read
             Write: read
         } )
-
-        setAlias( "seekf", "+" )
 
     do
 
@@ -211,12 +209,10 @@ do
             assert( fileDescriptor\Seek( "cur", -offset ) )
             return nil
 
-        registerIO( "seekb", {
+        registerIO( "-", {
             Read: read
             Write: read
         } )
-
-        setAlias( "seekb", "-" )
 
     do
 
@@ -224,12 +220,10 @@ do
             assert( fileDescriptor\Seek( "set", offset ) )
             return nil
 
-        registerIO( "seekto", {
+        registerIO( "@", {
             Read: read
             Write: read
         } )
-
-        setAlias( "seekto", "@" )
 
     do
 
@@ -281,6 +275,7 @@ do
     -- https://github.com/ToxicFrog/vstruct/blob/master/io.lua
     do
 
+        -- big-endian
         do
 
             import Big from endianness
@@ -289,7 +284,7 @@ do
                 Big!
                 return nil
 
-            registerIO( "bigendian", {
+            registerIO( ">", {
                 Size: ( number ) ->
                     assert( number == nil, "'>' is an endianness control, and does not have size" )
                     return 0
@@ -298,8 +293,7 @@ do
                 Write: read
             } )
 
-            setAlias( "bigendian", ">" )
-
+        -- little-endian
         do
 
             import Little from endianness
@@ -308,7 +302,7 @@ do
                 Little!
                 return nil
 
-            registerIO( "littleendian", {
+            registerIO( "<", {
                 Size: ( number ) ->
                     assert( number == nil, "'<' is an endianness control, and does not have size" )
                     return 0
@@ -317,8 +311,7 @@ do
                 Write: read
             } )
 
-            setAlias( "littleendian", "<" )
-
+        -- host
         do
 
             import Host from endianness
@@ -327,7 +320,7 @@ do
                 Host!
                 return nil
 
-            registerIO( "hostendian", {
+            registerIO( "=", {
                 Size: ( number ) ->
                     assert( number == nil, "'=' is an endianness control, and does not have size" )
                     return 0
@@ -335,8 +328,6 @@ do
                 Read: read
                 Write: read
             } )
-
-            setAlias( "hostendian", "=" )
 
     -- https://github.com/ToxicFrog/vstruct/blob/master/io/a.lua
     -- align-to
@@ -357,37 +348,37 @@ do
 
         -- https://github.com/ToxicFrog/vstruct/blob/master/io/u.lua
         -- unsigned ints
-        readUInt = ( _, binary, size = 4 ) ->
+        readUInt = ( _, binary, bytes = 4 ) ->
             number = 0
 
             if endianness.value == "big"
-                for index = 1, size, 1
+                for index = 1, bytes, 1
                     number = number * 0x100 + byte( binary, index, index )
 
                 return number
 
-            for index = size, 1, -1
+            for index = bytes, 1, -1
                 number = number * 0x100 + byte( binary, index, index )
 
             return number
 
-        writeUInt = ( _, number, size = 4 ) ->
-            assert( number >= 0 and number < pow2[ size * 8 ], "unsigned integer overflow" )
+        writeUInt = ( _, number, bytes = 4 ) ->
+            assert( number >= 0 and number < pow2[ bytes * 8 ], "unsigned integer overflow" )
             number = trunc( number )
             buffer = {}
 
             if endianness.value == "big"
-                for index = size, 1, -1
+                for index = bytes, 1, -1
                     buffer[ index ] = char( number % 0x100 )
                     number = trunc( number / 0x100 )
 
-                return concat( buffer, "", 1, size )
+                return concat( buffer, "", 1, bytes )
 
-            for index = 1, size, 1
+            for index = 1, bytes, 1
                 buffer[ index ] = char( number % 0x100 )
                 number = trunc( number / 0x100 )
 
-            return concat( buffer, "", 1, size )
+            return concat( buffer, "", 1, bytes )
 
         readUIntBits = ( readBit, size ) ->
             bits = 0
@@ -432,12 +423,22 @@ do
 
         }, true )
 
-        readInt = ( _, binary, size = 4 ) ->
-            number = readUInt( nil, binary, size )
-            if number < pow2[ size * 8 - 1 ]
+        readInt = ( _, binary, bytes = 4 ) ->
+            number = readUInt( nil, binary, bytes )
+            if number < pow2[ bytes * 8 - 1 ]
                 return number
 
-            return number - pow2[ size * 8 ]
+            return number - pow2[ bytes * 8 ]
+
+        writeInt = ( _, number, bytes = 4 ) ->
+            limit = pow2[ bytes * 8 - 1 ]
+            assert( number >= -limit and number < limit, "signed integer overflow" )
+            number = trunc( number )
+
+            if number < 0
+                number += pow2[ bytes * 8 ]
+
+            return writeUInt( nil, number, bytes )
 
         readIntBits = ( readBit, size = 4 ) ->
             number = readUIntBits( readBit, size )
@@ -445,16 +446,6 @@ do
                 return number
 
             return number - pow2[ size ]
-
-        writeInt = ( _, number, size = 4 ) ->
-            limit = pow2[ size * 8 - 1 ]
-            assert( number >= -limit and number < limit, "signed integer overflow" )
-            number = trunc( number )
-
-            if number < 0
-                number += pow2[ size * 8 ]
-
-            return writeUInt( nil, number, size )
 
         writeIntBits = ( writeBit, number, size = 4 ) ->
             if number < 0
@@ -1875,17 +1866,5 @@ do
             length += 1
 
         return array
-
--- environment.string extension
-string.pack = ( fmt, ... ) ->
-    return write( fmt, { ... } )
-
-string.unpack = ( fmt, binary, offset ) ->
-    if offset
-        return unpack( read( fmt, sub( binary, offset, len( binary ) ) ) )
-
-    return unpack( read( fmt, binary ) )
-
-string.packsize = sizeOf
 
 return _module_0
