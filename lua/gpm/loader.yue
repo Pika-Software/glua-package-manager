@@ -11,6 +11,14 @@ import getfpath from debug
 unless istable( loader )
     loader = gpm.loader = {}
 
+packages = gpm.Packages
+unless istable( packages )
+    packages = gpm.Packages = setmetatable( {}, { __newindex: debug.fempty, __index: ( key ) =>
+        tbl = {}
+        rawset( @, key, tbl )
+        return tbl
+    } )
+
 -- Resolves specifier as it is package specifier
 -- See https://nodejs.org/api/esm.html#resolution-algorithm-specification PACKAGE_RESOLVE
 import CompileLuaString, CompileMoonString, CompileYueString, Version, Logger, JSONToTable from environment.util
@@ -21,6 +29,7 @@ local Package
 do
 
     import getDirectory from path
+    import tobool from _G
 
     class Module
         __tostring: =>
@@ -49,90 +58,58 @@ do
         metatable = getmetatable( any )
         return metatable and metatable.__class == Module
 
-    packages = gpm.Packages
-    unless istable( packages )
-        packages = gpm.Packages = setmetatable( {}, { __newindex: debug.fempty, __index: ( key ) =>
-            tbl = {}
-            rawset( @, key, tbl )
-            return tbl
-        } )
-
-    base = {
-        __tostring: => -- 2
+    class Package
+        __tostring: =>
             return format( "Package: %p [%s@%s]", @, @name, @version )
-    }
+        new: ( filePath, info ) =>
+            unless istable( info )
+                return {
+                    path: filePath,
+                    exists: false
+                }
 
-    base.__index = base
+            name = info.name
+            unless isstring( name )
+                name = match( filePath, "packages/(.+)/package%..+$" )
 
-    Package = loader.Package = setmetatable(
-        {
-            __name: "Package"
-            __base: base
+            @name = name
 
-            __init: ( filePath, info ) =>
-                unless istable( info )
-                    return {
-                        path: filePath,
-                        exists: false
-                    }
+            version = info.version
+            unless isstring( version )
+                version = "0.1.0"
 
-                name = info.name
-                unless isstring( name )
-                    name = match( filePath, "packages/(.+)/package%..+$" )
+            version = @version = Version( version )
 
-                @name = name
+            @exports = info.exports
+            @imports = info.imports
+            @path = filePath
 
-                version = info.version
-                unless isstring( version )
-                    version = "0.1.0"
+            @autorun = tobool( info.autorun )
+            @exists = true
 
-                version = @version = Version( version )
+            local logger
 
-                pkg = packages[ name ][ version ]
-                if pkg
-                    return pkg
+            params = info.logger
+            if params
+                logger = Logger( name .. "@" .. version\__tostring!, params.color, params.interpolation )
+            else
+                logger = Logger( name .. "@" .. version\__tostring! )
 
-                packages[ name ][ version ] = @
+            @logger = logger
 
-                @exports = info.exports
-                @imports = info.imports
-                @path = filePath
-                @exists = true
+            @env = setmetatable({ __package: @, Logger: logger }, { __index: environment, __newindex: _G })
 
-                local logger
+            :description = info
+            if description and isstring( description )
+                @description = description
 
-                params = info.logger
-                if params
-                    logger = Logger( name .. "@" .. version\__tostring!, params.color, params.interpolation )
-                else
-                    logger = Logger( name .. "@" .. version\__tostring! )
+            :license = info
+            if license and isstring( license )
+                @license = license
 
-                @logger = logger
-
-                @env = setmetatable({ __package: @, Logger: logger }, { __index: environment, __newindex: _G })
-
-                :description = info
-                if description and isstring( description )
-                    @description = description
-
-                :license = info
-                if license and isstring( license )
-                    @license = license
-
-                :homepage = info
-                if homepage and isstring( homepage )
-                    @homepage = homepage
-
-        },
-        {
-            __index: base
-            __call: ( cls, ... ) ->
-                obj = setmetatable( {}, base )
-                return cls.__init( obj, ... ) or obj
-        }
-    )
-
-    base.__class = Package
+            :homepage = info
+            if homepage and isstring( homepage )
+                @homepage = homepage
 
     environment.ispackage = ( any ) ->
         metatable = getmetatable( any )
