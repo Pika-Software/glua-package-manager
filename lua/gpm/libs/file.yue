@@ -3,8 +3,8 @@ import file, CLIENT, SERVER, error from _G
 import environment, Logger from _G.gpm
 
 import async, await, debug, util, path, string, Promise, CodeCompileError, FileSystemError from environment
-import IsBinaryModuleInstalled from util
-import sub, len, ByteSplit from string
+import ByteStream, IsBinaryModuleInstalled from util
+import sub, len, gsub, match, ByteSplit from string
 import concat from environment.table
 import fempty from debug
 import resolve from path
@@ -47,8 +47,6 @@ assertWriteAllowed = ( filePath, gamePath ) ->
 
 local normalizeGamePath
 do
-
-    import match from string
 
     dir2path = {
         lua: luaPath
@@ -180,8 +178,8 @@ do
 
     do
 
+        import MountGMA from environment.game
         import getDirectory from path
-        import MountGMA from game
 
         _module_0.MountGMA = ( relativePath ) ->
             success, files = MountGMA( sub( resolve( relativePath ), 2 ) )
@@ -337,7 +335,6 @@ do
     local open
     do
 
-        import ByteStream from util
         import Open from file
 
         open = _module_0.Open = ( filePath, fileMode, gamePath, skipNormalize ) ->
@@ -363,6 +360,23 @@ do
     do
 
         import ReadULong, WriteULong, ReadByte, WriteByte, Seek, Skip, Tell from File
+
+        do
+
+            import tostring from _G
+
+            File.IsValid = ( fileHandle ) ->
+                return tostring( fileHandle ) ~= "File [NULL]"
+
+        File.SeekToBegin = ( fileHandle ) ->
+            return Seek( fileHandle, 0 )
+
+        do
+
+            import Size from File
+
+            File.SeekToEnd = ( fileHandle ) ->
+                return Seek( fileHandle, Size )
 
         File.SkipEmpty = ( fileHandle ) ->
             while not EndOfFile( fileHandle )
@@ -396,6 +410,10 @@ do
                 WriteULong( fileHandle, number )
                 WriteULong( fileHandle, 0 )
                 return
+
+        -- ZipFile
+        File.ReadZipFile = ByteStream.ReadZipFile
+        File.WriteZipFile = ByteStream.WriteZipFile
 
     append = _module_0.Append = ( filePath, content, gamePath, skipNormalize ) ->
         fileHandle = open( filePath, "ab", gamePath, skipNormalize )
@@ -443,7 +461,6 @@ do
             return fempty
 
         import getinfo from debug
-        import gsub, match from string
 
         debug.getfcode = ( location ) ->
             info = getinfo( location )
@@ -930,5 +947,81 @@ do
 
         error CodeCompileError "File '" .. filePath .. "' cannot be compiled."
         return
+
+do
+
+    addon = environment.addon = include( "addon.lua" )
+    import Addon, IsFilePathAllowed from addon
+    import AsyncWrite, MountGMA from _module_0
+    import time from environment.os
+    import find from string
+    import equal from path
+    import pairs from _G
+    import MD5 from util
+
+    iterateZipFiles = _module_0.IterateZipFiles = ( fileHandle, doCRC ) ->
+        unless fileHandle
+            return fempty
+
+        doCRC = doCRC ~= false
+
+        return ->
+            return fileHandle\ReadZipFile( doCRC )
+
+    mountZIPData = _module_0.MountZIPData = async ( data, uniqueName ) ->
+        gma = Addon!
+
+        local isInFolder, last
+        temp = {}
+
+        for data in iterateZipFiles( ByteStream( data ), true )
+            :content = data
+            if content and content ~= ""
+                filePath = data.path
+                temp[ filePath ] = content
+
+                if isInFolder ~= false
+                    current = match( filePath, "^(.-)/" )
+                    if last
+                        isInFolder = equal( last, current )
+
+                    last = current
+
+        files = temp
+        if isInFolder
+            files = {}
+            endPos = #last + 2
+            for fileName, content in pairs( temp )
+                files[ sub( fileName, endPos ) ] = content
+
+        for fileName, content in pairs( files )
+            if IsFilePathAllowed( fileName )
+                filePath = fileName
+                if find( filePath, "/lua/packages/", 1, true ) ~= nil
+                    filePath = gsub( filePath, "/lua/packages/", "/lua/gpm/vfs/packages/" )
+
+                gma\AddFile( filePath, content )
+
+        title = MD5( uniqueName .. time! )
+        gma\SetTitle( title )
+
+        filePath = "gpm/mount/" .. title .. ".gma"
+        await AsyncWrite( filePath, gma\Write( "memory", true )\Read( "*a" ), "DATA", true )
+
+        ok, result = MountGMA( "/data/" .. filePath )
+        unless ok
+            error FileSystemError result
+            return nil
+
+        return result
+
+    asyncMount = async ( filePath, gamePath ) ->
+        return await mountZIPData( await( asyncRead( filePath, gamePath, true ) ), "file:///" .. filePath )
+
+    _module_0.MountZIP = ( filePath, gamePath, skipNormalize ) ->
+        unless skipNormalize
+            filePath, gamePath = normalizeGamePath( filePath, gamePath )
+
+        return asyncMount( filePath, gamePath )
 
 return _module_0

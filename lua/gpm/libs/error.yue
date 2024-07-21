@@ -33,8 +33,8 @@ export class Error
         child.__base.name = child.__name or @name
 
     new: ( @message, @fileName, @lineNumber, stackPos ) =>
-        @stack = stack = Error.captureStack( stackPos or 3 )
-        
+        @stack = stack = getstack( stackPos or 3 )
+
         if first := stack[1]
             @fileName or= first.short_src
             @lineNumber or= first.currentline
@@ -61,9 +61,10 @@ export class Error
         lines[ length ] = "\n"
 
         ErrorNoHalt concat( lines, "\n", 1, length )
-        return
+        return nil
 
-    @captureStack: ( stackPos = 1 ) -> gpm.debug.getstack( stackPos )
+    @captureStack: ( stackPos ) ->
+        return getstack( stackPos or 1 )
 
     @is: ( obj, name = "Error" ) ->
         meta = getmetatable( obj )
@@ -71,7 +72,9 @@ export class Error
         while cls
             if cls.__name == name
                 return true
+
             cls = cls.__parent
+
         return false
 
 export iserror = Error.is

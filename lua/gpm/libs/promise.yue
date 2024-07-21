@@ -21,10 +21,13 @@
     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
     SOFTWARE.
 --]]
-import Error, TypeError, RuntimeError, PromiseError, isfunction, istable, isstring, getmetatable, pcall, xpcall, error, ipairs from gpm.environment
-import format, match from gpm.environment.string
+_G = _G
+import environment from _G.gpm
+import Error, TypeError, RuntimeError, PromiseError, isfunction, istable, isstring, getmetatable, pcall, xpcall, error, ipairs, iserror from environment
 import create, resume, yield, running from coroutine
-import remove from gpm.environment.table
+import format, match from environment.string
+import remove from environment.table
+import captureStack from Error
 
 setTimeout = timer.Simple
 
@@ -33,7 +36,7 @@ iscallable = (obj) ->
         return true
 
     meta = getmetatable obj
-    return meta and meta.__call and true or false 
+    return meta and meta.__call and true or false
 
 getThenable = (obj) ->
     thenFn = obj.Then or obj.next
@@ -111,7 +114,7 @@ class Promise
     finalize = =>
         if @state == STATE_PENDING
             return
-        
+
         setTimeout 0, ->
             queue = @queue
             index = 1
@@ -205,7 +208,7 @@ class Promise
             if file and line
                 err = RuntimeError( message, file, line, 4 )
 
-        if Error.is( err )
+        if iserror( err )
             stack = err.stack
             length = #stack
 
@@ -236,7 +239,7 @@ class Promise
         return (...) ->
             p = Promise!
 
-            CALL_STACK[] = Error.captureStack() -- push stack
+            CALL_STACK[] = captureStack! -- push stack
 
             co = create (...) ->
                 success, result = xpcall( fn, transformError, ... )
@@ -263,7 +266,7 @@ class Promise
                 resume co, success, value
             else
                 _success, _value = success, value
-        
+
         wait = ->
             if _success != nil
                 return _success, _value
@@ -284,7 +287,7 @@ class Promise
                 else
                     Then( p, onResolve, onReject )
                     return wait!
-        
+
         thenable = istable(p) and getThenable(p)
         if iscallable( thenable )
             pcall( thenable, p, onResolve, onReject )

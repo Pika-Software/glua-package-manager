@@ -121,6 +121,7 @@ export log2 = (n) -> log(n) / ln2
 -- Other
 export rand = (a, b) -> a + (b - a) * random()
 export isascii = (n) -> n >= 0 and n <= 255
+export fdiv = (a, b) -> floor(a / b)
 export hypot = (...) ->
     s = 0
     for n in *{...}

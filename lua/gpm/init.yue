@@ -140,12 +140,14 @@ do
 include( "moonloader.lua" )
 include( "post-util.lua" )
 
-environment.file = setmetatable( include( "libs/file.lua" ), { __index: _G.file } )
+do
+
+    file = environment.file = setmetatable( include( "libs/file.lua" ), { __index: _G.file } )
+
+    file.Delete( "gpm/mount" )
+    file.CreateDir( "gpm/mount", true )
+
 include( "libs/http.lua" )
-
-environment.addon = include( "libs/addon.lua" )
-
-include( "libs/zip.lua" )
 include( "loader.lua" )
 
 -- Plugins

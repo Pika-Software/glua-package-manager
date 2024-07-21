@@ -6,8 +6,9 @@ string = environment.string = setmetatable( rawget( environment, "string" ) or {
 table = environment.table = setmetatable( rawget( environment, "table" ) or {}, { __index: _G.table } )
 debug = environment.debug = setmetatable( rawget( environment, "debug" ) or {}, { __index: _G.debug } )
 math = environment.math = setmetatable( rawget( environment, "math" ) or {}, { __index: _G.math } )
-http = environment.http = setmetatable( rawget( environment, "http" ) or {}, { __index: _G.http } )
 util = environment.util = setmetatable( rawget( environment, "util" ) or {}, { __index: _G.util } )
+environment.http = setmetatable( rawget( environment, "http" ) or {}, { __index: _G.http } )
+environment.os = setmetatable( rawget( environment, "os" ) or {}, { __index: _G.os } )
 
 import byte, sub, gsub, format, len, find from string
 import concat, remove from table
@@ -362,6 +363,15 @@ string.StartsWith = ( str, startStr ) ->
 
 string.EndsWith = ( str, endStr ) ->
 	return endStr == "" or sub( str, len( str ) - len( endStr ) ) == endStr
+
+string.concat = ( ... ) ->
+    args = { ... }
+
+    lenght = #args
+    if lenght == 0
+        return ""
+
+    return concat( args, "", 1, lenght )
 
 string.indexOf = ( str, searchable, position, withPattern ) ->
     unless searchable

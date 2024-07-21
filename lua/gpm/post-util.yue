@@ -1,9 +1,34 @@
 _G = _G
 import environment from _G.gpm
 
-import math, string, table, util, ArgAssert from environment
+import bit, math, string, table, os, util, ArgAssert from environment
+import band, bor, lshift, rshift from bit
 import error, getmetatable from _G
 import byte, sub, len from string
+
+do
+
+    import fdiv from math
+    import time from os
+
+    os.dos2unix = ( d, t ) ->
+        data = { year: 1980, month: 1, day: 1, hour: 0, min: 0, sec: 0 }
+
+        if d
+            data.year += rshift( band( d, 0xFE00 ), 9 )
+            data.month = rshift( band( d, 0x01E0 ), 5 )
+            data.day = band( d, 0x001F )
+
+        if t
+            data.hour = rshift( band( t, 0xF800 ), 11 )
+            data.min = rshift( band( t, 0x07E0 ), 5 )
+            data.sec = band( t, 0x001F ) * 2
+
+        return time( data )
+
+    os.unix2dos = ( u ) ->
+        data = os.date("*t", unix_time)
+        return bor( lshift( data.year - 1980, 9 ), lshift( data.month, 5 ), data.day ), bor( lshift( data.hour, 11 ), lshift( data.min, 5 ), fdiv( data.sec, 2 ) )
 
 do
 
@@ -96,6 +121,9 @@ do
         @CompressionMethods: compressionMethods
         __tostring: =>
             return format( "ByteStream: %p [%d/%d]", @, @position, @size )
+
+        IsValid: =>
+            return @data ~= nil
 
         EndOfFile: =>
             return @position >= @size
@@ -320,11 +348,9 @@ do
             setEndianness( endianness or "little" )
             return @Write( writeQuad( nil, number, 16 ) )
 
-        -- Zip
-        ReadZipFile: =>
-            :position = @
+        -- ZipFile ( https://medium.com/@felixstridsberg/the-zip-file-format-6c8a160d1c34 )
+        ReadZipFile: ( doCRC ) =>
             if @Read( 4 ) ~= "PK\x03\x04"
-                @Seek( position )
                 return
 
             data = {}
@@ -336,7 +362,7 @@ do
             data.time = @ReadUShort!
             data.date = @ReadUShort!
 
-            data.crc32 = @ReadULong!
+            crc = data.crc = @ReadULong!
 
             compressedSize = @ReadULong!
             data.size = @ReadULong!
@@ -348,8 +374,13 @@ do
             @Skip( extraLength )
 
             method = compressionMethods[ compressionMethod ]
-            if method
-                data.content = method[2]( @Read( compressedSize ) )
+            unless method
+                return data, "compression method not supported"
+
+            content = data.content = method[ 2 ]( @Read( compressedSize ) )
+
+            if doCRC and content and crc ~= CRC32( content )
+                return data, "crc-32 mismatch"
 
             return data
 
@@ -415,7 +446,6 @@ do
 
     import match, find, gsub, ByteCount, ByteSplit from string
     import isnumber, tonumber, isstring, tostring from _G
-    import bor, band, lshift, rshift from environment.bit
     import isuint, max from math
 
     compare = ( a, b ) ->

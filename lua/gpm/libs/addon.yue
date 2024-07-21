@@ -1,6 +1,5 @@
-import gpm from _G
-import environment from gpm
-import AddonError, ArgAssert, isstring, istable, error, tostring, tonumber from environment
+import environment from _G.gpm
+import AddonError, ArgAssert, isstring, error, tostring, tonumber from environment
 import Open, Find, GetFolderContents from environment.file
 import HasValue, Empty from environment.table
 import lower, gsub, find from string
@@ -215,6 +214,9 @@ export class Addon
     Open: ( filePath = @file_path, fileMode ) =>
         @Close!
 
+        if filePath == "memory" and filePath == @file_path
+            return @file_handler
+
         ArgAssert( filePath, 1, "string" )
 
         fileHandle = Open( filePath, fileMode or "rb" )
@@ -228,9 +230,8 @@ export class Addon
 
     Close: =>
         fileHandle = @file_handler
-        if fileHandle
+        if fileHandle and fileHandle\IsValid!
             fileHandle\Close!
-            @file_handler = nil
             return true
 
         return false
@@ -413,13 +414,13 @@ export class Addon
             unless fileHandle
                 error AddonError "file read handler is missing, opening is impossible"
 
-            fileHandle\Seek( fileHandle\Size! )
-            fileHandle\WriteULong( crc )
+            fileHandle\SeekToEnd!
+            fileHandle\WriteULong( fileCRC )
         else
             fileHandle\WriteULong( 0 )
 
         @Close!
-        return true
+        return fileHandle
 
     ReadFile: ( index ) =>
         ArgAssert( index, 1, "number" )
@@ -446,8 +447,7 @@ export class Addon
         pointer = files.data_pointer
         for data in *files
             fileHandle\Seek( pointer + data.position )
-            content = fileHandle\Read( data.size )
-            data.content = content
+            content = data.content = fileHandle\Read( data.size )
             if doCRCs
                 data.real_crc = tonumber( CRC( content ) )
 
@@ -455,6 +455,9 @@ export class Addon
 
     GetFile: ( index ) =>
         return @files[ index ]
+
+    GetFiles: =>
+        return @files
 
     AddFile: ( filePath, content, doCRCs ) =>
         ArgAssert( filePath, 1, "string" )
