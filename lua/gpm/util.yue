@@ -686,6 +686,15 @@ table.SetValue = ( tbl, str, value ) ->
 
     tbl[ sub( str, pointer ) ] = value
 
+table.Slice = ( tbl, startPos, endPos, step ) ->
+	result, lenght = {}, 0
+
+	for index = startPos or 1, endPos or #tbl, step or 1
+        lenght += 1
+        result[ lenght ] = tbl[ index ]
+
+	return result
+
 do
 
     import random from math

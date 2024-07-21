@@ -130,6 +130,7 @@ export hypot = (...) ->
     return sqrt(s)
 
 export cbrt = (n) -> pow(n, 1 / 3)
+export root = (n, d) -> pow(n, 1 / d)
 export timef = (c,s,f) -> (c - s) / (f - s)
 export approach = (a, b, d) ->
     c = b - a
