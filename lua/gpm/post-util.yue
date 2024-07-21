@@ -5,30 +5,32 @@ import bit, math, string, table, os, util, ArgAssert from environment
 import band, bor, lshift, rshift from bit
 import error, getmetatable from _G
 import byte, sub, len from string
+import time from os
 
+dos2unix = os.dos2unix = ( t, d ) ->
+    data = { year: 1980, month: 1, day: 1, hour: 0, min: 0, sec: 0 }
+
+    if t
+        data.hour = rshift( band( t, 0xF800 ), 11 )
+        data.min = rshift( band( t, 0x07E0 ), 5 )
+        data.sec = band( t, 0x001F ) * 2
+
+    if d
+        data.year += rshift( band( d, 0xFE00 ), 9 )
+        data.month = rshift( band( d, 0x01E0 ), 5 )
+        data.day = band( d, 0x001F )
+
+    return time( data )
+
+local unix2dos
 do
 
     import fdiv from math
-    import time from os
+    import date from os
 
-    os.dos2unix = ( d, t ) ->
-        data = { year: 1980, month: 1, day: 1, hour: 0, min: 0, sec: 0 }
-
-        if d
-            data.year += rshift( band( d, 0xFE00 ), 9 )
-            data.month = rshift( band( d, 0x01E0 ), 5 )
-            data.day = band( d, 0x001F )
-
-        if t
-            data.hour = rshift( band( t, 0xF800 ), 11 )
-            data.min = rshift( band( t, 0x07E0 ), 5 )
-            data.sec = band( t, 0x001F ) * 2
-
-        return time( data )
-
-    os.unix2dos = ( u ) ->
-        data = os.date("*t", unix_time)
-        return bor( lshift( data.year - 1980, 9 ), lshift( data.month, 5 ), data.day ), bor( lshift( data.hour, 11 ), lshift( data.min, 5 ), fdiv( data.sec, 2 ) )
+    unix2dos = os.unix2dos = ( u ) ->
+        data = date( "*t", u )
+        return bor( lshift( data.hour, 11 ), lshift( data.min, 5 ), fdiv( data.sec, 2 ) ), bor( lshift( data.year - 1980, 9 ), lshift( data.month, 5 ), data.day )
 
 do
 
@@ -358,12 +360,8 @@ do
             @Skip( 4 )
 
             compressionMethod = data.compression = @ReadUShort!
-
-            data.time = @ReadUShort!
-            data.date = @ReadUShort!
-
+            data.time = dos2unix( @ReadUShort!, @ReadUShort! )
             crc = data.crc = @ReadULong!
-
             compressedSize = @ReadULong!
             data.size = @ReadULong!
 
@@ -384,12 +382,11 @@ do
 
             return data
 
-        WriteZipFile: ( fileName, content, compressionMethod = 0, time = 0, date = 0 ) =>
+        WriteZipFile: ( fileName, content, compressionMethod = 0, u = time! ) =>
             ArgAssert( fileName, 1, "string" )
             ArgAssert( content, 2, "string" )
             ArgAssert( compressionMethod, 3, "number" )
-            ArgAssert( time, 4, "number" )
-            ArgAssert( date, 5, "number" )
+            ArgAssert( u, 4, "number" )
 
             -- signature
             @Write( "PK\x03\x04" )
@@ -409,8 +406,9 @@ do
             @WriteUShort( compressionMethod )
 
             -- Modification time
-            @WriteUShort( time or 0 )
-            @WriteUShort( date or 0 )
+            t, d = unix2dos( u )
+            @WriteUShort( t )
+            @WriteUShort( d )
 
             -- CRC-32
             @WriteULong( tonumber( CRC32( content ), 10 ) )
