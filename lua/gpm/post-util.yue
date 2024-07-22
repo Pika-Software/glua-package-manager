@@ -157,6 +157,12 @@ do
         SeekToEnd: =>
             return @Seek( @size - @position )
 
+        File.SkipEmpty: =>
+            while not @EndOfFile!
+                if @ReadByte! ~= 0
+                    @Skip( -1 )
+                    break
+
         Skip: ( bytes ) =>
             if bytes
                 ArgAssert( bytes, 2, "number" )
@@ -349,6 +355,15 @@ do
             ArgAssert( number, 2, "number" )
             setEndianness( endianness or "little" )
             return @Write( writeQuad( nil, number, 16 ) )
+
+        -- Time
+        ReadTime: =>
+            return dos2unix( @ReadUShort!, @ReadUShort! )
+
+        WriteTime: ( unixTime ) =>
+            t, d = unix2dos( unixTime )
+            @WriteUShort( t )
+            return @WriteUShort( d )
 
         -- ZipFile ( https://medium.com/@felixstridsberg/the-zip-file-format-6c8a160d1c34 )
         ReadZipFile: ( doCRC ) =>

@@ -376,7 +376,7 @@ do
             import Size from File
 
             File.SeekToEnd = ( fileHandle ) ->
-                return Seek( fileHandle, Size )
+                return Seek( fileHandle, Size( fileHandle ) )
 
         File.SkipEmpty = ( fileHandle ) ->
             while not EndOfFile( fileHandle )
@@ -384,6 +384,7 @@ do
                     Skip( fileHandle, -1 )
                     break
 
+        -- String
         File.ReadString = ( fileHandle ) ->
             startPos, length = Tell( fileHandle ), 0
             while not EndOfFile( fileHandle ) and ReadByte( fileHandle ) ~= 0
@@ -394,10 +395,10 @@ do
             Skip( fileHandle, 1 )
             return data
 
-        File.WriteString = ( fileHandle, str ) ->
-            Write( fileHandle, str )
-            WriteByte( fileHandle, 0 )
-            return
+        File.WriteString = ByteStream.WriteString
+
+        -- Line
+        File.WriteLine = ByteStream.WriteLine
 
         unless File.ReadUInt64
             File.ReadUInt64 = ( fileHandle ) ->
@@ -410,6 +411,10 @@ do
                 WriteULong( fileHandle, number )
                 WriteULong( fileHandle, 0 )
                 return
+
+        -- UnixTime
+        File.ReadTime = ByteStream.ReadTime
+        File.WriteTime = ByteStream.WriteTime
 
         -- ZipFile
         File.ReadZipFile = ByteStream.ReadZipFile
