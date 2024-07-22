@@ -2,7 +2,7 @@ _G = _G
 import gpm, getmetatable, setmetatable from _G
 import environment from gpm
 
-import debug, path, isurl, isstring, ArgAssert, URL, NotImplementedError from environment
+import debug, string, path, table, file, util, isurl, isstring, ArgAssert, URL, NotImplementedError from environment
 import getCurrentFile, getCurrentDirectory from path
 import async, await, reject from environment.Promise
 import getfpath from debug
@@ -21,13 +21,13 @@ unless istable( packages )
 
 -- Resolves specifier as it is package specifier
 -- See https://nodejs.org/api/esm.html#resolution-algorithm-specification PACKAGE_RESOLVE
-import CompileLuaString, CompileMoonString, CompileYueString, Version, Logger, JSONToTable from environment.util
-import AsyncRead, IsFile, IsDir, NormalizeGamePath from environment.file
-import sub, byte, find, match, gsub, format, StartsWith, IsURL from environment.string
+import sub, byte, find, match, gsub, format, StartsWith, IsURL from string
+import IsFile from file
 
 local Package
 do
 
+    import Logger, Version from util
     import getDirectory from path
     import tobool from _G
 
@@ -119,8 +119,11 @@ do
 local ESM
 do
 
-    import PackageError from environment
+    import CompileLuaString, CompileMoonString, CompileYueString, JSONToTable from util
+    import AsyncRead, IsDir, NormalizeGamePath from file
     import join, stripExtension from path
+    import PackageError from environment
+    import Merge from table
 
     class ESM
         DEFAULT_CONDITIONS = {
@@ -371,7 +374,7 @@ do
                 success, result = pcall( func )
                 if success
                     if istable( result )
-                        table.Merge( info, result )
+                        Merge( info, result )
 
                     return Package( filePath, info )
 
