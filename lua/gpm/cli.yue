@@ -41,14 +41,20 @@ commands = {
     list: {
         help: "Lists installed packages"
         call: ( args ) ->
-            buffer, length = {}, 0
-
-            for _, versions in pairs( gpm.Packages )
-                for _, pkg in pairs( versions )
+            lines, count = {}, 0
+            for name, versions in pairs( gpm.Packages )
+                buffer, length = {}, 0
+                for version in pairs( versions )
                     length += 1
-                    buffer[ length ] = length .. ". " .. pkg\__tostring!
+                    buffer[ length ] = version\__tostring!
 
-            Logger\Info( "Package list:\n" .. concat( buffer, "\n", 1, length ) )
+                count += 1
+                lines[ count ] = count .. ". " .. name .. ": " .. concat( buffer, ", ", 1, length )
+
+            count += 1
+            lines[ count ] = "Total: " .. count
+
+            Logger\Info( "Package list:\n" .. concat( lines, "\n", 1, count ) )
             return nil
     },
     info: {
@@ -62,6 +68,13 @@ commands = {
         hint: ( args ) ->
     }
 }
+
+-- Aliases
+commands.del = commands.uninstall
+commands.add = commands.install
+commands.upd = commands.update
+commands.rel = commands.reload
+commands.ls = commands.list
 
 list = {}
 for name in pairs( commands )
@@ -130,11 +143,15 @@ Add( "gpm", ( ply, _, args ) ->
 
         suggestions, length = {}, 0
         for name in *list
-            if StartsWith( name, str )
+            if name == str
+                suggestions = nil
+                break
+
+            elseif StartsWith( name, str )
                 length += 1
                 suggestions[ length ] = name
 
-        if length ~= 0
+        if suggestions and length ~= 0
             return suggestions
 
         command = commands[ cmd ]
