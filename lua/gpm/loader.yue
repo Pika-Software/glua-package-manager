@@ -21,8 +21,6 @@ unless istable( packages )
             return new
     } )
 
-table.Empty( packages )
-
 -- Resolves specifier as it is package specifier
 -- See https://nodejs.org/api/esm.html#resolution-algorithm-specification PACKAGE_RESOLVE
 import sub, byte, find, match, gsub, format, StartsWith, IsURL from string
