@@ -157,7 +157,7 @@ do
         SeekToEnd: =>
             return @Seek( @size - @position )
 
-        File.SkipEmpty: =>
+        SkipEmpty: =>
             while not @EndOfFile!
                 if @ReadByte! ~= 0
                     @Skip( -1 )
