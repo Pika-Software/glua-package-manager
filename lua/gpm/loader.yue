@@ -13,11 +13,15 @@ unless istable( loader )
 
 packages = gpm.Packages
 unless istable( packages )
-    packages = gpm.Packages = setmetatable( {}, { __newindex: debug.fempty, __index: ( key ) =>
-        tbl = {}
-        rawset( @, key, tbl )
-        return tbl
+    packages = gpm.Packages = setmetatable( {}, {
+        __newindex: debug.fempty
+        __index: ( tbl, key ) ->
+            new = {}
+            rawset( tbl, key, new )
+            return new
     } )
+
+table.Empty( packages )
 
 -- Resolves specifier as it is package specifier
 -- See https://nodejs.org/api/esm.html#resolution-algorithm-specification PACKAGE_RESOLVE
@@ -61,12 +65,13 @@ do
     class Package
         __tostring: =>
             return format( "Package: %p [%s@%s]", @, @name, @version )
+
         new: ( filePath, info ) =>
-            unless istable( info )
-                return {
-                    path: filePath,
-                    exists: false
-                }
+            @path = filePath
+
+            unless info
+                @exists = false
+                return nil
 
             name = info.name
             unless isstring( name )
@@ -82,22 +87,10 @@ do
 
             @exports = info.exports
             @imports = info.imports
-            @path = filePath
 
             @autorun = tobool( info.autorun )
+            @logger = info.logger
             @exists = true
-
-            local logger
-
-            params = info.logger
-            if params
-                logger = Logger( name .. "@" .. version\__tostring!, params.color, params.interpolation )
-            else
-                logger = Logger( name .. "@" .. version\__tostring! )
-
-            @logger = logger
-
-            @env = setmetatable({ __package: @, Logger: logger }, { __index: environment, __newindex: _G })
 
             :description = info
             if description and isstring( description )
@@ -110,6 +103,26 @@ do
             :homepage = info
             if homepage and isstring( homepage )
                 @homepage = homepage
+
+        Initialize: =>
+            unless @exists
+                error PackageError "Package does not exist"
+                return
+
+            :logger = @
+            if logger
+                if logger.disabled
+                    logger = nil
+                else
+                    logger = Logger( @name .. "@" .. @version\__tostring!, logger.color, logger.interpolation )
+            else
+                logger = Logger( @name .. "@" .. @version\__tostring! )
+
+            @logger = logger
+            @env = setmetatable( { __package: @, Logger: logger }, { __index: environment, __newindex: _G } )
+
+            logger\Debug( "Package has been initialized." )
+            return nil
 
     environment.ispackage = ( any ) ->
         metatable = getmetatable( any )
@@ -336,6 +349,20 @@ do
 
                 scopeURL = URL( "../package.lua", scopeURL )
 
+        getPackage = ( filePath, info ) ->
+            pkg = Package( filePath, info )
+            if pkg.exists
+                :name, :version = pkg
+
+                existing = packages[ name ][ version ]
+                if existing
+                    return existing
+
+                packages[ name ][ version ] = pkg
+                pkg\Initialize!
+
+            return pkg
+
         -- READ_PACKAGE_JSON(packageURL)
         readPackageJSON = ( packageURL ) =>
             pjsonPath = join( packageURL.pathname, "package.lua" )
@@ -358,7 +385,7 @@ do
                 if firstByte == 0x5b --[['[']] or firstByte == 0x7b --[['{']]
                     info = JSONToTable( content )
                     if info
-                        return Package( filePath, info )
+                        return getPackage( filePath, info )
 
             func = switch extension
                 when "yue"
@@ -376,7 +403,7 @@ do
                     if istable( result )
                         Merge( info, result )
 
-                    return Package( filePath, info )
+                    return getPackage( filePath, info )
 
                 error PackageError "File '" .. filePath .. "' compilation error: " .. result
                 return

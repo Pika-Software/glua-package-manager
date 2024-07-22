@@ -1,6 +1,6 @@
 _G = _G
+import setmetatable from _G
 import environment from _G.gpm
-
 import bit, math, string, table, os, util, ArgAssert from environment
 import band, bor, lshift, rshift from bit
 import error, getmetatable from _G
@@ -532,7 +532,9 @@ do
 
     -- Semver lua parser. Based on https://github.com/kikito/semver.lua
     -- https://github.com/Pika-Software/gpm_legacy/blob/main/lua/gpm/sh_semver.lua
-    class Version
+    local Version
+
+    _base_0  = {
         __tostring: =>
             preRelease, build = @prelease, @build
             if preRelease and build
@@ -739,7 +741,40 @@ do
             error "Invaild operator: '" .. operator .. "'"
             return nil
 
-        new: ( major, minor, patch, prerelease, build ) =>
+        nextMajor: =>
+            return Version( @major + 1, 0, 0 )
+
+        nextMinor: =>
+            return Version( @major, @minor + 1, 0 )
+
+        nextPatch: =>
+            return Version( @major, @minor, @patch + 1 )
+
+        toNumber: =>
+            major = tonumber( @major )
+            if major > 0x3ff
+                error "major version is too large (max 1023)"
+                return nil
+
+            minor = tonumber( @minor )
+            if minor > 0x7ff
+                error "minor version is too large (max 2047)"
+                return nil
+
+            patch = tonumber( @patch )
+            if patch > 0x7ff
+                error "patch version is too large (max 2047)"
+                return nil
+
+            return bor( lshift( patch, 21 ), lshift( minor, 10 ), major )
+    }
+
+    _base_0.__index = _base_0
+
+    Version = {
+        __base: _base_0
+        __name: "Version"
+        __init: ( major, minor, patch, prerelease, build ) =>
             unless major
                 error "at least one parameter is needed"
                 return nil
@@ -799,37 +834,25 @@ do
             @patch = tonumber( patch )
             return nil
 
-        nextMajor: =>
-            return Version( @major + 1, 0, 0 )
-
-        nextMinor: =>
-            return Version( @major, @minor + 1, 0 )
-
-        nextPatch: =>
-            return Version( @major, @minor, @patch + 1 )
-
-        toNumber: =>
-            major = tonumber( @major )
-            if major > 0x3ff
-                error "major version is too large (max 1023)"
-                return nil
-
-            minor = tonumber( @minor )
-            if minor > 0x7ff
-                error "minor version is too large (max 2047)"
-                return nil
-
-            patch = tonumber( @patch )
-            if patch > 0x7ff
-                error "patch version is too large (max 2047)"
-                return nil
-
-            return bor( lshift( patch, 21 ), lshift( minor, 10 ), major )
-
-        @fromNumber: ( uint ) ->
+        fromNumber: ( uint ) ->
             return Version( band( uint, 0x3ff ), band( rshift( uint, 10 ), 0x7ff ), band( rshift( uint, 21 ), 0x7ff ) )
+    }
 
-    util.Version = Version
+    versions = {}
+
+    util.Version = _base_0.__class = setmetatable( Version, {
+        __index: _base_0,
+        __call: ( cls, ... ) ->
+            obj = setmetatable( {}, _base_0 )
+            cls.__init( obj, ... )
+
+            existing = versions[ obj\__tostring! ]
+            if existing
+                return existing
+
+            versions[ obj\__tostring! ] = obj
+            return obj
+    } )
 
     environment.IsVersion = ( any ) ->
         metatable = getmetatable( any )
@@ -840,7 +863,7 @@ do
 -- TODO: Think what to do with this
 do
 
-    import rawget, rawset, setmetatable, setfenv, isfunction from _G
+    import rawget, rawset, setfenv, isfunction from _G
 
     class LinkedTable
         new: ( object, read, write ) =>

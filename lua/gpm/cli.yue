@@ -1,6 +1,6 @@
 _G = _G
-import environment, Logger from _G.gpm
-
+import gpm from _G
+import environment, Logger from gpm
 import concommand from environment
 
 -- just in case :>
@@ -8,7 +8,7 @@ unless concommand
     return
 
 import lower, StartsWith from environment.string
-import remove from environment.table
+import concat, remove from environment.table
 import pairs from environment
 import Add from concommand
 
@@ -41,7 +41,15 @@ commands = {
     list: {
         help: "Lists installed packages"
         call: ( args ) ->
-        hint: ( args ) ->
+            buffer, length = {}, 0
+
+            for _, versions in pairs( gpm.Packages )
+                for _, pkg in pairs( versions )
+                    length += 1
+                    buffer[ length ] = length .. ". " .. pkg\__tostring!
+
+            Logger\Info( "Package list:\n" .. concat( buffer, "\n", 1, length ) )
+            return nil
     },
     info: {
         help: "Shows information about the package manager"
