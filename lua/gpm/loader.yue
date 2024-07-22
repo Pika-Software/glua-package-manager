@@ -11,6 +11,8 @@ import getfpath from debug
 unless istable( loader )
     loader = gpm.loader = {}
 
+    loader.Modules = {}
+
 packages = gpm.Packages
 unless istable( packages )
     packages = gpm.Packages = setmetatable( {}, {
@@ -33,7 +35,7 @@ do
     import getDirectory from path
     import tobool from _G
 
-    class Module
+    loader.Module = class Module
         __tostring: =>
             return format( "Module: %p [%s]", @, @name )
 
@@ -45,6 +47,8 @@ do
 
             :pathname = url
             setfenv( location, setmetatable({ __module: @, __filename: pathname, __dirname: getDirectory( pathname ) }, { __index: env, __newindex: env }) )
+
+            loader.Modules[ url.href ] = @
             return
 
         run: ( ... ) =>
@@ -54,7 +58,16 @@ do
             result = @result = async( @location )( ... )
             return result
 
-    loader.Module = Module
+        @getAll: -> loader.Modules
+
+        @get: ( url ) -> loader.Modules[ url.href ]
+
+        @run: ( location, url, env ) ->
+            m = Module.get( url )
+            unless m
+                m = Module( location, url, env )
+            return m\run!
+
 
     environment.ismodule = ( any ) ->
         metatable = getmetatable( any )
@@ -119,7 +132,7 @@ do
             @logger = logger
             @env = setmetatable( { __package: @, Logger: logger }, { __index: environment, __newindex: _G } )
 
-            logger\Debug( "Package has been initialized." )
+            logger?\Debug( "Package has been initialized." )
             return nil
 
     environment.ispackage = ( any ) ->
@@ -609,12 +622,12 @@ do
             return base, env, parent
 
     gpm.Import = ( specifier ) ->
-        ArgAssert( specifier, 1, "string", 2 )
+        ArgAssert( specifier, 1, "string" )
         return asyncImport( specifier, ESM.resolve, nil, getImportMeta! )
 
     -- just for a .lua users
     environment.import = ( specifier ) ->
-        ArgAssert( specifier, 1, "string", 2 )
+        ArgAssert( specifier, 1, "string" )
         return await asyncImport( specifier, ESM.resolve, nil, getImportMeta! )
 
     environment.require = ( modname ) ->
@@ -626,7 +639,9 @@ do
         return await asyncImport( fileName, Include.resolve, nil, getImportMeta! )
 
 test = async ->
-    environment.import "package_v2"
+    result = environment.import "package_v2"
+    -- gpm.Logger\Info "package result: #{result}" 
+    error ""
     -- package resovle
 
     -- :resolved, :format, :package = await ESM.resolve( "b/init.lua", URL( "file:/lua/packages/exports/" ) )

@@ -130,6 +130,7 @@ class RepositoryHandler extends BaseSourceHandler
                             when "base64"
                                 content = Base64Decode( content )
 
+                        -- Optimize compilation?
                         switch getExtension( currentPath )
                             when "lua"
                                 func = await CompileLuaString( content, url.href, true, false )
@@ -137,7 +138,7 @@ class RepositoryHandler extends BaseSourceHandler
                                     error ModuleError "File '" .. url.href .. "' cannot be compiled."
                                     return
 
-                                return Module( func, url, env )\run!
+                                return Module.run( func, url, env )
 
                             when "moon"
                                 func = await CompileMoonString( content, url.href, true )
@@ -145,7 +146,7 @@ class RepositoryHandler extends BaseSourceHandler
                                     error ModuleError "File '" .. url.href .. "' cannot be compiled."
                                     return
 
-                                return Module( func, url, env )\run!
+                                return Module.run( func, url, env )
 
                             when "yue"
                                 yueConfig = {}
@@ -157,7 +158,7 @@ class RepositoryHandler extends BaseSourceHandler
                                     error ModuleError "File '" .. url.href .. "' cannot be compiled."
                                     return
 
-                                return Module( func, url, env )\run!
+                                return Module.run( func, url, env )
 
                             when "json"
                                 return JSONToTable( content, true, false )

@@ -74,7 +74,7 @@ do
                 error ModuleError "File '" .. url.href .. "' cannot be compiled."
                 return
 
-            return Module( func, url, env )\run!
+            return Module.run( func, url, env )
 
 class TextHandler extends BaseSourceHandler
     ShouldHandle: ( url ) =>

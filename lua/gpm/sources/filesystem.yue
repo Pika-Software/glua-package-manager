@@ -82,7 +82,7 @@ do
 
         Install: async ( url, func, _, env ) =>
             if func
-                return Module( func, url, env )\run!
+                return Module.run( func, url, env )
 
             error ModuleError "File '" .. url.pathname .. "' cannot be compiled."
             return

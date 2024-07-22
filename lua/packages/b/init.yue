@@ -11,7 +11,7 @@ print "data from async module: ", data
 print "me:", __package
 print "and:", __module
 
-print "realm is:", gpm.Import "exports/gpmv2"
+print "realm is:", await gpm.Import "exports/gpmv2"
 
 -- gpm.Import "https://gist.githubusercontent.com/dankmolot/edbab85edb6281a72082f53b98232caf/raw/c0ff1c7287503ea5decdd91b2e0b2b2bfa8d2038/example.lua"
 
