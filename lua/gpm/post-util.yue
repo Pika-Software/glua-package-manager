@@ -1,36 +1,10 @@
 _G = _G
 import setmetatable from _G
 import environment from _G.gpm
-import bit, math, string, table, os, util, ArgAssert from environment
+import bit, math, string, table, util, ArgAssert from environment
 import band, bor, lshift, rshift from bit
 import error, getmetatable from _G
 import byte, sub, len from string
-import time from os
-
-dos2unix = os.dos2unix = ( t, d ) ->
-    data = { year: 1980, month: 1, day: 1, hour: 0, min: 0, sec: 0 }
-
-    if t
-        data.hour = rshift( band( t, 0xF800 ), 11 )
-        data.min = rshift( band( t, 0x07E0 ), 5 )
-        data.sec = band( t, 0x001F ) * 2
-
-    if d
-        data.year += rshift( band( d, 0xFE00 ), 9 )
-        data.month = rshift( band( d, 0x01E0 ), 5 )
-        data.day = band( d, 0x001F )
-
-    return time( data )
-
-local unix2dos
-do
-
-    import fdiv from math
-    import date from os
-
-    unix2dos = os.unix2dos = ( u ) ->
-        data = date( "*t", u )
-        return bor( lshift( data.hour, 11 ), lshift( data.min, 5 ), fdiv( data.sec, 2 ) ), bor( lshift( data.year - 1980, 9 ), lshift( data.month, 5 ), data.day )
 
 do
 
@@ -69,11 +43,37 @@ do
 -- Byte Stream
 do
 
+    import struct, deflate, os from environment
     import char, reverse, format from string
-    import struct, deflate from environment
     import clamp from math
     import CRC32 from util
     import io from struct
+    import time from os
+
+    dos2unix = os.dos2unix = ( t, d ) ->
+        data = { year: 1980, month: 1, day: 1, hour: 0, min: 0, sec: 0 }
+
+        if t
+            data.hour = rshift( band( t, 0xF800 ), 11 )
+            data.min = rshift( band( t, 0x07E0 ), 5 )
+            data.sec = band( t, 0x001F ) * 2
+
+        if d
+            data.year += rshift( band( d, 0xFE00 ), 9 )
+            data.month = rshift( band( d, 0x01E0 ), 5 )
+            data.day = band( d, 0x001F )
+
+        return time( data )
+
+    local unix2dos
+    do
+
+        import fdiv from math
+        import date from os
+
+        unix2dos = os.unix2dos = ( u ) ->
+            data = date( "*t", u )
+            return bor( lshift( data.hour, 11 ), lshift( data.min, 5 ), fdiv( data.sec, 2 ) ), bor( lshift( data.year - 1980, 9 ), lshift( data.month, 5 ), data.day )
 
     local readInt, writeInt
     do
@@ -360,8 +360,8 @@ do
         ReadTime: =>
             return dos2unix( @ReadUShort!, @ReadUShort! )
 
-        WriteTime: ( unixTime ) =>
-            t, d = unix2dos( unixTime )
+        WriteTime: ( u ) =>
+            t, d = unix2dos( u )
             @WriteUShort( t )
             return @WriteUShort( d )
 
@@ -375,7 +375,8 @@ do
             @Skip( 4 )
 
             compressionMethod = data.compression = @ReadUShort!
-            data.time = dos2unix( @ReadUShort!, @ReadUShort! )
+            data.time = @ReadTime!
+
             crc = data.crc = @ReadULong!
             compressedSize = @ReadULong!
             data.size = @ReadULong!
@@ -397,11 +398,11 @@ do
 
             return data
 
-        WriteZipFile: ( fileName, content, compressionMethod = 0, u = time! ) =>
+        WriteZipFile: ( fileName, content, compressionMethod = 0, unixTime = time! ) =>
             ArgAssert( fileName, 1, "string" )
             ArgAssert( content, 2, "string" )
             ArgAssert( compressionMethod, 3, "number" )
-            ArgAssert( u, 4, "number" )
+            ArgAssert( unixTime, 4, "number" )
 
             -- signature
             @Write( "PK\x03\x04" )
@@ -421,9 +422,7 @@ do
             @WriteUShort( compressionMethod )
 
             -- Modification time
-            t, d = unix2dos( u )
-            @WriteUShort( t )
-            @WriteUShort( d )
+            @WriteTime( unixTime )
 
             -- CRC-32
             @WriteULong( tonumber( CRC32( content ), 10 ) )
