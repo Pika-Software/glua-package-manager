@@ -115,6 +115,10 @@ do
             if homepage and isstring( homepage )
                 @homepage = homepage
 
+            :dependencies = info
+            if dependencies and istable( dependencies )
+                @dependencies = dependencies
+
         Initialize: =>
             unless @exists
                 error PackageError "Package does not exist"
@@ -203,10 +207,15 @@ do
 
             local packageURL
             while not packageURL or packageURL.path[1] ~= "packages" -- While parentURL is not the file system root
+                firstTime = not packageURL
+
                 packageURL = URL( "packages/" .. packageName .. "/", parentURL ) -- Let packageURL be the URL resolution of "node_modules/" concatenated with packageSpecifier, relative to parentURL.
                 parentURL = URL( "..", parentURL ) -- Set parentURL to the parent folder URL of parentURL.
 
                 if packageURL.scheme == "file" and not IsDir( packageURL.pathname ) -- If the folder at packageURL does not exist, then
+                    if result := firstTime and packageDependenciesResolve( @, packageName, packageSubpath )
+                        return result
+
                     continue
 
                 pjson = @pjson = readPackageJSON( @, packageURL )
@@ -230,6 +239,36 @@ do
 
             if pjson.name == packageName
                 return packageExportsResolve( @, packageURL, packageSubpath, pjson.exports )
+
+        packageDependenciesResolve = ( packageName, packageSubpath ) =>
+            -- @pjson must be set by packageSelfResolve
+            pjson = @pjson
+            if not pjson or not istable(pjson.dependencies)
+                return
+
+            target = pjson.dependencies[ packageName ]
+            if isstring( target )
+                return packageDependencyResolve( @, packageName, target, packageSubpath )
+
+        
+        packageDependencyResolve = ( name, target, subpath ) =>
+            if not target or #target == 0
+                error PackageError "invalid dependency target '#{target}' for '#{name}'"
+    
+            -- TODO: implement URL target and etc.
+            targetPath = target
+            if not string.match( target, "^[%w._+~^-]+$" )
+                targetPath = util.MD5( target )
+
+            packageURL = URL( path.join("file:///lua/gpm/vfs/packages", name, targetPath, "/") )
+            if not IsDir( packageURL.pathname )
+                return
+
+            pjson = @pjson = readPackageJSON( @, packageURL )
+            if pjson and pjson.exports
+                return packageExportsResolve( @, packageURL, subpath, pjson.exports )
+
+            return URL( packageSubpath, packageURL )
 
         exportsStartsWithDot = ( exports, packageURL ) =>
             if istable( exports )
@@ -639,6 +678,9 @@ do
         return await asyncImport( fileName, Include.resolve, nil, getImportMeta! )
 
 test = async ->
+    table.Empty( loader.Modules )
+    table.Empty( gpm.Packages )
+
     result = environment.import "package_v2"
     gpm.Logger\Info "package result: #{result}"
     -- error ""

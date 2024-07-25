@@ -10,7 +10,7 @@ end
 local submodule = include "submodule.lua"
 
 print("Got from submodule:", submodule)
-Promise.delay(1):await()
+-- Promise.delay(1):await()
 
 print("I am", __package )
 require "b"
