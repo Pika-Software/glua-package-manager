@@ -5,9 +5,25 @@ import await, async, SourceError, ModuleError from environment
 import Base64Decode, JSONToTable, CompileLuaString, CompileMoonString, CompileYueString from environment.util
 import BaseSource, BaseSourceHandler, Module from gpm.loader
 import MountZIPData from environment.file
-import getExtension from environment.path
+import extname from environment.path
 import insert from environment.table
-import Fetch from environment.http
+
+local fetch
+do
+
+    import STATE_PENDING from environment.Promise
+    import Fetch from environment.http
+
+    promises = {}
+
+    fetch = ( url, ... ) ->
+        promise = promises[ url ]
+        if promise and promise.state == STATE_PENDING
+            return promise
+
+        promise = Fetch( url, ... )
+        promises[ url ] = promise
+        return promise
 
 class RepositoryHandler extends BaseSourceHandler
     FetchInfo: async ( url ) =>
@@ -32,7 +48,7 @@ class RepositoryHandler extends BaseSourceHandler
 
         branch = segments[ 3 ]
         if not branch or branch == ""
-            response = await Fetch( "https://api.github.com/repos/" .. user .. "/" .. repository, headers )
+            response = await fetch( "https://api.github.com/repos/" .. user .. "/" .. repository, headers )
             if response.status ~= 200
                 json = JSONToTable( response.body )
                 error SourceError json and json.message or "Failed to fetch repository info."
@@ -47,7 +63,7 @@ class RepositoryHandler extends BaseSourceHandler
 
             segments[ 3 ] = branch
 
-        response = await Fetch( "https://api.github.com/repos/" .. user .. "/" .. repository .. "/git/trees/" .. branch, headers )
+        response = await fetch( "https://api.github.com/repos/" .. user .. "/" .. repository .. "/git/trees/" .. branch, headers )
         if response.status ~= 200
             json = JSONToTable( response.body )
             error SourceError json and json.message or "Failed to fetch repository info."
@@ -71,7 +87,7 @@ class RepositoryHandler extends BaseSourceHandler
 
     Install: async ( url, info, _, env ) =>
         unless info.path
-            response = await Fetch( "https://api.github.com/repos/" .. info.user .. "/" .. info.repository .. "/zipball/" .. info.branch, info.headers )
+            response = await fetch( "https://api.github.com/repos/" .. info.user .. "/" .. info.repository .. "/zipball/" .. info.branch, info.headers )
             if response.status ~= 200
                 error SourceError "Failed to download the repository."
 
@@ -98,7 +114,7 @@ class RepositoryHandler extends BaseSourceHandler
                 item = tree[ j ]
                 if item.path == fileName
                     if item.type == "tree"
-                        response = await Fetch( item.url, info.headers )
+                        response = await fetch( item.url, info.headers )
                         if response.status ~= 200
                             json = JSONToTable( response.body )
                             error SourceError json and json.message or "Failed to resolve repository path."
@@ -115,7 +131,7 @@ class RepositoryHandler extends BaseSourceHandler
                         if i ~= pathEnd
                             error SourceError "Can't download the blob file in the middle of the path."
 
-                        response = await Fetch( item.url, info.headers )
+                        response = await fetch( item.url, info.headers )
                         if response.status ~= 200
                             json = JSONToTable( response.body )
                             error SourceError json and json.message or "Failed to get repository file."
@@ -131,7 +147,7 @@ class RepositoryHandler extends BaseSourceHandler
                                 content = Base64Decode( content )
 
                         -- Optimize compilation?
-                        switch getExtension( currentPath )
+                        switch extname( currentPath )
                             when "lua"
                                 func = await CompileLuaString( content, url.href, true, false )
                                 unless func

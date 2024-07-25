@@ -640,8 +640,8 @@ do
 
 test = async ->
     result = environment.import "package_v2"
-    -- gpm.Logger\Info "package result: #{result}" 
-    error ""
+    gpm.Logger\Info "package result: #{result}"
+    -- error ""
     -- package resovle
 
     -- :resolved, :format, :package = await ESM.resolve( "b/init.lua", URL( "file:/lua/packages/exports/" ) )
@@ -651,6 +651,5 @@ test = async ->
     return
 
 -- requre( "package:a" )
-
 if SERVER
     test!\Catch( environment.Error.display )

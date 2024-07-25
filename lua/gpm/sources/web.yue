@@ -4,12 +4,28 @@ import await, async, file, util, ModuleError, SourceError from environment
 
 import AsyncImport, BaseSource, BaseSourceHandler, Module from gpm.loader
 import AsyncWrite, MountZIPData from file
-import Fetch from environment.http
 import MD5 from util
 import time from os
 
 file.Delete( "gpm/downloads" )
 file.CreateDir( "gpm/downloads" )
+
+local fetch
+do
+
+    import STATE_PENDING from environment.Promise
+    import Fetch from environment.http
+
+    requests = {}
+
+    fetch = ( url, ... ) ->
+        request = requests[ url ]
+        if request and request.state == 1
+            return request
+
+        request = Fetch( url, ... )
+        requests[ url ] = request
+        return request
 
 local getExtension
 do
@@ -49,7 +65,7 @@ do
             return extensions[ getExtension( url ) ]
 
         FetchInfo: async ( url ) =>
-            result = await Fetch( url.href )
+            result = await fetch( url.href )
             if result.status ~= 200
                 error SourceError "failed to fetch " .. url.href
 
@@ -84,7 +100,7 @@ class TextHandler extends BaseSourceHandler
         return url.href
 
     Install: async ( url, href ) =>
-        result = await Fetch( href )
+        result = await fetch( href )
         if result.status ~= 200
             error SourceError "failed to fetch " .. href
 
@@ -100,7 +116,7 @@ do
             return getExtension( url ) == "json"
 
         FetchInfo: async ( url ) =>
-            result = await Fetch( url.href )
+            result = await fetch( url.href )
             if result.status ~= 200
                 error SourceError "failed to fetch " .. url.href
 
@@ -119,7 +135,7 @@ class GMAHandler extends BaseSourceHandler
         return getExtension( url ) == "gma"
 
     FetchInfo: async ( url ) =>
-        result = await Fetch( url.href )
+        result = await fetch( url.href )
         if result.status ~= 200
             error SourceError "failed to fetch " .. url.href
 
@@ -133,7 +149,7 @@ class ZIPHandler extends BaseSourceHandler
         return getExtension( url ) == "zip"
 
     FetchInfo: async ( url ) =>
-        result = await Fetch( url.href )
+        result = await fetch( url.href )
         if result.status ~= 200
             error SourceError "failed to fetch " .. url.href
 

@@ -2,12 +2,11 @@ _G = _G
 import gpm, error from _G
 import environment from gpm
 
-import async, await, ModuleError, MountError, SourceError from environment
+import file, async, await, ModuleError, MountError, SourceError from environment
 import BaseSource, BaseSourceHandler, Module from gpm.loader
 import getExtension, equal from environment.path
-import sub from environment.string
-import MD5 from environment.util
-import time from environment.os
+import STATE_PENDING from environment.Promise
+import NormalizeGamePath from file
 
 do
 
@@ -34,7 +33,10 @@ do
 
 do
 
-    import Compile, MountGMA, MountZIP from environment.file
+    import MountGMA from file
+    import sub from environment.string
+    import MD5 from environment.util
+    import time from environment.os
 
     class GMAHandler extends BaseSourceHandler
         ShouldHandle: ( url ) =>
@@ -60,32 +62,66 @@ do
                 return result
 
             error MountError result
-            return
+            return nil
 
-    class ZIPHandler extends BaseSourceHandler
-        ShouldHandle: ( url ) =>
-            return getExtension( url.pathname ) == "zip"
+    local ZIPHandler
+    do
 
-        Install: async ( url ) =>
-            return await MountZIP( url.pathname )
+        import MountZIP from file
 
-    class LuaHandler extends BaseSourceHandler
-        ShouldHandle: ( url ) =>
-            return equal( sub( url.pathname, 1, 5 ), "/lua/" )
+        promises = {}
 
-        FetchInfo: ( url ) =>
-            yueConfig = {}
-            for key, value in url.searchParams\iterator!
-                yueConfig[ key ] = value
+        mountZip = ( filePath ) ->
+            promise = promises[ filePath ]
+            if promise and promise.state == STATE_PENDING
+                return promise
 
-            return await Compile( url.pathname, nil, true, yueConfig )
+            filePath, gamePath = NormalizeGamePath( filePath, gamePath )
+            promise = MountZIP( filePath, gamePath, true )
+            promises[ filePath ] = promise
+            return promise
 
-        Install: async ( url, func, _, env ) =>
-            if func
-                return Module.run( func, url, env )
+        class ZIPHandler extends BaseSourceHandler
+            ShouldHandle: ( url ) =>
+                return getExtension( url.pathname ) == "zip"
 
-            error ModuleError "File '" .. url.pathname .. "' cannot be compiled."
-            return
+            Install: async ( url ) =>
+                return await mountZip( url.pathname )
+
+    local LuaHandler
+    do
+
+        import Compile from file
+
+        promises = {}
+
+        compile = ( filePath, handleError, yueConfig ) ->
+            promise = promises[ filePath ]
+            if promise and promise.state == STATE_PENDING
+                return promise
+
+            filePath, gamePath = NormalizeGamePath( filePath, gamePath )
+            promise = Compile( filePath, gamePath, handleError, yueConfig, true )
+            promises[ filePath ] = promise
+            return promise
+
+        class LuaHandler extends BaseSourceHandler
+            ShouldHandle: ( url ) =>
+                return equal( sub( url.pathname, 1, 5 ), "/lua/" )
+
+            FetchInfo: ( url ) =>
+                yueConfig = {}
+                for key, value in url.searchParams\iterator!
+                    yueConfig[ key ] = value
+
+                return await compile( url.pathname, true, yueConfig )
+
+            Install: async ( url, func, _, env ) =>
+                if func
+                    return Module.run( func, url, env )
+
+                error ModuleError "File '" .. url.pathname .. "' cannot be compiled."
+                return
 
     class FileSource extends BaseSource
 

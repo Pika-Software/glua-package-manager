@@ -69,13 +69,6 @@ commands = {
     }
 }
 
--- Aliases
-commands.del = commands.uninstall
-commands.add = commands.install
-commands.upd = commands.update
-commands.rel = commands.reload
-commands.ls = commands.list
-
 list = {}
 for name in pairs( commands )
     list[] = "gpm " .. name
