@@ -31,8 +31,8 @@ import IsFile from file
 local Package
 do
 
-    import Logger, Version from util
-    import getDirectory from path
+    import getDirectory, getFileName from path
+    import Version from util
     import tobool from _G
 
     loader.Module = class Module
@@ -81,12 +81,16 @@ do
             @path = filePath
 
             unless info
-                @exists = false
+                @name = match( filePath, ".*packages/([^/]+)" ) or getFileName( filePath )
+                @version = Version( "0.1.0" )
                 return nil
 
             name = info.name
             unless isstring( name )
-                name = match( filePath, ".*packages/([^/]+)" )
+                name = match( filePath, ".*packages/([^/]+)" ) or getFileName( filePath )
+
+            if not name or name == ""
+                name = format( "%p", @ )
 
             @name = name
 
@@ -101,7 +105,6 @@ do
 
             @autorun = tobool( info.autorun )
             @logger = info.logger
-            @exists = true
 
             :description = info
             if description and isstring( description )
@@ -119,26 +122,6 @@ do
             if dependencies and istable( dependencies )
                 @dependencies = dependencies
 
-        Initialize: =>
-            unless @exists
-                error PackageError "Package does not exist"
-                return
-
-            :logger = @
-            if logger
-                if logger.disabled
-                    logger = nil
-                else
-                    logger = Logger( @name .. "@" .. @version\__tostring!, logger.color, logger.interpolation )
-            else
-                logger = Logger( @name .. "@" .. @version\__tostring! )
-
-            @logger = logger
-            @env = setmetatable( { __package: @, Logger: logger }, { __index: environment, __newindex: _G } )
-
-            logger?\Debug( "Package has been initialized." )
-            return nil
-
     environment.ispackage = ( any ) ->
         metatable = getmetatable( any )
         return metatable and metatable.__class == Package
@@ -147,7 +130,7 @@ do
 local ESM
 do
 
-    import CompileLuaString, CompileMoonString, CompileYueString, JSONToTable from util
+    import CompileLuaString, CompileMoonString, CompileYueString, JSONToTable, Logger from util
     import AsyncRead, IsDir, NormalizeGamePath from file
     import join, stripExtension from path
     import PackageError from environment
@@ -401,7 +384,7 @@ do
 
         getPackage = ( filePath, info ) ->
             pkg = Package( filePath, info )
-            if pkg.exists
+            if info
                 :name, :version = pkg
 
                 existing = packages[ name ][ version ]
@@ -409,7 +392,18 @@ do
                     return existing
 
                 packages[ name ][ version ] = pkg
-                pkg\Initialize!
+
+                :logger = pkg
+                if logger
+                    if logger.disabled
+                        logger = nil
+                    else
+                        logger = Logger( name .. "@" .. version\__tostring!, logger.color, logger.interpolation )
+                else
+                    logger = Logger( name .. "@" .. version\__tostring! )
+
+                pkg.logger = logger
+                pkg.env = setmetatable( { __package: pkg, Logger: logger }, { __index: environment, __newindex: _G } )
 
             return pkg
 
