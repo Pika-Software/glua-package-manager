@@ -86,7 +86,7 @@ do
 
             name = info.name
             unless isstring( name )
-                name = match( filePath, "packages/(.+)/package%..+$" )
+                name = match( filePath, ".*packages/([^/]+)" )
 
             @name = name
 
@@ -250,11 +250,11 @@ do
             if isstring( target )
                 return packageDependencyResolve( @, packageName, target, packageSubpath )
 
-        
+
         packageDependencyResolve = ( name, target, subpath ) =>
             if not target or #target == 0
                 error PackageError "invalid dependency target '#{target}' for '#{name}'"
-    
+
             -- TODO: implement URL target and etc.
             targetPath = target
             if not string.match( target, "^[%w._+~^-]+$" )
@@ -693,5 +693,5 @@ test = async ->
     return
 
 -- requre( "package:a" )
-if SERVER
-    test!\Catch( environment.Error.display )
+-- if SERVER
+    -- test!\Catch( environment.Error.display )

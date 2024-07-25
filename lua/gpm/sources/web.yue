@@ -16,16 +16,16 @@ do
     import STATE_PENDING from environment.Promise
     import Fetch from environment.http
 
-    requests = {}
+    promises = {}
 
     fetch = ( url, ... ) ->
-        request = requests[ url ]
-        if request and request.state == 1
-            return request
+        promise = promises[ url ]
+        if promise and promise.state == STATE_PENDING
+            return promise
 
-        request = Fetch( url, ... )
-        requests[ url ] = request
-        return request
+        promise = Fetch( url, ... )
+        promises[ url ] = promise
+        return promise
 
 local getExtension
 do
