@@ -526,6 +526,7 @@ class Include
 
 loader.Include = Include
 
+local findSource
 do
 
     import SourceError from environment
@@ -677,21 +678,48 @@ do
         ArgAssert( fileName, 1, "string" )
         return await asyncImport( fileName, Include.resolve, nil, getImportMeta! )
 
-test = async ->
-    table.Empty( loader.Modules )
-    table.Empty( gpm.Packages )
+-- packages autorun
+do
 
-    result = environment.import "package_v2"
-    gpm.Logger\Info "package result: #{result}"
-    -- error ""
-    -- package resovle
+    import SafeAwait from environment.Promise
+    import display from environment.Error
+    import resolve from ESM
+    import Empty from table
+    import Logger from gpm
 
-    -- :resolved, :format, :package = await ESM.resolve( "b/init.lua", URL( "file:/lua/packages/exports/" ) )
-    -- source = loader.FindSource(resolved.scheme)
-    -- func = await source\FetchInfo(resolved)
-    -- print await source\Install(resolved, func)
-    return
+    Empty( loader.Modules )
+    Empty( gpm.Packages )
 
--- requre( "package:a" )
--- if SERVER
-    -- test!\Catch( environment.Error.display )
+    async( ->
+        base = URL( "file:///lua/" )
+
+        _, folders = file.Find( "packages/*", file.LuaPath, true )
+        for folderName in *folders
+            ok, result = SafeAwait resolve( folderName, base )
+            unless ok
+                display( result )
+                continue
+
+            :resolved, :package = result
+            unless package and package.autorun
+                continue
+
+            source = findSource( resolved.scheme )
+            unless source
+                continue
+
+            :env = package
+
+            ok, result = SafeAwait source\FetchInfo( resolved, base, env, nil )
+            unless ok
+                display( result )
+                continue
+
+            ok, result = SafeAwait source\Install( resolved, result, base, env, nil )
+            if ok
+                Logger\Debug( "Package autorun: " .. package\__tostring! )
+            else
+                display( result )
+
+        return nil
+    )!
