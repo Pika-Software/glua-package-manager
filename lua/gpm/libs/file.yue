@@ -958,11 +958,10 @@ do
     addon = environment.addon = include( "addon.lua" )
     import Addon, IsFilePathAllowed from addon
     import AsyncWrite, MountGMA from _module_0
-    import time from environment.os
     import find from string
     import equal from path
+    import MD5ID from util
     import pairs from _G
-    import MD5 from util
 
     iterateZipFiles = _module_0.IterateZipFiles = ( fileHandle, doCRC ) ->
         unless fileHandle
@@ -1007,7 +1006,7 @@ do
 
                 gma\AddFile( filePath, content )
 
-        title = MD5( uniqueName .. time! )
+        title = MD5ID( uniqueName )
         gma\SetTitle( title )
 
         filePath = "gpm/mount/" .. title .. ".gma"

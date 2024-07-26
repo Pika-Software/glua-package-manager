@@ -2,16 +2,14 @@ _G = _G
 import gpm, getmetatable, setmetatable from _G
 import environment from gpm
 
-import debug, string, path, table, file, util, isurl, isstring, ArgAssert, URL, NotImplementedError from environment
+import debug, string, path, table, file, util, isurl, isstring, ArgAssert, URL, NotImplementedError, Promise from environment
 import getCurrentFile, getCurrentDirectory from path
-import async, await, reject from environment.Promise
+import async, await, reject from Promise
 import getfpath from debug
 
 :loader = gpm
 unless istable( loader )
-    loader = gpm.loader = {}
-
-    loader.Modules = {}
+    loader = gpm.loader = { Modules: {} }
 
 packages = gpm.Packages
 unless istable( packages )
@@ -686,8 +684,8 @@ do
 -- packages autorun
 do
 
-    import SafeAwait from environment.Promise
     import display from environment.Error
+    import SafeAwait from Promise
     import resolve from ESM
     import Empty from table
     import Logger from gpm

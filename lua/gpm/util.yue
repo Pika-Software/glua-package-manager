@@ -1172,3 +1172,12 @@ do
                 return nil
 
             return nil
+
+do
+
+    import time from environment.os
+    import SERVER from _G
+    import MD5 from util
+
+    util.MD5ID = ( str ) ->
+        return MD5( str .. time! .. ( SERVER and "s" or "c" ) )
