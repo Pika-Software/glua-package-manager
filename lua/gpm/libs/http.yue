@@ -1,7 +1,7 @@
 _G = _G
-import gpm from _G
+import gpm, SysTime from _G
 import environment, Logger from gpm
-import ArgAssert, Promise, http, isstring, isnumber, istable, WebClientError from environment
+import await, async, ArgAssert, Promise, http, isstring, isnumber, istable, WebClientError from environment
 
 unless isstring( http.UserAgent )
     http.UserAgent = "GLua Package Manager/" .. gpm.VERSION .. " - Garry's Mod/" .. VERSIONSTR
@@ -35,9 +35,50 @@ do
 local HTTP
 do
 
-    http_timeout = CreateConVar( "http_timeout", "10", FCVAR_ARCHIVE, "Default http timeout for gpm http library.", 3, 300 )
+    defaultTimeout, cacheLifetime = 10, 30 * 60
+
+    do
+
+        import CreateConVar from _G
+
+        flags = _G.bit.bor( _G.FCVAR_ARCHIVE, _G.FCVAR_REPLICATED )
+
+        defaultTimeout = CreateConVar( "http_timeout", "10", flags, "Default http timeout for gpm http library.", 3, 300 )\GetInt!
+        cacheLifetime = CreateConVar( "gpm_http_cache_lifetime", "30", flags, "Cache lifetime for gpm http library." )\GetInt! * 60
+
+    do
+
+        import AddChangeCallback from _G.cvars
+
+        AddChangeCallback( "http_timeout", ( _, __, new ) ->
+            defaultTimeout = tonumber( new )
+        "GLua Package Manager::HTTP" )
+
+        AddChangeCallback( "gpm_http_cache_lifetime", ( _, __, new ) ->
+            cacheLifetime = tonumber( new ) * 60
+        "GLua Package Manager::HTTP" )
 
     requestCache = {}
+
+    do
+
+        import pairs from _G
+
+        methods = http.Methods = { "GET", "POST", "HEAD", "PUT", "DELETE", "PATCH", "OPTIONS" }
+        length = #methods
+        methods.n = length
+
+        for index = 1, length
+            requestCache[ methods[ index ] ] = {}
+
+        timer.Create "GLua Package Manager::HTTP", 60, 0, ->
+            time = SysTime!
+
+            for index = 1, length
+                cache = requestCache[ methods[ index ] ]
+                for href, data in pairs( cache )
+                    if ( time - data[ 2 ] ) > cacheLifetime
+                        cache[ href ] = nil
 
     request = ( parameters ) =>
         if client( parameters ) or not returnsState
@@ -55,7 +96,6 @@ do
 
         queue = nil
 
-
     HTTP = ( parameters ) ->
         ArgAssert( parameters, 1, "table" )
         promise = Promise!
@@ -64,7 +104,7 @@ do
             parameters.method = "GET"
 
         unless isnumber( parameters.timeout )
-            parameters.timeout = http_timeout\GetInt!
+            parameters.timeout = defaultTimeout
 
         if userAgentKey
             unless istable( parameters.headers )
@@ -76,22 +116,23 @@ do
         if cache
             unless requestCache[ method ]
                 requestCache[ method ] = {}
-            
-            if requestCache[ method ][ url ]
-                return promise\Resolve( requestCache[ method ][ url ] )
-            
-            requestCache[ method ][ url ] = promise
+
+            data = requestCache[ method ][ url ]
+            if data
+                return promise\Resolve( data[ 1 ] )
+
+            requestCache[ method ][ url ] = { promise, SysTime! }
 
         parameters.success = ( status, body, headers ) ->
             promise\Resolve( { :status, :body, :headers } )
-            return
+            return nil
 
         parameters.failed = ( msg ) ->
             if cache
                 requestCache[ method ][ url ] = nil
 
             promise\Reject( WebClientError msg )
-            return
+            return nil
 
         if queue
             queue[] = ->
@@ -103,39 +144,10 @@ do
 
     environment.HTTP = HTTP
 
-do
-
-    tbl = setmetatable( {}, { __mode: "v" } )
-
-    http.Fetch = ( url, headers, timeout ) ->
-        tbl.url = url
-        tbl.method = "GET"
-        tbl.headers = headers
-        tbl.timeout = timeout
-        tbl.parameters = nil
-        return HTTP( tbl )
-
-    http.CachedFetch = ( url, headers, timeout ) ->
-        tbl.url = url
-        tbl.method = "GET"
-        tbl.headers = headers
-        tbl.timeout = timeout
-        tbl.parameters = nil
-        tbl.cache = true
-        return HTTP( tbl )
-
-    http.Post = ( url, parameters, headers, timeout ) ->
-        tbl.url = url
-        tbl.method = "POST"
-        tbl.headers = headers
-        tbl.timeout = timeout
-        tbl.parameters = parameters
-        return HTTP( tbl )
-
 -- https://github.com/luvit/luvit/blob/master/deps/http-codec.lua
 -- https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
 -- https://en.wikipedia.org/wiki/List_of_HTTP_status_codes
-http.StatusCodes = setmetatable(
+statusCodes = http.StatusCodes = setmetatable(
     {
         [ 100 ]: "Continue"
         [ 101 ]: "Switching Protocols"
@@ -201,3 +213,149 @@ http.StatusCodes = setmetatable(
             return "Unknown"
     }
 )
+
+do
+
+    import AsyncWrite, MountGMA, MountGMAData, MountZIPData from environment.file
+    import concat, LowerKeyNames, Flip from environment.table
+    import stripFile, stripExtension from environment.path
+    import ByteSplit from environment.string
+    import Addon from environment.addon
+    import MD5ID from environment.util
+    import error, URL from environment
+
+    tbl = setmetatable( {}, { __mode: "v" } )
+
+    http.Fetch = ( url, headers, timeout ) ->
+        tbl.url = url
+        tbl.method = "GET"
+        tbl.headers = headers
+        tbl.timeout = timeout
+        tbl.parameters = nil
+        tbl.cache = false
+        return HTTP( tbl )
+
+    http.Post = ( url, parameters, headers, timeout ) ->
+        tbl.url = url
+        tbl.method = "POST"
+        tbl.headers = headers
+        tbl.timeout = timeout
+        tbl.parameters = parameters
+        tbl.cache = false
+        return HTTP( tbl )
+
+    cachedFetch = http.CachedFetch = ( url, headers, timeout ) ->
+        tbl.url = url
+        tbl.method = "GET"
+        tbl.headers = headers
+        tbl.timeout = timeout
+        tbl.parameters = nil
+        tbl.cache = true
+        return HTTP( tbl )
+
+    http.CachedPost = ( url, parameters, headers, timeout ) ->
+        tbl.url = url
+        tbl.method = "POST"
+        tbl.headers = headers
+        tbl.timeout = timeout
+        tbl.parameters = parameters
+        tbl.cache = true
+        return HTTP( tbl )
+
+    http.FileInfo = async ( href, headers, timeout ) ->
+        folderPath, fileName = stripFile( URL( href ).pathname )
+
+        tbl.url = href
+        tbl.method = "HEAD"
+        tbl.headers = headers
+        tbl.timeout = timeout
+        tbl.parameters = nil
+        tbl.cache = false
+
+        result = await HTTP( tbl )
+
+        if result.status ~= 200
+            error WebClientError "request failed " .. href .. " ( " .. statusCodes[ result.status ] .. " [" .. result.status .. "] )"
+            return nil
+
+        headers = LowerKeyNames( result.headers )
+
+        return {
+            size: headers["content-length"],
+            type: headers["content-type"],
+            folder: folderPath,
+            file: fileName
+        }
+
+    materialExtensions = {
+        ["vtf"]: true,
+        ["vmt"]: true,
+        ["png"]: true,
+        ["jpg"]: true,
+        ["jpeg"]: true
+    }
+
+    soundExtensions = {
+        ["mp3"]: true,
+        ["wav"]: true,
+        ["ogg"]: true
+    }
+
+    otherExtensions = {
+        ["txt"]: true,
+        ["dat"]: true,
+        ["json"]: true,
+        ["xml"]: true,
+        ["csv"]: true,
+        ["dem"]: true,
+        ["vcd"]: true,
+    }
+
+    http.Download = async ( href, headers, timeout ) ->
+        result = await cachedFetch( href, headers, timeout )
+
+        if result.status ~= 200
+            error WebClientError "request failed " .. href .. " (" .. statusCodes[ result.status ] .. " [" .. result.status .. "] )"
+            return nil
+
+        url = URL( href )
+        filePath, extension = stripExtension( url.pathname )
+
+        if extension == "gma"
+            return MountGMAData( result.body, href )
+
+        if extension == "zip"
+            return MountZIPData( result.body, href )
+
+        filePath = concat( Flip( ByteSplit( url.hostname, 0x2E --[[ . ]] ) ), "/" ) .. filePath .. "."
+
+        if extension == "lua"
+            filePath = "lua/gpm/vfs/downloads/" .. filePath .. extension
+
+        elseif soundExtensions[ extension ]
+            filePath = "sound/gpm/vfs/downloads/" .. filePath .. extension
+
+        elseif materialExtensions[ extension ]
+            filePath = "materials/gpm/vfs/downloads/" .. filePath .. extension
+
+        elseif otherExtensions[ extension ]
+            filePath = "data_static/gpm/downloads/" .. filePath .. extension
+
+        else
+            filePath = "data_static/gpm/downloads/" .. filePath .. extension .. ".dat"
+
+        gma = Addon!
+
+        title = MD5ID( href )
+        gma\SetTitle( title )
+        gma\AddFile( filePath, result.body, false )
+
+        mountPath = "gpm/mount/" .. title .. ".gma"
+        await AsyncWrite( mountPath, gma\Write( "memory", true )\Read( "*a" ), "DATA", true )
+
+        ok, result = MountGMA( "/data/" .. mountPath )
+        unless ok
+            error WebClientError result
+            return nil
+
+        return filePath

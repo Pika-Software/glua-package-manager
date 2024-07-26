@@ -4,28 +4,8 @@ import await, async, file, util, ModuleError, SourceError from environment
 
 import AsyncImport, BaseSource, BaseSourceHandler, Module from gpm.loader
 import AsyncWrite, MountZIPData from file
-import MD5 from util
-import time from os
-
-file.Delete( "gpm/downloads" )
-file.CreateDir( "gpm/downloads" )
-
-local fetch
-do
-
-    import STATE_PENDING from environment.Promise
-    import Fetch from environment.http
-
-    promises = {}
-
-    fetch = ( url, ... ) ->
-        promise = promises[ url ]
-        if promise and promise.state == STATE_PENDING
-            return promise
-
-        promise = Fetch( url, ... )
-        promises[ url ] = promise
-        return promise
+import CachedFetch from environment.http
+import MD5ID from util
 
 local getExtension
 do
@@ -65,7 +45,7 @@ do
             return extensions[ getExtension( url ) ]
 
         FetchInfo: async ( url ) =>
-            result = await fetch( url.href )
+            result = await CachedFetch( url.href )
             if result.status ~= 200
                 error SourceError "failed to fetch " .. url.href
 
@@ -100,7 +80,7 @@ class TextHandler extends BaseSourceHandler
         return url.href
 
     Install: async ( url, href ) =>
-        result = await fetch( href )
+        result = await CachedFetch( href )
         if result.status ~= 200
             error SourceError "failed to fetch " .. href
 
@@ -116,7 +96,7 @@ do
             return getExtension( url ) == "json"
 
         FetchInfo: async ( url ) =>
-            result = await fetch( url.href )
+            result = await CachedFetch( url.href )
             if result.status ~= 200
                 error SourceError "failed to fetch " .. url.href
 
@@ -135,11 +115,11 @@ class GMAHandler extends BaseSourceHandler
         return getExtension( url ) == "gma"
 
     FetchInfo: async ( url ) =>
-        result = await fetch( url.href )
+        result = await CachedFetch( url.href )
         if result.status ~= 200
             error SourceError "failed to fetch " .. url.href
 
-        return AsyncWrite( "gpm/downloads/" .. MD5( url.href .. time! ) .. ".gma", result.body )
+        return AsyncWrite( "gpm/mount/" .. MD5ID( url.href ) .. ".gma", result.body )
 
     Install: async ( url, data ) =>
         return AsyncImport( "file://data/" .. data.fileName )
@@ -149,7 +129,7 @@ class ZIPHandler extends BaseSourceHandler
         return getExtension( url ) == "zip"
 
     FetchInfo: async ( url ) =>
-        result = await fetch( url.href )
+        result = await CachedFetch( url.href )
         if result.status ~= 200
             error SourceError "failed to fetch " .. url.href
 

@@ -7,10 +7,10 @@ import date from os
 
 dateScheme, limit = "%d-%m-%Y %H:%M:%S ", 128
 if CreateConVar
-    flags = bit.bor( FCVAR_ARCHIVE, FCVAR_REPLICATED )
+    import FCVAR_ARCHIVE from _G
 
-    dateScheme = CreateConVar( "gpm_logger_date", "0", flags, "Allows the logger to display date.", 0, 1 )\GetBool! and "%d-%m-%Y %H:%M:%S " or "%H:%M:%S "
-    limit = CreateConVar( "gpm_logger_limit", "128", flags, "Maximum number of messages displayed per second.", 0, 2 ^ 16 )\GetInt!
+    dateScheme = CreateConVar( "gpm_logger_date", "0", FCVAR_ARCHIVE, "Allows the logger to display date.", 0, 1 )\GetBool! and "%d-%m-%Y %H:%M:%S " or "%H:%M:%S "
+    limit = CreateConVar( "gpm_logger_limit", "128", FCVAR_ARCHIVE, "Maximum number of messages displayed per second.", 0, 2 ^ 16 )\GetInt!
 
 queue = util.Queue( limit )
 

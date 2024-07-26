@@ -972,6 +972,17 @@ do
         return ->
             return fileHandle\ReadZipFile( doCRC )
 
+    mountGMAData = _module_0.MountGMAData = async ( data, uniqueName ) ->
+        filePath = "gpm/mount/" .. MD5ID( uniqueName ) .. ".gma"
+        await AsyncWrite( filePath, data, "DATA", true )
+
+        ok, result = MountGMA( "/data/" .. filePath )
+        unless ok
+            error FileSystemError result
+            return nil
+
+        return result
+
     mountZIPData = _module_0.MountZIPData = async ( data, uniqueName ) ->
         gma = Addon!
 
@@ -1006,18 +1017,8 @@ do
 
                 gma\AddFile( filePath, content )
 
-        title = MD5ID( uniqueName )
-        gma\SetTitle( title )
-
-        filePath = "gpm/mount/" .. title .. ".gma"
-        await AsyncWrite( filePath, gma\Write( "memory", true )\Read( "*a" ), "DATA", true )
-
-        ok, result = MountGMA( "/data/" .. filePath )
-        unless ok
-            error FileSystemError result
-            return nil
-
-        return result
+        gma\SetTitle( uniqueName )
+        return mountGMAData( gma\Write( "memory", true )\Read( "*a" ), uniqueName )
 
     asyncMount = async ( filePath, gamePath ) ->
         return await mountZIPData( await( asyncRead( filePath, gamePath, true ) ), "file:///" .. filePath )

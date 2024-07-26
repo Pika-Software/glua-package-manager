@@ -5,25 +5,9 @@ import await, async, SourceError, ModuleError from environment
 import Base64Decode, JSONToTable, CompileLuaString, CompileMoonString, CompileYueString from environment.util
 import BaseSource, BaseSourceHandler, Module from gpm.loader
 import MountZIPData from environment.file
+import CachedFetch from environment.http
 import extname from environment.path
 import insert from environment.table
-
-local fetch
-do
-
-    import STATE_PENDING from environment.Promise
-    import Fetch from environment.http
-
-    promises = {}
-
-    fetch = ( url, ... ) ->
-        promise = promises[ url ]
-        if promise and promise.state == STATE_PENDING
-            return promise
-
-        promise = Fetch( url, ... )
-        promises[ url ] = promise
-        return promise
 
 class RepositoryHandler extends BaseSourceHandler
     FetchInfo: async ( url ) =>
@@ -34,13 +18,15 @@ class RepositoryHandler extends BaseSourceHandler
         user = segments[ 1 ]
         unless user
             error SourceError "Repository user not specified."
+            return nil
 
         repository = segments[ 2 ]
         unless repository
             error SourceError "Repository name not specified."
+            return nil
 
         headers = {
-            ["Authorization"]: "Bearer " .. (url.username or "") .. (url.password or "")
+            ["Authorization"]: "Bearer " .. ( url.username or "" ) .. ( url.password or "" )
         }
 
         url.username = nil
@@ -48,29 +34,34 @@ class RepositoryHandler extends BaseSourceHandler
 
         branch = segments[ 3 ]
         if not branch or branch == ""
-            response = await fetch( "https://api.github.com/repos/" .. user .. "/" .. repository, headers )
+            response = await CachedFetch( "https://api.github.com/repos/" .. user .. "/" .. repository, headers )
             if response.status ~= 200
                 json = JSONToTable( response.body )
                 error SourceError json and json.message or "Failed to fetch repository info."
+                return nil
 
             json = JSONToTable( response.body )
             unless json
                 error SourceError "Unable to parse JSON response."
+                return nil
 
             branch = json.default_branch
             unless branch
                 error SourceError "Failed to fetch repository default branch."
+                return nil
 
             segments[ 3 ] = branch
 
-        response = await fetch( "https://api.github.com/repos/" .. user .. "/" .. repository .. "/git/trees/" .. branch, headers )
+        response = await CachedFetch( "https://api.github.com/repos/" .. user .. "/" .. repository .. "/git/trees/" .. branch, headers )
         if response.status ~= 200
             json = JSONToTable( response.body )
             error SourceError json and json.message or "Failed to fetch repository info."
+            return nil
 
         info = JSONToTable( response.body )
         unless info
             error SourceError "Unable to parse JSON response."
+            return nil
 
         if #segments > 3
             path = {}
@@ -87,9 +78,10 @@ class RepositoryHandler extends BaseSourceHandler
 
     Install: async ( url, info, _, env ) =>
         unless info.path
-            response = await fetch( "https://api.github.com/repos/" .. info.user .. "/" .. info.repository .. "/zipball/" .. info.branch, info.headers )
+            response = await CachedFetch( "https://api.github.com/repos/" .. info.user .. "/" .. info.repository .. "/zipball/" .. info.branch, info.headers )
             if response.status ~= 200
                 error SourceError "Failed to download the repository."
+                return nil
 
             return MountZIPData( response, url.href )
 
@@ -114,14 +106,16 @@ class RepositoryHandler extends BaseSourceHandler
                 item = tree[ j ]
                 if item.path == fileName
                     if item.type == "tree"
-                        response = await fetch( item.url, info.headers )
+                        response = await CachedFetch( item.url, info.headers )
                         if response.status ~= 200
                             json = JSONToTable( response.body )
                             error SourceError json and json.message or "Failed to resolve repository path."
+                            return nil
 
                         json = JSONToTable( response.body )
                         unless json
                             error SourceError "Unable to parse JSON response."
+                            return nil
 
                         tree = json.tree
                         pathStart += 1
@@ -130,15 +124,18 @@ class RepositoryHandler extends BaseSourceHandler
                     elseif item.type == "blob"
                         if i ~= pathEnd
                             error SourceError "Can't download the blob file in the middle of the path."
+                            return nil
 
-                        response = await fetch( item.url, info.headers )
+                        response = await CachedFetch( item.url, info.headers )
                         if response.status ~= 200
                             json = JSONToTable( response.body )
                             error SourceError json and json.message or "Failed to get repository file."
+                            return nil
 
                         json = JSONToTable( response.body )
                         unless json
                             error SourceError "Unable to parse JSON response."
+                            return nil
 
                         :content = json
 
@@ -152,7 +149,7 @@ class RepositoryHandler extends BaseSourceHandler
                                 func = await CompileLuaString( content, url.href, true, false )
                                 unless func
                                     error ModuleError "File '" .. url.href .. "' cannot be compiled."
-                                    return
+                                    return nil
 
                                 return Module.run( func, url, env )
 
@@ -160,7 +157,7 @@ class RepositoryHandler extends BaseSourceHandler
                                 func = await CompileMoonString( content, url.href, true )
                                 unless func
                                     error ModuleError "File '" .. url.href .. "' cannot be compiled."
-                                    return
+                                    return nil
 
                                 return Module.run( func, url, env )
 
@@ -172,7 +169,7 @@ class RepositoryHandler extends BaseSourceHandler
                                 func = await CompileYueString( content, url.href, true, yueConfig )
                                 unless func
                                     error ModuleError "File '" .. url.href .. "' cannot be compiled."
-                                    return
+                                    return nil
 
                                 return Module.run( func, url, env )
 
@@ -185,9 +182,10 @@ class RepositoryHandler extends BaseSourceHandler
 
             if i == pathEnd
                 error SourceError "Couldn't find `" .. currentPath .. "` in " .. info.user .. "/" .. info.repository .. " (" .. info.branch .. ")."
+                return nil
 
         error SourceError "Invalid path: " .. currentPath
-        return
+        return nil
 
 class RepositorySource extends BaseSource
 
