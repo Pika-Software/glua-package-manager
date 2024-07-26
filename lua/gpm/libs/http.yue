@@ -37,10 +37,15 @@ do
 
     http_timeout = CreateConVar( "http_timeout", "10", FCVAR_ARCHIVE, "Default http timeout for gpm http library.", 3, 300 )
 
+    requestCache = {}
+
     request = ( parameters ) =>
         if client( parameters ) or not returnsState
             Logger\Debug( "%s HTTP request to '%s', using '%s', with timeout %d seconds.", parameters.method, parameters.url, clientName, parameters.timeout )
         else
+            if parameters.cache
+                requestCache[ parameters.method ][ parameters.url ] = nil
+
             @Reject( WebClientError "failed to make http request" )
 
     queue = {}
@@ -49,6 +54,7 @@ do
             func!
 
         queue = nil
+
 
     HTTP = ( parameters ) ->
         ArgAssert( parameters, 1, "table" )
@@ -66,11 +72,24 @@ do
 
             parameters.headers[ userAgentKey ] = http.UserAgent
 
+        :cache, :method, :url = parameters
+        if cache
+            unless requestCache[ method ]
+                requestCache[ method ] = {}
+            
+            if requestCache[ method ][ url ]
+                return promise\Resolve( requestCache[ method ][ url ] )
+            
+            requestCache[ method ][ url ] = promise
+
         parameters.success = ( status, body, headers ) ->
             promise\Resolve( { :status, :body, :headers } )
             return
 
         parameters.failed = ( msg ) ->
+            if cache
+                requestCache[ method ][ url ] = nil
+
             promise\Reject( WebClientError msg )
             return
 
@@ -94,6 +113,15 @@ do
         tbl.headers = headers
         tbl.timeout = timeout
         tbl.parameters = nil
+        return HTTP( tbl )
+
+    http.CachedFetch = ( url, headers, timeout ) ->
+        tbl.url = url
+        tbl.method = "GET"
+        tbl.headers = headers
+        tbl.timeout = timeout
+        tbl.parameters = nil
+        tbl.cache = true
         return HTTP( tbl )
 
     http.Post = ( url, parameters, headers, timeout ) ->
