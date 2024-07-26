@@ -583,6 +583,9 @@ do
     string.IsURL = ( str ) ->
         return match( str, "^%l[%l+-.]+%:[^%z\x01-\x20\x7F-\xFF\"<>^`{-}]*$" ) ~= nil
 
+string.IsASCII = ( byte0 ) ->
+    return byte0 >= 0 and byte0 <= 255
+
 -- table
 unless table.unpack
     table.unpack = _G.unpack
