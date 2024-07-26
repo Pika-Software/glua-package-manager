@@ -311,21 +311,23 @@ do
         ["vcd"]: true,
     }
 
-    http.Download = async ( href, headers, timeout ) ->
-        result = await cachedFetch( href, headers, timeout )
+    http.Download = async ( url, headers, timeout ) ->
+        if isstring( url )
+            url = URL( url )
+
+        result = await cachedFetch( url.href, headers, timeout )
 
         if result.status ~= 200
-            error WebClientError "request failed " .. href .. " (" .. statusCodes[ result.status ] .. " [" .. result.status .. "] )"
+            error WebClientError "request failed " .. url.href .. " (" .. statusCodes[ result.status ] .. " [" .. result.status .. "] )"
             return nil
 
-        url = URL( href )
         filePath, extension = stripExtension( url.pathname )
 
         if extension == "gma"
-            return MountGMAData( result.body, href )
+            return MountGMAData( result.body, url.href )
 
         if extension == "zip"
-            return MountZIPData( result.body, href )
+            return MountZIPData( result.body, url.href )
 
         filePath = concat( Flip( ByteSplit( url.hostname, 0x2E --[[ . ]] ) ), "/" ) .. filePath .. "."
 
@@ -346,7 +348,7 @@ do
 
         gma = Addon!
 
-        title = MD5ID( href )
+        title = MD5ID( url.href )
         gma\SetTitle( title )
         gma\AddFile( filePath, result.body, false )
 
