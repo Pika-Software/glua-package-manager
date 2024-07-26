@@ -122,6 +122,7 @@ do
             if dependencies and istable( dependencies )
                 @dependencies = dependencies
 
+
     environment.ispackage = ( any ) ->
         metatable = getmetatable( any )
         return metatable and metatable.__class == Package
@@ -135,6 +136,41 @@ do
     import join, stripExtension from path
     import PackageError from environment
     import Merge from table
+
+    local getPackage
+    do
+
+        metatable = { __index: getmetatable( packages ).__index }
+
+        getPackage = ( filePath, info ) ->
+            pkg = Package( filePath, info )
+            if info
+                :name, :version = pkg
+
+                existing = packages[ name ][ version ]
+                if existing
+                    return existing
+
+                packages[ name ][ version ] = pkg
+
+                -- package logger
+                :logger = pkg
+                if logger
+                    if logger.disabled
+                        logger = nil
+                    else
+                        logger = Logger( name .. "@" .. version\__tostring!, logger.color, logger.interpolation )
+                else
+                    logger = Logger( name .. "@" .. version\__tostring! )
+
+                pkg.__hooks = setmetatable( {}, metatable )
+                pkg.__prefix = pkg\__tostring! .. "::"
+                pkg.__timers = {}
+
+                -- package environment
+                pkg.env = setmetatable( { __package: pkg, Logger: logger }, { __index: environment, __newindex: _G } )
+
+            return pkg
 
     class ESM
         DEFAULT_CONDITIONS = {
@@ -381,31 +417,6 @@ do
                     return URL( "./", scopeURL )
 
                 scopeURL = URL( "../package.lua", scopeURL )
-
-        getPackage = ( filePath, info ) ->
-            pkg = Package( filePath, info )
-            if info
-                :name, :version = pkg
-
-                existing = packages[ name ][ version ]
-                if existing
-                    return existing
-
-                packages[ name ][ version ] = pkg
-
-                :logger = pkg
-                if logger
-                    if logger.disabled
-                        logger = nil
-                    else
-                        logger = Logger( name .. "@" .. version\__tostring!, logger.color, logger.interpolation )
-                else
-                    logger = Logger( name .. "@" .. version\__tostring! )
-
-                pkg.logger = logger
-                pkg.env = setmetatable( { __package: pkg, Logger: logger }, { __index: environment, __newindex: _G } )
-
-            return pkg
 
         -- READ_PACKAGE_JSON(packageURL)
         readPackageJSON = ( packageURL ) =>
@@ -716,4 +727,4 @@ do
                 display( result )
 
         return nil
-    )!
+    )!\Catch( display )

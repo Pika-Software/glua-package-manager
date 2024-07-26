@@ -8,6 +8,15 @@ import byte, sub, len from string
 
 do
 
+    import Delay, SafeAwait from environment.Promise
+
+    environment.sleep = ( time = 0 ) ->
+        ArgAssert( time, 1, "number" )
+        SafeAwait( Delay( time ) )
+        return nil
+
+do
+
     import struct from environment
 
     -- lua 5.3 string features
@@ -873,85 +882,3 @@ do
         return metatable and metatable.__class == Version
 
     util.RegisterMetaTable( "Version", Version.__base )
-
--- TODO: Think what to do with this
-do
-
-    import rawget, rawset, setfenv, isfunction from _G
-
-    class LinkedTable
-        new: ( object, read, write ) =>
-            setmetatable( @, {
-                "__index": read ~= false and object or nil
-                "__newindex": write == true and object or nil
-            } )
-
-    util.LinkedTable = LinkedTable
-
-    metatable = {
-        __index: ( tbl, key ) ->
-            links = rawget( tbl, "__indexes" )
-            for index = 1, #links
-                value = links[ index ][ key ]
-                if value ~= nil
-                    if getmetatable( value ) == nil
-                        value = LinkedTable( value, true )
-                        rawset( tbl, key, value )
-                        return value
-
-                    return value
-    }
-
-    import insert, RemoveByValue, GetValue, SetValue from table
-
-    class util.MultiIndexTable
-        new: ( link, @value = {} ) =>
-            rawset( value, "__indexes", {} )
-            setmetatable( value, metatable )
-            rawset( value, "__mit", @ )
-
-            if link
-                @Link( link )
-
-            return
-
-        GetLinks: =>
-            return rawget( @value, "__indexes" )
-
-        GetBase: =>
-            return @value
-
-        SetBase: ( tbl ) =>
-            rawset( tbl, "__indexes", rawget( @value, "__indexes" ) or {} )
-            setmetatable( tbl, metatable )
-            rawset( tbl, "__mit", @ )
-            @value = tbl
-
-        Get: ( keyPath ) =>
-            return GetValue( @value, keyPath )
-
-        Set: ( keyPath, any ) =>
-            :value = @
-            if isfunction( any )
-                setfenv( any, value )
-
-            return SetValue( value, keyPath, any )
-
-        Link: ( tbl ) =>
-            :value = @
-            insert( rawget( value, "__indexes" ), 1, tbl )
-            return value
-
-        UnLink: ( tbl ) =>
-            :value = @
-            RemoveByValue( rawget( value, "__indexes" ), tbl, true )
-            return value
-
-        ClearLinks: =>
-            :value = @
-
-            indexes = rawget( value, "__indexes" )
-            for index = 1, #indexes
-                indexes[ index ] = nil
-
-            return value

@@ -1,5 +1,5 @@
 _G = _G
-import pairs, error, rawget, getmetatable, setmetatable, istable from _G
+import pairs, error, rawget, getfenv, getmetatable, setmetatable, istable from _G
 import environment from _G.gpm
 
 string = environment.string = setmetatable( rawget( environment, "string" ) or {}, { __index: _G.string } )
@@ -20,11 +20,28 @@ util.CompileLuaFile = _G.CompileFile
 environment.throw = error
 util.CRC32 = util.CRC
 
-local _R
+do
+
+    import next from _G
+
+    table.IsEmpty = ( tbl ) ->
+        return next( tbl ) == nil
+
+    table.Count = ( tbl ) ->
+        length = 0
+
+        key = next( tbl )
+        while key
+            length += 1
+            key = next( tbl, key )
+
+        return lenght
+
+metatables = {}
 do
 
     import FindMetaTable, RegisterMetaTable, rawset from _G
-    _R = debug.getregistry and debug.getregistry! or {}
+    import Count from table
 
     static = {
         "unknown": -1
@@ -74,38 +91,40 @@ do
         "Color": 255
     }
 
-    setmetatable( _R, {
+    setmetatable( metatables, {
         __index: ( tbl, key ) ->
             value = FindMetaTable( key )
+            unless istable( value )
+                return nil
+
             rawset( tbl, key, value )
 
-            if index := static[ key ]
-                rawset( value, "MetaID", index )
+            if id := static[ key ]
+                rawset( value, "MetaID", id )
             else
-                rawset( value, "MetaID", value.MetaID or -1 )
+                rawset( value, "MetaID", value.MetaID or Count( metatables ) + 256 )
 
             rawset( value, "MetaName", key )
             return value
 
         __newindex: ( tbl, key, value ) ->
             value = FindMetaTable( key ) or value
+            unless istable( value )
+                return nil
 
             if RegisterMetaTable
                 RegisterMetaTable( key, value )
 
             rawset( tbl, key, value )
 
-            if index := static[ key ]
-                rawset( value, "MetaID", index )
+            if id := static[ key ]
+                rawset( value, "MetaID", id )
             else
-                rawset( value, "MetaID", value.MetaID or -1 )
+                rawset( value, "MetaID", value.MetaID or Count( metatables ) + 256 )
 
             rawset( value, "MetaName", key )
             return nil
     } )
-
-    debug.getregistry = ->
-        return _R
 
 do
 
@@ -160,7 +179,7 @@ do
             metatable = {}
             setmetatabled( object, metatable )
 
-        _R[ "nil" ] = metatable
+        metatables[ "nil" ] = metatable
         rawset( metatable, "MetaName", "nil" )
         rawset( metatable, "MetaID", 0 )
 
@@ -173,7 +192,7 @@ do
             metatable = {}
             setmetatabled( object, metatable )
 
-        _R[ "boolean" ] = metatable
+        metatables[ "boolean" ] = metatable
         rawset( metatable, "MetaName", "boolean" )
         rawset( metatable, "MetaID", 1 )
 
@@ -195,7 +214,7 @@ do
             metatable = {}
             setmetatabled( object, metatable )
 
-        _R[ "number" ] = metatable
+        metatables[ "number" ] = metatable
         rawset( metatable, "MetaName", "number" )
         rawset( metatable, "MetaID", 3 )
 
@@ -217,7 +236,7 @@ do
             metatable = {}
             setmetatabled( object, metatable )
 
-        _R[ "string" ] = metatable
+        metatables[ "string" ] = metatable
         rawset( metatable, "MetaName", "string" )
         rawset( metatable, "MetaID", 4 )
 
@@ -239,7 +258,7 @@ do
             metatable = {}
             setmetatabled( object, metatable )
 
-        _R[ "function" ] = metatable
+        metatables[ "function" ] = metatable
         rawset( metatable, "MetaName", "function" )
         rawset( metatable, "MetaID", 6 )
 
@@ -264,7 +283,7 @@ do
             metatable = {}
             setmetatabled( object, metatable )
 
-        _R[ "thread" ] = metatable
+        metatables[ "thread" ] = metatable
         rawset( metatable, "MetaName", "thread" )
         rawset( metatable, "MetaID", 8 )
 
@@ -281,17 +300,37 @@ environment.iscallable = ( obj ) ->
 
     return false
 
-environment.FindMetaTable = util.FindMetaTable = ( name ) ->
+util.FindMetaTable = ( name ) ->
     assert( isstring( name ), "bad argument #1 to \'util.FindMetaTable\' (string expected)" )
-    return _R[ name ]
+    return metatables[ name ]
 
-environment.RegisterMetaTable = util.RegisterMetaTable = ( name, metatable ) ->
+util.RegisterMetaTable = ( name, new, id ) ->
     assert( isstring( name ), "bad argument #1 to \'util.RegisterMetaTable\' (string expected)" )
-    assert( istable( metatable ), "bad argument #2 to \'util.RegisterMetaTable\' (metatable expected)" )
-    _R[ name ] = metatable
+    assert( istable( new ), "bad argument #2 to \'util.RegisterMetaTable\' (table expected)" )
+    assert( isnumber( id ) and id > 255 or id == nil, "bad argument #3 to \'util.RegisterMetaTable\' (number expected)" )
 
-    metatable = _R[ name ]
-    return metatable and metatable.MetaID or -1
+    old = metatables[ name ]
+    unless old
+        metatables[ name ] = new
+        id = new.MetaID = id or new.MetaID or -1
+        return id
+
+    id = id or old.MetaID
+
+    if old ~= new
+        for key in pairs( old )
+            old[ key ] = nil
+
+        for key, value in pairs( new )
+            old[ key ] = value
+
+        old.MetaName = name
+        old.MetaID = id
+
+        new.MetaName = name
+        new.MetaID = id
+
+    return id
 
 debug.fcall = ( func, ... ) ->
     return func( ... )
@@ -329,11 +368,12 @@ do
 
         return ""
 
+local ArgAssert
 do
 
     import type from environment
 
-    environment.ArgAssert = ( value, num, expected, errorlevel = 3 ) ->
+    ArgAssert = environment.ArgAssert = ( value, num, expected, errorlevel = 3 ) ->
         name = type( value )
 
         if name == expected
@@ -543,6 +583,7 @@ do
     string.IsURL = ( str ) ->
         return match( str, "^%l[%l+-.]+%:[^%z\x01-\x20\x7F-\xFF\"<>^`{-}]*$" ) ~= nil
 
+-- table
 unless table.unpack
     table.unpack = _G.unpack
 
@@ -601,13 +642,6 @@ table.GetValues = ( tbl ) ->
         result[ length ] = value
 
     return result, length
-
-do
-
-    import next from _G
-
-    table.IsEmpty = ( tbl ) ->
-        return next( tbl ) == nil
 
 table.IsSequential = ( tbl ) ->
     index = 1
@@ -760,7 +794,7 @@ do
 
 do
 
-    metatable = util.FindMetaTable( "Color" )
+    metatable = metatables.Color
     environment.TYPE_COLOR = metatable.TypeID
 
     environment.iscolor = ( any ) ->
@@ -918,15 +952,6 @@ do
 
 do
 
-    import Simple from timer
-
-    util.NextTick = ( func, a, b, c, d, e, f ) ->
-        return Simple 0, ->
-            func( a, b, c, d, e, f )
-            return
-
-do
-
     -- https://github.com/willox/gmbc
     if util.IsBinaryModuleInstalled( "gmbc" )
         pcall( require, "gmbc" )
@@ -942,3 +967,205 @@ do
             return
 
         return CompileString( code, identifier, handleError )
+
+-- Garry's Mod hooks
+do
+
+    import hook from _G
+
+    -- just in case
+    if hook
+
+        lib = environment.hook = setmetatable( rawget( environment, "hook" ) or {}, { __index: hook } )
+        import Add, Remove, GetTable from hook
+        import IsEmpty from table
+
+        lib.Add = ( eventName, identifier, func, priority ) ->
+            ArgAssert( eventName, 1, "string" )
+            ArgAssert( identifier, 2, "string" )
+            ArgAssert( func, 3, "function" )
+
+            if fenv := getfenv( 2 )
+                if pkg := fenv.__package
+                    if hooks := pkg.__hooks
+                        hooks[ eventName ][ identifier ] = func
+                        return Add( eventName, pkg.__prefix .. identifier, func, priority )
+
+            return Add( eventName, identifier, func, priority )
+
+        lib.Remove = ( eventName, identifier ) ->
+            ArgAssert( eventName, 1, "string" )
+            ArgAssert( identifier, 2, "string" )
+
+            if fenv := getfenv( 2 )
+                if pkg := fenv.__package
+                    if hooks := pkg.__hooks
+                        event = hooks[ eventName ]
+                        event[ identifier ] = nil
+
+                        if IsEmpty( event )
+                            hooks[ eventName ] = nil
+
+                        return Remove( eventName, pkg.__prefix .. identifier )
+
+            return Remove( eventName, identifier )
+
+        lib.GetTable = ->
+            if fenv := getfenv( 2 )
+                if pkg := fenv.__package
+                    if hooks := pkg.__hooks
+                        return hooks
+
+            return GetTable!
+
+-- Garry's Mod timers
+do
+
+    import timer from _G
+
+    -- just in case
+    if timer
+
+        import Adjust, Create, Exists, Pause, Remove, RepsLeft, Start, Stop, Simple, TimeLeft, Toggle, UnPause from timer
+        lib = environment.timer = setmetatable( rawget( environment, "timer" ) or {}, { __index: timer } )
+        import unpack from table
+
+        lib.Adjust = ( identifier, delay, repetitions, func ) ->
+            ArgAssert( identifier, 1, "string" )
+            ArgAssert( delay, 2, "number" )
+
+            if fenv := getfenv( 2 )
+                if pkg := fenv.__package
+                    if timers := pkg.__timers
+                        data = timers[ identifier ]
+                        unless data
+                            return nil
+
+                        delay = data.delay = delay or data.delay
+                        repetitions = data.repetitions = repetitions or data.repetitions
+                        func = data.func = func or data.func
+
+                        return Adjust( pkg.__prefix .. identifier, delay, repetitions, func)
+
+            return Adjust( identifier, delay, repetitions, func )
+
+        lib.Create = ( identifier, delay, repetitions, func ) ->
+            ArgAssert( identifier, 1, "string" )
+            ArgAssert( delay, 2, "number" )
+            ArgAssert( repetitions, 3, "number" )
+            ArgAssert( func, 4, "function" )
+
+            if fenv := getfenv( 2 )
+                if pkg := fenv.__package
+                    if timers := pkg.__timers
+                        data = timers[ identifier ]
+                        if data
+                            data.delay = delay
+                            data.repetitions = repetitions
+                            data.func = func
+                        else
+                            timers[ identifier ] = { :delay, :repetitions, :func }
+
+                        return Create( pkg.__prefix .. identifier, delay, repetitions, func )
+
+            return Create( identifier, delay, repetitions, func )
+
+        lib.Exists = ( identifier ) ->
+            ArgAssert( identifier, 1, "string" )
+
+            if fenv := getfenv( 2 )
+                if pkg := fenv.__package
+                    return Exists( pkg.__prefix .. identifier )
+
+            return Exists( identifier )
+
+        lib.Pause = ( identifier ) ->
+            ArgAssert( identifier, 1, "string" )
+
+            if fenv := getfenv( 2 )
+                if pkg := fenv.__package
+                    return Pause( pkg.__prefix .. identifier )
+
+            return Pause( identifier )
+
+        lib.Remove = ( identifier ) ->
+            ArgAssert( identifier, 1, "string" )
+
+            if fenv := getfenv( 2 )
+                if pkg := fenv.__package
+                    if timers := pkg.__timers
+                        timers[ identifier ] = nil
+                        return Remove( pkg.__prefix .. identifier )
+
+            return Remove( identifier )
+
+        lib.RepsLeft = ( identifier ) ->
+            ArgAssert( identifier, 1, "string" )
+
+            if fenv := getfenv( 2 )
+                if pkg := fenv.__package
+                    return RepsLeft( pkg.__prefix .. identifier )
+
+            return RepsLeft( identifier )
+
+        lib.Start = ( identifier ) ->
+            ArgAssert( identifier, 1, "string" )
+
+            if fenv := getfenv( 2 )
+                if pkg := fenv.__package
+                    return Start( pkg.__prefix .. identifier )
+
+            return Start( identifier )
+
+        lib.Stop = ( identifier ) ->
+            ArgAssert( identifier, 1, "string" )
+
+            if fenv := getfenv( 2 )
+                if pkg := fenv.__package
+                    return Stop( pkg.__prefix .. identifier )
+
+            return Stop( identifier )
+
+        lib.TimeLeft = ( identifier ) ->
+            ArgAssert( identifier, 1, "string" )
+
+            if fenv := getfenv( 2 )
+                if pkg := fenv.__package
+                    return TimeLeft( pkg.__prefix .. identifier )
+
+            return TimeLeft( identifier )
+
+        lib.Toggle = ( identifier ) ->
+            ArgAssert( identifier, 1, "string" )
+
+            if fenv := getfenv( 2 )
+                if pkg := fenv.__package
+                    return Toggle( pkg.__prefix .. identifier )
+
+            return Toggle( identifier )
+
+        lib.UnPause = ( identifier ) ->
+            ArgAssert( identifier, 1, "string" )
+
+            if fenv := getfenv( 2 )
+                if pkg := fenv.__package
+                    return UnPause( pkg.__prefix .. identifier )
+
+            return UnPause( identifier )
+
+        lib.GetTable = ->
+            if fenv := getfenv( 2 )
+                if pkg := fenv.__package
+                    return pkg.__timers
+
+            return {}
+
+        lib.NextTick = util.NextTick = ( func, ... ) ->
+            ArgAssert( func, 1, "function" )
+            args = { ... }
+
+            Simple 0, ->
+                func( unpack( args ) )
+                return nil
+
+            return nil

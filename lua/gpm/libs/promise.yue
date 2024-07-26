@@ -28,8 +28,7 @@ import create, resume, yield, running from coroutine
 import format, match from environment.string
 import remove from environment.table
 import captureStack from Error
-
-setTimeout = timer.Simple
+import Simple from timer
 
 iscallable = (obj) ->
     if isfunction obj
@@ -115,7 +114,7 @@ class Promise
         if @state == STATE_PENDING
             return
 
-        setTimeout 0, ->
+        Simple 0, ->
             queue = @queue
             index = 1
             while queue and queue[index]
@@ -374,7 +373,7 @@ class Promise
 
     @Delay: (time, value) ->
         p = Promise!
-        setTimeout time, -> Resolve( p, value )
+        Simple time, -> Resolve( p, value )
         return p
 
     @HTTP: (options) ->

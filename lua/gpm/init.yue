@@ -114,12 +114,20 @@ deflate = include( "libs/3rd-party/deflate.lua" )
 logger\Loaded( "LibDeflate v%s", deflate._VERSION )
 environment.deflate = deflate
 
+import RegisterMetaTable from environment.util
+
 -- gm_promise
-promise = include( "libs/promise.lua" )
-logger\Loaded( "gm_promise v%s", promise.VERSION )
-environment.async = promise.async
-environment.await = promise.await
-environment.Promise = promise
+do
+
+    promise = include( "libs/promise.lua" )
+
+    environment.async = promise.async
+    environment.await = promise.await
+    environment.Promise = promise
+
+    RegisterMetaTable( "Promise", promise.__base )
+
+    logger\Loaded( "gm_promise v%s", promise.VERSION )
 
 -- gm_url
 do
@@ -127,9 +135,12 @@ do
     url = include( "libs/url.lua" )
 
     environment.IsURLSearchParams = url.IsURLSearchParams
-    environment.URLSearchParams = url.URLSearchParams
+    URLSearchParams = environment.URLSearchParams = url.URLSearchParams
+    RegisterMetaTable( "URLSearchParams", URLSearchParams.__base )
+
     environment.isurl = url.IsURL
-    environment.URL = url.URL
+    URL = environment.URL = url.URL
+    RegisterMetaTable( "URL", URL.__base )
 
     import http from environment
 

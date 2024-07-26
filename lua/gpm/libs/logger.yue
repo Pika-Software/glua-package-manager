@@ -1,15 +1,32 @@
 _G = _G
-import MsgC, Color, tostring, getmetatable from _G
-import format, gsub, sub, len from _G.string
 import environment from _G.gpm
-import util from environment
-import date from _G.os
+import tostring, getmetatable from _G
+import format, gsub, sub, len from _G.string
+import cvars, timer, util, os, CreateConVar, MsgC, Color from environment
+import date from os
 
-dateScheme = CreateConVar( "gpm_logger_date", "0", bit.bor( FCVAR_ARCHIVE, FCVAR_REPLICATED ), "Allows the logger to display date.", 0, 1 )\GetBool! and "%d-%m-%Y %H:%M:%S " or "%H:%M:%S "
+dateScheme, limit = "%d-%m-%Y %H:%M:%S ", 128
+if CreateConVar
+    flags = bit.bor( FCVAR_ARCHIVE, FCVAR_REPLICATED )
 
-cvars.AddChangeCallback( "gpm_logger_date", ( _, __, new ) ->
-    dateScheme = ( new == "1" and "%d-%m-%Y %H:%M:%S " or "%H:%M:%S ")
-"GLua Package Manager::Logger")
+    dateScheme = CreateConVar( "gpm_logger_date", "0", flags, "Allows the logger to display date.", 0, 1 )\GetBool! and "%d-%m-%Y %H:%M:%S " or "%H:%M:%S "
+    limit = CreateConVar( "gpm_logger_limit", "128", flags, "Maximum number of messages displayed per second.", 0, 2 ^ 16 )\GetInt!
+
+queue = util.Queue( limit )
+
+if cvars
+    cvars.AddChangeCallback( "gpm_logger_date", ( _, __, new ) ->
+        dateScheme = ( new == "1" and "%d-%m-%Y %H:%M:%S " or "%H:%M:%S ")
+
+    "GLua Package Manager::Logger")
+
+    cvars.AddChangeCallback( "gpm_logger_limit", ( _, __, new ) ->
+        limit = tonumber( new )
+        if limit
+            queue.size = limit
+            timer.Adjust( "GLua Package Manager::Logger", 1 / limit, 0 )
+
+    "GLua Package Manager::Logger" )
 
 secondary_text = Color( 150, 150, 150 )
 primary_text = Color( 200, 200, 200 )
@@ -35,9 +52,7 @@ else
 
 state = "[" .. state .. "] "
 
-queue = util.Queue( 256 )
-
-timer.Create "GLua Package Manager::Logger", 1 / 100, 0, ->
+timer.Create "GLua Package Manager::Logger", 1 / limit, 0, ->
     data = queue\dequeue!
     unless data
         return
