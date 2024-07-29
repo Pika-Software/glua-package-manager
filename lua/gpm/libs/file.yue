@@ -1012,8 +1012,9 @@ do
         for fileName, content in pairs( files )
             if IsFilePathAllowed( fileName )
                 filePath = fileName
+                -- TODO: What the fuck is this? It's won't work.
                 if find( filePath, "/lua/packages/", 1, true ) ~= nil
-                    filePath = gsub( filePath, "/lua/packages/", "/lua/gpm/vfs/packages/" )
+                    filePath = gsub( filePath, "/lua/packages/", "/lua/gpm/packages/" )
 
                 gma\AddFile( filePath, content )
 

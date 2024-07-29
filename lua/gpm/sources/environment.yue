@@ -1,0 +1,30 @@
+_G = _G
+import gpm, rawget, rawset from _G
+import async, environment from gpm
+import gsub from environment.string
+import GetValue from environment.table
+import BaseSourceHandler, BaseSource from gpm.loader
+
+class EnvironmentSourceHandler extends BaseSourceHandler
+    Install: async ( url, _, __, env ) =>
+        :pathname = url
+        if pathname and pathname ~= "" and pathname ~= "/"
+            local value
+            if url.scheme == "gpm"
+                value = GetValue( environment, gsub( pathname, "/", "." ) )
+            else
+                value = GetValue( _G, gsub( pathname, "/", "." ) )
+
+            -- unless getmetatable( value )
+            --     setmetatable( value, )
+
+            return value
+
+        if url.scheme == "gpm"
+            return environment
+
+        return _G
+
+class EnvironmentSource extends BaseSource
+
+EnvironmentSource( "gpm", "garrysmod", "gmod" )\RegisterHandler( EnvironmentSourceHandler! )

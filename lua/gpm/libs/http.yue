@@ -332,13 +332,13 @@ do
         filePath = concat( Flip( ByteSplit( url.hostname, 0x2E --[[ . ]] ) ), "/" ) .. filePath .. "."
 
         if extension == "lua"
-            filePath = "lua/gpm/vfs/downloads/" .. filePath .. extension
+            filePath = "lua/gpm/downloads/" .. filePath .. extension
 
         elseif soundExtensions[ extension ]
-            filePath = "sound/gpm/vfs/downloads/" .. filePath .. extension
+            filePath = "sound/gpm/downloads/" .. filePath .. extension
 
         elseif materialExtensions[ extension ]
-            filePath = "materials/gpm/vfs/downloads/" .. filePath .. extension
+            filePath = "materials/gpm/downloads/" .. filePath .. extension
 
         elseif otherExtensions[ extension ]
             filePath = "data_static/gpm/downloads/" .. filePath .. extension

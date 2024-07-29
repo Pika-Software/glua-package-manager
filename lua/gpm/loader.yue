@@ -1,5 +1,5 @@
 _G = _G
-import gpm, getmetatable, setmetatable from _G
+import gpm, getmetatable, setmetatable, rawset from _G
 import environment from gpm
 
 import debug, string, path, table, file, util, isurl, isstring, ArgAssert, URL, NotImplementedError, Promise from environment
@@ -10,6 +10,13 @@ import getfpath from debug
 :loader = gpm
 unless istable( loader )
     loader = gpm.loader = { Modules: {} }
+
+repositories = loader.Repositories = {}
+
+-- do
+
+--     import sql from _G.sql
+
 
 packages = gpm.Packages
 unless istable( packages )
@@ -138,7 +145,22 @@ do
     local getPackage
     do
 
-        metatable = { __index: getmetatable( packages ).__index }
+        hooksMeta = {
+            __index: ( tbl, key ) ->
+                new = {}
+                rawset( tbl, key, new )
+                return new
+        }
+
+        environmentMetatable = {
+            __index: ( tbl, key ) ->
+                value = environment[ key ]
+                unless getmetatable( value )
+                    value = setmetatable( {}, { __index: value } )
+                    rawset( tbl, key, value )
+
+                return value
+        }
 
         getPackage = ( filePath, info ) ->
             pkg = Package( filePath, info )
@@ -161,12 +183,12 @@ do
                 else
                     logger = Logger( name .. "@" .. version\__tostring! )
 
-                pkg.__hooks = setmetatable( {}, metatable )
+                pkg.__hooks = setmetatable( {}, hooksMeta )
                 pkg.__prefix = pkg\__tostring! .. "::"
                 pkg.__timers = {}
 
                 -- package environment
-                pkg.env = setmetatable( { __package: pkg, Logger: logger }, { __index: environment, __newindex: _G } )
+                pkg.env = setmetatable( { __package: pkg, Logger: logger }, environmentMetatable )
 
             return pkg
 
@@ -190,6 +212,12 @@ do
                 resolved = URL( specifier )
             elseif StartsWith( specifier, "/" ) or StartsWith( specifier, "./" ) or StartsWith( specifier, "../" )
                 resolved = URL( specifier, parentURL )
+            elseif specifier == "gpm" or StartsWith( specifier, "gpm/" )
+                resolved = URL( "gpm:///" .. sub( specifier, 5 ) )
+            elseif specifier == "gmod" or StartsWith( specifier, "gmod/" )
+                resolved = URL( "gmod:///" .. sub( specifier, 6 ) )
+            elseif specifier == "garrysmod" or StartsWith( specifier, "garrysmod/" )
+                resolved = URL( "garrysmod:///" .. sub( specifier, 11 ) )
             elseif StartsWith( specifier, "#" )
                 resolved = packageImportsResolve( @, specifier, parentURL )
             else
@@ -277,8 +305,8 @@ do
             if not string.match( target, "^[%w._+~^-]+$" )
                 targetPath = util.MD5( target )
 
-            packageURL = URL( path.join("file:///lua/gpm/vfs/packages", name, targetPath, "/") )
-            if not IsDir( packageURL.pathname )
+            packageURL = URL( path.join("file:///lua/gpm/packages", name, targetPath, "/") )
+            unless IsDir( packageURL.pathname )
                 return
 
             pjson = @pjson = readPackageJSON( @, packageURL )
@@ -619,6 +647,7 @@ do
         unless info
             info = await source\FetchInfo( resolved, base, env, parent )
 
+        print specifier, await source\Install( resolved, info, base, env, parent )
         return source\Install( resolved, info, base, env, parent )
 
     local getImportMeta
@@ -677,7 +706,7 @@ do
         ArgAssert( modname, 1, "string" )
         return await asyncImport( modname, Require.resolve, nil, getImportMeta! )
 
-    environment.include = ( fileName ) ->
+    environment.include = environment.dofile = ( fileName ) ->
         ArgAssert( fileName, 1, "string" )
         return await asyncImport( fileName, Include.resolve, nil, getImportMeta! )
 

@@ -28,6 +28,24 @@ table.Flip = ( tbl ) ->
 
 do
 
+    import Open from environment.file
+    import load from environment
+
+    environment.loadfile = ( filePath, mode, env ) ->
+        ArgAssert( filePath, 1, "string" )
+
+        handler = Open( filePath, "rb" )
+        unless handler
+            error "File '" .. filePath .. "' can't be opened!", 2
+            return nil
+
+        chunk = handler\Read( handler\Size! )
+        handler\Close!
+
+        return load( chunk, filePath, mode, env )
+
+do
+
     import struct from environment
 
     -- lua 5.3 string features

@@ -1,15 +1,7 @@
 _G = _G
-import pairs, error, rawget, getfenv, getmetatable, setmetatable, istable from _G
 import environment from _G.gpm
-
-string = environment.string = setmetatable( rawget( environment, "string" ) or {}, { __index: _G.string } )
-table = environment.table = setmetatable( rawget( environment, "table" ) or {}, { __index: _G.table } )
-debug = environment.debug = setmetatable( rawget( environment, "debug" ) or {}, { __index: _G.debug } )
-math = environment.math = setmetatable( rawget( environment, "math" ) or {}, { __index: _G.math } )
-util = environment.util = setmetatable( rawget( environment, "util" ) or {}, { __index: _G.util } )
-environment.http = setmetatable( rawget( environment, "http" ) or {}, { __index: _G.http } )
-environment.os = setmetatable( rawget( environment, "os" ) or {}, { __index: _G.os } )
-
+import pairs, error, rawget, getfenv, getmetatable, setmetatable, istable from _G
+import string, table, debug, math, util from environment
 import byte, sub, gsub, format, len, find from string
 import concat, remove from table
 import max, min from math
@@ -961,15 +953,58 @@ do
 
     import CompileString, gmbc_load_bytecode from _G
 
-    util.CompileLuaString = ( code, identifier, handleError, ignoreBytecode ) ->
+    loadstring = environment.loadstring = util.CompileLuaString = ( code, identifier, handleError, ignoreBytecode ) ->
         if not ignoreBytecode and byte( code, 1 ) == 0x1b
-            if gmbc_load_bytecode
+            if isfunction( gmbc_load_bytecode )
                 return gmbc_load_bytecode( code )
 
-            error "Bytecode compilation is not supported."
-            return
+            error "Bytecode compilation is not supported.", 2
+            return nil
 
         return CompileString( code, identifier, handleError )
+
+    load = environment.load = ( chunk, chunkName, mode = "bt", env = getfenv( 2 ) ) ->
+        ArgAssert( chunkName, 2, "string" )
+
+        switch type( chunk )
+            when "string"
+                local func
+                if mode == "t"
+                    func = CompileString( chunk, chunkName, true, true )
+                elseif mode == "b"
+                    if isfunction( gmbc_load_bytecode )
+                        func = gmbc_load_bytecode( chunk )
+
+                    error "Bytecode compilation is not supported.", 2
+                    return nil
+                elseif mode == "bt" or mode == "tb"
+                    func = loadstring( chunk, chunkName, true, false )
+
+                if func
+                    if env
+                        setfenv( func, env )
+
+                    return func
+
+                error "unknown load mode", 2
+                return nil
+
+            when "function"
+                result, length = {}, 0
+
+                str = chunk!
+                while str
+                    length += 1
+                    result[ length ] = str
+                    str = chunk!
+
+                if lenght == 0
+                    return ->
+
+                return load( concat( result, "", 1, length ), chunkName, mode, env )
+
+        error "Invalid argument #1 to 'load' (string/function expected)", 2
+        return nil
 
 -- Garry's Mod hooks
 do

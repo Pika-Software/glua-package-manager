@@ -50,8 +50,10 @@ do
                 data = files[ index ]
 
                 filePath = data.path
+
+                -- TODO: What the fuck is this? It's won't work.
                 if find( filePath, "/lua/packages/", 1, true ) ~= nil
-                    data.path = gsub( filePath, "/lua/packages/", "/lua/gpm/vfs/packages/" )
+                    data.path = gsub( filePath, "/lua/packages/", "/lua/gpm/packages/" )
 
             filePath = "/data/" .. MD5ID( url.href ) .. ".gma"
             gma\Write( filePath )

@@ -37,7 +37,10 @@ do
     gpm.UserName = username
 
     splashes = {
+        "Don't worry, " .. username .. " :>"
         "I know you, " .. username .. "..."
+        "Don't bring your light near me."
+        "I'll make you a promise."
         "Flying over rooftops..."
         "We need more packages!"
         "Where's fireworks!?"
@@ -75,6 +78,8 @@ do
 
     _G = _G
 
+    import getmetatable, setmetatable, rawset from _G
+
     environment._G = _G
     environment.garrysmod = _G
 
@@ -82,7 +87,17 @@ do
     environment.SERVER = _G.SERVER == true
     environment.MENU = _G.MENU_DLL == true
 
-    setmetatable( environment, { __index: _G } )
+    -- TODO: FIX ME ( broken )
+    tableIndexSandbox = ( parent ) ->
+        return ( child, key ) ->
+            value = parent[ key ]
+            if not getmetatable( value ) and rawget( parent, key ) == value
+                value = setmetatable( {}, { __index: tableIndexSandbox( value ) } )
+                rawset( child, key, value )
+
+            return value
+
+    setmetatable( environment, { __index: tableIndexSandbox( _G ) } )
     setmetatable( gpm, { __index: environment } )
 
 include( "gpm/util.lua" )
