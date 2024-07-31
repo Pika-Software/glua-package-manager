@@ -23,22 +23,16 @@
 --]]
 _G = _G
 import environment from _G.gpm
-import Error, TypeError, RuntimeError, PromiseError, isfunction, istable, isstring, getmetatable, pcall, xpcall, error, ipairs, iserror from environment
+import Error, TypeError, RuntimeError, PromiseError, isfunction, istable, isstring, getmetatable, pcall, xpcall, error, ipairs, iserror, iscallable from environment
 import create, resume, yield, running from coroutine
 import format, match from environment.string
 import remove from environment.table
 import captureStack from Error
 import Simple from timer
 
-iscallable = (obj) ->
-    if isfunction obj
-        return true
-
-    meta = getmetatable obj
-    return meta and meta.__call and true or false
-
 getThenable = (obj) ->
-    thenFn = obj.Then or obj.next
+    -- TODO: FIX ME!!!!1 Retro pls try to fix this crap
+    thenFn = obj.Then -- or obj.next
     return iscallable(thenFn) and thenFn
 
 getAwaitable = (obj) ->
