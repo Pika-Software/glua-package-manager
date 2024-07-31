@@ -2,7 +2,7 @@ _G = _G
 import gpm, getmetatable, setmetatable, rawset from _G
 import environment from gpm
 
-import debug, string, path, table, file, util, isurl, isstring, ArgAssert, URL, NotImplementedError, Promise from environment
+import debug, string, path, table, file, util, isurl, isstring, ArgAssert, URL, NotImplementedError, ModuleError, Promise from environment
 import getCurrentFile, getCurrentDirectory from path
 import async, await, reject from Promise
 import getfpath from debug
@@ -46,7 +46,7 @@ do
 
         new: ( @location, @url, @env = _G ) =>
             unless isurl( url )
-                error InvalidModuleConfigurationError "url is " .. type( url ) .. ", expected URL"
+                error ModuleError "url is " .. type( url ) .. ", expected URL"
 
             @name = getfpath( location ) or "unknown"
 
@@ -71,8 +71,8 @@ do
             m = Module.get( url )
             unless m
                 m = Module( location, url, env )
-            return m\run!
 
+            return m\run!
 
     environment.ismodule = ( any ) ->
         metatable = getmetatable( any )
@@ -140,26 +140,19 @@ do
     import AsyncRead, IsDir, NormalizeGamePath from file
     import join, stripExtension from path
     import PackageError from environment
+    import canParse from URL
     import Merge from table
 
     local getPackage
     do
+
+        import SandboxMetatable from table
 
         hooksMeta = {
             __index: ( tbl, key ) ->
                 new = {}
                 rawset( tbl, key, new )
                 return new
-        }
-
-        environmentMetatable = {
-            __index: ( tbl, key ) ->
-                value = environment[ key ]
-                unless getmetatable( value )
-                    value = setmetatable( {}, { __index: value } )
-                    rawset( tbl, key, value )
-
-                return value
         }
 
         getPackage = ( filePath, info ) ->
@@ -188,7 +181,7 @@ do
                 pkg.__timers = {}
 
                 -- package environment
-                pkg.env = setmetatable( { __package: pkg, Logger: logger }, environmentMetatable )
+                pkg.env = setmetatable( { __package: pkg, Logger: logger }, SandboxMetatable( environment ) )
 
             return pkg
 
@@ -208,7 +201,7 @@ do
             local resolved
 
             -- resolve
-            if isurl( specifier ) or URL.canParse( specifier )
+            if isurl( specifier ) or canParse( specifier )
                 resolved = URL( specifier )
             elseif StartsWith( specifier, "/" ) or StartsWith( specifier, "./" ) or StartsWith( specifier, "../" )
                 resolved = URL( specifier, parentURL )
@@ -378,7 +371,7 @@ do
         packageTargetResolve = ( packageURL, target, patternMatch, isImports ) =>
             if isstring( target )
                 if not StartsWith( target, "./" )
-                    if isImports == false or StartsWith( target, "/" ) or StartsWith( target, "../" ) or URL.canParse( target )
+                    if isImports == false or StartsWith( target, "/" ) or StartsWith( target, "../" ) or canParse( target )
                         error PackageError "invalid target '#{target}' for '#{packageURL}'"
 
                     if isstring( patternMatch )
@@ -494,50 +487,45 @@ do
 
     loader.ESM = ESM
 
-local Require
-do
+class Require
+    PACKAGE_PATHS = { "./?.lua", "./?/init.lua" }
 
-    import ModuleError from environment
+    -- Just a shortcut so `Require.resolve ...` can be used instead of creating a new instance.
+    @resolve: ( ... ) -> Require!\resolve( ... )
 
-    class Require
-        PACKAGE_PATHS = { "./?.lua", "./?/init.lua" }
+    resolve: async ( modname, base ) =>
+        unless base
+            error ModuleError "`require` cannot be used outside of modules"
 
-        -- Just a shortcut so `Require.resolve ...` can be used instead of creating a new instance.
-        @resolve: ( ... ) -> Require!\resolve( ... )
+        if base.scheme ~= "file"
+            error NotImplementedError "cannot use `require` from `#{base}`"
 
-        resolve: async ( modname, base ) =>
-            unless base
-                error ModuleError "`require` cannot be used outside of modules"
+        isOpaque = isRequireSyntax( modname )
+        filePath = gsub( modname, "%.", "/" )
 
-            if base.scheme ~= "file"
-                error NotImplementedError "cannot use `require` from `#{base}`"
+        if resolved := isOpaque and resolveFile( @, filePath, base )
+            return { :resolved }
 
-            isOpaque = isRequireSyntax( modname )
-            filePath = gsub( modname, "%.", "/" )
+        success, resolved = try await ESM.resolve( isOpaque and filePath or modname, base )
+        if success
+            return resolved
 
-            if resolved := isOpaque and resolveFile( @, filePath, base )
-                return { :resolved }
+        if util.IsBinaryModuleInstalled( modname )
+            return { resolved: URL( "dll:" .. modname ) }
 
-            success, resolved = try await ESM.resolve( isOpaque and filePath or modname, base )
-            if success
-                return resolved
+        -- TODO: make better errors
+        error resolved -- just return error from ESM
+        return
 
-            if util.IsBinaryModuleInstalled( modname )
-                return { resolved: URL( "dll:" .. modname ) }
+    isRequireSyntax = ( modname ) -> match( modname, "^[%a%d_%-.]+$" )
 
-            -- TODO: make better errors
-            error resolved -- just return error from ESM
-            return
+    resolveFile = ( filePath, base ) =>
+        for pattern in *PACKAGE_PATHS
+            url = URL( gsub( pattern, "%?", filePath ), base )
+            if IsFile( url.pathname )
+                return url
 
-        isRequireSyntax = ( modname ) -> match( modname, "^[%a%d_%-.]+$" )
-
-        resolveFile = ( filePath, base ) =>
-            for pattern in *PACKAGE_PATHS
-                url = URL( gsub( pattern, "%?", filePath ), base )
-                if IsFile( url.pathname )
-                    return url
-
-    loader.Require = Require
+loader.Require = Require
 
 class Include
     -- Just a shortcut so `Include.resolve ...` can be used instead of creating a new instance.
@@ -647,7 +635,6 @@ do
         unless info
             info = await source\FetchInfo( resolved, base, env, parent )
 
-        print specifier, await source\Install( resolved, info, base, env, parent )
         return source\Install( resolved, info, base, env, parent )
 
     local getImportMeta

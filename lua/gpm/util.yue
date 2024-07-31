@@ -27,7 +27,7 @@ do
             length += 1
             key = next( tbl, key )
 
-        return lenght
+        return length
 
 metatables = {}
 do
@@ -94,7 +94,7 @@ do
             if id := static[ key ]
                 rawset( value, "MetaID", id )
             else
-                rawset( value, "MetaID", value.MetaID or Count( metatables ) + 256 )
+                rawset( value, "MetaID", value.MetaID or ( Count( metatables ) + 256 ) )
 
             rawset( value, "MetaName", key )
             return value
@@ -112,7 +112,7 @@ do
             if id := static[ key ]
                 rawset( value, "MetaID", id )
             else
-                rawset( value, "MetaID", value.MetaID or Count( metatables ) + 256 )
+                rawset( value, "MetaID", value.MetaID or ( Count( metatables ) + 256 ) )
 
             rawset( value, "MetaName", key )
             return nil
