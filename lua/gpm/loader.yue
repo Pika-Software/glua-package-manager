@@ -723,6 +723,8 @@ do
             unless package and package.autorun
                 continue
 
+            Logger\Debug( "Package autorun: " .. package\__tostring! )
+
             source = findSource( resolved.scheme )
             unless source
                 continue
@@ -735,9 +737,7 @@ do
                 continue
 
             ok, result = SafeAwait source\Install( resolved, result, base, env, nil )
-            if ok
-                Logger\Debug( "Package autorun: " .. package\__tostring! )
-            else
+            unless ok
                 display( result )
 
         return nil
