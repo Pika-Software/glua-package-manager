@@ -23,21 +23,20 @@
 --]]
 _G = _G
 import environment from _G.gpm
-import Error, TypeError, RuntimeError, PromiseError, isfunction, istable, isstring, getmetatable, pcall, xpcall, error, ipairs, iserror, iscallable from environment
+import Error, TypeError, RuntimeError, PromiseError, istable, isstring, getmetatable, pcall, xpcall, error, ipairs, iserror, iscallable from environment
 import create, resume, yield, running from coroutine
 import format, match from environment.string
 import remove from environment.table
 import captureStack from Error
 import Simple from timer
 
-getThenable = (obj) ->
-    -- TODO: FIX ME!!!!1 Retro pls try to fix this crap
-    thenFn = obj.Then -- or obj.next
-    return iscallable(thenFn) and thenFn
+-- getThenable = (obj) ->
+--     thenFn = obj.Then or obj.next
+--     return iscallable(thenFn) and thenFn
 
-getAwaitable = (obj) ->
-    awaitable = obj.Await or obj.await
-    return iscallable(awaitable) and awaitable
+-- getAwaitable = (obj) ->
+--     awaitable = obj.Await or obj.await
+--     return iscallable(awaitable) and awaitable
 
 once = ->
     wasCalled = false
@@ -58,7 +57,9 @@ class Promise
     STATE_FULFILLED = 2
     STATE_REJECTED = 3
 
-    IsPromise = (obj) -> istable(obj) and obj.__class == Promise
+    IsPromise = (any) ->
+        metatable = getmetatable( any )
+        return metatable and metatable.__class == Promise
 
     new: (executor) =>
         @state = STATE_PENDING
@@ -147,14 +148,14 @@ class Promise
                 value.queue[] = @
             else
                 finalizePromise( value, @ )
-        elseif istable value
-            ok, thenable = try getThenable(value)
-            unless ok then return reject( @, thenable )
+        -- elseif istable value
+        --     ok, thenable = try getThenable(value)
+        --     unless ok then return reject( @, thenable )
 
-            if thenable
-                resolveThenable( @, value, thenable )
-            else
-                fulfill( @, value )
+        --     if thenable
+        --         resolveThenable( @, value, thenable )
+        --     else
+        --         fulfill( @, value )
         else
             fulfill( @, value )
 
@@ -281,21 +282,23 @@ class Promise
                     Then( p, onResolve, onReject )
                     return wait!
 
-        thenable = istable(p) and getThenable(p)
-        if iscallable( thenable )
-            pcall( thenable, p, onResolve, onReject )
-            return wait!
+        -- thenable = istable(p) and getThenable(p)
+        -- if iscallable( thenable )
+        --     pcall( thenable, p, onResolve, onReject )
+        --     return wait!
 
         return true, p
 
     Await = (p) ->
-        awaitable = istable(p) and getAwaitable(p)
-        if awaitable and not IsPromise(p)
-            return awaitable(p)
+        -- awaitable = istable(p) and getAwaitable(p)
+        -- if awaitable and not IsPromise(p)
+        --     return awaitable(p)
 
         ok, result = SafeAwait(p)
-        if ok then return result
-        else error result
+        if ok
+            return result
+
+        return error( result )
 
     @All: (promises) ->
         p = Promise!
