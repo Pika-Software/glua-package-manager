@@ -78,12 +78,10 @@ do
 
     import getmetatable, setmetatable, rawset from _G
 
-    environment._G = _G
-    environment.garrysmod = _G
-
     environment.CLIENT = _G.CLIENT == true
     environment.SERVER = _G.SERVER == true
     environment.MENU = _G.MENU_DLL == true
+    environment._G = environment
 
     local sandboxMetatable
     sandbox = ( tbl ) ->
