@@ -177,14 +177,7 @@ do
     http.DecodeURI = url.decodeURI
 
 include( "post-util.lua" )
-
-do
-
-    file = environment.file = setmetatable( include( "libs/file.lua" ), { __index: _G.file } )
-
-    file.Delete( "/data/gpm/mount" )
-    file.CreateDir( "/data/gpm/mount", true )
-
+include( "libs/file.lua" )
 include( "libs/http.lua" )
 include( "loader.lua" )
 

@@ -1,11 +1,10 @@
 import gpm, pairs from _G
 import environment from gpm
-import await, async, file, util, ModuleError, SourceError from environment
-
-import AsyncImport, BaseSource, BaseSourceHandler, Module from gpm.loader
-import AsyncWrite, MountZIPData from file
+import await, async, util, SourceError, error from environment
+import BaseSource, BaseSourceHandler, Module from gpm.loader
+import MountZIPData from environment.file
 import CachedFetch from environment.http
-import MD5ID from util
+import File from environment.addon
 
 local getExtension
 do
@@ -67,7 +66,7 @@ do
                     CompileLuaString( content, url.href, true, false )
 
             unless func
-                error ModuleError "File '" .. url.href .. "' cannot be compiled."
+                error SourceError "File '" .. url.href .. "' cannot be compiled."
                 return
 
             return Module.run( func, url, env )
@@ -119,10 +118,15 @@ class GMAHandler extends BaseSourceHandler
         if result.status ~= 200
             error SourceError "failed to fetch " .. url.href
 
-        return AsyncWrite( "gpm/mount/" .. MD5ID( url.href ) .. ".gma", result.body )
+        return result.body
 
     Install: async ( url, data ) =>
-        return AsyncImport( "file://data/" .. data.fileName )
+        f = File( data, url.href, true )
+
+        unless f\VerifyCRC!
+            error SourceError "Invalid CRC checksum for '" .. url.href .. "'"
+
+        return await f\AsyncMount( false )
 
 class ZIPHandler extends BaseSourceHandler
     ShouldHandle: ( url ) =>

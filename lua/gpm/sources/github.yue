@@ -1,7 +1,6 @@
 import gpm from _G
 import environment from gpm
-import await, async, SourceError, ModuleError from environment
-
+import await, async, SourceError, ModuleError, error from environment
 import Base64Decode, JSONToTable, CompileLuaString, CompileMoonString, CompileYueString from environment.util
 import BaseSource, BaseSourceHandler, Module from gpm.loader
 import MountZIPData from environment.file

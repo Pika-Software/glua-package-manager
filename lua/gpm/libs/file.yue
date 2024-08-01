@@ -1,10 +1,10 @@
 _G = _G
-import file, CLIENT, SERVER, error from _G
+import file, CLIENT, SERVER from _G
 import environment, Logger from _G.gpm
 
-import async, await, debug, util, path, string, Promise, CodeCompileError, FileSystemError from environment
+import async, await, debug, util, path, string, Promise, CodeCompileError, FileSystemError, error from environment
 import ByteStream, IsBinaryModuleInstalled from util
-import sub, len, gsub, match, ByteSplit from string
+import sub, len, match, ByteSplit from string
 import concat from environment.table
 import fempty from debug
 import resolve from path
@@ -14,7 +14,7 @@ import Find from file
 if SERVER and not _G.efsw and IsBinaryModuleInstalled( "efsw" ) and pcall( require, "efsw" )
     Logger\Info( "gm_efsw is initialized, package auto-reloading are available." )
 
-_module_0 = {}
+lib = environment.file
 
 local luaPath
 if SERVER
@@ -26,24 +26,24 @@ elseif MENU_DLL
 else
     luaPath = "LUA"
 
-_module_0.LuaPath = luaPath
+lib.LuaPath = luaPath
 
-luaExtensions = _module_0.LuaExtensions = {
+luaExtensions = lib.LuaExtensions = {
     lua: true
     yue: true
     moon: true
 }
 
-writeAllowedGamePaths = _module_0.WriteAllowedGamePaths = {
+writeAllowedGamePaths = lib.WriteAllowedGamePaths = {
     "DATA": true
 }
 
 assertWriteAllowed = ( filePath, gamePath ) ->
     if writeAllowedGamePaths[ gamePath ]
-        return
+        return nil
 
-    error FileSystemError "File '" .. filePath .. "' is not allowed to be written to '" .. gamePath .. "'."
-    return
+    error FileSystemError "File '" .. filePath .. "' is not allowed to be written to '" .. gamePath .. "'.", 3
+    return nil
 
 local normalizeGamePath
 do
@@ -54,8 +54,7 @@ do
         download: "DOWNLOAD"
     }
 
-    normalizeGamePath = _module_0.NormalizeGamePath = ( absolutePath, gamePath ) ->
-        -- FIXME: '/test/' becomes 'test///', but should be 'test/'
+    normalizeGamePath = lib.NormalizeGamePath = ( absolutePath, gamePath ) ->
         absolutePath = sub( resolve( absolutePath ), 2 )
 
         if gamePath
@@ -73,13 +72,13 @@ do
 
     import Time from file
 
-    _module_0.Time = ( filePath, gamePath, skipNormalize ) ->
+    lib.Time = ( filePath, gamePath, skipNormalize ) ->
         unless skipNormalize
             filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
         return Time( filePath, gamePath )
 
-_module_0.Find = ( filePath, gamePath, skipNormalize ) ->
+lib.Find = ( filePath, gamePath, skipNormalize ) ->
     unless skipNormalize
         filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
@@ -90,7 +89,7 @@ do
     import replaceDir, replaceFile from path
     import Rename from file
 
-    _module_0.Move = ( pathFrom, pathTo, gamePathFrom, gamePathTo, skipNormalize ) ->
+    lib.Move = ( pathFrom, pathTo, gamePathFrom, gamePathTo, skipNormalize ) ->
         unless skipNormalize
             pathFrom, gamePathFrom = normalizeGamePath( pathFrom, gamePathFrom )
 
@@ -112,7 +111,7 @@ do
 
     ]]
 
-    _module_0.Rename = ( filePath, newName, gamePath, skipNormalize ) ->
+    lib.Rename = ( filePath, newName, gamePath, skipNormalize ) ->
         unless skipNormalize
             filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
@@ -148,9 +147,9 @@ do
         "THIRDPARTY": true
     }
 
-    mountedFiles = _module_0.MountedFiles = rawget( environment.file, "MountedFiles" ) or {}
+    mountedFiles = lib.MountedFiles = rawget( environment.file, "MountedFiles" ) or {}
 
-    isFileMounted = _module_0.IsFileMounted = ( filePath, gamePath, skipNormalize ) ->
+    isFileMounted = lib.IsFileMounted = ( filePath, gamePath, skipNormalize ) ->
         unless skipNormalize
             filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
@@ -162,9 +161,9 @@ do
 
         return mountedFiles[ filePath ]
 
-    mountedFolders = _module_0.MountedFolders = rawget( environment.file, "MountedFolders" ) or {}
+    mountedFolders = lib.MountedFolders = rawget( environment.file, "MountedFolders" ) or {}
 
-    isDirMounted = _module_0.IsDirMounted = ( filePath, gamePath, skipNormalize ) ->
+    isDirMounted = lib.IsDirMounted = ( filePath, gamePath, skipNormalize ) ->
         unless skipNormalize
             filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
@@ -181,7 +180,7 @@ do
         import MountGMA from environment.game
         import getDirectory from path
 
-        _module_0.MountGMA = ( relativePath ) ->
+        lib.MountGMA = ( relativePath ) ->
             success, files = MountGMA( sub( resolve( relativePath ), 2 ) )
             if success
                 fileCount = #files
@@ -203,24 +202,24 @@ do
 
             return success, files
 
-local isDir, isFile, createDir
+local isDir, isFile
 do
 
     import Delete, Exists, IsDir from file
 
-    _module_0.Exists = ( filePath, gamePath, skipNormalize ) ->
+    lib.Exists = ( filePath, gamePath, skipNormalize ) ->
         unless skipNormalize
             filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
         return Exists( filePath, gamePath ) or isFileMounted( filePath, gamePath ) or isDirMounted( filePath, gamePath )
 
-    isDir = _module_0.IsDir = ( filePath, gamePath, skipNormalize ) ->
+    isDir = lib.IsDir = ( filePath, gamePath, skipNormalize ) ->
         unless skipNormalize
             filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
         return IsDir( filePath, gamePath ) or isDirMounted( filePath, gamePath )
 
-    isFile = _module_0.IsFile = ( filePath, gamePath, skipNormalize ) ->
+    isFile = lib.IsFile = ( filePath, gamePath, skipNormalize ) ->
         unless skipNormalize
             filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
@@ -241,7 +240,7 @@ do
 
             return Delete( filePath, gamePath )
 
-        _module_0.Delete = ( filePath, gamePath, skipNormalize ) ->
+        lib.Delete = ( filePath, gamePath, skipNormalize ) ->
             unless skipNormalize
                 filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
@@ -253,8 +252,11 @@ do
 
         import CreateDir from file
 
-        createDir = _module_0.CreateDir = ( folderPath, force ) ->
-            folderPath = sub( resolve( folderPath ), 2 )
+        lib.CreateDir = ( folderPath, force, gamePath, skipNormalize ) ->
+            unless skipNormalize
+                folderPath, gamePath = normalizeGamePath( folderPath, gamePath )
+
+            assertWriteAllowed( folderPath, gamePath )
 
             if force
                 local currentPath
@@ -265,15 +267,15 @@ do
                         else
                             currentPath = folderName
 
-                        if IsDir( currentPath, "DATA" )
+                        if IsDir( currentPath, gamePath )
                             continue
 
-                        Delete( currentPath, "DATA" )
-                        CreateDir( currentPath )
+                        Delete( currentPath, gamePath )
+                        CreateDir( currentPath, gamePath )
 
                 return currentPath
 
-            CreateDir( folderPath )
+            CreateDir( folderPath, gamePath )
             return folderPath
 
     do
@@ -295,7 +297,7 @@ do
 
             return Size( filePath, gamePath )
 
-        _module_0.Size = ( filePath, gamePath, skipNormalize ) ->
+        lib.Size = ( filePath, gamePath, skipNormalize ) ->
             unless skipNormalize
                 filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
@@ -317,7 +319,7 @@ do
 
         return result, length
 
-    _module_0.GetFolderContents = ( folderPath, gamePath, skipNormalize ) ->
+    lib.GetFolderContents = ( folderPath, gamePath, skipNormalize ) ->
         unless skipNormalize
             folderPath, gamePath = normalizeGamePath( folderPath, gamePath )
 
@@ -339,7 +341,7 @@ do
 
         import Open from file
 
-        open = _module_0.Open = ( filePath, fileMode, gamePath, skipNormalize ) ->
+        open = lib.Open = ( filePath, fileMode, gamePath, skipNormalize ) ->
             unless skipNormalize
                 if filePath == "memory" and not gamePath
                     return ByteStream!
@@ -375,10 +377,24 @@ do
 
         do
 
+            import ArgAssert, load from environment
             import Size from File
 
             File.SeekToEnd = ( fileHandle ) ->
                 return Seek( fileHandle, Size( fileHandle ) )
+
+            environment.loadfile = ( filePath, mode, env ) ->
+                ArgAssert( filePath, 1, "string" )
+
+                handler = open( filePath, "rb" )
+                unless handler
+                    error "File '" .. filePath .. "' can't be opened!", 2
+                    return nil
+
+                chunk = Read( handler, Size( handler ) )
+                Close( handler )
+
+                return load( chunk, filePath, mode, env )
 
         File.SkipEmpty = ( fileHandle ) ->
             while not EndOfFile( fileHandle )
@@ -422,7 +438,7 @@ do
         File.ReadZipFile = ByteStream.ReadZipFile
         File.WriteZipFile = ByteStream.WriteZipFile
 
-    append = _module_0.Append = ( filePath, content, gamePath, skipNormalize ) ->
+    append = lib.Append = ( filePath, content, gamePath, skipNormalize ) ->
         fileHandle = open( filePath, "ab", gamePath, skipNormalize )
         if fileHandle
             Write( fileHandle, content )
@@ -431,12 +447,12 @@ do
 
         return false
 
-    read = _module_0.Read = ( filePath, gamePath, length, skipNormalize ) ->
+    read = lib.Read = ( filePath, gamePath, length, skipNormalize ) ->
         fileHandle = open( filePath, "rb", gamePath, skipNormalize )
         if fileHandle
             return Read( fileHandle, length ), Close( fileHandle )
 
-    write = _module_0.Write = ( filePath, content, gamePath, skipNormalize ) ->
+    write = lib.Write = ( filePath, content, gamePath, skipNormalize ) ->
         fileHandle = open( filePath, "wb", gamePath, skipNormalize )
         if fileHandle
             Write( fileHandle, content )
@@ -448,8 +464,9 @@ do
     do
 
         import ReadLine from File
+        import gsub from string
 
-        readLines = _module_0.Lines = ( filePath, gamePath, skipNormalize ) ->
+        readLines = lib.Lines = ( filePath, gamePath, skipNormalize ) ->
             fileHandle = open( filePath, "rb", gamePath, skipNormalize )
             if fileHandle
                 lines, length = {}, 0
@@ -513,7 +530,7 @@ do
     if moonloader
         import PreCacheFile from moonloader
 
-        isCompilable = _module_0.IsCompilable = ( filePath, doPreCache ) ->
+        isCompilable = lib.IsCompilable = ( filePath, doPreCache ) ->
             if sub( filePath, 1, 4 ) ~= "/lua"
                 return false
 
@@ -541,7 +558,7 @@ do
 
     else
 
-        isCompilable = _module_0.IsCompilable = ( filePath ) ->
+        isCompilable = lib.IsCompilable = ( filePath ) ->
             if sub( filePath, 1, 4 ) ~= "/lua"
                 return false
 
@@ -558,9 +575,9 @@ if SERVER
 
     import getCurrentFile, getFile from path
 
-    _module_0.AddCSLuaFileInternal = _G.AddCSLuaFile
+    lib.AddCSLuaFileInternal = _G.AddCSLuaFile
 
-    _module_0.AddCSLuaFile = ( filePath = "" ) ->
+    lib.AddCSLuaFile = ( filePath = "" ) ->
         if filePath == ""
             filePath = getFile( getCurrentFile! )
 
@@ -570,7 +587,7 @@ if SERVER
             error CodeCompileError "Couldn't AddCSLuaFile file '" .. filePath .. "' - Invalid path"
 
         if isCompilable( filePath, true )
-            _module_0.AddCSLuaFileInternal( sub( filePath, 6 ) )
+            lib.AddCSLuaFileInternal( sub( filePath, 6 ) )
             return
 
         error CodeCompileError "Couldn't AddCSLuaFile file '" .. filePath .. "' - File not found"
@@ -581,12 +598,12 @@ if SERVER
         for fileName in *files
             filePath = folderPath .. fileName
             if isCompilable( "/lua/" .. filePath, true )
-                _module_0.AddCSLuaFileInternal( filePath )
+                lib.AddCSLuaFileInternal( filePath )
 
         for folderName in *folders
             addCSLuaFolder( folderPath .. folderName .. "/" )
 
-    _module_0.AddCSLuaFolder = ( folderPath = "" ) ->
+    lib.AddCSLuaFolder = ( folderPath = "" ) ->
         folderPath = resolve( folderPath )
         if sub( folderPath, 1, 4 ) ~= "/lua"
             error CodeCompileError "Couldn't AddCSLuaFolder folder '" .. folderPath .. "' - Invalid path"
@@ -598,12 +615,12 @@ import efsw from _G
 if istable( efsw )
     import Watch, Unwatch from efsw
 
-    observedFiles = _module_0.ObservedFiles = rawget( environment.file, "ObservedFiles" ) or {}
+    observedFiles = lib.ObservedFiles = rawget( environment.file, "ObservedFiles" ) or {}
 
     hashIdentifier = ( filePath, gamePath ) ->
         return gamePath .. ":///" .. filePath
 
-    watch = _module_0.Watch = ( filePath, gamePath, skipNormalize ) ->
+    watch = lib.Watch = ( filePath, gamePath, skipNormalize ) ->
         unless skipNormalize
             filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
@@ -626,7 +643,7 @@ if istable( efsw )
 
         return true
 
-    unWatch = _module_0.UnWatch = ( filePath, gamePath, skipNormalize ) ->
+    unWatch = lib.UnWatch = ( filePath, gamePath, skipNormalize ) ->
         unless skipNormalize
             filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
@@ -653,8 +670,8 @@ if istable( efsw )
 
 else
 
-    _module_0.Watch = fempty
-    _module_0.Unwatch = fempty
+    lib.Watch = fempty
+    lib.Unwatch = fempty
 
 local asyncRead
 do
@@ -748,7 +765,7 @@ do
                 if functionsNeed < 1
                     break
 
-    FSASYNC = _module_0.FSASYNC = {
+    FSASYNC = lib.FSASYNC = {
         [ -8 ]: "Filename not part of the specified file system, try a different one."
         [ -7 ]: "Failure for a reason that might be temporary, you might retry, but not immediately."
         [ -6 ]: "Read parameters invalid for unbuffered IO."
@@ -768,7 +785,7 @@ do
 
         import Append from functions
 
-        _module_0.AsyncAppend = ( filePath, content, gamePath, skipNormalize ) ->
+        lib.AsyncAppend = ( filePath, content, gamePath, skipNormalize ) ->
             unless skipNormalize
                 filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
@@ -794,7 +811,7 @@ do
 
         import Read from functions
 
-        asyncRead = _module_0.AsyncRead = ( filePath, gamePath, skipNormalize ) ->
+        asyncRead = lib.AsyncRead = ( filePath, gamePath, skipNormalize ) ->
             unless skipNormalize
                 filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
@@ -817,7 +834,7 @@ do
 
         import Write from functions
 
-        _module_0.AsyncWrite = ( filePath, content, gamePath, skipNormalize ) ->
+        lib.AsyncWrite = ( filePath, content, gamePath, skipNormalize ) ->
             unless skipNormalize
                 filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
@@ -847,7 +864,7 @@ do
             pointer += 1
             return lines[ pointer ], pointer
 
-    _module_0.AsyncLines = ( filePath, gamePath, skipNormalize ) ->
+    lib.AsyncLines = ( filePath, gamePath, skipNormalize ) ->
         return func( asyncRead( filePath, gamePath, skipNormalize ) )
 
 local compileLua
@@ -877,7 +894,7 @@ do
         error CodeCompileError "File '" .. filePath .. "' cannot be compiled."
         return
 
-    compileLua = _module_0.CompileLua = ( filePath, gamePath, handleError, skipNormalize ) ->
+    compileLua = lib.CompileLua = ( filePath, gamePath, handleError, skipNormalize ) ->
         unless skipNormalize
             filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
@@ -900,7 +917,7 @@ do
         error CodeCompileError "File '" .. filePath .. "' cannot be compiled."
         return
 
-    compileMoon = _module_0.CompileMoon = ( filePath, gamePath, handleError, skipNormalize ) ->
+    compileMoon = lib.CompileMoon = ( filePath, gamePath, handleError, skipNormalize ) ->
         unless skipNormalize
             filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
@@ -923,7 +940,7 @@ do
         error CodeCompileError "File '" .. filePath .. "' cannot be compiled."
         return
 
-    compileYue = _module_0.CompileYue = ( filePath, gamePath, handleError, yueConfig, skipNormalize ) ->
+    compileYue = lib.CompileYue = ( filePath, gamePath, handleError, yueConfig, skipNormalize ) ->
         unless skipNormalize
             filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
@@ -933,7 +950,7 @@ do
 
     import stripExtension from path
 
-    _module_0.Compile = ( filePath, gamePath, handleError, yueConfig, skipNormalize ) ->
+    lib.Compile = ( filePath, gamePath, handleError, yueConfig, skipNormalize ) ->
         unless skipNormalize
             filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
@@ -963,7 +980,7 @@ do
     import equal from path
     import pairs from _G
 
-    iterateZipFiles = _module_0.IterateZipFiles = ( fileHandle, doCRC ) ->
+    iterateZipFiles = lib.IterateZipFiles = ( fileHandle, doCRC ) ->
         unless fileHandle
             return fempty
 
@@ -972,7 +989,7 @@ do
         return ->
             return fileHandle\ReadZipFile( doCRC )
 
-    _module_0.MountGMAData = async ( data, uniqueName, verifyCRC ) ->
+    lib.MountGMAData = async ( data, uniqueName, verifyCRC ) ->
         f = File( data, false )
 
         if verifyCRC and not f\VerifyCRC!
@@ -983,7 +1000,7 @@ do
 
         return f\AsyncMount( false )
 
-    mountZIPData = _module_0.MountZIPData = async ( data, uniqueName ) ->
+    mountZIPData = lib.MountZIPData = async ( data, uniqueName ) ->
         f = File!
         f\SetTitle( uniqueName )
 
@@ -1019,10 +1036,8 @@ do
     asyncMount = async ( filePath, gamePath ) ->
         return await mountZIPData( await( asyncRead( filePath, gamePath, true ) ), "file:///" .. filePath )
 
-    _module_0.MountZIP = ( filePath, gamePath, skipNormalize ) ->
+    lib.MountZIP = ( filePath, gamePath, skipNormalize ) ->
         unless skipNormalize
             filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
         return asyncMount( filePath, gamePath )
-
-return _module_0

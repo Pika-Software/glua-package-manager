@@ -1,8 +1,7 @@
 _G = _G
-import gpm, error from _G
+import gpm from _G
 import environment from gpm
-
-import file, async, await, ModuleError, MountError, SourceError from environment
+import file, async, await, ModuleError, MountError, SourceError, error from environment
 import BaseSource, BaseSourceHandler, Module from gpm.loader
 import getExtension, equal from environment.path
 import STATE_PENDING from environment.Promise

@@ -9,8 +9,18 @@ import getinfo from debug
 
 -- Aliases
 util.CompileLuaFile = _G.CompileFile
-environment.throw = error
 util.CRC32 = util.CRC
+
+do
+
+    import running from coroutine
+    import tostring from _G
+
+    environment.throw = environment.error = ( message, level ) ->
+        if running!
+            return error( message, level )
+
+        return error( tostring( message ), level )
 
 do
 

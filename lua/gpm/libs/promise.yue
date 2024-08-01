@@ -23,7 +23,8 @@
 --]]
 _G = _G
 import environment from _G.gpm
-import Error, TypeError, RuntimeError, PromiseError, istable, isstring, getmetatable, pcall, xpcall, error, ipairs, iserror, iscallable from environment
+import error, getmetatable, pcall, xpcall, ipairs, istable from _G
+import Error, TypeError, RuntimeError, PromiseError, isstring, iserror, iscallable from environment
 import create, resume, yield, running from coroutine
 import format, match from environment.string
 import remove from environment.table

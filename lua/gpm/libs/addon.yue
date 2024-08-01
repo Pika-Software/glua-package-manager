@@ -2,6 +2,9 @@ _G = _G
 import environment from _G.gpm
 import string, file, table, await, async, AddonError, ArgAssert, isstring, error, tostring, tonumber from environment
 
+file.Delete( "/data/gpm/mount" )
+file.CreateDir( "/data/gpm/mount", true )
+
 _module_0 = {}
 
 do
@@ -510,7 +513,7 @@ class File
 
         handler = Open( filePath, "wb" )
         unless handler
-            error AddonError "file cannot be opened"
+            error AddonError "file '" .. filePath .. "' cannot be opened"
 
         handler\Write( @GetBinary( doCRC ) )
         handler\Close!

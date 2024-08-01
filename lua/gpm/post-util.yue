@@ -1,7 +1,7 @@
 _G = _G
-import error, getmetatable, setmetatable, istable from _G
 import environment, Logger from _G.gpm
-import bit, math, string, table, util, ArgAssert, isfunction from environment
+import getmetatable, setmetatable, istable from _G
+import bit, math, string, table, util, ArgAssert, isfunction, error from environment
 import band, bor, lshift, rshift from bit
 import byte, sub, len from string
 import fdiv from math
@@ -104,24 +104,6 @@ table.Flip = ( tbl ) ->
         tbl[ index ], tbl[ lenght - index ] = tbl[ lenght - index ], tbl[ index ]
 
     return tbl
-
-do
-
-    import Open from environment.file
-    import load from environment
-
-    environment.loadfile = ( filePath, mode, env ) ->
-        ArgAssert( filePath, 1, "string" )
-
-        handler = Open( filePath, "rb" )
-        unless handler
-            error "File '" .. filePath .. "' can't be opened!", 2
-            return nil
-
-        chunk = handler\Read( handler\Size! )
-        handler\Close!
-
-        return load( chunk, filePath, mode, env )
 
 do
 

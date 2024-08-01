@@ -2,7 +2,7 @@ _G = _G
 import gpm, getmetatable, setmetatable, rawset from _G
 import environment from gpm
 
-import debug, string, path, table, file, util, isurl, isstring, ArgAssert, URL, NotImplementedError, ModuleError, Promise from environment
+import debug, string, path, table, file, util, isurl, isstring, ArgAssert, URL, NotImplementedError, ModuleError, Promise, error from environment
 import getCurrentFile, getCurrentDirectory from path
 import async, await, reject from Promise
 import getfpath from debug
@@ -25,18 +25,14 @@ if SERVER or MENU_DLL
         repository.Packages = Query( "SELECT * FROM `gpm.packages` WHERE RepositoryID = " .. repository.ID ) or {}
 
 if SERVER
-    ok, result = pcall ->
-        f = environment.addon.File!
-        f\SetTitle( "GLua Package Manager::Repositories" )
+    f = environment.addon.File!
+    f\SetTitle( "GLua Package Manager::Repositories" )
 
-        filePath = "/lua/gpm/vfs/repositories.lua"
-        f\SetFile( filePath, "return \"" .. util.TableToJSON( repositories, false ) .. "\"" )
-        f\Mount( false )
+    filePath = "/lua/gpm/vfs/repositories.lua"
+    f\SetFile( filePath, "return \"" .. util.TableToJSON( repositories, false ) .. "\"" )
+    f\Mount( false )
 
-        file.AddCSLuaFile( filePath )
-
-    unless ok
-        environment.Error.display( result )
+    file.AddCSLuaFile( filePath )
 
 if CLIENT
     repositories = include( "gpm/vfs/repositories.lua" )
