@@ -21,7 +21,6 @@ if SERVER
     for fileName in *Find( "gpm/sources/*.lua", "lsv" )
         AddCSLuaFile( "gpm/sources/" .. fileName )
 
-    AddCSLuaFile( "gpm/moonloader.lua" )
     AddCSLuaFile( "gpm/post-util.lua" )
     AddCSLuaFile( "gpm/loader.lua" )
     AddCSLuaFile( "gpm/init.lua" )
@@ -178,7 +177,6 @@ do
     http.EncodeURI = url.encodeURI
     http.DecodeURI = url.decodeURI
 
-include( "moonloader.lua" )
 include( "post-util.lua" )
 
 do

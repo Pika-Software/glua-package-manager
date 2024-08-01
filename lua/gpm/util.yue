@@ -958,7 +958,7 @@ do
             if isfunction( gmbc_load_bytecode )
                 return gmbc_load_bytecode( code )
 
-            error "Bytecode compilation is not supported.", 2
+            error "Bytecode compilation is not supported. Please install gmbc (https://github.com/willox/gmbc)", 2
             return nil
 
         return CompileString( code, identifier, handleError )

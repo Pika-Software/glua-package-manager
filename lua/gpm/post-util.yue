@@ -1,11 +1,90 @@
 _G = _G
-import setmetatable from _G
-import environment from _G.gpm
-import bit, math, string, table, util, ArgAssert from environment
+import error, getmetatable, setmetatable, istable from _G
+import environment, Logger from _G.gpm
+import bit, math, string, table, util, ArgAssert, isfunction from environment
 import band, bor, lshift, rshift from bit
-import error, getmetatable from _G
 import byte, sub, len from string
 import fdiv from math
+
+do
+
+    import CodeCompileError from environment
+    local installed
+
+    if util.IsBinaryModuleInstalled( "moonloader" )
+        local ok, msg = pcall( require, "moonloader" )
+        if ok and istable( moonloader )
+            Logger\Loaded( "gm_moonloader v%s", moonloader._VERSION )
+            installed = true
+        else
+            Logger\Error( "gm_moonloader startup error: %s", msg or "unknown error" )
+            installed = false
+    else
+        installed = false
+
+    if installed
+        moonloader = environment.moonloader = _G.moonloader
+
+        import CompileLuaString from util
+
+        -- MoonScript
+        do
+
+            import ToLua from moonloader
+
+            util.CompileMoonString = ( moonCode, identifier, handleError ) ->
+                ArgAssert( moonCode, 1, "string" )
+                ArgAssert( identifier, 2, "string" )
+
+                luaCode, msg = ToLua( moonCode )
+                unless luaCode
+                    error CodeCompileError msg or "MoonScript compilation failed."
+
+                func = CompileLuaString( luaCode, identifier, handleError == true, true )
+                unless isfunction( func )
+                    error CodeCompileError msg or "MoonScript compilation failed."
+
+                return func
+
+        -- Yuescript
+        import yue from moonloader
+
+        if istable( yue )
+            import ToLua from yue
+            emptyTable = {}
+
+            -- https://github.com/pigpigyyy/Yuescript/src/yuescript/yue_compiler.h#L28
+            util.CompileYueString = ( yueCode, identifier, handleError, yueConfig ) ->
+                ArgAssert( yueCode, 1, "string" )
+                ArgAssert( identifier, 2, "string" )
+
+                if yueConfig ~= nil
+                    ArgAssert( yueConfig, 4, "table" )
+                else
+                    yueConfig = emptyTable
+
+                luaCode, msg = ToLua( yueCode, yueConfig )
+                unless luaCode
+                    error CodeCompileError msg or "Yuescript compilation failed."
+
+                func = CompileLuaString( luaCode, identifier, handleError == true, true )
+                unless isfunction( func )
+                    error CodeCompileError msg or "Yuescript compilation failed."
+
+                return func
+
+        else
+            Logger\Warn( "Yuescript support is missing, yue package execution is unavailable!" )
+
+    else
+
+        util.CompileMoonString = ->
+            error CodeCompileError "Attempt to compile MoonScript failed, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader."
+
+        util.CompileYueString = ->
+            error CodeCompileError "Attempt to compile Yuescript failed, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader."
+
+        Logger\Warn( "gm_moonloader is missing, support for moon and yue scripts is unavailable!" )
 
 do
 

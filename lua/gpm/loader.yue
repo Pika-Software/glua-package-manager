@@ -181,7 +181,7 @@ do
                 pkg.__timers = {}
 
                 -- package environment
-                pkg.env = setmetatable( { __package: pkg, Logger: logger }, SandboxMetatable( environment ) )
+                pkg.env = setmetatable( { __package: pkg, Logger: logger, :_G }, SandboxMetatable( environment ) )
 
             return pkg
 

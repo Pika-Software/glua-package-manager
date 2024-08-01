@@ -1,8 +1,8 @@
 _G = _G
 import gpm from _G
 import async, environment, loader from gpm
-import GetValue, Sandbox from environment.table
 import sub, gsub from environment.string
+import GetValue from environment.table
 
 class EnvironmentSourceHandler extends loader.BaseSourceHandler
     Install: async ( url, _, __, env, package ) =>
@@ -12,9 +12,9 @@ class EnvironmentSourceHandler extends loader.BaseSourceHandler
                 source = package.env
 
             unless source
-                source = Sandbox( environment )
+                source = environment
         else
-            source = Sandbox( _G )
+            source = _G
 
         :pathname = url
         if pathname and pathname ~= "" and pathname ~= "/"
