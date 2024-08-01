@@ -311,6 +311,10 @@ do
 
                 return reverse( sub( @data, position + 1, @Skip( bytes ) ) )
 
+        ReadAll: =>
+            @SeekToBegin!
+            return @Read( @size )
+
         -- String
         ReadString: =>
             :position, :size = @

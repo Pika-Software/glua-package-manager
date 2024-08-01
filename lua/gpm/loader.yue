@@ -11,12 +11,37 @@ import getfpath from debug
 unless istable( loader )
     loader = gpm.loader = { Modules: {} }
 
-repositories = loader.Repositories = {}
+local repositories
 
--- do
+if SERVER or MENU_DLL
+    import Query from _G.sql
 
---     import sql from _G.sql
+    Query( "CREATE TABLE IF NOT EXISTS `gpm.repository` ( ID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, URL TEXT NOT NULL )" )
+    Query( "CREATE TABLE IF NOT EXISTS `gpm.packages` ( Name TEXT PRIMARY KEY NOT NULL, URL TEXT UNIQUE NOT NULL, RepositoryID INTEGER DEFAULT 0 NOT NULL, FOREIGN KEY(repositoryID) REFERENCES `gpm.repository` (ID) )" )
 
+    repositories = loader.Repositories = Query( "SELECT * FROM `gpm.repository`" ) or {}
+    for index = 1, #repositories
+        repository = repositories[ index ]
+        repository.Packages = Query( "SELECT * FROM `gpm.packages` WHERE RepositoryID = " .. repository.ID ) or {}
+
+if SERVER
+    ok, result = pcall ->
+        f = environment.addon.File!
+        f\SetTitle( "GLua Package Manager::Repositories" )
+
+        filePath = "/lua/gpm/vfs/repositories.lua"
+        f\SetFile( filePath, "return \"" .. util.TableToJSON( repositories, false ) .. "\"" )
+        f\Mount( false )
+
+        file.AddCSLuaFile( filePath )
+
+    unless ok
+        environment.Error.display( result )
+
+if CLIENT
+    repositories = include( "gpm/vfs/repositories.lua" )
+    if repositories
+        repositories = loader.Repositories = util.JSONToTable( repositories )
 
 packages = gpm.Packages
 unless istable( packages )
