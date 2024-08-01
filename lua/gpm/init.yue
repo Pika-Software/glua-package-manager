@@ -25,7 +25,6 @@ if SERVER
     AddCSLuaFile( "gpm/loader.lua" )
     AddCSLuaFile( "gpm/init.lua" )
     AddCSLuaFile( "gpm/util.lua" )
-    AddCSLuaFile( "gpm/cli.lua" )
 
 import gpm from _G
 gpm.StartTime = SysTime!
@@ -188,7 +187,9 @@ do
 
 include( "libs/http.lua" )
 include( "loader.lua" )
-include( "cli.lua" )
+
+if SERVER
+    include( "cli.lua" )
 
 -- Plugins
 for fileName in *Find( "gpm/plugins/*.lua", "LUA" )
