@@ -96,12 +96,12 @@ do
         return nil
 
 table.Flip = ( tbl ) ->
-    lenght = #tbl
-    finish = fdiv( lenght, 2 )
-    lenght += 1
+    length = #tbl
+    finish = fdiv( length, 2 )
+    length += 1
 
     for index = 1, finish, 1
-        tbl[ index ], tbl[ lenght - index ] = tbl[ lenght - index ], tbl[ index ]
+        tbl[ index ], tbl[ length - index ] = tbl[ length - index ], tbl[ index ]
 
     return tbl
 

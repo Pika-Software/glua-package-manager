@@ -409,11 +409,11 @@ string.EndsWith = ( str, endStr ) ->
 string.concat = ( ... ) ->
     args = { ... }
 
-    lenght = #args
-    if lenght == 0
+    length = #args
+    if length == 0
         return ""
 
-    return concat( args, "", 1, lenght )
+    return concat( args, "", 1, length )
 
 string.indexOf = ( str, searchable, position, withPattern ) ->
     unless searchable
@@ -726,11 +726,11 @@ table.SetValue = ( tbl, str, value ) ->
     tbl[ sub( str, pointer ) ] = value
 
 table.Slice = ( tbl, startPos, endPos, step ) ->
-	result, lenght = {}, 0
+	result, length = {}, 0
 
 	for index = startPos or 1, endPos or #tbl, step or 1
-        lenght += 1
-        result[ lenght ] = tbl[ index ]
+        length += 1
+        result[ length ] = tbl[ index ]
 
 	return result
 
@@ -1008,7 +1008,7 @@ do
                     result[ length ] = str
                     str = chunk!
 
-                if lenght == 0
+                if length == 0
                     return ->
 
                 return load( concat( result, "", 1, length ), chunkName, mode, env )

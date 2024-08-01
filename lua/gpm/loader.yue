@@ -19,10 +19,18 @@ if SERVER or MENU_DLL
     Query( "CREATE TABLE IF NOT EXISTS `gpm.repository` ( ID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, URL TEXT NOT NULL )" )
     Query( "CREATE TABLE IF NOT EXISTS `gpm.packages` ( Name TEXT PRIMARY KEY NOT NULL, URL TEXT UNIQUE NOT NULL, InstalledVersion TEXT, RepositoryID INTEGER DEFAULT 0 NOT NULL, FOREIGN KEY(repositoryID) REFERENCES `gpm.repository` (ID) )" )
 
-    repositories = loader.Repositories = Query( "SELECT * FROM `gpm.repository`" ) or {}
-    for index = 1, #repositories
+    repositories = Query( "SELECT * FROM `gpm.repository`" ) or {}
+
+    length = #repositories
+    if length == 0
+        Query( "INSERT INTO `gpm.repository` ( URL ) VALUES ( 'https://raw.githubusercontent.com/Pika-Software/.github/main/gpm/repositories.json' )" )
+        repositories = Query( "SELECT * FROM `gpm.repository`" ) or {}
+
+    for index = 1, length
         repository = repositories[ index ]
         repository.Packages = Query( "SELECT * FROM `gpm.packages` WHERE RepositoryID = " .. repository.ID ) or {}
+
+    loader.Repositories = repositories
 
 if SERVER
     f = environment.addon.File!
