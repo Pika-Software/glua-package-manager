@@ -316,10 +316,10 @@ do
 
             -- TODO: implement URL target and etc.
             targetPath = target
-            if not string.match( target, "^[%w._+~^-]+$" )
+            unless match( target, "^[%w._+~^-]+$" )
                 targetPath = util.MD5( target )
 
-            packageURL = URL( path.join("file:///lua/gpm/packages", name, targetPath, "/") )
+            packageURL = URL( join("file:///lua/gpm/vfs/packages", name, targetPath, "/") )
             unless IsDir( packageURL.pathname )
                 return
 
