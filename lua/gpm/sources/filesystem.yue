@@ -33,37 +33,20 @@ do
 
 do
 
-    import MountGMA from file
-    import sub from environment.string
-    import MD5ID from environment.util
+    import File from environment.addon
 
     class GMAHandler extends BaseSourceHandler
         ShouldHandle: ( url ) =>
             return getExtension( url.pathname ) == "gma"
 
         Install: async ( url ) =>
-            gma = Addon!
-            gma\Read( url.pathname, true, true )
+            f = File!
+            await f\AsyncRead( url.pathname, true, true )
+            -- f\SetTitle( url.href )
+            unless f\VerifyCRC!
+                error SourceError "Invalid CRC checksum for '" .. url.href .. "'"
 
-            :files = gma
-            for index = 1, #files
-                data = files[ index ]
-
-                filePath = data.path
-
-                -- TODO: What the fuck is this? It's won't work.
-                if find( filePath, "/lua/packages/", 1, true ) ~= nil
-                    data.path = gsub( filePath, "/lua/packages/", "/lua/gpm/packages/" )
-
-            filePath = "/data/" .. MD5ID( url.href ) .. ".gma"
-            gma\Write( filePath )
-
-            ok, result = MountGMA( filePath )
-            if ok
-                return result
-
-            error MountError result
-            return nil
+            return f\AsyncMount( false )
 
     local ZIPHandler
     do
