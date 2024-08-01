@@ -167,7 +167,7 @@ do
     local getPackage
     do
 
-        import SandboxMetatable from table
+        environmentMetatable = { __index: environment }
 
         hooksMeta = {
             __index: ( tbl, key ) ->
@@ -202,7 +202,7 @@ do
                 pkg.__timers = {}
 
                 -- package environment
-                pkg.env = setmetatable( { __package: pkg, Logger: logger, :_G }, SandboxMetatable( environment ) )
+                pkg.env = setmetatable( { __package: pkg, Logger: logger }, environmentMetatable )
 
             return pkg
 
