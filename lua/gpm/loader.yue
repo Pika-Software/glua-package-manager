@@ -17,7 +17,7 @@ if SERVER or MENU_DLL
     import Query from _G.sql
 
     Query( "CREATE TABLE IF NOT EXISTS `gpm.repository` ( ID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, URL TEXT NOT NULL )" )
-    Query( "CREATE TABLE IF NOT EXISTS `gpm.packages` ( Name TEXT PRIMARY KEY NOT NULL, URL TEXT UNIQUE NOT NULL, RepositoryID INTEGER DEFAULT 0 NOT NULL, FOREIGN KEY(repositoryID) REFERENCES `gpm.repository` (ID) )" )
+    Query( "CREATE TABLE IF NOT EXISTS `gpm.packages` ( Name TEXT PRIMARY KEY NOT NULL, URL TEXT UNIQUE NOT NULL, InstalledVersion TEXT, RepositoryID INTEGER DEFAULT 0 NOT NULL, FOREIGN KEY(repositoryID) REFERENCES `gpm.repository` (ID) )" )
 
     repositories = loader.Repositories = Query( "SELECT * FROM `gpm.repository`" ) or {}
     for index = 1, #repositories
