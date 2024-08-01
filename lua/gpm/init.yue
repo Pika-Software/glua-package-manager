@@ -1,5 +1,5 @@
 _G = _G
-import include, SERVER from _G
+import include, SERVER, istable from _G
 import Find from file
 
 unless istable( _G.gpm )
@@ -87,18 +87,32 @@ do
     environment.SERVER = _G.SERVER == true
     environment.MENU = _G.MENU_DLL == true
 
-    -- TODO: FIX ME ( broken )
-    tableIndexSandbox = ( parent ) ->
-        return ( child, key ) ->
-            value = parent[ key ]
-            if not getmetatable( value ) and rawget( parent, key ) == value
-                value = setmetatable( {}, { __index: tableIndexSandbox( value ) } )
-                rawset( child, key, value )
+    local sandboxMetatable
+    sandbox = ( tbl ) ->
+        return setmetatable( {}, sandboxMetatable( tbl ) )
 
-            return value
+    sandboxMetatable = ( parent ) ->
+        return {
+            __sandbox: true,
+            __index: ( child, key ) ->
+                value = parent[ key ]
 
-    setmetatable( environment, { __index: tableIndexSandbox( _G ) } )
+                if istable( value )
+                    metatable = getmetatable( value )
+                    if not metatable or metatable.__sandbox
+                        sbox = sandbox( value )
+                        rawset( child, key, sbox )
+                        return sbox
+
+                return value
+        }
+
+    setmetatable( environment, sandboxMetatable( _G ) )
     setmetatable( gpm, { __index: environment } )
+
+    import table from environment
+    table.SandboxMetatable = sandboxMetatable
+    table.Sandbox = sandbox
 
 include( "gpm/util.lua" )
 
