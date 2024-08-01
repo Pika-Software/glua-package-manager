@@ -182,8 +182,8 @@ do
 
     file = environment.file = setmetatable( include( "libs/file.lua" ), { __index: _G.file } )
 
-    file.Delete( "gpm/mount" )
-    file.CreateDir( "gpm/mount", true )
+    file.Delete( "/data/gpm/mount" )
+    file.CreateDir( "/data/gpm/mount", true )
 
 include( "libs/http.lua" )
 include( "loader.lua" )

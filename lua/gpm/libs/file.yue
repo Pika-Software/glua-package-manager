@@ -245,6 +245,8 @@ do
             unless skipNormalize
                 filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
+            assertWriteAllowed( filePath, gamePath )
+
             return delete( filePath, gamePath )
 
     do
@@ -555,7 +557,8 @@ do
 if SERVER
 
     import getCurrentFile, getFile from path
-    import AddCSLuaFile from _G
+
+    _module_0.AddCSLuaFileInternal = _G.AddCSLuaFile
 
     _module_0.AddCSLuaFile = ( filePath = "" ) ->
         if filePath == ""
@@ -567,7 +570,7 @@ if SERVER
             error CodeCompileError "Couldn't AddCSLuaFile file '" .. filePath .. "' - Invalid path"
 
         if isCompilable( filePath, true )
-            AddCSLuaFile( sub( filePath, 6 ) )
+            _module_0.AddCSLuaFileInternal( sub( filePath, 6 ) )
             return
 
         error CodeCompileError "Couldn't AddCSLuaFile file '" .. filePath .. "' - File not found"
@@ -578,7 +581,7 @@ if SERVER
         for fileName in *files
             filePath = folderPath .. fileName
             if isCompilable( "/lua/" .. filePath, true )
-                AddCSLuaFile( filePath )
+                _module_0.AddCSLuaFileInternal( filePath )
 
         for folderName in *folders
             addCSLuaFolder( folderPath .. folderName .. "/" )

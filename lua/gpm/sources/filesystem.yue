@@ -92,6 +92,7 @@ do
     local LuaHandler
     do
 
+        import sub from _G.string
         import Compile from file
 
         promises = {}

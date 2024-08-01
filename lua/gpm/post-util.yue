@@ -256,16 +256,19 @@ do
             @Flush!
             @position = 0
 
-        Seek: ( bytes ) =>
-            if bytes
-                ArgAssert( bytes, 2, "number" )
-                bytes = clamp( bytes, 0, @size )
-            else
-                bytes = 0
-
+        Seek: ( position ) =>
             @Flush!
-            @position = bytes
-            return bytes
+
+            if position
+                ArgAssert( position, 2, "number" )
+                position = clamp( position, 0, @size )
+            else
+                position = 0
+
+            @position = position
+            return position
+
+        @__base.SeekTo = @__base.Seek
 
         SeekToBegin: =>
             return @Seek( 0 )
