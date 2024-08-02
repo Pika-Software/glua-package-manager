@@ -2,7 +2,7 @@ _G = _G
 import file, CLIENT, SERVER from _G
 import environment, Logger from _G.gpm
 
-import async, await, debug, util, path, string, Promise, CodeCompileError, FileSystemError, error from environment
+import async, await, debug, util, path, string, Promise, CodeCompileError, FileSystemError, error, ArgAssert from environment
 import ByteStream, IsBinaryModuleInstalled from util
 import sub, len, match, ByteSplit from string
 import concat from environment.table
@@ -377,7 +377,7 @@ do
 
         do
 
-            import ArgAssert, load from environment
+            import load from environment
             import Size from File
 
             File.SeekToEnd = ( fileHandle ) ->
@@ -958,9 +958,13 @@ do
         import Read from lib
 
         lib.Get = ( filePath ) ->
+            ArgAssert( filePath, 1, "string" )
             return Read( filePath, nil, nil, false )
 
     lib.Set = ( filePath, content ) ->
+        ArgAssert( filePath, 1, "string" )
+        ArgAssert( content, 2, "string" )
+
         unless IsFilePathAllowed( filePath )
             error FileSystemError "File '" .. filePath .. "' cannot be written."
 
@@ -1028,6 +1032,8 @@ do
         return await mountZIPData( await( asyncRead( filePath, gamePath, true ) ), "file:///" .. filePath )
 
     lib.MountZIP = ( filePath, gamePath, skipNormalize ) ->
+        ArgAssert( filePath, 1, "string" )
+
         unless skipNormalize
             filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
