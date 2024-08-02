@@ -1,10 +1,9 @@
 _G = _G
-import file, CLIENT, SERVER from _G
 import environment, Logger from _G.gpm
-
+import file, istable, CLIENT, SERVER from _G
 import async, await, debug, util, path, string, Promise, CodeCompileError, FileSystemError, error, ArgAssert from environment
 import ByteStream, IsBinaryModuleInstalled from util
-import sub, len, match, ByteSplit from string
+import byte, sub, len, match, ByteSplit from string
 import concat from environment.table
 import fempty from debug
 import resolve from path
@@ -521,7 +520,6 @@ do
 if SERVER
 
     import getCurrentFile, getFile, stripExtension from path
-    import byte from string
 
     -- For future overrides by plugins
     lib.InternalAddCSLuaFile = _G.AddCSLuaFile
@@ -958,22 +956,64 @@ do
         import Read from lib
 
         lib.Get = ( filePath ) ->
+            if istable( filePath )
+                result = {}
+                for index = 1, #filePath
+                    fileName = filePath[ index ]
+                    ArgAssert( fileName, 1, "string" )
+                    result[ fileName ] = Read( fileName, nil, nil, false )
+
+                return result
+
             ArgAssert( filePath, 1, "string" )
-            return Read( filePath, nil, nil, false )
+
+            result = {}
+            result[ filePath ] = Read( filePath, nil, nil, false )
+            return result
 
     lib.Set = ( filePath, content ) ->
+        if istable( filePath )
+            title, length = {}, 0
+
+            f = File!
+            for fileName, fileContent in pairs( filePath )
+                ArgAssert( fileName, 1, "string" )
+                ArgAssert( fileContent, 2, "string" )
+
+                if len( fileContent ) == 0
+                    error FileSystemError "File '" .. fileName .. "' cannot be empty.", 2
+
+                subPath = fileName
+                if byte( subPath, 1 ) == 0x2f --[[/]]
+                    subPath = sub( subPath, 2 )
+
+                unless IsFilePathAllowed( subPath )
+                    error FileSystemError "File '" .. subPath .. "' cannot be written.", 2
+
+                f\SetFile( subPath, fileContent, false )
+
+                length += 1
+                title[ length ] = fileName
+
+            f\SetTitle( concat( title, ";", 1, length ) )
+            return f\Mount( false )
+
         ArgAssert( filePath, 1, "string" )
         ArgAssert( content, 2, "string" )
 
+        if len( content ) == 0
+            error FileSystemError "File '" .. filePath .. "' cannot be empty.", 2
+
+        if byte( filePath, 1 ) == 0x2f --[[/]]
+            filePath = sub( filePath, 2 )
+
         unless IsFilePathAllowed( filePath )
-            error FileSystemError "File '" .. filePath .. "' cannot be written."
+            error FileSystemError "File '" .. filePath .. "' cannot be written.", 2
 
         f = File!
         f\SetTitle( filePath )
         f\SetFile( filePath, content, false )
-        f\Mount( false )
-
-        return lib.InternalAddCSLuaFile( filePath )
+        return f\Mount( false )
 
     iterateZipFiles = lib.IterateZipFiles = ( fileHandle, doCRC ) ->
         unless fileHandle
