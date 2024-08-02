@@ -29,9 +29,9 @@ else
 lib.LuaPath = luaPath
 
 luaExtensions = lib.LuaExtensions = {
-    lua: true
-    yue: true
-    moon: true
+    ["lua"]: true
+    ["yue"]: true
+    ["moon"]: true
 }
 
 writeAllowedGamePaths = lib.WriteAllowedGamePaths = {
@@ -518,97 +518,70 @@ do
 
             return concat( lines, "", 1, length )
 
-local isCompilable
-do
-
-    import moonloader from environment
-    import getExtension from path
-
-    cacheExts = { "yue", "moon" }
-    cacheCount = #cacheExts
-
-    if moonloader
-        import PreCacheFile from moonloader
-
-        isCompilable = lib.IsCompilable = ( filePath, doPreCache ) ->
-            if sub( filePath, 1, 4 ) ~= "/lua"
-                return false
-
-            extension = getExtension( filePath )
-            if extension
-                if luaExtensions[ extension ]
-                    filePath = sub( filePath, 1, len( filePath ) - ( len( extension ) + 1 ) )
-                else
-                    return false
-
-            filePath = sub( filePath, 6 )
-
-            for index = 1, cacheCount
-                preCachePath = filePath .. "." .. cacheExts[ index ]
-                if isFile( preCachePath, luaPath, true )
-                    if doPreCache
-                        if PreCacheFile( preCachePath )
-                            Logger\Debug( "Pre-compiling '%s' into Lua completed successfully.", preCachePath )
-                        else
-                            error CodeCompileError "Pre-compiling '" .. preCachePath .. "' file in Lua failed."
-
-                    return true
-
-            return isFile( filePath .. ".lua", luaPath, true )
-
-    else
-
-        isCompilable = lib.IsCompilable = ( filePath ) ->
-            if sub( filePath, 1, 4 ) ~= "/lua"
-                return false
-
-            extension = getExtension( filePath )
-            if extension
-                if luaExtensions[ extension ]
-                    filePath = sub( filePath, 1, len( filePath ) - ( len( extension ) + 1 ) )
-                else
-                    return false
-
-            return isFile( sub( filePath, 6 ) .. ".lua", luaPath, true )
-
 if SERVER
 
-    import getCurrentFile, getFile from path
+    import getCurrentFile, getFile, stripExtension from path
+    import byte from string
 
-    lib.AddCSLuaFileInternal = _G.AddCSLuaFile
+    -- For future overrides by plugins
+    lib.InternalAddCSLuaFile = _G.AddCSLuaFile
 
-    lib.AddCSLuaFile = ( filePath = "" ) ->
-        if filePath == ""
+    addCSLuaFile = ( filePath, isFolder ) ->
+        if byte( filePath, len( filePath ) ) == 0x2f --[[/]]
+            filePath = sub( filePath, 1, len( filePath ) - 1 )
+
+        subPath = sub( filePath, 6 )
+
+        if isFolder or isDir( subPath, luaPath, true )
+            findFiles, findFolders = Find( subPath .. "/*", luaPath )
+
+            foldersCount = #findFolders
+            filesCount = #findFiles
+
+            if foldersCount == 0 and filesCount == 0
+                error CodeCompileError "Couldn't AddCSLuaFile folder '" .. filePath .. "/' - Folder is empty", 3
+
+            for index = 1, foldersCount
+                addCSLuaFile( filePath .. "/" .. findFolders[ index ], true )
+
+            files, length = {}, 0
+
+            for index = 1, filesCount
+                fileName, extension = stripExtension( findFiles[ index ] )
+
+                isValidFile = luaExtensions[ extension ]
+                if isValidFile
+                    for j = length, 1, -1
+                        if files[ j ][ 1 ] == fileName
+                            isValidFile = false
+                            break
+
+                if isValidFile
+                    length += 1
+                    files[ length ] = { fileName, extension }
+
+            for fileName in *files
+                addCSLuaFile( filePath .. "/" .. fileName[ 1 ] .. "." .. fileName[ 2 ], false )
+
+            return nil
+
+        if isFolder == nil and not isFile( subPath, luaPath, true )
+            error CodeCompileError "Couldn't AddCSLuaFile file '" .. filePath .. "' - File not found", 3
+
+        lib.InternalAddCSLuaFile( subPath )
+        return nil
+
+    lib.AddCSLuaFile = ( filePath ) ->
+        if not filePath or filePath == ""
             filePath = getFile( getCurrentFile! )
 
         filePath = resolve( filePath )
 
         if sub( filePath, 1, 4 ) ~= "/lua"
-            error CodeCompileError "Couldn't AddCSLuaFile file '" .. filePath .. "' - Invalid path"
+            error CodeCompileError "Couldn't AddCSLuaFile file '" .. filePath .. "' - Invalid path", 2
 
-        if isCompilable( filePath, true )
-            lib.AddCSLuaFileInternal( sub( filePath, 6 ) )
-            return
-
-        error CodeCompileError "Couldn't AddCSLuaFile file '" .. filePath .. "' - File not found"
-        return
-
-    addCSLuaFolder = ( folderPath ) ->
-        files, folders = Find( folderPath .. "*", luaPath )
-        for fileName in *files
-            filePath = folderPath .. fileName
-            if isCompilable( "/lua/" .. filePath, true )
-                lib.AddCSLuaFileInternal( filePath )
-
-        for folderName in *folders
-            addCSLuaFolder( folderPath .. folderName .. "/" )
-
-    lib.AddCSLuaFolder = ( folderPath = "" ) ->
-        folderPath = resolve( folderPath )
-        if sub( folderPath, 1, 4 ) ~= "/lua"
-            error CodeCompileError "Couldn't AddCSLuaFolder folder '" .. folderPath .. "' - Invalid path"
-
-        return addCSLuaFolder( sub( folderPath, 6 ) )
+        addCSLuaFile( filePath )
+        return nil
 
 import efsw from _G
 
