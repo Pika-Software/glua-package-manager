@@ -980,6 +980,17 @@ do
     import equal from path
     import pairs from _G
 
+    lib.AddCSLuaContent = ( filePath, content ) ->
+        unless IsFilePathAllowed( filePath )
+            error FileSystemError "File '" .. filePath .. "' cannot be written."
+
+        f = File!
+        f\SetTitle( filePath )
+        f\SetFile( filePath, content, false )
+        f\Mount( false )
+
+        return lib.InternalAddCSLuaFile( filePath )
+
     iterateZipFiles = lib.IterateZipFiles = ( fileHandle, doCRC ) ->
         unless fileHandle
             return fempty
