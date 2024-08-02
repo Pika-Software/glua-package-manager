@@ -37,7 +37,7 @@ if SERVER
     f\SetTitle( "GLua Package Manager::Repositories" )
 
     filePath = "/lua/gpm/vfs/repositories.lua"
-    f\SetFile( filePath, "return \"" .. util.TableToJSON( repositories, false ) .. "\"" )
+    f\SetFile( filePath, "return '" .. util.TableToJSON( repositories, false ) .. "'" )
     f\Mount( false )
 
     file.AddCSLuaFile( filePath )
