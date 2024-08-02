@@ -953,7 +953,14 @@ do
     import equal from path
     import pairs from _G
 
-    lib.AddCSLuaContent = ( filePath, content ) ->
+    do
+
+        import Read from lib
+
+        lib.Get = ( filePath ) ->
+            return Read( filePath, nil, nil, false )
+
+    lib.Set = ( filePath, content ) ->
         unless IsFilePathAllowed( filePath )
             error FileSystemError "File '" .. filePath .. "' cannot be written."
 
