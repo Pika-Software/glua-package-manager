@@ -1,6 +1,6 @@
 _G = _G
 import environment, Logger from _G.gpm
-import file, istable, CLIENT, SERVER from _G
+import file, istable, CLIENT, SERVER, MENU_DLL from _G
 import async, await, debug, util, path, string, Promise, CodeCompileError, FileSystemError, error, ArgAssert from environment
 import ByteStream, IsBinaryModuleInstalled from util
 import byte, sub, len, match, ByteSplit from string
@@ -38,7 +38,7 @@ writeAllowedGamePaths = lib.WriteAllowedGamePaths = {
 }
 
 assertWriteAllowed = ( filePath, gamePath ) ->
-    if writeAllowedGamePaths[ gamePath ]
+    if writeAllowedGamePaths[ gamePath ] or MENU_DLL
         return nil
 
     error FileSystemError "File '" .. filePath .. "' is not allowed to be written to '" .. gamePath .. "'.", 3
