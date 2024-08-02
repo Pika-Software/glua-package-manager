@@ -107,6 +107,8 @@ do
         metatable = getmetatable( any )
         return metatable and metatable.__class == Module
 
+    default = Color( 50, 100, 200 )
+
     class Package
         __tostring: =>
             return format( "Package: %p [%s@%s]", @, @name, @version )
@@ -119,6 +121,7 @@ do
                 @version = Version( "0.1.0" )
                 return nil
 
+            -- name
             name = info.name
             unless isstring( name )
                 name = match( filePath, ".*packages/([^/]+)" ) or getFileName( filePath )
@@ -128,34 +131,79 @@ do
 
             @name = name
 
+            -- version
             version = info.version
             unless isstring( version )
                 version = "0.1.0"
 
             version = @version = Version( version )
 
-            @exports = info.exports
-            @imports = info.imports
-
+            -- autorun
             @autorun = tobool( info.autorun )
-            @logger = info.logger
 
-            :description = info
-            if description and isstring( description )
-                @description = description
+            -- send
+            :send = info
+            unless istable( send )
+                send = {}
 
-            :license = info
-            if license and isstring( license )
-                @license = license
+            @send = send
 
-            :homepage = info
-            if homepage and isstring( homepage )
-                @homepage = homepage
+            -- exports
+            :exports = info
+            if isstring( exports )
+                exports = { [ "." ]: exports }
+            elseif not istable( exports )
+                exports = nil
 
+            @exports = exports
+
+            -- imports
+            :imports = info
+            if isstring( imports )
+                imports = { [ "." ]: imports }
+            elseif not istable( imports )
+                imports = nil
+
+            @imports = imports
+
+            -- dependencies
             :dependencies = info
-            if dependencies and istable( dependencies )
-                @dependencies = dependencies
+            unless istable( dependencies )
+                dependencies = nil
 
+            @dependencies = dependencies
+
+            -- logger
+            :logger = info
+            unless istable( logger )
+                logger = {
+                    interpolation: true
+                    disabled: false
+                    color: default
+                }
+
+            @logger = logger
+
+            -- description
+            :description = info
+            unless isstring( description )
+                description = "Description not provided"
+
+            @description = description
+
+            -- license
+            :license = info
+            unless isstring( license )
+                license = "License not provided"
+
+            @license = license
+
+            -- homepage
+            :homepage = info
+            unless isstring( homepage )
+                homepage = "Homepage not provided"
+
+            @homepage = homepage
 
     environment.ispackage = ( any ) ->
         metatable = getmetatable( any )
@@ -399,7 +447,7 @@ do
         -- PACKAGE_TARGET_RESOLVE(packageURL, target, patternMatch, isImports, conditions)
         packageTargetResolve = ( packageURL, target, patternMatch, isImports ) =>
             if isstring( target )
-                if not StartsWith( target, "./" )
+                unless StartsWith( target, "./" )
                     if isImports == false or StartsWith( target, "/" ) or StartsWith( target, "../" ) or canParse( target )
                         error PackageError "invalid target '#{target}' for '#{packageURL}'"
 
