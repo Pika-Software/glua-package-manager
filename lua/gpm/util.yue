@@ -810,12 +810,15 @@ do
     metatable = metatables.Color
     environment.TYPE_COLOR = metatable.TypeID
 
-    local Color
-    Color = environment.Color = setmetatable(
+    environment.Color = setmetatable(
         {
             FromHex: ( hex ) ->
                 if isnumber( hex )
-                    return Color( rshift( band( hex, 0xFF0000 ), 16 ), rshift( band( hex, 0xFF00 ), 8 ), band( hex, 0xFF ) )
+                    return setmetatable( {
+                        r: rshift( band( hex, 0xFF0000 ), 16 ),
+                        g: rshift( band( hex, 0xFF00 ), 8 ),
+                        b: band( hex, 0xFF )
+                    }, metatable )
 
                 if byte( hex, 1 ) == 0x23 --[[ # ]]
                     hex = sub( hex, 2 )
@@ -836,42 +839,75 @@ do
                     else
                         error "invalid hex color: " .. hex
 
-                return Color( r, g, b, 255 )
+                return setmetatable( { :r, :g, :b, a: 255 }, metatable )
 
             FromBinary: ( binary ) ->
-                return switch len( binary )
+                local color
+                switch len( binary )
                     when 1
-                        Color byte( binary, 1 ), 0, 0, 255
+                        color = {
+                            r: byte( binary, 1 ),
+                            g: 0,
+                            b: 0,
+                            a: 255
+                        }
 
                     when 2
-                        Color byte( binary, 1 ), byte( binary, 2 ), 0, 255
+                        color = {
+                            r: byte( binary, 1 ),
+                            g: byte( binary, 2 ),
+                            b: 0,
+                            a: 255
+                        }
 
                     when 3
-                        Color byte( binary, 1 ), byte( binary, 2 ), byte( binary, 3 ), 255
+                        color = {
+                            r: byte( binary, 1 ),
+                            g: byte( binary, 2 ),
+                            b: byte( binary, 3 ),
+                            a: 255
+                        }
 
                     else
-                        Color byte( binary, 1 ), byte( binary, 2 ), byte( binary, 3 ), byte( binary, 4 )
+                        color = {
+                            r: byte( binary, 1 ),
+                            g: byte( binary, 2 ),
+                            b: byte( binary, 3 ),
+                            a: byte( binary, 4 )
+                        }
+
+                return setmetatable( color, metatable )
 
             FromVector: ( vector ) ->
-                return Color( vector[ 1 ] * 255, vector[ 2 ] * 255, vector[ 3 ] * 255, 255 )
+                return setmetatable( {
+                    r: vector[ 1 ] * 255,
+                    g: vector[ 2 ] * 255,
+                    b: vector[ 3 ] * 255,
+                    a: 255
+                }, metatable )
 
             FromHSL: ( hue, saturation, lightness ) ->
-                return Color( HSLToColor( hue, saturation, lightness ) )
+                return setmetatable( HSLToColor( hue, saturation, lightness ), metatable )
 
             FromHSV: ( hue, saturation, brightness ) ->
-                return Color( HSVToColor( hue, saturation, brightness ) )
+                return setmetatable( HSVToColor( hue, saturation, brightness ), metatable )
 
             FromHWB: ( hue, saturation, brightness ) ->
-                return Color( HSVToColor( hue, 1 - saturation / ( 1 - brightness ), 1 - brightness ) )
+                return setmetatable( HSVToColor( hue, 1 - saturation / ( 1 - brightness ), 1 - brightness ), metatable )
 
             FromCMYK: ( cyan, magenta, yellow, black ) ->
                 cyan, magenta, yellow, black = cyan * 0.01, magenta * 0.01, yellow * 0.01, black * 0.01
                 mk = 1 - black
 
-                return Color( ( 1 - cyan ) * mk * 255, ( 1 - magenta ) * mk * 255, ( 1 - yellow ) * mk * 255, 255 )
+                return setmetatable( {
+                    r: ( 1 - cyan ) * mk * 255,
+                    g: ( 1 - magenta ) * mk * 255,
+                    b: ( 1 - yellow ) * mk * 255,
+                    a: 255
+                }, metatable )
 
             FromTable: ( tbl ) ->
-                return Color( tbl[ 1 ] or 0, tbl[ 2 ] or 0, tbl[ 3 ] or 0, tbl[ 4 ] or 255 )
+                return setmetatable( { r: tbl[ 1 ] or 0, g: tbl[ 2 ] or 0, b: tbl[ 3 ] or 0, a: tbl[ 4 ] or 255 }, metatable )
 
         },
         {
@@ -942,7 +978,7 @@ do
             return @
 
     metatable.Copy = =>
-        return Color( @r, @g, @b, @a )
+        return setmetatable( { r: @r, g: @g, b: @b, a: @a }, metatable )
 
     do
 
@@ -997,7 +1033,12 @@ do
 
         metatable.Lerp = ( color, frac ) =>
             frac = clamp01( frac )
-            return Color( lerp( frac, @r, color.r ), lerp( frac, @g, color.g ), lerp( frac, @b, color.b ), lerp( frac, @a, color.a ) )
+            return setmetatable( {
+                r: lerp( frac, @r, color.r ),
+                g: lerp( frac, @g, color.g ),
+                b: lerp( frac, @b, color.b ),
+                a: lerp( frac, @a, color.a )
+            }, metatable )
 
         metatable.LerpTo = ( color, frac ) =>
             frac = clamp01( frac )
@@ -1015,22 +1056,38 @@ do
         return @Copy!\Invert!
 
     metatable.__add = ( color ) =>
-        return Color( clamp( @r + color.r, 0, 255 ), clamp( @g + color.g, 0, 255 ), clamp( @b + color.b, 0, 255 ), clamp( @a + color.a, 0, 255 ) )
+        return setmetatable( {
+            r: clamp( @r + color.r, 0, 255 ),
+            g: clamp( @g + color.g, 0, 255 ),
+            b: clamp( @b + color.b, 0, 255 ),
+            a: clamp( @a + color.a, 0, 255 )
+        }, metatable )
 
     metatable.__sub = ( color ) =>
-        return Color( clamp( @r - color.r, 0, 255 ), clamp( @g - color.g, 0, 255 ), clamp( @b - color.b, 0, 255 ), clamp( @a - color.a, 0, 255 ) )
+        return setmetatable( {
+            r: clamp( @r - color.r, 0, 255 ),
+            g: clamp( @g - color.g, 0, 255 ),
+            b: clamp( @b - color.b, 0, 255 ),
+            a: clamp( @a - color.a, 0, 255 )
+        }, metatable )
 
     metatable.__mul = ( other ) =>
+        local r, g, b, a
         if isnumber( other )
-            return Color( clamp( @r * other, 0, 255 ), clamp( @g * other, 0, 255 ), clamp( @b * other, 0, 255 ), clamp( @a * other, 0, 255 ) )
+            r, g, b, a = clamp( @r * other, 0, 255 ), clamp( @g * other, 0, 255 ), clamp( @b * other, 0, 255 ), clamp( @a * other, 0, 255 )
+        else
+            r, g, b, a = clamp( @r * other.r, 0, 255 ), clamp( @g * other.g, 0, 255 ), clamp( @b * other.b, 0, 255 ), clamp( @a * other.a, 0, 255 )
 
-        return Color( clamp( @r * other.r, 0, 255 ), clamp( @g * other.g, 0, 255 ), clamp( @b * other.b, 0, 255 ), clamp( @a * other.a, 0, 255 ) )
+        return setmetatable( { :r, :g, :b, :a }, metatable )
 
     metatable.__div = ( other ) =>
+        local r, g, b, a
         if isnumber( other )
-            return Color( clamp( @r / other, 0, 255 ), clamp( @g / other, 0, 255 ), clamp( @b / other, 0, 255 ), clamp( @a / other, 0, 255 ) )
+            r, g, b, a = clamp( @r / other, 0, 255 ), clamp( @g / other, 0, 255 ), clamp( @b / other, 0, 255 ), clamp( @a / other, 0, 255 )
+        else
+            r, g, b, a = clamp( @r / other.r, 0, 255 ), clamp( @g / other.g, 0, 255 ), clamp( @b / other.b, 0, 255 ), clamp( @a / other.a, 0, 255 )
 
-        return Color( clamp( @r / other.r, 0, 255 ), clamp( @g / other.g, 0, 255 ), clamp( @b / other.b, 0, 255 ), clamp( @a / other.a, 0, 255 ) )
+        return setmetatable( { :r, :g, :b, :a }, metatable )
 
     metatable.__lt = ( other ) =>
         return ( @r + @g + @b + @a ) < ( other.r + other.g + other.b + other.a )
@@ -1043,7 +1100,7 @@ do
 
     -- i really hate this
     environment.ColorAlpha = ( color, alpha ) ->
-        return Color( color.r, color.g, color.b, alpha )
+        return setmetatable( { r: color.r, g: color.g, b: color.b, a: alpha }, metatable )
 
     environment.IsColor = ( any ) ->
         return getmetatable( any ) == metatable

@@ -35,13 +35,15 @@ do
     gpm.UserName = username
 
     splashes = {
+        "Why are we always looking for more?"
         "Don't worry, " .. username .. " :>"
-        "I know you, " .. username .. "..."
         "Don't bring your light near me."
+        "Hello, " .. username .. "!"
         "I'll make you a promise."
         "Flying over rooftops..."
         "We need more packages!"
         "Where's fireworks!?"
+        "Looking For More ♪"
         "Now on Yuescript!"
         "I'm watching you."
         "Faster than ever."
