@@ -7,6 +7,13 @@ import getCurrentFile, getCurrentDirectory from path
 import async, await, reject from Promise
 import getfpath from debug
 
+-- file.Delete( "/data/gpm/vfs" )
+-- file.CreateDir( "/data/gpm/vfs", true )
+
+-- _G.hook.Add "ShutDown", "GLua Package Manager::VFS", ->
+--     file.Delete( "/data/gpm/vfs" )
+--     return nil
+
 :loader = gpm
 unless istable( loader )
     loader = gpm.loader = { Modules: {} }
@@ -66,6 +73,8 @@ local Package
 do
 
     import getDirectory, getFileName from path
+    import PathFromURL from string
+    import AsyncWrite from file
     import Version from util
     import tobool from _G
 
@@ -95,6 +104,10 @@ do
         @getAll: -> loader.Modules
 
         @get: ( url ) -> loader.Modules[ url.href ]
+
+        -- TODO: Remove or replace
+        @cache: ( url, content ) ->
+            return AsyncWrite( "/data/gpm/vfs/" .. PathFromURL( url ), content )
 
         @run: ( location, url, env ) ->
             m = Module.get( url )
@@ -367,18 +380,22 @@ do
             if isstring( target )
                 return packageDependencyResolve( @, packageName, target, packageSubpath )
 
-
         packageDependencyResolve = ( name, target, subpath ) =>
             if not target or #target == 0
                 error PackageError "invalid dependency target '#{target}' for '#{name}'"
 
-            -- TODO: implement URL target and etc.
-            targetPath = target
-            unless match( target, "^[%w._+~^-]+$" )
-                targetPath = util.MD5( target )
+            -- TODO: add installed package resolving
+            unless IsURL( target )
+                error PackageError "unsupported dependency target '#{target}' from '#{name}'"
 
-            packageURL = URL( join("file:///lua/gpm/vfs/packages", name, targetPath, "/") )
-            unless IsDir( packageURL.pathname )
+            target = URL( target )
+
+            -- Convert target url to file:///
+            if target.scheme ~= "file"
+                error PackageError "unsupported scheme #{target.scheme} ('#{target}') from '{#name}'"
+
+            packageURL = URL( ".", target ) -- remove file from url (basically same as path.dirname)
+            if not file.IsDir( packageURL.pathname )
                 return
 
             pjson = @pjson = readPackageJSON( @, packageURL )
@@ -584,6 +601,10 @@ class Require
 
         if resolved := isOpaque and resolveFile( @, filePath, base )
             return { :resolved }
+
+        if StartsWith( filePath, "gpm/" ) or StartsWith( filePath, "garrysmod/" ) or StartsWith( filePath, "gmod/" )
+            protocol, filePath = match( filePath, "^(.-)/(.*)" )
+            filePath = tostring( URL( protocol .. ":///" .. filePath ) )
 
         success, resolved = try await ESM.resolve( isOpaque and filePath or modname, base )
         if success
