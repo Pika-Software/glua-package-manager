@@ -4,9 +4,9 @@ import file, istable, CLIENT, SERVER, MENU_DLL from _G
 import async, await, debug, util, path, string, Promise, CodeCompileError, FileSystemError, error, ArgAssert from environment
 import ByteStream, IsBinaryModuleInstalled from util
 import byte, sub, len, match, ByteSplit from string
+import resolve, getDirectory from path
 import concat from environment.table
 import fempty from debug
-import resolve from path
 import Find from file
 
 -- Entropia File System Watcher: https://github.com/Pika-Software/gm_efsw
@@ -106,7 +106,7 @@ do
         Usage:
 
             file.Move( fullPathToFile, newFilePath )
-            file.Move( "/data/test.txt", "/data/folder/" )
+            file.Move( "/data/test.txt", "/data/dir/" )
 
     ]]
 
@@ -177,7 +177,6 @@ do
     do
 
         import MountGMA from environment.game
-        import getDirectory from path
 
         lib.MountGMA = ( relativePath ) ->
             success, files = MountGMA( sub( resolve( relativePath ), 2 ) )
@@ -201,7 +200,7 @@ do
 
             return success, files
 
-local isDir, isFile
+local isDir, isFile, createDir
 do
 
     import Delete, Exists, IsDir from file
@@ -210,13 +209,13 @@ do
         unless skipNormalize
             filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
-        return Exists( filePath, gamePath ) or isFileMounted( filePath, gamePath ) or isDirMounted( filePath, gamePath )
+        return Exists( filePath, gamePath ) or isFileMounted( filePath, gamePath, true ) or isDirMounted( filePath, gamePath, true )
 
     isDir = lib.IsDir = ( filePath, gamePath, skipNormalize ) ->
         unless skipNormalize
             filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
-        return IsDir( filePath, gamePath ) or isDirMounted( filePath, gamePath )
+        return IsDir( filePath, gamePath ) or isDirMounted( filePath, gamePath, true )
 
     isFile = lib.IsFile = ( filePath, gamePath, skipNormalize ) ->
         unless skipNormalize
@@ -227,7 +226,7 @@ do
     do
 
         delete = ( filePath, gamePath ) ->
-            if isDir( filePath, gamePath )
+            if isDir( filePath, gamePath, true )
                 files, folders = Find( filePath .. "/*", gamePath )
                 for folderName in *folders
                     delete( filePath .. "/" .. folderName, gamePath )
@@ -251,22 +250,22 @@ do
 
         import CreateDir from file
 
-        lib.CreateDir = ( folderPath, force, gamePath, skipNormalize ) ->
+        createDir = lib.CreateDir = ( directoryPath, force, gamePath, skipNormalize ) ->
             unless skipNormalize
-                folderPath, gamePath = normalizeGamePath( folderPath, gamePath )
+                directoryPath, gamePath = normalizeGamePath( directoryPath, gamePath )
 
-            assertWriteAllowed( folderPath, gamePath )
+            assertWriteAllowed( directoryPath, gamePath )
 
             if force
                 local currentPath
-                for folderName in *ByteSplit( folderPath, 0x2F --[[ / ]] )
+                for folderName in *ByteSplit( directoryPath, 0x2F --[[ / ]] )
                     if folderName
                         if currentPath
                             currentPath ..= "/" .. folderName
                         else
                             currentPath = folderName
 
-                        if IsDir( currentPath, gamePath )
+                        if isDir( currentPath, gamePath, true )
                             continue
 
                         Delete( currentPath, gamePath )
@@ -274,8 +273,8 @@ do
 
                 return currentPath
 
-            CreateDir( folderPath, gamePath )
-            return folderPath
+            CreateDir( directoryPath, gamePath )
+            return directoryPath
 
     do
 
@@ -304,31 +303,31 @@ do
 
 do
 
-    getFolderContents = ( folderPath, gamePath, result, length ) ->
-        files, folders = Find( folderPath .. "*", gamePath )
+    getFolderContents = ( directoryPath, gamePath, result, length ) ->
+        files, folders = Find( directoryPath .. "*", gamePath )
         unless files
             return result, length
 
         for fileName in *files
             length += 1
-            result[ length ] = folderPath .. fileName
+            result[ length ] = directoryPath .. fileName
 
         for folderName in *folders
-            result, length = getFolderContents( folderPath .. folderName .. "/", gamePath, result, length )
+            result, length = getFolderContents( directoryPath .. folderName .. "/", gamePath, result, length )
 
         return result, length
 
-    lib.GetFolderContents = ( folderPath, gamePath, skipNormalize ) ->
+    lib.GetFolderContents = ( directoryPath, gamePath, skipNormalize ) ->
         unless skipNormalize
-            folderPath, gamePath = normalizeGamePath( folderPath, gamePath )
+            directoryPath, gamePath = normalizeGamePath( directoryPath, gamePath )
 
         result, length = {}, 0
 
-        if folderPath == "" or isDir( folderPath, gamePath, true )
-            if folderPath ~= ""
-                folderPath ..= "/"
+        if directoryPath == "" or isDir( directoryPath, gamePath, true )
+            if directoryPath ~= ""
+                directoryPath ..= "/"
 
-            return getFolderContents( folderPath, gamePath, result, length )
+            return getFolderContents( directoryPath, gamePath, result, length )
 
         return result, length
 
@@ -340,12 +339,24 @@ do
 
         import Open from file
 
+        writeModes = {
+            ["a"]: true,
+            ["w"]: true,
+            ["ab"]: true,
+            ["wb"]: true
+        }
+
         open = lib.Open = ( filePath, fileMode, gamePath, skipNormalize ) ->
             unless skipNormalize
                 if filePath == "memory" and not gamePath
                     return ByteStream!
 
                 filePath, gamePath = normalizeGamePath( filePath, gamePath )
+
+            if writeModes[ fileMode ]
+                directoryPath = getDirectory( filePath )
+                if directoryPath ~= "" and directoryPath ~= "/"
+                    createDir( directoryPath, true, gamePath, true )
 
             return Open( filePath, fileMode, gamePath )
 
@@ -429,6 +440,10 @@ do
                 WriteULong( fileHandle, 0 )
                 return
 
+        File.ReadAll = ( fileHandle ) ->
+            Seek( fileHandle, 0 )
+            return Read( fileHandle, Size( fileHandle ) )
+
         -- UnixTime
         File.ReadTime = ByteStream.ReadTime
         File.WriteTime = ByteStream.WriteTime
@@ -436,6 +451,10 @@ do
         -- ZipFile
         File.ReadZipFile = ByteStream.ReadZipFile
         File.WriteZipFile = ByteStream.WriteZipFile
+
+        -- Color
+        File.ReadColor = ByteStream.ReadColor
+        File.WriteColor = ByteStream.WriteColor
 
     append = lib.Append = ( filePath, content, gamePath, skipNormalize ) ->
         fileHandle = open( filePath, "ab", gamePath, skipNormalize )
@@ -537,7 +556,7 @@ if SERVER
             filesCount = #findFiles
 
             if foldersCount == 0 and filesCount == 0
-                error CodeCompileError "Couldn't AddCSLuaFile folder '" .. filePath .. "/' - Folder is empty", 3
+                error CodeCompileError "Couldn't AddCSLuaFile directory '" .. filePath .. "/' - Directory is empty", 3
 
             for index = 1, foldersCount
                 addCSLuaFile( filePath .. "/" .. findFolders[ index ], true )
@@ -810,6 +829,10 @@ do
                 filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
             assertWriteAllowed( filePath, gamePath )
+
+            directoryPath = getDirectory( filePath )
+            if directoryPath ~= "" and directoryPath ~= "/"
+                createDir( directoryPath, true, gamePath, true )
 
             promise = Promise!
 

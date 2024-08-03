@@ -262,7 +262,7 @@ do
         return HTTP( tbl )
 
     http.FileInfo = async ( href, headers, timeout ) ->
-        folderPath, fileName = stripFile( URL( href ).pathname )
+        directoryPath, fileName = stripFile( URL( href ).pathname )
 
         tbl.url = href
         tbl.method = "HEAD"
@@ -282,7 +282,7 @@ do
         return {
             size: headers["content-length"],
             type: headers["content-type"],
-            folder: folderPath,
+            directory: directoryPath,
             file: fileName
         }
 

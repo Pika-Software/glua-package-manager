@@ -112,23 +112,13 @@ do
 
 include( "gpm/util.lua" )
 
-logger = gpm.Logger = include( "libs/logger.lua" )( "gpm@" .. gpm.VERSION, Color( 180, 180, 255 ), false )
+logger = gpm.Logger = include( "libs/logger.lua" )( "gpm@" .. gpm.VERSION, environment.Color( 180, 180, 255 ), false )
 
 environment.path = include( "libs/path.lua" )
 
-do
-
-    import pairs from _G
-
-    -- gm_error
-    for key, value in pairs( include( "libs/error.lua" ) )
-        environment[ key ] = value
-
-    -- math extensions
-    import math from environment
-
-    for key, value in pairs( include( "libs/math.lua" ) )
-        math[ key ] = value
+-- gm_error
+for key, value in _G.pairs( include( "libs/error.lua" ) )
+    environment[ key ] = value
 
 environment.ipaml = include( "libs/3rd-party/ip.lua" )
 environment.utf8 = include( "libs/utf8/init.lua" )

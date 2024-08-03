@@ -69,7 +69,7 @@ do
                 return getExtension( url.pathname ) == "zip"
 
             Install: async ( url ) =>
-                return await mountZip( url.pathname )
+                return mountZip( url.pathname )
 
     local LuaHandler
     do
@@ -93,12 +93,12 @@ do
             ShouldHandle: ( url ) =>
                 return equal( sub( url.pathname, 1, 5 ), "/lua/" )
 
-            FetchInfo: ( url ) =>
+            FetchInfo: async ( url ) =>
                 yueConfig = {}
                 for key, value in url.searchParams\iterator!
                     yueConfig[ key ] = value
 
-                return await compile( url.pathname, true, yueConfig )
+                return compile( url.pathname, true, yueConfig )
 
             Install: async ( url, func, _, env ) =>
                 if func

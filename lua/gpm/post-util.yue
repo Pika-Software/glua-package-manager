@@ -142,7 +142,7 @@ do
 -- Byte Stream
 do
 
-    import struct, deflate, os from environment
+    import struct, deflate, os, Color from environment
     import char, reverse, format from string
     import clamp from math
     import CRC32 from util
@@ -550,6 +550,13 @@ do
             @Write( fileName )
             return @Write( content )
 
+        -- Color
+        ReadColor: =>
+            return Color( byte( @Read( 4 ) ) )
+
+        WriteColor: ( color ) =>
+            return @Write( char( color.r, color.g, color.b, color.a ) )
+
     util.ByteStream = ByteStream
 
     environment.IsByteStream = ( any ) ->
@@ -561,8 +568,24 @@ do
 -- Version
 do
 
-    import match, find, gsub, ByteCount, ByteSplit from string
+    import ByteSplit from string
+
+    do
+
+        import URL, isurl from environment
+        import concat, Flip from table
+
+        string.PathFromURL = ( url ) ->
+            unless isurl( url )
+                url = URL( url )
+
+            if url.hostname == ""
+                return url.scheme .. url.pathname
+
+            return url.scheme .. "/" .. concat( Flip( ByteSplit( url.hostname, 0x2E --[[ . ]] ) ), "/" ) .. url.pathname
+
     import isnumber, tonumber, isstring, tostring from _G
+    import match, find, gsub, ByteCount from string
     import isuint, max from math
 
     compare = ( a, b ) ->
