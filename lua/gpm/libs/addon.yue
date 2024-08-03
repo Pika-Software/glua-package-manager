@@ -171,7 +171,6 @@ import byte, sub, lower, format, len from string
 import equal from environment.path
 import time from environment.os
 import Empty from table
-import SERVER from _G
 
 class File
     Identity: "GMAD"
@@ -524,8 +523,10 @@ class File
         await AsyncWrite( filePath, @GetBinary( doCRC ) )
         return @
 
+    sidePrefix = _G.SERVER and "s" or _G.CLIENT and "c" or _G.MENU_DLL and "m" or "u"
+
     Mount: ( doCRC ) =>
-        filePath = "/data/gpm/mount/" .. MD5( @title .. time! .. ( SERVER and "s" or "c" ) ) .. ".gma"
+        filePath = "/data/gpm/mount/" .. MD5( @title .. time! .. sidePrefix ) .. ".gma"
         @Write( filePath, doCRC )
 
         ok, result = MountGMA( filePath )
@@ -535,7 +536,7 @@ class File
         return result
 
     AsyncMount: async ( doCRC ) =>
-        filePath = "/data/gpm/mount/" .. MD5( @title .. time! .. ( SERVER and "s" or "c" ) ) .. ".gma"
+        filePath = "/data/gpm/mount/" .. MD5( @title .. time! .. sidePrefix ) .. ".gma"
         await @AsyncWrite( filePath, doCRC )
 
         ok, result = MountGMA( filePath )
