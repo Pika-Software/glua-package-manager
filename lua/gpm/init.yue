@@ -186,7 +186,9 @@ for fileName in *Find( "gpm/sources/*.lua", "LUA" )
 if SERVER
     include( "test.lua" )
 
-gpm.loader.Startup!\Catch( environment.Error.display )
+-- TODO: IDK why but file.Delete is too slow and async so here we are
+_G.timer.Simple 0.5, ->
+    gpm.loader.Startup!\Catch( environment.Error.display )
 
 logger\Info( "Start-up time: %.4f sec.", SysTime! - gpm.StartTime )
 

@@ -7,6 +7,7 @@ import getCurrentFile, getCurrentDirectory, stripExtension from path
 import async, await, reject from Promise
 import getfpath from debug
 
+-- TODO: F1CKING MAGICAL FILE.DELETE
 file.Delete( "/data/gpm/vfs" )
 file.CreateDir( "/data/gpm/vfs", true )
 
@@ -112,7 +113,6 @@ do
             if IsFile( filePath )
                 return filePath
 
-            -- print "content", content and #content
             return AsyncWrite( filePath, content )
 
         @run: ( location, url, env ) ->
@@ -552,6 +552,10 @@ do
                 extension = "yue"
             elseif IsFile( withoutExtension .. ".moon", gamePath, true )
                 extension = "moon"
+            elseif IsFile( withoutExtension .. ".luac", gamePath, true )
+                extension = "luac"
+            elseif IsFile( withoutExtension .. ".lc", gamePath, true )
+                extension = "lc"
 
             filePath = withoutExtension .. "." .. extension
             content = await AsyncRead( filePath, gamePath, true )
@@ -574,8 +578,10 @@ do
             mode = "t"
             if extension == "yue"
                 mode = "y" .. mode
+
             elseif extension == "moon"
                 mode = "m" .. mode
+
             elseif extension == "luac" or extension == "lc"
                 mode = "b" .. mode
 

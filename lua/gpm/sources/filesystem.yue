@@ -1,11 +1,11 @@
 _G = _G
 import gpm from _G
 import environment from gpm
-import file, async, await, ModuleError, MountError, SourceError, error from environment
+import file, path, async, await, ModuleError, MountError, SourceError, error from environment
 import BaseSource, BaseSourceHandler, Module from gpm.loader
-import getExtension, equal from environment.path
 import STATE_PENDING from environment.Promise
 import AsyncRead, NormalizeGamePath from file
+import getExtension, equal from path
 
 do
 
@@ -74,29 +74,45 @@ do
     local LuaHandler
     do
 
-        import load from environment
+        import yue, moon, load from environment
+        import stripExtension from path
         import sub from _G.string
+        import IsFile from file
 
         promises = {}
 
         codeCompile = async ( url ) ->
-            :pathname = url
+            filePath, gamePath = NormalizeGamePath( url.pathname )
+            filePath, extension = stripExtension( filePath )
 
-            extension, mode = getExtension( pathname ), "t"
+            if IsFile( filePath .. ".yue", gamePath, true )
+                extension = "yue"
+            elseif IsFile( filePath .. ".moon", gamePath, true )
+                extension = "moon"
+            elseif IsFile( filePath .. ".luac", gamePath, true )
+                extension = "luac"
+            elseif IsFile( filePath .. ".lc", gamePath, true )
+                extension = "lc"
+
+            chunk = await AsyncRead( filePath .. "." .. extension, gamePath, true )
+
+            mode = "t"
             if extension == "yue"
-                mode = "y" .. mode
+                config = {}
+                for key, value in url.searchParams\iterator!
+                    config[ key ] = value
+
+                chunk = yue.ToLua( chunk, config )
 
             elseif extension == "moon"
-                mode = "m" .. mode
+                chunk = moon.ToLua( chunk )
 
             elseif extension == "luac" or extension == "lc"
                 mode = "b" .. mode
 
-            content = await AsyncRead( pathname )
-
             return {
-                chunk: content,
-                name: sub( await( Module.cache( url, content ) ), 2 ),
+                name: sub( await( Module.cache( url, chunk ) ), 2 ),
+                :chunk,
                 :mode
             }
 
@@ -116,11 +132,7 @@ do
             Install: async ( url, _, __, env ) =>
                 result = await compile( url )
 
-                config = {}
-                for key, value in url.searchParams\iterator!
-                    config[ key ] = value
-
-                func = load( result.chunk, result.name, result.mode, env, config, false )
+                func = load( result.chunk, result.name, result.mode, env, nil, false )
                 if func
                     if isstring( func )
                         error ModuleError func

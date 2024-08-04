@@ -121,7 +121,7 @@ do
                     func = CompileString( chunk, chunkName, handleError )
 
                 if func
-                    if env
+                    if isfunction( func ) and env
                         setfenv( func, env )
 
                     return func
