@@ -12,7 +12,7 @@ do
     local installed
 
     if util.IsBinaryModuleInstalled( "moonloader" )
-        local ok, msg = pcall( require, "moonloader" )
+        ok, msg = pcall( require, "moonloader" )
         if ok and istable( moonloader )
             Logger\Loaded( "gm_moonloader v%s", moonloader._VERSION )
             installed = true
@@ -22,69 +22,135 @@ do
     else
         installed = false
 
+    yueFail = ->
+        error CodeCompileError "Attempt to compile Yuescript failed, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader."
+
     if installed
-        moonloader = environment.moonloader = _G.moonloader
-
-        import CompileLuaString from util
-
-        -- MoonScript
-        do
-
-            import ToLua from moonloader
-
-            util.CompileMoonString = ( moonCode, identifier, handleError ) ->
-                ArgAssert( moonCode, 1, "string" )
-                ArgAssert( identifier, 2, "string" )
-
-                luaCode, msg = ToLua( moonCode )
-                unless luaCode
-                    error CodeCompileError msg or "MoonScript compilation failed."
-
-                func = CompileLuaString( luaCode, identifier, handleError == true, true )
-                unless isfunction( func )
-                    error CodeCompileError msg or "MoonScript compilation failed."
-
-                return func
+        moonloader = environment.moon = _G.moonloader
 
         -- Yuescript
         import yue from moonloader
 
         if istable( yue )
-            import ToLua from yue
-            emptyTable = {}
-
-            -- https://github.com/pigpigyyy/Yuescript/src/yuescript/yue_compiler.h#L28
-            util.CompileYueString = ( yueCode, identifier, handleError, yueConfig ) ->
-                ArgAssert( yueCode, 1, "string" )
-                ArgAssert( identifier, 2, "string" )
-
-                if yueConfig ~= nil
-                    ArgAssert( yueConfig, 4, "table" )
-                else
-                    yueConfig = emptyTable
-
-                luaCode, msg = ToLua( yueCode, yueConfig )
-                unless luaCode
-                    error CodeCompileError msg or "Yuescript compilation failed."
-
-                func = CompileLuaString( luaCode, identifier, handleError == true, true )
-                unless isfunction( func )
-                    error CodeCompileError msg or "Yuescript compilation failed."
-
-                return func
-
+            environment.yue = yue
         else
+
+            environment.yue = {
+                ToLua: yueFail
+            }
+
             Logger\Warn( "Yuescript support is missing, yue package execution is unavailable!" )
 
     else
 
-        util.CompileMoonString = ->
+        moonFail = ->
             error CodeCompileError "Attempt to compile MoonScript failed, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader."
 
-        util.CompileYueString = ->
-            error CodeCompileError "Attempt to compile Yuescript failed, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader."
+        environment.moon = {
+            PreCacheFile: moonFail,
+            PreCacheDir: moonFail,
+            ToLua: moonFail
+        }
+
+        environment.yue = {
+            ToLua: yueFail
+        }
 
         Logger\Warn( "gm_moonloader is missing, support for moon and yue scripts is unavailable!" )
+
+do
+
+
+    -- https://github.com/willox/gmbc
+    byteCodeSupported = false
+    if util.IsBinaryModuleInstalled( "gmbc" )
+        byteCodeSupported = pcall( require, "gmbc" )
+
+    import CompileString, gmbc_load_bytecode, setfenv from _G
+    import yue, moon from environment
+
+    environment.loadstring = ( code, identifier, handleError = true, ignoreBytecode ) ->
+        if not ignoreBytecode and byte( code, 1 ) == 0x1b
+            if byteCodeSupported
+                return gmbc_load_bytecode( code )
+
+            msg = "Bytecode compilation is not supported. Please install gmbc (https://github.com/willox/gmbc)"
+            if handleError
+                error msg, 2
+                return nil
+
+            return msg
+
+        return CompileString( code, identifier, handleError )
+
+    load = ( chunk, chunkName, mode = "bt", env = getfenv( 2 ), config, handleError = true ) ->
+        ArgAssert( chunkName, 2, "string" )
+
+        if mode == ""
+            mode = "bt"
+
+        switch type( chunk )
+            when "string"
+                modes = {}
+                for byte0 in *{ byte( mode, 1, len( mode ) ) }
+                    modes[ byte0 ] = true
+
+                local func
+                if modes[ 0x62 --[[ b ]] ] and byte( chunk, 1 ) == 0x1B --[[ byte code marker ]]
+                    if byteCodeSupported
+                        func = gmbc_load_bytecode( chunk )
+
+                    msg = "Bytecode compilation is not supported."
+                    if handleError
+                        error msg, 2
+                        return nil
+
+                    return msg
+
+                if modes[ 0x79 --[[ y ]] ]
+                    if config
+                        ArgAssert( config, 5, "table" )
+                        chunk = yue.ToLua( chunk, config )
+                    else
+                        chunk = yue.ToLua( chunk )
+
+                elseif modes[ 0x6D --[[ m ]] ]
+                    chunk = moon.ToLua( chunk )
+
+                if modes[ 0x74 --[[ t ]] ]
+                    func = CompileString( chunk, chunkName, handleError )
+
+                if func
+                    if env
+                        setfenv( func, env )
+
+                    return func
+
+                msg = "wrong load mode"
+                if handleError
+                    error msg, 2
+                    return nil
+
+                return msg
+
+            when "function"
+                result, length = {}, 0
+
+                str = chunk!
+                while str
+                    length += 1
+                    result[ length ] = str
+                    str = chunk!
+
+                if length == 0
+                    return ->
+
+                return load( concat( result, "", 1, length ), chunkName, mode, env, config, handleError )
+
+        error "Invalid argument #1 to 'load' (string/function expected)", 2
+        return nil
+
+    environment.load = load
 
 do
 

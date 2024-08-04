@@ -5,7 +5,7 @@ import file, async, await, ModuleError, MountError, SourceError, error from envi
 import BaseSource, BaseSourceHandler, Module from gpm.loader
 import getExtension, equal from environment.path
 import STATE_PENDING from environment.Promise
-import NormalizeGamePath from file
+import AsyncRead, NormalizeGamePath from file
 
 do
 
@@ -74,38 +74,62 @@ do
     local LuaHandler
     do
 
+        import load from environment
         import sub from _G.string
-        import Compile from file
 
         promises = {}
 
-        compile = ( filePath, handleError, yueConfig ) ->
-            promise = promises[ filePath ]
+        codeCompile = async ( url ) ->
+            :pathname = url
+
+            extension, mode = getExtension( pathname ), "t"
+            if extension == "yue"
+                mode = "y" .. mode
+
+            elseif extension == "moon"
+                mode = "m" .. mode
+
+            elseif extension == "luac" or extension == "lc"
+                mode = "b" .. mode
+
+            content = await AsyncRead( pathname )
+
+            return {
+                chunk: content,
+                name: sub( await( Module.cache( url, content ) ), 2 ),
+                :mode
+            }
+
+        compile = ( url ) ->
+            promise = promises[ url.href ]
             if promise and promise.state == STATE_PENDING
                 return promise
 
-            filePath, gamePath = NormalizeGamePath( filePath, gamePath )
-            promise = Compile( filePath, gamePath, handleError, yueConfig, true )
-            promises[ filePath ] = promise
+            promise = codeCompile( url )
+            promises[ url.href ] = promise
             return promise
 
         class LuaHandler extends BaseSourceHandler
             ShouldHandle: ( url ) =>
                 return equal( sub( url.pathname, 1, 5 ), "/lua/" )
 
-            FetchInfo: async ( url ) =>
-                yueConfig = {}
+            Install: async ( url, _, __, env ) =>
+                result = await compile( url )
+
+                config = {}
                 for key, value in url.searchParams\iterator!
-                    yueConfig[ key ] = value
+                    config[ key ] = value
 
-                return compile( url.pathname, true, yueConfig )
-
-            Install: async ( url, func, _, env ) =>
+                func = load( result.chunk, result.name, result.mode, env, config, false )
                 if func
+                    if isstring( func )
+                        error ModuleError func
+                        return nil
+
                     return Module.run( func, url, env )
 
                 error ModuleError "File '" .. url.pathname .. "' cannot be compiled."
-                return
+                return nil
 
     class FileSource extends BaseSource
 

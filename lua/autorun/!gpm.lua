@@ -1,4 +1,5 @@
 if SERVER then
+    -- TODO: Remove this on release
     if util.IsBinaryModuleInstalled( "moonloader" ) then
         require( "moonloader" )
     end

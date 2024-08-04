@@ -11,10 +11,6 @@ import getinfo from debug
 for key, value in pairs( _G.include( "gpm/libs/math.lua" ) )
     math[ key ] = value
 
--- Aliases
-util.CompileLuaFile = _G.CompileFile
-util.CRC32 = util.CRC
-
 do
 
     import running from coroutine
@@ -1251,67 +1247,6 @@ do
         return metatable and metatable.__class == Queue
 
     util.RegisterMetaTable( "Queue", Queue.__base )
-
-do
-
-    -- https://github.com/willox/gmbc
-    if util.IsBinaryModuleInstalled( "gmbc" )
-        pcall( require, "gmbc" )
-
-    import CompileString, gmbc_load_bytecode from _G
-
-    loadstring = environment.loadstring = util.CompileLuaString = ( code, identifier, handleError, ignoreBytecode ) ->
-        if not ignoreBytecode and byte( code, 1 ) == 0x1b
-            if isfunction( gmbc_load_bytecode )
-                return gmbc_load_bytecode( code )
-
-            error "Bytecode compilation is not supported. Please install gmbc (https://github.com/willox/gmbc)", 2
-            return nil
-
-        return CompileString( code, identifier, handleError )
-
-    load = environment.load = ( chunk, chunkName, mode = "bt", env = getfenv( 2 ) ) ->
-        ArgAssert( chunkName, 2, "string" )
-
-        switch type( chunk )
-            when "string"
-                local func
-                if mode == "t"
-                    func = CompileString( chunk, chunkName, true, true )
-                elseif mode == "b"
-                    if isfunction( gmbc_load_bytecode )
-                        func = gmbc_load_bytecode( chunk )
-
-                    error "Bytecode compilation is not supported.", 2
-                    return nil
-                elseif mode == "bt" or mode == "tb"
-                    func = loadstring( chunk, chunkName, true, false )
-
-                if func
-                    if env
-                        setfenv( func, env )
-
-                    return func
-
-                error "unknown load mode", 2
-                return nil
-
-            when "function"
-                result, length = {}, 0
-
-                str = chunk!
-                while str
-                    length += 1
-                    result[ length ] = str
-                    str = chunk!
-
-                if length == 0
-                    return ->
-
-                return load( concat( result, "", 1, length ), chunkName, mode, env )
-
-        error "Invalid argument #1 to 'load' (string/function expected)", 2
-        return nil
 
 -- Garry's Mod hooks
 do

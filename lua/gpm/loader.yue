@@ -23,6 +23,7 @@ local repositories
 if SERVER or MENU_DLL
     import Query from _G.sql
 
+    Query( "CREATE TABLE IF NOT EXISTS `gpm.table_version` ( Name TEXT PRIMARY KEY NOT NULL, Version INT )" )
     Query( "CREATE TABLE IF NOT EXISTS `gpm.repository` ( ID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, URL TEXT NOT NULL )" )
     Query( "CREATE TABLE IF NOT EXISTS `gpm.packages` ( Name TEXT PRIMARY KEY NOT NULL, URL TEXT UNIQUE NOT NULL, InstalledVersion TEXT, RepositoryID INTEGER DEFAULT 0 NOT NULL, FOREIGN KEY(repositoryID) REFERENCES `gpm.repository` (ID) )" )
 
@@ -95,21 +96,27 @@ do
             return
 
         run: ( ... ) =>
-            if result := @result
-                return result
+            -- if result := @result
+            --     return result
 
-            result = @result = async( @location )( ... )
-            return result
+            -- result = @result = async( @location )( ... )
+            -- return result
+            return async( @location )( ... )
 
         @getAll: -> loader.Modules
 
         @get: ( url ) -> loader.Modules[ url.href ]
 
-        @cache: ( url, content ) ->
-            return AsyncWrite( "/data/gpm/vfs/" .. stripExtension( PathFromURL( url ) ) .. ".txt", content )
+        @cache: async ( url, content ) ->
+            filePath = "/data/gpm/vfs/" .. stripExtension( PathFromURL( url ) ) .. ".txt"
+            if IsFile( filePath )
+                return filePath
+
+            -- print "content", content and #content
+            return AsyncWrite( filePath, content )
 
         @run: ( location, url, env ) ->
-            m = Module.get( url )
+            m = loader.Modules[ url.href ]
             unless m
                 m = Module( location, url, env )
 
@@ -227,9 +234,9 @@ do
 local ESM
 do
 
-    import CompileLuaString, CompileMoonString, CompileYueString, JSONToTable, Logger from util
-    import AsyncRead, IsDir, NormalizeGamePath from file
-    import PackageError from environment
+    import AsyncRead, AbsoluteGamePath, IsDir, NormalizeGamePath from file
+    import PackageError, load from environment
+    import JSONToTable, Logger from util
     import canParse from URL
     import Merge from table
     import join from path
@@ -549,6 +556,14 @@ do
             filePath = withoutExtension .. "." .. extension
             content = await AsyncRead( filePath, gamePath, true )
 
+            if extension == "json"
+                info = JSONToTable( content )
+                if info
+                    return getPackage( filePath, info )
+
+                error PackageError "Invalid JSON for '" .. filePath .. "'"
+                return nil
+
             if extension == "lua"
                 firstByte = byte( content, 1 )
                 if firstByte == 0x5b --[['[']] or firstByte == 0x7b --[['{']]
@@ -556,15 +571,21 @@ do
                     if info
                         return getPackage( filePath, info )
 
-            func = switch extension
-                when "yue"
-                    CompileYueString( content, filePath, true )
-                when "moon"
-                    CompileMoonString( content, filePath, true )
-                else
-                    CompileLuaString( content, filePath, true, false )
+            mode = "t"
+            if extension == "yue"
+                mode = "y" .. mode
+            elseif extension == "moon"
+                mode = "m" .. mode
+            elseif extension == "luac" or extension == "lc"
+                mode = "b" .. mode
+
+            func = load( content, AbsoluteGamePath( filePath, gamePath, true ), mode, environment, nil, false )
 
             if func
+                if isstring( func )
+                    error PackageError func
+                    return nil
+
                 info = {}
                 setfenv( func, info )
                 success, result = pcall( func )
@@ -575,10 +596,10 @@ do
                     return getPackage( filePath, info )
 
                 error PackageError "File '" .. filePath .. "' compilation error: " .. result
-                return
+                return nil
 
             error PackageError "File '" .. filePath .. "' cannot be compiled."
-            return
+            return nil
 
     loader.ESM = ESM
 
@@ -808,7 +829,7 @@ do
     Empty( loader.Modules )
     Empty( gpm.Packages )
 
-    async( ->
+    loader.Startup = async ->
         base = URL( "file:///lua/" )
 
         _, folders = file.Find( "packages/*", file.LuaPath, true )
@@ -840,4 +861,3 @@ do
                 display( result )
 
         return nil
-    )!\Catch( display )

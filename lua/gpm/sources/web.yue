@@ -31,7 +31,7 @@ do
 local LuaCodeHandler
 do
 
-    import CompileLuaString, CompileMoonString, CompileYueString from util
+    import isstring, load from environment
 
     extensions = {
         "moon": true
@@ -51,25 +51,29 @@ do
             return result.body
 
         Install: async ( url, content, _, env ) =>
-            func = await switch url.extension
-                when "yue"
-                    yueConfig = {}
-                    for key, value in url.searchParams\iterator!
-                        yueConfig[ key ] = value
+            mode = "t"
+            :extension = url
+            if extension == "yue"
+                mode = "y" .. mode
+            elseif extension == "moon"
+                mode = "m" .. mode
+            elseif extension == "luac" or extension == "lc"
+                mode = "b" .. mode
 
-                    CompileYueString( content, url.href, true, yueConfig )
+            config = {}
+            for key, value in url.searchParams\iterator!
+                config[ key ] = value
 
-                when "moon"
-                    CompileMoonString( content, url.href, true )
+            func = load( content, await( Module.cache( url, content ) ), mode, env, config, false )
+            if func
+                if isstring( func )
+                    error SourceError func
+                    return nil
 
-                else
-                    CompileLuaString( content, url.href, true, false )
+                return Module.run( func, url, env )
 
-            unless func
-                error SourceError "File '" .. url.href .. "' cannot be compiled."
-                return
-
-            return Module.run( func, url, env )
+            error SourceError "File '" .. url.href .. "' cannot be compiled."
+            return nil
 
 class TextHandler extends BaseSourceHandler
     ShouldHandle: ( url ) =>

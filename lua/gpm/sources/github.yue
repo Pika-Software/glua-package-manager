@@ -1,11 +1,12 @@
+_G = _G
 import gpm from _G
 import environment from gpm
-import await, async, SourceError, ModuleError, error from environment
-import Base64Decode, JSONToTable, CompileLuaString, CompileMoonString, CompileYueString from environment.util
+import await, async, load, SourceError, ModuleError, error, isstring from environment
 import BaseSource, BaseSourceHandler, Module from gpm.loader
+import Base64Decode, JSONToTable from environment.util
 import MountZIPData from environment.file
 import CachedFetch from environment.http
-import extname from environment.path
+import getExtension from environment.path
 import insert from environment.table
 
 class RepositoryHandler extends BaseSourceHandler
@@ -142,38 +143,63 @@ class RepositoryHandler extends BaseSourceHandler
                             when "base64"
                                 content = Base64Decode( content )
 
+                        config = {}
+                        for key, value in url.searchParams\iterator!
+                            config[ key ] = value
+
                         -- Optimize compilation?
-                        switch extname( currentPath )
-                            when "lua"
-                                func = await CompileLuaString( content, url.href, true, false )
-                                unless func
-                                    error ModuleError "File '" .. url.href .. "' cannot be compiled."
+                        extension = getExtension( currentPath )
+
+                        if extension == "lua"
+                            func = load( content, await( Module.cache( url, content ) ), "t", env, config, false )
+                            if func
+                                if isstring( func )
+                                    error ModuleError func
                                     return nil
 
                                 return Module.run( func, url, env )
 
-                            when "moon"
-                                func = await CompileMoonString( content, url.href, true )
-                                unless func
-                                    error ModuleError "File '" .. url.href .. "' cannot be compiled."
+                            error ModuleError "File '" .. url.href .. "' cannot be compiled."
+                            return nil
+
+                        if extension == "luac" or extension == "lc"
+                            func = load( content, await( Module.cache( url, content ) ), "bt", env, config, false )
+                            if func
+                                if isstring( func )
+                                    error ModuleError func
                                     return nil
 
                                 return Module.run( func, url, env )
 
-                            when "yue"
-                                yueConfig = {}
-                                for key, value in url.searchParams\iterator!
-                                    yueConfig[ key ] = value
+                            error ModuleError "File '" .. url.href .. "' cannot be compiled."
+                            return nil
 
-                                func = await CompileYueString( content, url.href, true, yueConfig )
-                                unless func
-                                    error ModuleError "File '" .. url.href .. "' cannot be compiled."
+                        if extension == "moon"
+                            func = load( content, await( Module.cache( url, content ) ), "mt", env, config, false )
+                            if func
+                                if isstring( func )
+                                    error ModuleError func
                                     return nil
 
                                 return Module.run( func, url, env )
 
-                            when "json"
-                                return JSONToTable( content, true, false )
+                            error ModuleError "File '" .. url.href .. "' cannot be compiled."
+                            return nil
+
+                        if extension == "yue"
+                            func = load( content, await( Module.cache( url, content ) ), "yt", env, config, false )
+                            if func
+                                if isstring( func )
+                                    error ModuleError func
+                                    return nil
+
+                                return Module.run( func, url, env )
+
+                            error ModuleError "File '" .. url.href .. "' cannot be compiled."
+                            return nil
+
+                        if extension == "json"
+                            return JSONToTable( content, true, false )
 
                         return content
 

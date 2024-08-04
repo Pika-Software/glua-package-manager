@@ -186,6 +186,8 @@ for fileName in *Find( "gpm/sources/*.lua", "LUA" )
 if SERVER
     include( "test.lua" )
 
+gpm.loader.Startup!\Catch( environment.Error.display )
+
 logger\Info( "Start-up time: %.4f sec.", SysTime! - gpm.StartTime )
 
 return gpm

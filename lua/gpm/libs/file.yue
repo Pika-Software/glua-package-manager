@@ -28,9 +28,9 @@ else
 lib.LuaPath = luaPath
 
 luaExtensions = lib.LuaExtensions = {
-    ["lua"]: true
-    ["yue"]: true
-    ["moon"]: true
+    lua: true
+    yue: true
+    moon: true
 }
 
 writeAllowedGamePaths = lib.WriteAllowedGamePaths = {
@@ -44,7 +44,7 @@ assertWriteAllowed = ( filePath, gamePath ) ->
     error FileSystemError "File '" .. filePath .. "' is not allowed to be written to '" .. gamePath .. "'.", 3
     return nil
 
-local normalizeGamePath
+local normalizeGamePath, absoluteGamePath
 do
 
     dir2path = {
@@ -66,6 +66,24 @@ do
                 return relativePath, gamePath
 
         return absolutePath, "GAME"
+
+    path2dir = {
+        DOWNLOAD: "/download"
+        LuaMenu: "/lua"
+        DATA: "/data"
+        LUA: "/lua"
+        lsv: "/lua"
+        lcl: "/lua"
+    }
+
+    absoluteGamePath = lib.AbsoluteGamePath = ( filePath, gamePath, withoutSlash ) ->
+        if gamePath
+            filePath = ( path2dir[ gamePath ] or "" ) .. "/" .. filePath
+
+        if withoutSlash and byte( filePath, 1 ) == 0x2F --[[ / ]]
+            filePath = sub( filePath, 2 )
+
+        return filePath
 
 do
 
@@ -387,24 +405,10 @@ do
 
         do
 
-            import load from environment
             import Size from File
 
             File.SeekToEnd = ( fileHandle ) ->
                 return Seek( fileHandle, Size( fileHandle ) )
-
-            environment.loadfile = ( filePath, mode, env ) ->
-                ArgAssert( filePath, 1, "string" )
-
-                handler = open( filePath, "rb" )
-                unless handler
-                    error "File '" .. filePath .. "' can't be opened!", 2
-                    return nil
-
-                chunk = Read( handler, Size( handler ) )
-                Close( handler )
-
-                return load( chunk, filePath, mode, env )
 
         File.SkipEmpty = ( fileHandle ) ->
             while not EndOfFile( fileHandle )
@@ -710,19 +714,19 @@ do
                 "Name": "Garry's Mod"
                 "Install": ->
                     return {
-                        "Append": ( fileName, content, gamePath, func ) ->
-                            state = append( fileName, content, true ) and 0 or -1
-                            func( fileName, "DATA", state )
-                            return state
-
                         "Read": ( fileName, gamePath, func ) ->
-                            content = read( fileName, gamePath )
+                            content = read( fileName, gamePath, nil, true )
                             state = content == nil and -1 or 0
                             func( fileName, gamePath, state, content )
                             return state
 
+                        "Append": ( fileName, content, gamePath, func ) ->
+                            state = append( fileName, content, gamePath, true ) and 0 or -1
+                            func( fileName, "DATA", state )
+                            return state
+
                         "Write": ( fileName, content, gamePath, func ) ->
-                            state = write( fileName, content, "wb", true ) and 0 or -1
+                            state = write( fileName, content, gamePath, true ) and 0 or -1
                             func( fileName, "DATA", state )
                             return state
                     }
@@ -785,11 +789,11 @@ do
 
             state = Append( filePath, content, ( iFilePath, iGamePath, iState ) ->
                 if iState == 0
-                    promise\Resolve( { fileName: iFilePath, gamePath: iGamePath } )
-                    return
+                    promise\Resolve( absoluteGamePath( iFilePath, iGamePath ) )
+                    return nil
 
                 promise\Reject( FileSystemError FSASYNC[ iState ] )
-                return
+                return nil
             gamePath )
 
             if state ~= 0
@@ -810,10 +814,10 @@ do
             state = Read filePath, gamePath, ( _, __, iState, iContent ) ->
                 if iState == 0
                     promise\Resolve( iContent )
-                    return
+                    return nil
 
                 promise\Reject( FileSystemError FSASYNC[ iState ] )
-                return
+                return nil
 
             if state ~= 0
                 promise\Reject( FileSystemError FSASYNC[ state ] )
@@ -838,11 +842,12 @@ do
 
             state = Write( filePath, content, ( iFilePath, iGamePath, iState ) ->
                 if iState == 0
-                    promise\Resolve( { fileName: iFilePath, gamePath: iGamePath } )
-                    return
+                    promise\Resolve( absoluteGamePath( iFilePath, iGamePath ) )
+                    return nil
 
                 promise\Reject( FileSystemError FSASYNC[ iState ] )
-                return
+                return nil
+
             gamePath )
 
             if state ~= 0
@@ -861,111 +866,41 @@ do
     lib.AsyncLines = ( filePath, gamePath, skipNormalize ) ->
         return func( asyncRead( filePath, gamePath, skipNormalize ) )
 
-local compileLua
 do
 
-    import CompileLuaString, CompileLuaFile from util
+    import load from environment
+    import Open from file
 
-    asyncCompile = async ( filePath, gamePath, handleError ) ->
+    asyncCompile = async ( filePath, mode, env, config, gamePath ) ->
+        return load( await( asyncRead( filePath, gamePath, true ) ), absoluteGamePath( filePath, gamePath ), mode, env, config )
+
+    lib.AsyncCompile = ( filePath, mode, env, config, gamePath, skipNormalize ) ->
+        ArgAssert( filePath, 1, "string" )
+
+        unless skipNormalize
+            filePath, gamePath = normalizeGamePath( filePath, gamePath )
+
         if CLIENT and isFileMounted( filePath, gamePath, true )
             if luaGamePaths[ gamePath ]
                 filePath = "lua/" .. filePath
 
             gamePath = "WORKSHOP"
 
-        content = await asyncRead( filePath, gamePath, true )
-        unless content
-            error CodeCompileError "File '" .. filePath .. "' cannot be read."
+        return asyncCompile( filePath, mode, env, config, gamePath )
 
-        local func
-        func = CompileLuaString( content, filePath, handleError, false )
-        if not func and luaGamePaths[ gamePath ]
-            func = CompileLuaFile( filePath )
+    lib.Compile = environment.loadfile = ( filePath, mode, env, config, gamePath, skipNormalize ) ->
+        ArgAssert( filePath, 1, "string" )
 
-        if func
-            return func
-
-        error CodeCompileError "File '" .. filePath .. "' cannot be compiled."
-        return
-
-    compileLua = lib.CompileLua = ( filePath, gamePath, handleError, skipNormalize ) ->
         unless skipNormalize
             filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
-        return asyncCompile( filePath, gamePath, handleError )
+        if CLIENT and isFileMounted( filePath, gamePath, true )
+            if luaGamePaths[ gamePath ]
+                filePath = "lua/" .. filePath
 
-local compileMoon
-do
+            gamePath = "WORKSHOP"
 
-    import CompileMoonString from util
-
-    asyncCompile = async ( filePath, gamePath, handleError ) ->
-        content = await asyncRead( filePath, gamePath, true )
-        unless content
-            error CodeCompileError "File '" .. filePath .. "' cannot be read."
-
-        func = CompileMoonString( content, filePath, handleError )
-        if func
-            return func
-
-        error CodeCompileError "File '" .. filePath .. "' cannot be compiled."
-        return
-
-    compileMoon = lib.CompileMoon = ( filePath, gamePath, handleError, skipNormalize ) ->
-        unless skipNormalize
-            filePath, gamePath = normalizeGamePath( filePath, gamePath )
-
-        return asyncCompile( filePath, gamePath, handleError )
-
-local compileYue
-do
-
-    import CompileYueString from util
-
-    asyncCompile = async ( filePath, gamePath, handleError, yueConfig ) ->
-        content = await asyncRead( filePath, gamePath, true )
-        unless content
-            error CodeCompileError "File '" .. filePath .. "' cannot be read."
-
-        func = CompileYueString( content, filePath, handleError, yueConfig )
-        if func
-            return func
-
-        error CodeCompileError "File '" .. filePath .. "' cannot be compiled."
-        return
-
-    compileYue = lib.CompileYue = ( filePath, gamePath, handleError, yueConfig, skipNormalize ) ->
-        unless skipNormalize
-            filePath, gamePath = normalizeGamePath( filePath, gamePath )
-
-        return asyncCompile( filePath, gamePath, handleError, yueConfig )
-
-do
-
-    import stripExtension from path
-
-    lib.Compile = ( filePath, gamePath, handleError, yueConfig, skipNormalize ) ->
-        unless skipNormalize
-            filePath, gamePath = normalizeGamePath( filePath, gamePath )
-
-        withoutExtension, extension = stripExtension( filePath )
-        if extension ~= "" and not luaExtensions[ extension ]
-            return compileLua( filePath, gamePath, handleError, true )
-
-        compilePath = withoutExtension .. ".yue"
-        if isFile( compilePath, gamePath, true )
-            return compileYue( compilePath, gamePath, handleError, yueConfig, true )
-
-        compilePath = withoutExtension .. ".moon"
-        if isFile( compilePath, gamePath, true )
-            return compileMoon( compilePath, gamePath, handleError, true )
-
-        compilePath = withoutExtension .. ".lua"
-        if isFile( compilePath, gamePath, true )
-            return compileLua( compilePath, gamePath, handleError, true )
-
-        error CodeCompileError "File '" .. filePath .. "' cannot be compiled."
-        return
+        return load( read( filePath, gamePath, nil, true ), absoluteGamePath( filePath, gamePath ), mode, env, config )
 
 do
 
