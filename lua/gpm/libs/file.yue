@@ -930,7 +930,7 @@ do
 
         filePath ..= "." .. ( extension or "lua" )
 
-        unless mode
+        unless extension
             error CodeCompileError "Could not determine compile mode for '" .. filePath .. "'"
 
         content = await asyncRead( filePath, gamePath, true )

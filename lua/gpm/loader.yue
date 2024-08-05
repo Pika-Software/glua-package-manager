@@ -71,7 +71,7 @@ unless istable( packages )
 import sub, byte, find, match, gsub, format, StartsWith, IsURL from string
 import IsFile, NormalizeGamePath from file
 
-local Package
+local Module, Package
 do
 
     import getDirectory, getFileName, getExtension from path
@@ -616,7 +616,7 @@ do
             --     return nil
 
             config = {}
-            for key, value in url.searchParams\iterator!
+            for key, value in packageURL.searchParams\iterator!
                 config[ key ] = value
 
             compileResult = await AsyncCompile( filePath, {}, config, gamePath, true )
@@ -638,41 +638,15 @@ do
 
     loader.ESM = ESM
 
-class Require
+local Require
+do
+
     PACKAGE_PATHS = { "./?.lua", "./?/init.lua" }
+    import IsBinaryModuleInstalled from util
+    import tostring from environment
 
-    -- Just a shortcut so `Require.resolve ...` can be used instead of creating a new instance.
-    @resolve: ( ... ) -> Require!\resolve( ... )
-
-    resolve: async ( modname, base ) =>
-        unless base
-            error ModuleError "`require` cannot be used outside of modules"
-
-        if base.scheme ~= "file"
-            error NotImplementedError "cannot use `require` from `#{base}`"
-
-        isOpaque = isRequireSyntax( modname )
-        filePath = gsub( modname, "%.", "/" )
-
-        if resolved := isOpaque and resolveFile( @, filePath, base )
-            return { :resolved }
-
-        if StartsWith( filePath, "gpm/" ) or StartsWith( filePath, "garrysmod/" ) or StartsWith( filePath, "gmod/" )
-            protocol, filePath = match( filePath, "^(.-)/(.*)" )
-            filePath = tostring( URL( protocol .. ":///" .. filePath ) )
-
-        success, resolved = try await ESM.resolve( isOpaque and filePath or modname, base )
-        if success
-            return resolved
-
-        if util.IsBinaryModuleInstalled( modname )
-            return { resolved: URL( "dll:" .. modname ) }
-
-        -- TODO: make better errors
-        error resolved -- just return error from ESM
-        return
-
-    isRequireSyntax = ( modname ) -> match( modname, "^[%a%d_%-.]+$" )
+    isRequireSyntax = ( modname ) ->
+        return match( modname, "^[%a%d_%-.]+$" )
 
     resolveFile = ( filePath, base ) =>
         for pattern in *PACKAGE_PATHS
@@ -680,7 +654,41 @@ class Require
             if IsFile( url.pathname )
                 return url
 
-loader.Require = Require
+        return nil
+
+    class Require
+        -- Just a shortcut so `Require.resolve ...` can be used instead of creating a new instance.
+        @resolve: ( ... ) -> Require!\resolve( ... )
+
+        resolve: async ( modname, base ) =>
+            unless base
+                error ModuleError "`require` cannot be used outside of modules"
+
+            if base.scheme ~= "file"
+                error NotImplementedError "cannot use `require` from `#{base}`"
+
+            isOpaque = isRequireSyntax( modname )
+            filePath = gsub( modname, "%.", "/" )
+
+            if resolved := isOpaque and resolveFile( @, filePath, base )
+                return { :resolved }
+
+            if StartsWith( filePath, "gpm/" ) or StartsWith( filePath, "garrysmod/" ) or StartsWith( filePath, "gmod/" )
+                protocol, filePath = match( filePath, "^(.-)/(.*)" )
+                filePath = tostring( URL( protocol .. ":///" .. filePath ) )
+
+            success, resolved = try await ESM.resolve( isOpaque and filePath or modname, base )
+            if success
+                return resolved
+
+            if IsBinaryModuleInstalled( modname )
+                return { resolved: URL( "dll:" .. modname ) }
+
+            -- TODO: make better errors
+            error resolved -- just return error from ESM
+            return
+
+    loader.Require = Require
 
 class Include
     -- Just a shortcut so `Include.resolve ...` can be used instead of creating a new instance.
