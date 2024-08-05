@@ -805,7 +805,7 @@ do
 
             state = Append( filePath, content, ( iFilePath, iGamePath, iState ) ->
                 if iState == 0
-                    promise\Resolve( absoluteGamePath( iFilePath, iGamePath ) )
+                    promise\Resolve( absoluteGamePath( iFilePath, iGamePath, false ) )
                     return nil
 
                 promise\Reject( FileSystemError FSASYNC[ iState ] )
@@ -858,7 +858,7 @@ do
 
             state = Write( filePath, content, ( iFilePath, iGamePath, iState ) ->
                 if iState == 0
-                    promise\Resolve( absoluteGamePath( iFilePath, iGamePath ) )
+                    promise\Resolve( absoluteGamePath( iFilePath, iGamePath, false ) )
                     return nil
 
                 promise\Reject( FileSystemError FSASYNC[ iState ] )
@@ -884,13 +884,45 @@ do
 
 do
 
+    import stripDirectory, getFileName, getExtension from path
     import load from environment
     import Open from file
 
-    asyncCompile = async ( filePath, mode, env, config, gamePath ) ->
-        return load( await( asyncRead( filePath, gamePath, true ) ), absoluteGamePath( filePath, gamePath ), mode, env, config )
+    asyncCompile = async ( filePath, gamePath, env, config ) ->
+        filePath, directoryPath = stripDirectory( filePath, true )
+        filePath = directoryPath .. getFileName( filePath )
 
-    lib.AsyncCompile = ( filePath, mode, env, config, gamePath, skipNormalize ) ->
+        extensions = {}
+        for fileName in *Find( filePath .. ".*", gamePath )
+            extensions[ getExtension( fileName ) ] = true
+
+        local mode
+        if extensions.yue
+            filePath ..= ".yue"
+            mode = "yt"
+
+        elseif extensions.moon
+            filePath ..= ".moon"
+            mode = "mt"
+
+        elseif extensions.luac
+            filePath ..= ".luac"
+            mode = "bt"
+
+        elseif extensions.lc
+            filePath ..= ".lc"
+            mode = "bt"
+
+        elseif extensions.lua
+            filePath ..= ".lua"
+            mode = "t"
+
+        unless mode
+            error CodeCompileError "Could not determine compile mode for '" .. filePath .. "'"
+
+        return load( await( asyncRead( filePath, gamePath, true ) ), absoluteGamePath( filePath, gamePath, true ), mode, env, config )
+
+    lib.AsyncCompile = ( filePath, env, config, gamePath, skipNormalize ) ->
         ArgAssert( filePath, 1, "string" )
 
         unless skipNormalize
@@ -902,9 +934,9 @@ do
 
             gamePath = "WORKSHOP"
 
-        return asyncCompile( filePath, mode, env, config, gamePath )
+        return asyncCompile( filePath, gamePath, env, config )
 
-    lib.Compile = environment.loadfile = ( filePath, mode, env, config, gamePath, skipNormalize ) ->
+    lib.Compile = ( filePath, env, config, gamePath, skipNormalize ) ->
         ArgAssert( filePath, 1, "string" )
 
         unless skipNormalize
@@ -916,7 +948,52 @@ do
 
             gamePath = "WORKSHOP"
 
-        return load( read( filePath, gamePath, nil, true ), absoluteGamePath( filePath, gamePath ), mode, env, config )
+        filePath, directoryPath = stripDirectory( filePath, true )
+        filePath = directoryPath .. getFileName( filePath )
+
+        extensions = {}
+        for fileName in *Find( filePath .. ".*", gamePath )
+            extensions[ getExtension( fileName ) ] = true
+
+        local mode
+        if extensions.yue
+            filePath ..= ".yue"
+            mode = "yt"
+
+        elseif extensions.moon
+            filePath ..= ".moon"
+            mode = "mt"
+
+        elseif extensions.luac
+            filePath ..= ".luac"
+            mode = "bt"
+
+        elseif extensions.lc
+            filePath ..= ".lc"
+            mode = "bt"
+
+        elseif extensions.lua
+            filePath ..= ".lua"
+            mode = "t"
+
+        unless mode
+            error CodeCompileError "Could not determine compile mode for '" .. filePath .. "'"
+
+        return load( read( filePath, gamePath, nil, true ), absoluteGamePath( filePath, gamePath, true ), mode, env, config )
+
+    environment.loadfile = ( filePath, mode, env, config, gamePath, skipNormalize ) ->
+        ArgAssert( filePath, 1, "string" )
+
+        unless skipNormalize
+            filePath, gamePath = normalizeGamePath( filePath, gamePath )
+
+        if CLIENT and isFileMounted( filePath, gamePath, true )
+            if luaGamePaths[ gamePath ]
+                filePath = "lua/" .. filePath
+
+            gamePath = "WORKSHOP"
+
+        return load( read( filePath, gamePath, nil, true ), absoluteGamePath( filePath, gamePath, true ), mode, env, config )
 
 do
 
