@@ -47,6 +47,8 @@ assertWriteAllowed = ( filePath, gamePath ) ->
 local normalizeGamePath, absoluteGamePath
 do
 
+    import isurl from environment
+
     dir2path = {
         lua: luaPath
         data: "DATA"
@@ -54,6 +56,9 @@ do
     }
 
     normalizeGamePath = lib.NormalizeGamePath = ( absolutePath, gamePath ) ->
+        if isurl( absolutePath )
+            absolutePath = absolutePath.pathname
+
         absolutePath = sub( resolve( absolutePath ), 2 )
 
         if gamePath
