@@ -8,7 +8,8 @@ import async, await, reject from Promise
 import getfpath from debug
 
 file.CreateDir( "/data/gpm/vfs", true )
-file.Delete( "/data/gpm/vfs/*" )
+--- TODO: IDK how and why but this calls asyncrously
+-- file.Delete( "/data/gpm/vfs/*" )
 
 _G.hook.Add "ShutDown", "GLua Package Manager::VFS", ->
     file.Delete( "/data/gpm/vfs/*" )
@@ -225,6 +226,97 @@ do
 
             @homepage = homepage
 
+        @read: async ( url ) ->
+            -- TODO: must be made by retr0
+            -- Implement reading by URL
+            -- Find appropiate way to find package.lua/package.json/package.yue and etc.
+            -- Cache packages by URL like in Module class
+            unless isstring( url ) or isurl( url )
+                error PackageError "url is " .. type( url ) .. ", expected URL"
+
+            if isstring( url )
+                url = URL( url )
+
+            if url.scheme != "file"
+                error PackageError "unsupported scheme '#{url.scheme}' ('#{url}')"
+
+            unless istable( url.path )
+                error PackageError "invalid path '#{url.path}' ('#{url}')"
+
+            filePath, gamePath = file.NormalizeGamePath( url.pathname )
+            fileDir = path.getDirectory( filePath )
+
+            if path.getFileName( fileName ) != "package"
+                files = file.Find( path.join( fileDir, "*" ), gamePath, true )
+                --
+
+
+            -- pjsonPath = join( packageURL.pathname, "package.lua" )
+            -- unless IsFile( pjsonPath )
+            --     return
+
+            -- filePath, gamePath = NormalizeGamePath( pjsonPath )
+
+            -- withoutExtension, extension = stripExtension( filePath )
+            -- if IsFile( withoutExtension .. ".yue", gamePath, true )
+            --     extension = "yue"
+            -- elseif IsFile( withoutExtension .. ".moon", gamePath, true )
+            --     extension = "moon"
+            -- elseif IsFile( withoutExtension .. ".luac", gamePath, true )
+            --     extension = "luac"
+            -- elseif IsFile( withoutExtension .. ".lc", gamePath, true )
+            --     extension = "lc"
+
+            -- filePath = withoutExtension .. "." .. extension
+            -- content = await AsyncRead( filePath, gamePath, true )
+
+            -- if extension == "json"
+            --     info = JSONToTable( content )
+            --     if info
+            --         return getPackage( filePath, info )
+
+            --     error PackageError "Invalid JSON for '" .. filePath .. "'"
+            --     return nil
+
+            -- if extension == "lua"
+            --     firstByte = byte( content, 1 )
+            --     if firstByte == 0x5b --[['[']] or firstByte == 0x7b --[['{']]
+            --         info = JSONToTable( content )
+            --         if info
+            --             return getPackage( filePath, info )
+
+            -- mode = "t"
+            -- if extension == "yue"
+            --     mode = "y" .. mode
+
+            -- elseif extension == "moon"
+            --     mode = "m" .. mode
+
+            -- elseif extension == "luac" or extension == "lc"
+            --     mode = "b" .. mode
+
+            -- func = load( content, AbsoluteGamePath( filePath, gamePath, true ), mode, environment, nil, false )
+
+            -- if func
+            --     if isstring( func )
+            --         error PackageError func
+            --         return nil
+
+            --     info = {}
+            --     setfenv( func, info )
+            --     success, result = pcall( func )
+            --     if success
+            --         if istable( result )
+            --             Merge( info, result )
+
+            --         return getPackage( filePath, info )
+
+            --     error PackageError "File '" .. filePath .. "' compilation error: " .. result
+            --     return nil
+
+            -- error PackageError "File '" .. filePath .. "' cannot be compiled."
+            -- return nil
+
     environment.ispackage = ( any ) ->
         metatable = getmetatable( any )
         return metatable and metatable.__class == Package
@@ -302,12 +394,6 @@ do
                 resolved = URL( specifier )
             elseif StartsWith( specifier, "/" ) or StartsWith( specifier, "./" ) or StartsWith( specifier, "../" )
                 resolved = URL( specifier, parentURL )
-            elseif specifier == "gpm" or StartsWith( specifier, "gpm/" )
-                resolved = URL( "gpm:///" .. sub( specifier, 5 ) )
-            elseif specifier == "gmod" or StartsWith( specifier, "gmod/" )
-                resolved = URL( "gmod:///" .. sub( specifier, 6 ) )
-            elseif specifier == "garrysmod" or StartsWith( specifier, "garrysmod/" )
-                resolved = URL( "garrysmod:///" .. sub( specifier, 11 ) )
             elseif StartsWith( specifier, "#" )
                 resolved = packageImportsResolve( @, specifier, parentURL )
             else
