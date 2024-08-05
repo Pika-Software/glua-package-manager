@@ -611,30 +611,9 @@ do
 
         -- READ_PACKAGE_JSON(packageURL)
         readPackageJSON = ( packageURL ) =>
-            filePath, gamePath = NormalizeGamePath( join( packageURL.pathname, "package.lua" ) )
-            -- unless IsFile( filePath, gamePath, true )
-            --     return nil
-
-            config = {}
-            for key, value in packageURL.searchParams\iterator!
-                config[ key ] = value
-
-            compileResult = await AsyncCompile( filePath, {}, config, gamePath, true )
-            await Module.cache( "file://" .. compileResult.path, compileResult.content )
-
-            info = {}
-            func = compileResult.func
-            setfenv( func, info )
-
-            success, result = pcall( func )
-            if success
-                if istable( result )
-                    Merge( info, result )
-
-                return getPackage( filePath, info )
-
-            error PackageError "File '" .. filePath .. "' compilation error: " .. result
-            return nil
+            ok, result = Package.read( packageURL )\safeAwait()
+            if ok
+                return result
 
     loader.ESM = ESM
 

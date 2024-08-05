@@ -38,6 +38,7 @@ do
         "Why are we always looking for more?"
         "Don't worry, " .. username .. " :>"
         "Don't bring your light near me."
+        "Big Brother is watching you"
         "Hello, " .. username .. "!"
         "I'll make you a promise."
         "Flying over rooftops..."
