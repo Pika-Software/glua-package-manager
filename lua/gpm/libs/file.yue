@@ -206,7 +206,7 @@ do
                     -- mounted files
                     mountedFiles[ filePath ] = true
 
-                    -- mounted folders
+                    -- mounted dirs
                     segments, segmentCount = ByteSplit( getDirectory( filePath, false ), 0x2F --[[ / ]] )
                     segmentCount -= 1
 
@@ -243,41 +243,29 @@ do
 
     do
 
-        import find from string
-
         delete = ( filePath, gamePath ) ->
+            basePath = getDirectory( filePath, true )
+            files, dirs = Find( filePath, gamePath )
             searchable = getFile( filePath )
+            successful = true
 
-            ignoreFolder = find( searchable, "*", 1, true ) ~= nil
-            if ignoreFolder
-                filePath = getDirectory( filePath, false )
+            for fileName in *files
+                unless Delete( basePath .. fileName, gamePath )
+                    successful = false
 
-            if isDir( filePath, gamePath, true )
-                local files, folders
-                if ignoreFolder
-                    files, folders = Find( filePath .. searchable, gamePath )
-                else
-                    files, folders = Find( filePath .. "/*", gamePath )
-
-                successful = true
-
-                for folderName in *folders
-                    unless delete( filePath .. "/" .. folderName, gamePath )
+            for folderName in *dirs
+                directoryPath = basePath .. folderName
+                if directoryPath == filePath
+                    unless delete( directoryPath .. "/*", gamePath )
                         successful = false
 
-                for fileName in *files
-                    unless Delete( filePath .. "/" .. fileName, gamePath )
-                        successful = false
+                elseif not delete( directoryPath .. "/" .. searchable, gamePath )
+                    successful = false
 
-                unless successful
-                    return false
+                unless Delete( directoryPath, gamePath )
+                    successful = false
 
-                if ignoreFolder
-                    return successful
-
-                return Delete( filePath, gamePath )
-
-            return Delete( filePath, gamePath )
+            return successful
 
         lib.Delete = ( filePath, gamePath, skipNormalize ) ->
             unless skipNormalize
@@ -325,11 +313,11 @@ do
             if isDir( filePath, gamePath )
                 bytes = 0
 
-                files, folders = Find( filePath .. "/*", gamePath )
+                files, dirs = Find( filePath .. "/*", gamePath )
                 for fileName in *files
                     bytes += Size( filePath .. "/" .. fileName, gamePath )
 
-                for folderName in *folders
+                for folderName in *dirs
                     bytes += size( filePath .. "/" .. folderName, gamePath )
 
                 return bytes
@@ -345,7 +333,7 @@ do
 do
 
     getFolderContents = ( directoryPath, gamePath, result, length ) ->
-        files, folders = Find( directoryPath .. "*", gamePath )
+        files, dirs = Find( directoryPath .. "*", gamePath )
         unless files
             return result, length
 
@@ -353,7 +341,7 @@ do
             length += 1
             result[ length ] = directoryPath .. fileName
 
-        for folderName in *folders
+        for folderName in *dirs
             result, length = getFolderContents( directoryPath .. folderName .. "/", gamePath, result, length )
 
         return result, length
@@ -651,11 +639,11 @@ if istable( efsw )
         if isDir( filePath, gamePath, true )
             filePath ..= "/"
 
-            files, folders = Find( filePath .. "*", gamePath )
+            files, dirs = Find( filePath .. "*", gamePath )
             for fileName in *files
                 watch( filePath .. fileName, gamePath )
 
-            for folderName in *folders
+            for folderName in *dirs
                 watch( filePath .. folderName, gamePath )
 
         return true
@@ -676,11 +664,11 @@ if istable( efsw )
         if isDir( filePath, gamePath, true )
             filePath ..= "/"
 
-            files, folders = Find( filePath .. "*", gamePath )
+            files, dirs = Find( filePath .. "*", gamePath )
             for fileName in *files
                 unWatch( filePath .. fileName, gamePath )
 
-            for folderName in *folders
+            for folderName in *dirs
                 unWatch( filePath .. folderName, gamePath )
 
         return true
