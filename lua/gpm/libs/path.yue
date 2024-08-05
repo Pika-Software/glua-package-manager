@@ -15,7 +15,10 @@ export getFile = ( path ) ->
 
     return ""
 
-export getFileName = ( path ) ->
+export getFileName = ( path, withExtension ) ->
+    if withExtension
+        return getFile( path )
+
     local dotPosition
     for index = len( path ), 1, -1
 		ch = byte( path, index )
@@ -30,29 +33,27 @@ export getFileName = ( path ) ->
 
     return ""
 
-export getDirectory = ( path ) ->
+export getDirectory = ( path, withTrailingSlash ) ->
     for index = len( path ), 1, -1
         ch = byte( path, index )
         if ch == 0x2F --[[ / ]] or ch == 0x5C --[[ \ ]]
-            return sub( path, 1, index )
+            if withTrailingSlash
+                return sub( path, 1, index )
+
+            return sub( path, 1, index - 1 )
 
     return ""
 
-export getFilePath = ( path ) ->
-    for index = len( path ), 1, -1
-        ch = byte( path, index )
-        if ch == 0x2F --[[ / ]] or ch == 0x5C --[[ \ ]]
-            return sub( path, 1, index )
-
-    return ""
-
-export getExtension = ( path ) ->
+export getExtension = ( path, withDot ) ->
     for index = len( path ), 1, -1
 		ch = byte( path, index )
 		if ch == 0x2F --[[ / ]] or ch == 0x5C --[[ \ ]]
             break
 
 		if ch == 0x2E --[[ . ]]
+            if withDot
+                return sub( path, index )
+
             return sub( path, index + 1 )
 
     return ""
