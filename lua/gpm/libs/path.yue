@@ -70,7 +70,7 @@ export stripFile = ( path ) ->
 
     return "", path
 
-export stripDir = ( path ) ->
+export stripDirectory = ( path ) ->
     for index = len( path ), 1, -1
         ch = byte( path, index )
         if ch == 0x2F --[[ / ]] or ch == 0x5C --[[ \ ]]
@@ -96,7 +96,7 @@ export replaceDir = ( path, newDir ) ->
     if byte( newDir, len( newDir ) ) ~= 0x2F --[[ / ]]
         newDir ..= "/"
 
-    return newDir .. stripDir( path )
+    return newDir .. stripDirectory( path )
 
 export replaceExtension = ( path, newExtension ) ->
     return stripExtension( path ) .. "." .. newExtension
@@ -165,7 +165,7 @@ export splitPath = ( path ) ->
     else
         root = ""
 
-    basename, dir = stripDir( path )
+    basename, dir = stripDirectory( path )
     return root, dir, basename
 
 export dirname = ( path ) ->
