@@ -243,14 +243,37 @@ do
 
     do
 
+        import find from string
+
         delete = ( filePath, gamePath ) ->
+            searchable = getFile( filePath )
+
+            ignoreFolder = find( searchable, "*", 1, true ) ~= nil
+            if ignoreFolder
+                filePath = getDirectory( filePath, false )
+
             if isDir( filePath, gamePath, true )
-                files, folders = Find( filePath .. "/*", gamePath )
+                local files, folders
+                if ignoreFolder
+                    files, folders = Find( filePath .. searchable, gamePath )
+                else
+                    files, folders = Find( filePath .. "/*", gamePath )
+
+                successful = true
+
                 for folderName in *folders
-                    delete( filePath .. "/" .. folderName, gamePath )
+                    unless delete( filePath .. "/" .. folderName, gamePath )
+                        successful = false
 
                 for fileName in *files
-                    Delete( filePath .. "/" .. fileName, gamePath )
+                    unless Delete( filePath .. "/" .. fileName, gamePath )
+                        successful = false
+
+                unless successful
+                    return false
+
+                if ignoreFolder
+                    return successful
 
                 return Delete( filePath, gamePath )
 
