@@ -8,11 +8,9 @@ import async, await, reject from Promise
 import getfpath from debug
 
 file.CreateDir( "/data/gpm/vfs", true )
---- TODO: IDK how and why but this calls asyncrously
--- file.Delete( "/data/gpm/vfs/*" )
 
 _G.hook.Add "ShutDown", "GLua Package Manager::VFS", ->
-    file.Delete( "/data/gpm/vfs/*" )
+    file.Delete( "/data/gpm/vfs" )
     return nil
 
 :loader = gpm
@@ -75,10 +73,12 @@ local Package
 do
 
     import getDirectory, getFileName from path
+    import AsyncWrite, Time from file
     import PathFromURL from string
-    import AsyncWrite from file
     import Version from util
     import tobool from _G
+
+    startTime = environment.os.time! - ( gpm.StartTime or 0 )
 
     class Module
         __tostring: =>
@@ -94,7 +94,7 @@ do
             setfenv( location, setmetatable({ __module: @, __filename: pathname, __dirname: getDirectory( pathname, false ) }, { __index: env, __newindex: env }) )
 
             loader.Modules[ url.href ] = @
-            return
+            return nil
 
         run: ( ... ) =>
             -- if result := @result
@@ -110,7 +110,7 @@ do
 
         @cache: async ( url, content ) ->
             filePath = "/data/gpm/vfs/" .. stripExtension( PathFromURL( url ) ) .. ".txt"
-            if IsFile( filePath )
+            if IsFile( filePath ) and Time( filePath ) >= startTime
                 return filePath
 
             return AsyncWrite( filePath, content )
