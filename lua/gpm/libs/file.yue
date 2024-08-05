@@ -888,6 +888,22 @@ do
     import load from environment
     import Open from file
 
+    extension2mode = {
+        luac: "bt"
+        moon: "mt"
+        yue: "yt"
+        lua: "t"
+        lc: "bt"
+    }
+
+    extension2type = {
+        moon: "moonscript"
+        yue: "yuescript"
+        luac: "bytecode"
+        lc: "bytecode"
+        lua: "lua"
+    }
+
     asyncCompile = async ( filePath, gamePath, env, config ) ->
         filePath, directoryPath = stripDirectory( filePath, true )
         filePath = directoryPath .. getFileName( filePath )
@@ -896,31 +912,36 @@ do
         for fileName in *Find( filePath .. ".*", gamePath )
             extensions[ getExtension( fileName ) ] = true
 
-        local mode
+        local extension
         if extensions.yue
-            filePath ..= ".yue"
-            mode = "yt"
+            extension = "yue"
 
         elseif extensions.moon
-            filePath ..= ".moon"
-            mode = "mt"
+            extension = "moon"
 
         elseif extensions.luac
-            filePath ..= ".luac"
-            mode = "bt"
+            extension = "luac"
 
         elseif extensions.lc
-            filePath ..= ".lc"
-            mode = "bt"
+            extension = "lc"
 
         elseif extensions.lua
-            filePath ..= ".lua"
-            mode = "t"
+            extension = "lua"
+
+        filePath ..= "." .. ( extension or "lua" )
 
         unless mode
             error CodeCompileError "Could not determine compile mode for '" .. filePath .. "'"
 
-        return load( await( asyncRead( filePath, gamePath, true ) ), absoluteGamePath( filePath, gamePath, true ), mode, env, config )
+        content = await asyncRead( filePath, gamePath, true )
+        chunkName = absoluteGamePath( filePath, gamePath, true )
+
+        return {
+            func: load( content, chunkName, extension2mode[ extension ] or "t", env, config ),
+            type: extension2type[ extension ] or "lua",
+            path: "/" .. chunkName,
+            :content
+        }
 
     lib.AsyncCompile = ( filePath, env, config, gamePath, skipNormalize ) ->
         ArgAssert( filePath, 1, "string" )
@@ -955,31 +976,36 @@ do
         for fileName in *Find( filePath .. ".*", gamePath )
             extensions[ getExtension( fileName ) ] = true
 
-        local mode
+        local extension
         if extensions.yue
-            filePath ..= ".yue"
-            mode = "yt"
+            extension = "yue"
 
         elseif extensions.moon
-            filePath ..= ".moon"
-            mode = "mt"
+            extension = "moon"
 
         elseif extensions.luac
-            filePath ..= ".luac"
-            mode = "bt"
+            extension = "luac"
 
         elseif extensions.lc
-            filePath ..= ".lc"
-            mode = "bt"
+            extension = "lc"
 
         elseif extensions.lua
-            filePath ..= ".lua"
-            mode = "t"
+            extension = "lua"
+
+        filePath ..= "." .. ( extension or "lua" )
 
         unless mode
             error CodeCompileError "Could not determine compile mode for '" .. filePath .. "'"
 
-        return load( read( filePath, gamePath, nil, true ), absoluteGamePath( filePath, gamePath, true ), mode, env, config )
+        content = read( filePath, gamePath, nil, true )
+        chunkName = absoluteGamePath( filePath, gamePath, true )
+
+        return {
+            func: load( content, chunkName, extension2mode[ extension ] or "t", env, config ),
+            path: "/" .. chunkName,
+            :content,
+            :type
+        }
 
     environment.loadfile = ( filePath, mode, env, config, gamePath, skipNormalize ) ->
         ArgAssert( filePath, 1, "string" )

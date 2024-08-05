@@ -1,6 +1,7 @@
-import gpm, pairs from _G
+_G = _G
+import gpm from _G
 import environment from gpm
-import await, async, util, SourceError, error from environment
+import await, async, SourceError, error from environment
 import BaseSource, BaseSourceHandler, Module from gpm.loader
 import MountZIPData from environment.file
 import CachedFetch from environment.http
@@ -34,9 +35,11 @@ do
     import isstring, load from environment
 
     extensions = {
+        "luac": true
         "moon": true
         "yue": true
         "lua": true
+        "lc": true
     }
 
     class LuaCodeHandler extends BaseSourceHandler
@@ -92,7 +95,7 @@ class TextHandler extends BaseSourceHandler
 local JSONHandler
 do
 
-    import JSONToTable from util
+    import JSONToTable from environment.util
 
     class JSONHandler extends BaseSourceHandler
         ShouldHandle: ( url ) =>

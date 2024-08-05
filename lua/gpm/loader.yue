@@ -67,7 +67,7 @@ unless istable( packages )
 -- Resolves specifier as it is package specifier
 -- See https://nodejs.org/api/esm.html#resolution-algorithm-specification PACKAGE_RESOLVE
 import sub, byte, find, match, gsub, format, StartsWith, IsURL from string
-import IsFile from file
+import IsFile, NormalizeGamePath from file
 
 local Package
 do
@@ -243,7 +243,7 @@ do
             unless istable( url.path )
                 error PackageError "invalid path '#{url.path}' ('#{url}')"
 
-            filePath, gamePath = file.NormalizeGamePath( url.pathname )
+            filePath, gamePath = NormalizeGamePath( url.pathname )
             fileDir = path.getDirectory( filePath )
 
             if path.getFileName( fileName ) != "package"
@@ -325,9 +325,9 @@ do
 local ESM
 do
 
-    import AsyncRead, AbsoluteGamePath, IsDir, NormalizeGamePath from file
-    import PackageError, load from environment
+    import PackageError, pcall from environment
     import JSONToTable, Logger from util
+    import AsyncCompile, IsDir from file
     import canParse from URL
     import Merge from table
     import join from path
@@ -486,7 +486,7 @@ do
                 error PackageError "unsupported scheme #{target.scheme} ('#{target}') from '{#name}'"
 
             packageURL = URL( ".", target ) -- remove file from url (basically same as path.dirname)
-            if not file.IsDir( packageURL.pathname )
+            unless IsDir( packageURL.pathname )
                 return
 
             pjson = @pjson = readPackageJSON( @, packageURL )
@@ -626,70 +626,29 @@ do
 
         -- READ_PACKAGE_JSON(packageURL)
         readPackageJSON = ( packageURL ) =>
-            pjsonPath = join( packageURL.pathname, "package.lua" )
-            unless IsFile( pjsonPath )
-                return
+            filePath, gamePath = NormalizeGamePath( join( packageURL.pathname, "package.lua" ) )
+            -- unless IsFile( filePath, gamePath, true )
+            --     return nil
 
-            filePath, gamePath = NormalizeGamePath( pjsonPath )
+            config = {}
+            for key, value in url.searchParams\iterator!
+                config[ key ] = value
 
-            withoutExtension, extension = stripExtension( filePath )
-            if IsFile( withoutExtension .. ".yue", gamePath, true )
-                extension = "yue"
-            elseif IsFile( withoutExtension .. ".moon", gamePath, true )
-                extension = "moon"
-            elseif IsFile( withoutExtension .. ".luac", gamePath, true )
-                extension = "luac"
-            elseif IsFile( withoutExtension .. ".lc", gamePath, true )
-                extension = "lc"
+            compileResult = await AsyncCompile( filePath, {}, config, gamePath, true )
+            await Module.cache( "file://" .. compileResult.path, compileResult.content )
 
-            filePath = withoutExtension .. "." .. extension
-            content = await AsyncRead( filePath, gamePath, true )
+            info = {}
+            func = compileResult.func
+            setfenv( func, info )
 
-            if extension == "json"
-                info = JSONToTable( content )
-                if info
-                    return getPackage( filePath, info )
+            success, result = pcall( func )
+            if success
+                if istable( result )
+                    Merge( info, result )
 
-                error PackageError "Invalid JSON for '" .. filePath .. "'"
-                return nil
+                return getPackage( filePath, info )
 
-            if extension == "lua"
-                firstByte = byte( content, 1 )
-                if firstByte == 0x5b --[['[']] or firstByte == 0x7b --[['{']]
-                    info = JSONToTable( content )
-                    if info
-                        return getPackage( filePath, info )
-
-            mode = "t"
-            if extension == "yue"
-                mode = "y" .. mode
-
-            elseif extension == "moon"
-                mode = "m" .. mode
-
-            elseif extension == "luac" or extension == "lc"
-                mode = "b" .. mode
-
-            func = load( content, AbsoluteGamePath( filePath, gamePath, true ), mode, environment, nil, false )
-
-            if func
-                if isstring( func )
-                    error PackageError func
-                    return nil
-
-                info = {}
-                setfenv( func, info )
-                success, result = pcall( func )
-                if success
-                    if istable( result )
-                        Merge( info, result )
-
-                    return getPackage( filePath, info )
-
-                error PackageError "File '" .. filePath .. "' compilation error: " .. result
-                return nil
-
-            error PackageError "File '" .. filePath .. "' cannot be compiled."
+            error PackageError "File '" .. filePath .. "' compilation error: " .. result
             return nil
 
     loader.ESM = ESM

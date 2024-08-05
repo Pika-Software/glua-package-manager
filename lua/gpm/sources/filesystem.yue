@@ -1,11 +1,11 @@
 _G = _G
 import gpm from _G
 import environment from gpm
-import file, path, async, await, ModuleError, MountError, SourceError, error from environment
+import file, path, async, await, SourceError, error from environment
 import BaseSource, BaseSourceHandler, Module from gpm.loader
 import STATE_PENDING from environment.Promise
-import AsyncRead, NormalizeGamePath from file
 import getExtension, equal from path
+import NormalizeGamePath from file
 
 do
 
@@ -41,7 +41,6 @@ do
         Install: async ( url ) =>
             f = File!
             await f\AsyncRead( url.pathname, true, true )
-            -- f\SetTitle( url.href )
             unless f\VerifyCRC!
                 error SourceError "Invalid CRC checksum for '" .. url.href .. "'"
 
@@ -54,7 +53,7 @@ do
 
         promises = {}
 
-        mountZip = ( filePath ) ->
+        task = ( filePath ) ->
             promise = promises[ filePath ]
             if promise and promise.state == STATE_PENDING
                 return promise
@@ -69,54 +68,27 @@ do
                 return getExtension( url.pathname, false ) == "zip"
 
             Install: async ( url ) =>
-                return mountZip( url.pathname )
+                return task( url.pathname )
 
     local LuaHandler
     do
 
-        import yue, moon, load from environment
-        import stripExtension from path
+        import AsyncCompile from file
         import sub from _G.string
-        import IsFile from file
 
         promises = {}
 
         codeCompile = async ( url ) ->
+            config = {}
+            for key, value in url.searchParams\iterator!
+                config[ key ] = value
+
             filePath, gamePath = NormalizeGamePath( url.pathname )
-            filePath, extension = stripExtension( filePath )
+            compileResult = await AsyncCompile( filePath, nil, config, gamePath, true )
+            await Module.cache( "file://" .. compileResult.path, compileResult.content )
+            return compileResult.func
 
-            if IsFile( filePath .. ".yue", gamePath, true )
-                extension = "yue"
-            elseif IsFile( filePath .. ".moon", gamePath, true )
-                extension = "moon"
-            elseif IsFile( filePath .. ".luac", gamePath, true )
-                extension = "luac"
-            elseif IsFile( filePath .. ".lc", gamePath, true )
-                extension = "lc"
-
-            chunk = await AsyncRead( filePath .. "." .. extension, gamePath, true )
-
-            mode = "t"
-            if extension == "yue"
-                config = {}
-                for key, value in url.searchParams\iterator!
-                    config[ key ] = value
-
-                chunk = yue.ToLua( chunk, config )
-
-            elseif extension == "moon"
-                chunk = moon.ToLua( chunk )
-
-            elseif extension == "luac" or extension == "lc"
-                mode = "b" .. mode
-
-            return {
-                name: sub( await( Module.cache( url, chunk ) ), 2 ),
-                :chunk,
-                :mode
-            }
-
-        compile = ( url ) ->
+        task = ( url ) ->
             promise = promises[ url.href ]
             if promise and promise.state == STATE_PENDING
                 return promise
@@ -130,18 +102,7 @@ do
                 return equal( sub( url.pathname, 1, 5 ), "/lua/" )
 
             Install: async ( url, _, __, env ) =>
-                result = await compile( url )
-
-                func = load( result.chunk, result.name, result.mode, env, nil, false )
-                if func
-                    if isstring( func )
-                        error ModuleError func
-                        return nil
-
-                    return Module.run( func, url, env )
-
-                error ModuleError "File '" .. url.pathname .. "' cannot be compiled."
-                return nil
+                return Module.run( await( task( url ) ), url, env )
 
     class FileSource extends BaseSource
 
