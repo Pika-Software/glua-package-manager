@@ -7,12 +7,11 @@ import getCurrentFile, getCurrentDirectory, stripExtension from path
 import async, await, reject from Promise
 import getfpath from debug
 
--- TODO: F1CKING MAGICAL FILE.DELETE
-file.Delete( "/data/gpm/vfs" )
 file.CreateDir( "/data/gpm/vfs", true )
+file.Delete( "/data/gpm/vfs/*" )
 
 _G.hook.Add "ShutDown", "GLua Package Manager::VFS", ->
-    file.Delete( "/data/gpm/vfs" )
+    file.Delete( "/data/gpm/vfs/*" )
     return nil
 
 :loader = gpm
@@ -91,7 +90,7 @@ do
             @name = getfpath( location ) or "unknown"
 
             :pathname = url
-            setfenv( location, setmetatable({ __module: @, __filename: pathname, __dirname: getDirectory( pathname ) }, { __index: env, __newindex: env }) )
+            setfenv( location, setmetatable({ __module: @, __filename: pathname, __dirname: getDirectory( pathname, false ) }, { __index: env, __newindex: env }) )
 
             loader.Modules[ url.href ] = @
             return
@@ -138,14 +137,14 @@ do
             @path = filePath
 
             unless info
-                @name = match( filePath, ".*packages/([^/]+)" ) or getFileName( filePath )
+                @name = match( filePath, ".*packages/([^/]+)" ) or getFileName( filePath, false )
                 @version = Version( "0.1.0" )
                 return nil
 
             -- name
             name = info.name
             unless isstring( name )
-                name = match( filePath, ".*packages/([^/]+)" ) or getFileName( filePath )
+                name = match( filePath, ".*packages/([^/]+)" ) or getFileName( filePath, false )
 
             if not name or name == ""
                 name = format( "%p", @ )

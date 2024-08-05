@@ -2,8 +2,8 @@ _G = _G
 import environment from _G.gpm
 import string, file, table, await, async, AddonError, ArgAssert, isstring, error, tostring, tonumber from environment
 
-file.Delete( "/data/gpm/mount" )
 file.CreateDir( "/data/gpm/mount", true )
+file.Delete( "/data/gpm/mount/*" )
 
 _module_0 = {}
 

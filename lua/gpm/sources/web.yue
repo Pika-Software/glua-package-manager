@@ -20,7 +20,7 @@ do
     getExtension = ( url ) ->
         extension = url.extension
         unless extension
-            extension = extname( url.pathname ) or ""
+            extension = extname( url.pathname, false ) or ""
             if luaExtensions[ extension ]
                 extension = "lua"
 

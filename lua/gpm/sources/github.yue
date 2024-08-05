@@ -148,7 +148,7 @@ class RepositoryHandler extends BaseSourceHandler
                             config[ key ] = value
 
                         -- Optimize compilation?
-                        extension = getExtension( currentPath )
+                        extension = getExtension( currentPath, false )
 
                         if extension == "lua"
                             func = load( content, await( Module.cache( url, content ) ), "t", env, config, false )

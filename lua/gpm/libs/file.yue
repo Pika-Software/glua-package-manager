@@ -4,7 +4,7 @@ import file, istable, CLIENT, SERVER, MENU_DLL from _G
 import async, await, debug, util, path, string, Promise, CodeCompileError, FileSystemError, error, ArgAssert from environment
 import ByteStream, IsBinaryModuleInstalled from util
 import byte, sub, len, match, ByteSplit from string
-import resolve, getDirectory from path
+import resolve, getDirectory, getFile from path
 import concat from environment.table
 import fempty from debug
 import Find from file
@@ -207,7 +207,7 @@ do
                     mountedFiles[ filePath ] = true
 
                     -- mounted folders
-                    segments, segmentCount = ByteSplit( getDirectory( filePath ), 0x2F --[[ / ]] )
+                    segments, segmentCount = ByteSplit( getDirectory( filePath, false ), 0x2F --[[ / ]] )
                     segmentCount -= 1
 
                     while segmentCount ~= 0
@@ -372,7 +372,7 @@ do
                 filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
             if writeModes[ fileMode ]
-                directoryPath = getDirectory( filePath )
+                directoryPath = getDirectory( filePath, true )
                 if directoryPath ~= "" and directoryPath ~= "/"
                     createDir( directoryPath, true, gamePath, true )
 
@@ -542,7 +542,7 @@ do
 
 if SERVER
 
-    import getCurrentFile, getFile, stripExtension from path
+    import getCurrentFile, stripExtension from path
 
     -- For future overrides by plugins
     lib.InternalAddCSLuaFile = _G.AddCSLuaFile
@@ -834,7 +834,7 @@ do
 
             assertWriteAllowed( filePath, gamePath )
 
-            directoryPath = getDirectory( filePath )
+            directoryPath = getDirectory( filePath, true )
             if directoryPath ~= "" and directoryPath ~= "/"
                 createDir( directoryPath, true, gamePath, true )
 
