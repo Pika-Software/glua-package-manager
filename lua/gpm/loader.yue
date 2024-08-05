@@ -15,7 +15,8 @@ _G.hook.Add "ShutDown", "GLua Package Manager::VFS", ->
 
 :loader = gpm
 unless istable( loader )
-    loader = gpm.loader = { Modules: {} }
+    -- Modules and Packages are tables with format: [url] = Module/Package
+    loader = gpm.loader = { Modules: {}, Packages: {} }
 
 local repositories
 
@@ -226,11 +227,55 @@ do
 
             @homepage = homepage
 
-        @read: async ( url ) ->
-            -- TODO: must be made by retr0
-            -- Implement reading by URL
-            -- Find appropiate way to find package.lua/package.json/package.yue and etc.
-            -- Cache packages by URL like in Module class
+        -- directly reads package info from given filePath and creates Package
+        -- do not use this method directly, use Package.read instead
+        @parse: async ( filePath, gamePath ) ->
+            content = await file.AsyncRead( filePath, gamePath, true )
+            unless content
+                error PackageError "file '#{filePath}' ('#{gamePath}') is empty for packageURL (or cannot be read)"
+
+            info = nil
+            fileExt = path.getExtension( filePath )
+            if fileExt == "lua"
+                if byte( content, 1 ) == 0x5b --[['[']] or byte( content, 1 ) == 0x7b --[['{']]
+                    fileExt = "json" -- try to parse as JSON
+
+            if fileExt == "json"
+                info = util.JSONToTable( content )
+
+            -- It is not a JSON file, we need to extract info from lua
+            unless info
+                mode = "t"
+                if fileExt == "yue"
+                    mode = "y" .. mode
+                elseif fileExt == "moon"
+                    mode = "m" .. mode
+                elseif fileExt == "luac" or fileExt == "lc"
+                    mode = "b" .. mode
+
+                info = {}
+                result = load( content, file.AbsoluteGamePath( filePath, gamePath, true ), mode, info, nil, false )
+                if isstring( result )
+                    error PackageError "package info '#{filePath}' compilation error: " .. result
+
+                if result
+                    success, result = pcall( result )
+                    unless success
+                        error PackageError "package info '#{filePath}' execution error: " .. result
+
+                    if istable( result )
+                        table.Merge( info, result )
+
+            if not info or table.IsEmpty( info )
+                error PackageError "file '#{filePath}' does not contain valid package info (empty or cannot be parsed)"
+
+            pkg = Package( filePath, info )
+            return pkg
+
+        -- Finds a package info in given url.
+        -- If package.* file was not given in path, tries to find it.
+        -- Also caches the package by URL.
+        @read: async ( url, cache = true ) ->
             unless isstring( url ) or isurl( url )
                 error PackageError "url is " .. type( url ) .. ", expected URL"
 
@@ -243,79 +288,32 @@ do
             unless istable( url.path )
                 error PackageError "invalid path '#{url.path}' ('#{url}')"
 
-            filePath, gamePath = NormalizeGamePath( url.pathname )
+            if loader.Packages[ url ]
+                return loader.Packages[ url ]
+
+            filePath, gamePath = file.NormalizeGamePath( url.pathname )
             fileDir = path.getDirectory( filePath )
 
+            -- if not package.* file was given in url, try to find it smartly
             if path.getFileName( fileName ) != "package"
-                files = file.Find( path.join( fileDir, "*" ), gamePath, true )
-                --
+                files = file.Find( path.join( fileDir, "package.*" ), gamePath, true )
+                if #files == 1
+                    filePath = path.join( fileDir, files[1] )
+                elseif #files > 1
+                    -- Smartly decide which file to use
+                    values = {} -- [ext] = filePath
+                    for _, name in *files
+                        values[ path.getExtension( name ) ] = name
 
+                    fileName = values["yue"] or values["moon"] or values["lua"] or values[1]
+                    filePath = path.join( fileDir, fileName )
 
-            -- pjsonPath = join( packageURL.pathname, "package.lua" )
-            -- unless IsFile( pjsonPath )
-            --     return
+            unless filePath and file.IsFile( filePath, gamePath )
+                error PackageError "file '#{filePath}' does not exist for packageURL '#{url}'"
 
-            -- filePath, gamePath = NormalizeGamePath( pjsonPath )
-
-            -- withoutExtension, extension = stripExtension( filePath )
-            -- if IsFile( withoutExtension .. ".yue", gamePath, true )
-            --     extension = "yue"
-            -- elseif IsFile( withoutExtension .. ".moon", gamePath, true )
-            --     extension = "moon"
-            -- elseif IsFile( withoutExtension .. ".luac", gamePath, true )
-            --     extension = "luac"
-            -- elseif IsFile( withoutExtension .. ".lc", gamePath, true )
-            --     extension = "lc"
-
-            -- filePath = withoutExtension .. "." .. extension
-            -- content = await AsyncRead( filePath, gamePath, true )
-
-            -- if extension == "json"
-            --     info = JSONToTable( content )
-            --     if info
-            --         return getPackage( filePath, info )
-
-            --     error PackageError "Invalid JSON for '" .. filePath .. "'"
-            --     return nil
-
-            -- if extension == "lua"
-            --     firstByte = byte( content, 1 )
-            --     if firstByte == 0x5b --[['[']] or firstByte == 0x7b --[['{']]
-            --         info = JSONToTable( content )
-            --         if info
-            --             return getPackage( filePath, info )
-
-            -- mode = "t"
-            -- if extension == "yue"
-            --     mode = "y" .. mode
-
-            -- elseif extension == "moon"
-            --     mode = "m" .. mode
-
-            -- elseif extension == "luac" or extension == "lc"
-            --     mode = "b" .. mode
-
-            -- func = load( content, AbsoluteGamePath( filePath, gamePath, true ), mode, environment, nil, false )
-
-            -- if func
-            --     if isstring( func )
-            --         error PackageError func
-            --         return nil
-
-            --     info = {}
-            --     setfenv( func, info )
-            --     success, result = pcall( func )
-            --     if success
-            --         if istable( result )
-            --             Merge( info, result )
-
-            --         return getPackage( filePath, info )
-
-            --     error PackageError "File '" .. filePath .. "' compilation error: " .. result
-            --     return nil
-
-            -- error PackageError "File '" .. filePath .. "' cannot be compiled."
-            -- return nil
+            -- also cache result so next calls will return current package
+            loader.Packages[ url ] = pkg = Package.parse( filePath, gamePath )
+            return pkg
 
     environment.ispackage = ( any ) ->
         metatable = getmetatable( any )
