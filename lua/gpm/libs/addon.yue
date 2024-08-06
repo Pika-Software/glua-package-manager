@@ -5,6 +5,10 @@ import string, file, table, await, async, AddonError, ArgAssert, isstring, error
 file.CreateDir( "/data/gpm/mount", true )
 file.Delete( "/data/gpm/mount/*" )
 
+_G.hook.Add "ShutDown", "GLua Package Manager::Mount", ->
+    file.Delete( "/data/gpm/mount/*" )
+    return nil
+
 _module_0 = {}
 
 do
