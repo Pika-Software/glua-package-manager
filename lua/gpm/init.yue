@@ -115,8 +115,7 @@ do
     table.Sandbox = sandbox
 
 include( "gpm/util.lua" )
-
-logger = gpm.Logger = include( "libs/logger.lua" )( "gpm@" .. gpm.VERSION, environment.Color( 180, 180, 255 ), false )
+Logger = include( "libs/logger.lua" )
 
 environment.path = include( "libs/path.lua" )
 
@@ -130,7 +129,7 @@ environment.struct = include( "libs/struct.lua" )
 
 -- LibDeflate
 deflate = include( "libs/3rd-party/deflate.lua" )
-logger\Loaded( "LibDeflate v%s", deflate._VERSION )
+Logger\Loaded( "LibDeflate v%s", deflate._VERSION )
 environment.deflate = deflate
 
 import RegisterMetaTable from environment.util
@@ -146,7 +145,7 @@ do
 
     RegisterMetaTable( "Promise", promise.__base )
 
-    logger\Loaded( "gm_promise v%s", promise.VERSION )
+    Logger\Loaded( "gm_promise v%s", promise.VERSION )
 
 -- gm_url
 do
@@ -190,6 +189,6 @@ if SERVER
 
 gpm.loader.Startup!\Catch( environment.Error.display )
 
-logger\Info( "Start-up time: %.4f sec.", SysTime! - gpm.StartTime )
+Logger\Info( "Start-up time: %.4f sec.", SysTime! - gpm.StartTime )
 
 return gpm

@@ -1,12 +1,14 @@
 _G = _G
-import environment from _G.gpm
-import tostring, getmetatable from _G
-import format, gsub, sub, len from _G.string
-import cvars, timer, util, os, CreateConVar, MsgC, Color from environment
-import date from os
+import gpm from _G
+import environment from gpm
+
+import format, gsub, sub, len from environment.string
+import timer, util, Color from environment
 
 dateScheme, limit = "%d-%m-%Y %H:%M:%S ", 128
-if CreateConVar
+do
+
+    import CreateConVar from environment
     import FCVAR_ARCHIVE from _G
 
     dateScheme = CreateConVar( "gpm_logger_date", "0", FCVAR_ARCHIVE, "Allows the logger to display date.", 0, 1 )\GetBool! and "%d-%m-%Y %H:%M:%S " or "%H:%M:%S "
@@ -14,13 +16,16 @@ if CreateConVar
 
 queue = util.Queue( limit )
 
-if cvars
-    cvars.AddChangeCallback( "gpm_logger_date", ( _, __, new ) ->
+do
+
+    import AddChangeCallback from environment.cvars
+
+    AddChangeCallback( "gpm_logger_date", ( _, __, new ) ->
         dateScheme = ( new == "1" and "%d-%m-%Y %H:%M:%S " or "%H:%M:%S ")
 
     "GLua Package Manager::Logger")
 
-    cvars.AddChangeCallback( "gpm_logger_limit", ( _, __, new ) ->
+    AddChangeCallback( "gpm_logger_limit", ( _, __, new ) ->
         limit = tonumber( new )
         if limit
             queue.size = limit
@@ -52,44 +57,53 @@ else
 
 state = "[" .. state .. "] "
 
-timer.Create "GLua Package Manager::Logger", 1 / limit, 0, ->
-    data = queue\dequeue!
-    unless data
-        return
+do
 
-    MsgC( secondary_text, date( dateScheme ), state_color, state, data[ 1 ], data[ 2 ], secondary_text, " --> ", data[ 3 ], data[ 4 ], secondary_text, " : ", data[ 5 ], data[ 6 ] .. "\n" )
-    return
+    import date from environment.os
+    import MsgC from environment
 
-log = ( color, level, str, ... ) =>
-    if @interpolation
-        args = {...}
-        for index = 1, #args
-            args[ tostring( index ) ] = tostring( args[ index ] )
+    timer.Create "GLua Package Manager::Logger", 1 / limit, 0, ->
+        data = queue\dequeue!
+        if data
+            MsgC( secondary_text, date( dateScheme ), state_color, state, data[ 1 ], data[ 2 ], secondary_text, " --> ", data[ 3 ], data[ 4 ], secondary_text, " : ", data[ 5 ], data[ 6 ] .. "\n" )
 
-        str = gsub( str, "{([0-9]+)}", args )
-    else
-        str = format( str, ... )
+        return nil
 
-    title = @title
+local log
+do
 
-    titleLength = len( title )
-    if titleLength > 64
-        title = sub( title, 1, 64 )
-        titleLength = 64
-        @title = title
+    import tostring from environment
 
-    if ( len( str ) + titleLength ) > 950
-        str = sub( str, 1, 950 - titleLength ) .. "..."
+    log = ( color, level, str, ... ) =>
+        if @interpolation
+            args = {...}
+            for index = 1, #args
+                args[ tostring( index ) ] = tostring( args[ index ] )
 
-    queue\enqueue( { color, level, @title_color, title, @text_color, str } )
-    return
+            str = gsub( str, "{([0-9]+)}", args )
+        else
+            str = format( str, ... )
+
+        title = @title
+
+        titleLength = len( title )
+        if titleLength > 64
+            title = sub( title, 1, 64 )
+            titleLength = 64
+            @title = title
+
+        if ( len( str ) + titleLength ) > 950
+            str = sub( str, 1, 950 - titleLength ) .. "..."
+
+        queue\enqueue( { color, level, @title_color, title, @text_color, str } )
+        return nil
 
 developer = GetConVar( "developer" )
 
 debugFilter = ->
     return developer\GetInt! > 0
 
-export default class Logger
+class Logger
     __tostring: =>
         return format( "Logger: %p [%s]", @, @title )
 
@@ -100,30 +114,38 @@ export default class Logger
 
     Info: ( ... ) =>
         log( @, info, " INFO ", ... )
-        return
+        return nil
 
     Warn: ( ... ) =>
         log( @, warn, " WARN ", ... )
-        return
+        return nil
 
     Error: ( ... ) =>
         log( @, error, "ERROR ", ... )
-        return
+        return nil
 
     Loaded: ( ... ) =>
         log( @, debug, "LOADED", ... )
-        return
+        return nil
 
     Debug: ( ... ) =>
         if @debug_filter( ... )
             log( @, debug, "DEBUG ", ... )
 
-        return
+        return nil
 
 util.Logger = Logger
 
-environment.IsLogger = ( any ) ->
-    metatable = getmetatable( any )
-    return metatable and metatable.__class == Logger
+do
+
+    import getmetatable from _G
+
+    environment.IsLogger = ( any ) ->
+        metatable = getmetatable( any )
+        return metatable and metatable.__class == Logger
 
 util.RegisterMetaTable( "Logger", Logger.__base )
+
+logger = Logger( "gpm@" .. gpm.VERSION, environment.Color( 180, 180, 255 ), false )
+gpm.Logger = logger
+return logger
