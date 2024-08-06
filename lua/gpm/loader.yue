@@ -2,7 +2,7 @@ _G = _G
 import gpm, getmetatable, setmetatable, rawset from _G
 import environment from gpm
 
-import debug, string, path, table, file, util, isurl, isstring, ArgAssert, URL, NotImplementedError, ModuleError, Promise, error, pcall, PackageError from environment
+import debug, string, path, table, file, util, pairs, isurl, isstring, ArgAssert, URL, NotImplementedError, ModuleError, Promise, error, pcall, PackageError from environment
 import async, await, reject, SafeAwait from Promise
 import stripExtension from path
 import getfpath from debug
@@ -170,11 +170,12 @@ do
                 @name = name
 
                 -- version
-                version = info.version
+                :version = info
                 unless isstring( version )
                     version = "0.1.0"
 
-                version = @version = Version( version )
+                version = Version( version )
+                @version = version
 
                 -- autorun
                 @autorun = tobool( info.autorun )
@@ -243,13 +244,25 @@ do
 
                 @homepage = homepage
 
+                -- package logger
+                if logger
+                    if logger.disabled
+                        logger = nil
+                    else
+                        logger = Logger( name .. "@" .. version\__tostring!, logger.color, logger.interpolation )
+                else
+                    logger = Logger( name .. "@" .. version\__tostring! )
+
+                @__hooks = setmetatable( {}, hooksMeta )
+                @__prefix = @__tostring! .. "::"
+                @__timers = {}
+
+                -- package environment
+                @env = setmetatable( { __package: @, Logger: logger }, environmentMetatable )
+
             -- directly reads package info from given filePath and creates Package
             -- do not use this method directly, use Package.read instead
-            @parse: async ( filePath, gamePath ) ->
-                config = {}
-                for key, value in url.searchParams\iterator!
-                    config[ key ] = value
-
+            @parse: async ( filePath, gamePath, config ) ->
                 compileResult = await AsyncCompile( filePath, {}, config, gamePath, true )
                 await Module.cache( "file://" .. compileResult.path, compileResult.content )
                 func = compileResult.func
@@ -274,21 +287,22 @@ do
             -- If package.* file was not given in path, tries to find it.
             -- Also caches the package by URL.
             @read: async ( url ) ->
-                isString = isstring( url )
-                unless isurl( url ) or isString
-                    error PackageError "url is " .. type( url ) .. ", expected URL/string"
-
-                if isString
+                if isstring( url )
                     url = URL( url )
 
+                unless isurl( url )
+                    error PackageError "invalid url '" .. url.href .. "'"
+
                 if url.scheme ~= "file"
-                    error PackageError "unsupported scheme '" .. url.scheme .. "' ('" .. url.href .. "')"
+                    -- error PackageError "unsupported scheme '" .. url.scheme .. "' ('" .. url.href .. "')"
+                    return nil
 
                 unless istable( url.path )
-                    error PackageError "invalid path '" .. url.pathname .. "' ('" .. url.href .. "')"
+                    -- error PackageError "invalid path '" .. url.pathname .. "' ('" .. url.href .. "')"
+                    return nil
 
-                if loader.Packages[ url.href ]
-                    return loader.Packages[ url.href ]
+                -- if loader.Packages[ url.href ]
+                --     return loader.Packages[ url.href ]
 
                 filePath, gamePath = NormalizeGamePath( url.pathname )
                 fileDir = getDirectory( filePath, true )
@@ -302,36 +316,23 @@ do
                     elseif #files > 1
                         -- Smartly decide which file to use
                         values = {} -- [ext] = filePath
-                        for _, fileName in *files
+                        for fileName in *files
                             values[ getExtension( fileName, false ) ] = fileName
 
                         filePath = fileDir .. values.yue or values.moon or values.lua or values[ 1 ]
 
-                unless filePath and IsFile( filePath, gamePath, true )
-                    error PackageError "file '" .. filePath .. "' does not exist for packageURL '" .. url.href .. "'"
+                unless IsFile( filePath, gamePath, true )
+                    -- error PackageError "file '" .. filePath .. "' does not exist for packageURL '" .. url.href .. "'"
+                    return nil
+
+                config = {}
+                for key, value in url.searchParams\iterator!
+                    config[ key ] = value
 
                 -- also cache result so next calls will return current package
-                pkg = Package.parse( filePath, gamePath )
-                loader.Packages[ url.href ] = pkg
-
-                -- package logger
-                :logger = pkg
-                if logger
-                    if logger.disabled
-                        logger = nil
-                    else
-                        logger = Logger( pkg.name .. "@" .. pkg.version\__tostring!, logger.color, logger.interpolation )
-                else
-                    logger = Logger( pkg.name .. "@" .. pkg.version\__tostring! )
-
-                pkg.__hooks = setmetatable( {}, hooksMeta )
-                pkg.__prefix = pkg\__tostring! .. "::"
-                pkg.__timers = {}
-
-                -- package environment
-                pkg.env = setmetatable( { __package: pkg, Logger: logger }, environmentMetatable )
-
-                return pkg
+                promise = Package.parse( filePath, gamePath, config )
+                loader.Packages[ url.href ] = promise
+                return promise
 
     environment.ispackage = ( any ) ->
         metatable = getmetatable( any )
@@ -409,7 +410,7 @@ do
 
                     continue
 
-                pjson = @pjson = readPackageJSON( @, packageURL )
+                pjson = @pjson = await Package.read( packageURL )
                 if pjson and pjson.exports
                     return packageExportsResolve( @, packageURL, packageSubpath, pjson.exports )
 
@@ -424,7 +425,7 @@ do
             if not packageURL
                 return
 
-            pjson = @pjson = readPackageJSON( @, packageURL )
+            pjson = @pjson = await Package.read( packageURL )
             if not pjson or not pjson.exports
                 return
 
@@ -459,7 +460,7 @@ do
             unless IsDir( packageURL.pathname )
                 return
 
-            pjson = @pjson = readPackageJSON( @, packageURL )
+            pjson = @pjson = await Package.read( packageURL )
             if pjson and pjson.exports
                 return packageExportsResolve( @, packageURL, subpath, pjson.exports )
 
@@ -468,7 +469,7 @@ do
         exportsStartsWithDot = ( exports, packageURL ) =>
             if istable( exports )
                 local state
-                for k, _ in pairs exports
+                for k in pairs( exports )
                     statsWithDot = StartsWith( k, "." )
                     if state == nil
                         state = statsWithDot
@@ -506,7 +507,7 @@ do
 
             packageURL = lookupPackageScope( @, parentURL )
             if packageURL
-                pjson = @pjson = readPackageJSON( @, packageURL )
+                pjson = @pjson = await Package.read( packageURL )
                 if pjson and pjson.imports
                     if resolved := packageImportsExportsResolve( @, specifier, pjson.imports, packageURL, true )
                         return resolved
@@ -530,6 +531,7 @@ do
                 unless StartsWith( target, "./" )
                     if isImports == false or StartsWith( target, "/" ) or StartsWith( target, "../" ) or canParse( target )
                         error PackageError "invalid target '#{target}' for '#{packageURL}'"
+                        return nil
 
                     if isstring( patternMatch )
                         return packageResolve( @, gsub( target, "*", patternMatch ), packageURL )
@@ -545,13 +547,15 @@ do
                 -- TODO: If patternMatch split on "/" or "\" contains any "", ".", "..", or "node_modules" segments, case insensitive and including percent encoded variants, throw an Invalid Module Specifier error.
                 resolvedTarget.pathname = gsub( resolvedTarget.pathname, "*", patternMatch )
                 return resolvedTarget
-            elseif istable( target )
+
+            if istable( target )
                 if #target == 0 -- object
                     local defaultValue
-                    for p, targetValue in pairs target
-                        if DEFAULT_CONDITIONS[p]
+                    for p, targetValue in pairs( target )
+                        if DEFAULT_CONDITIONS[ p ]
                             if resolved := packageTargetResolve( @, packageURL, targetValue, patternMatch, isImports )
                                 return resolved
+
                         elseif p == "default"
                             defaultValue = targetValue
 
@@ -570,14 +574,15 @@ do
 
                 unless success
                     error resolved
-                    return
+                    return nil
 
                 return nil
-            elseif target == nil
+
+            if target == nil
                 return nil
 
             error PackageError "invalid target '#{target}' for '#{packageURL}'"
-            return
+            return nil
 
         -- LOOKUP_PACKAGE_SCOPE(url)
         lookupPackageScope = ( url ) =>
@@ -587,18 +592,12 @@ do
             local scopeURL = URL( "./package.lua", url )
             while scopeURL.path[1] ~= "package.lua" -- not filesystem root
                 if scopeURL.path[ #scopeURL.path - 1 ] == "packages"
-                    return
+                    return nil
 
                 if IsFile( scopeURL.pathname )
                     return URL( "./", scopeURL )
 
                 scopeURL = URL( "../package.lua", scopeURL )
-
-        -- READ_PACKAGE_JSON(packageURL)
-        readPackageJSON = ( packageURL ) =>
-            ok, result = SafeAwait Package.read( packageURL )
-            if ok
-                return result
 
     loader.ESM = ESM
 
@@ -661,11 +660,11 @@ class Include
     resolve: async ( fileName, base ) =>
         if base and base.scheme == "file"
             resolved = URL( fileName, base )
-            if resolved.path[1] == "lua" and IsFile( resolved.pathname )
+            if resolved.path[ 1 ] == "lua" and IsFile( resolved.pathname )
                 return { :resolved }
 
         resolved = URL( fileName, "file:///lua/" )
-        if resolved.path[1] == "lua" and IsFile( resolved.pathname )
+        if resolved.path[ 1 ] == "lua" and IsFile( resolved.pathname )
             return { :resolved }
 
         return ESM.resolve( fileName, base )

@@ -1,15 +1,15 @@
 _G = _G
 import environment from _G.gpm
 import pairs, error, rawget, getfenv, getmetatable, setmetatable, istable, tostring from _G
-import string, table, debug, math, util from environment
+import string, table, debug, util from environment
 import byte, sub, gsub, format, len, find from string
 import concat, remove from table
-import min, max from math
 import getinfo from debug
 
 -- my cool math '^'
-for key, value in pairs( _G.include( "gpm/libs/math.lua" ) )
-    math[ key ] = value
+math = setmetatable( _G.include( "gpm/libs/math.lua" ), table.SandboxMetatable( _G.math ) )
+import min, max from math
+environment.math = math
 
 do
 

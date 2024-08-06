@@ -1,9 +1,11 @@
 _G = _G
-import include, SERVER, istable from _G
-import Find from file
+import SERVER, istable from _G
+import Find from _G.file
 
-unless istable( _G.gpm )
-    _G.gpm = { VERSION: "2.0.0" }
+:gpm = _G
+unless istable( gpm )
+    gpm = { VERSION: "2.0.0" }
+    _G.gpm = gpm
 
 if SERVER
 
@@ -26,7 +28,6 @@ if SERVER
     AddCSLuaFile( "gpm/init.lua" )
     AddCSLuaFile( "gpm/util.lua" )
 
-import gpm from _G
 gpm.StartTime = SysTime!
 
 do
@@ -70,15 +71,15 @@ do
 
         splash = " " .. splash
 
-    print( string.format( "\n                                     ___          __            \n                                   /'___`\\      /'__`\\          \n     __    _____     ___ ___      /\\_\\ /\\ \\    /\\ \\/\\ \\         \n   /'_ `\\ /\\ '__`\\ /' __` __`\\    \\/_/// /__   \\ \\ \\ \\ \\        \n  /\\ \\L\\ \\\\ \\ \\L\\ \\/\\ \\/\\ \\/\\ \\      // /_\\ \\ __\\ \\ \\_\\ \\   \n  \\ \\____ \\\\ \\ ,__/\\ \\_\\ \\_\\ \\_\\    /\\______//\\_\\\\ \\____/   \n   \\/___L\\ \\\\ \\ \\/  \\/_/\\/_/\\/_/    \\/_____/ \\/_/ \\/___/    \n     /\\____/ \\ \\_\\                                          \n     \\_/__/   \\/_/                %s                        \n\n  GitHub: https://github.com/Pika-Software\n  Discord: https://discord.gg/Gzak99XGvv\n  Website: https://pika-soft.ru\n  Developers: Pika Software\n  License: MIT\n", splash ) )
+    _G.print( _G.string.format( "\n                                     ___          __            \n                                   /'___`\\      /'__`\\          \n     __    _____     ___ ___      /\\_\\ /\\ \\    /\\ \\/\\ \\         \n   /'_ `\\ /\\ '__`\\ /' __` __`\\    \\/_/// /__   \\ \\ \\ \\ \\        \n  /\\ \\L\\ \\\\ \\ \\L\\ \\/\\ \\/\\ \\/\\ \\      // /_\\ \\ __\\ \\ \\_\\ \\   \n  \\ \\____ \\\\ \\ ,__/\\ \\_\\ \\_\\ \\_\\    /\\______//\\_\\\\ \\____/   \n   \\/___L\\ \\\\ \\ \\/  \\/_/\\/_/\\/_/    \\/_____/ \\/_/ \\/___/    \n     /\\____/ \\ \\_\\                                          \n     \\_/__/   \\/_/                %s                        \n\n  GitHub: https://github.com/Pika-Software\n  Discord: https://discord.gg/Gzak99XGvv\n  Website: https://pika-soft.ru\n  Developers: Pika Software\n  License: MIT\n", splash ) )
 
-environment = gpm.environment
+:environment = gpm
 unless istable( environment )
-    environment = gpm.environment = {}
+    environment = {}
+    gpm.environment = environment
 
+local sandboxMetatable
 do
-
-    _G = _G
 
     import getmetatable, setmetatable, rawset from _G
 
@@ -87,7 +88,6 @@ do
     environment.MENU = _G.MENU_DLL == true
     environment._G = environment
 
-    local sandboxMetatable
     sandbox = ( tbl ) ->
         return setmetatable( {}, sandboxMetatable( tbl ) )
 
@@ -114,6 +114,7 @@ do
     table.SandboxMetatable = sandboxMetatable
     table.Sandbox = sandbox
 
+import include from _G
 include( "gpm/util.lua" )
 Logger = include( "libs/logger.lua" )
 
@@ -123,7 +124,7 @@ environment.path = include( "libs/path.lua" )
 for key, value in _G.pairs( include( "libs/error.lua" ) )
     environment[ key ] = value
 
-environment.utf8 = setmetatable( include( "libs/utf8/init.lua" ), { __index: _G.utf8 } )
+environment.utf8 = setmetatable( include( "libs/utf8/init.lua" ), sandboxMetatable( _G.utf8 ) )
 environment.ipaml = include( "libs/3rd-party/ip.lua" )
 environment.struct = include( "libs/struct.lua" )
 
@@ -132,40 +133,42 @@ deflate = include( "libs/3rd-party/deflate.lua" )
 Logger\Loaded( "LibDeflate v%s", deflate._VERSION )
 environment.deflate = deflate
 
-import RegisterMetaTable from environment.util
-
--- gm_promise
 do
 
-    promise = include( "libs/promise.lua" )
+    import RegisterMetaTable from environment.util
 
-    environment.async = promise.async
-    environment.await = promise.await
-    environment.Promise = promise
+    -- gm_promise
+    do
 
-    RegisterMetaTable( "Promise", promise.__base )
+        promise = include( "libs/promise.lua" )
 
-    Logger\Loaded( "gm_promise v%s", promise.VERSION )
+        environment.async = promise.async
+        environment.await = promise.await
+        environment.Promise = promise
 
--- gm_url
-do
+        RegisterMetaTable( "Promise", promise.__base )
 
-    url = include( "libs/url.lua" )
+        Logger\Loaded( "gm_promise v%s", promise.VERSION )
 
-    environment.IsURLSearchParams = url.IsURLSearchParams
-    URLSearchParams = environment.URLSearchParams = url.URLSearchParams
-    RegisterMetaTable( "URLSearchParams", URLSearchParams.__base )
+    -- gm_url
+    do
 
-    environment.isurl = url.IsURL
-    URL = environment.URL = url.URL
-    RegisterMetaTable( "URL", URL.__base )
+        url = include( "libs/url.lua" )
 
-    import http from environment
+        environment.IsURLSearchParams = url.IsURLSearchParams
+        URLSearchParams = environment.URLSearchParams = url.URLSearchParams
+        RegisterMetaTable( "URLSearchParams", URLSearchParams.__base )
 
-    http.EncodeURIComponent = url.encodeURIComponent
-    http.DecodeURIComponent = url.decodeURIComponent
-    http.EncodeURI = url.encodeURI
-    http.DecodeURI = url.decodeURI
+        environment.isurl = url.IsURL
+        URL = environment.URL = url.URL
+        RegisterMetaTable( "URL", URL.__base )
+
+        import http from environment
+
+        http.EncodeURIComponent = url.encodeURIComponent
+        http.DecodeURIComponent = url.decodeURIComponent
+        http.EncodeURI = url.encodeURI
+        http.DecodeURI = url.decodeURI
 
 include( "post-util.lua" )
 include( "libs/file.lua" )
