@@ -247,8 +247,8 @@ do
             -- do not use this method directly, use Package.read instead
             @parse: async ( filePath, gamePath ) ->
                 config = {}
-                for key, value in url.searchParams\iterator!
-                    config[ key ] = value
+                -- for key, value in url.searchParams\iterator! -- we dont have url here
+                --     config[ key ] = value
 
                 compileResult = await AsyncCompile( filePath, {}, config, gamePath, true )
                 await Module.cache( "file://" .. compileResult.path, compileResult.content )
@@ -288,7 +288,12 @@ do
                     error PackageError "invalid path '" .. url.pathname .. "' ('" .. url.href .. "')"
 
                 if loader.Packages[ url.href ]
-                    return loader.Packages[ url.href ]
+                    result = loader.Packages[ url.href ]
+                    if result.state != result.STATE_REJECTED
+                        return result
+                    
+                    -- clear cache if parsing failed
+                    loader.Packages[ url.href ] = nil
 
                 filePath, gamePath = NormalizeGamePath( url.pathname )
                 fileDir = getDirectory( filePath, true )
@@ -302,7 +307,7 @@ do
                     elseif #files > 1
                         -- Smartly decide which file to use
                         values = {} -- [ext] = filePath
-                        for _, fileName in *files
+                        for fileName in *files
                             values[ getExtension( fileName, false ) ] = fileName
 
                         filePath = fileDir .. values.yue or values.moon or values.lua or values[ 1 ]
@@ -597,6 +602,8 @@ do
         -- READ_PACKAGE_JSON(packageURL)
         readPackageJSON = ( packageURL ) =>
             ok, result = SafeAwait Package.read( packageURL )
+            if not ok
+                result\display()
             if ok
                 return result
 
@@ -845,25 +852,27 @@ do
                 display( result )
                 continue
 
-            :resolved, :package = result
-            unless package and package.autorun
-                continue
+            -- :resolved, :package = result
+            -- unless package and package.autorun
+            --     continue
 
-            Logger\Debug( "Package autorun: " .. package\__tostring! )
+            -- Logger\Debug( "Package autorun: " .. package\__tostring! )
 
-            source = findSource( resolved.scheme )
-            unless source
-                continue
+            -- source = findSource( resolved.scheme )
+            -- unless source
+            --     continue
 
-            :env = package
+            -- :env = package
 
-            ok, result = SafeAwait source\FetchInfo( resolved, base, env, nil )
-            unless ok
-                display( result )
-                continue
+            -- ok, result = SafeAwait source\FetchInfo( resolved, base, env, nil )
+            -- unless ok
+            --     display( result )
+            --     continue
 
-            ok, result = SafeAwait source\Install( resolved, result, base, env, nil )
-            unless ok
-                display( result )
+            -- ok, result = SafeAwait source\Install( resolved, result, base, env, nil )
+            -- unless ok
+            --     display( result )
 
         return nil
+
+    loader.Startup()\Catch( display )
