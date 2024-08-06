@@ -1025,6 +1025,7 @@ do
 
     addon = environment.addon = include( "addon.lua" )
     import File, IsFilePathAllowed from addon
+    import isstring from environment
     import equal from path
     import pairs from _G
 
@@ -1037,18 +1038,18 @@ do
                 result = {}
                 for index = 1, #filePath
                     fileName = filePath[ index ]
-                    ArgAssert( fileName, 1, "string" )
+                    ArgAssert( fileName, index, "string" )
                     result[ fileName ] = Read( fileName, nil, nil, false )
 
                 return result
 
             ArgAssert( filePath, 1, "string" )
 
-            result = {}
-            result[ filePath ] = Read( filePath, nil, nil, false )
-            return result
+            return {
+                [ filePath ]: Read( filePath, nil, nil, false )
+            }
 
-    lib.Set = ( filePath, content ) ->
+    lib.Set = ( filePath, content, uniqueName ) ->
         if istable( filePath )
             title, length = {}, 0
 
@@ -1072,7 +1073,11 @@ do
                 length += 1
                 title[ length ] = fileName
 
-            f\SetTitle( concat( title, ";", 1, length ) )
+            if isstring( uniqueName )
+                f\SetTitle( uniqueName )
+            else
+                f\SetTitle( concat( title, ";", 1, length ) )
+
             return f\Mount( false )
 
         ArgAssert( filePath, 1, "string" )
@@ -1088,7 +1093,11 @@ do
             error FileSystemError "File '" .. filePath .. "' cannot be written.", 2
 
         f = File!
-        f\SetTitle( filePath )
+        if isstring( uniqueName )
+            f\SetTitle( uniqueName )
+        else
+            f\SetTitle( filePath )
+
         f\SetFile( filePath, content, false )
         return f\Mount( false )
 
