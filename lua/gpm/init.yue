@@ -124,8 +124,8 @@ environment.path = include( "libs/path.lua" )
 for key, value in _G.pairs( include( "libs/error.lua" ) )
     environment[ key ] = value
 
+environment.utf8 = setmetatable( include( "libs/utf8/init.lua" ), { __index: _G.utf8 } )
 environment.ipaml = include( "libs/3rd-party/ip.lua" )
-environment.utf8 = include( "libs/utf8/init.lua" )
 environment.struct = include( "libs/struct.lua" )
 
 -- LibDeflate
