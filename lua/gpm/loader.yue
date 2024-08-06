@@ -2,8 +2,8 @@ _G = _G
 import gpm, getmetatable, setmetatable, rawset from _G
 import environment from gpm
 
-import debug, string, path, table, file, util, pairs, isurl, isstring, ArgAssert, URL, NotImplementedError, ModuleError, Promise, error, pcall, PackageError from environment
-import async, await, reject, SafeAwait from Promise
+import debug, string, path, table, file, util, pairs, isurl, isstring, ArgAssert, URL, NotImplementedError, ModuleError, error, pcall, PackageError from environment
+import async, await, reject, SafeAwait, STATE_REJECTED from environment.Promise
 import stripExtension from path
 import getfpath from debug
 import Find from file
@@ -17,7 +17,10 @@ _G.hook.Add "ShutDown", "GLua Package Manager::VFS", ->
 :loader = gpm
 unless istable( loader )
     -- Modules and Packages are tables with format: [url] = Module/Package
-    loader = gpm.loader = { Modules: {}, Packages: {} }
+    loader = gpm.loader = {}
+
+packages = loader.Packages = {}
+modules = loader.Modules = {}
 
 local repositories
 
@@ -56,16 +59,6 @@ if CLIENT
     if repositories
         repositories = loader.Repositories = util.JSONToTable( repositories )
 
-packages = gpm.Packages
-unless istable( packages )
-    packages = gpm.Packages = setmetatable( {}, {
-        __newindex: debug.fempty
-        __index: ( tbl, key ) ->
-            new = {}
-            rawset( tbl, key, new )
-            return new
-    } )
-
 -- Resolves specifier as it is package specifier
 -- See https://nodejs.org/api/esm.html#resolution-algorithm-specification PACKAGE_RESOLVE
 import sub, byte, find, match, gsub, format, StartsWith, IsURL from string
@@ -96,7 +89,7 @@ do
             :pathname = url
             setfenv( location, setmetatable({ __module: @, __filename: pathname, __dirname: getDirectory( pathname, false ) }, { __index: env, __newindex: env }) )
 
-            loader.Modules[ url.href ] = @
+            modules[ url.href ] = @
             return nil
 
         run: ( ... ) =>
@@ -107,9 +100,9 @@ do
             -- return result
             return async( @location )( ... )
 
-        @getAll: -> loader.Modules
+        @getAll: -> modules
 
-        @get: ( url ) -> loader.Modules[ url.href ]
+        @get: ( url ) -> modules[ url.href ]
 
         @cache: async ( url, content ) ->
             filePath = "/data/gpm/vfs/" .. stripExtension( PathFromURL( url ) ) .. ".txt"
@@ -119,7 +112,7 @@ do
             return AsyncWrite( filePath, content )
 
         @run: ( location, url, env ) ->
-            m = loader.Modules[ url.href ]
+            m = modules[ url.href ]
             unless m
                 m = Module( location, url, env )
 
@@ -133,11 +126,11 @@ do
 
     do
 
-        default = environment.Color( 50, 100, 200 )\DoCorrection!
         import AsyncCompile from file
         import Logger from util
         import Merge from table
 
+        default = environment.Color( 50, 100, 200 )\DoCorrection!
         environmentMetatable = { __index: environment }
 
         hooksMeta = {
@@ -301,13 +294,13 @@ do
                     -- error PackageError "invalid path '" .. url.pathname .. "' ('" .. url.href .. "')"
                     return nil
 
-                if loader.Packages[ url.href ]
-                    result = loader.Packages[ url.href ]
-                    if result.state ~= result.STATE_REJECTED
-                        return result
+                cached = packages[ url.href ]
+                if cached
+                    if cached.state ~= STATE_REJECTED
+                        return cached
 
                     -- clear cache if parsing failed
-                    loader.Packages[ url.href ] = nil
+                    packages[ url.href ] = nil
 
                 filePath, gamePath = NormalizeGamePath( url.pathname )
                 fileDir = getDirectory( filePath, true )
@@ -336,7 +329,7 @@ do
 
                 -- also cache result so next calls will return current package
                 promise = Package.parse( filePath, gamePath, config )
-                loader.Packages[ url.href ] = promise
+                packages[ url.href ] = promise
                 return promise
 
     environment.ispackage = ( any ) ->
@@ -833,11 +826,7 @@ do
 
     import display from environment.Error
     import resolve from ESM
-    import Empty from table
     import Logger from gpm
-
-    Empty( loader.Modules )
-    Empty( gpm.Packages )
 
     loader.Startup = async ->
         base = URL( "file:///lua/" )
