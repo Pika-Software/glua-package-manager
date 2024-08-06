@@ -37,7 +37,7 @@ export getFileName = ( path, withExtension ) ->
 
     return path
 
-export getDirectory = ( path, withTrailingSlash ) ->
+export getDirectory = ( path, withTrailingSlash = true ) ->
     for index = len( path ), 1, -1
         ch = byte( path, index )
         if ch == 0x2F --[[ / ]] or ch == 0x5C --[[ \ ]]
@@ -127,17 +127,20 @@ export getCurrentFile = ( func = getfmain! ) ->
 
         return "/" .. fpath
 
-export getCurrentDirectory = ( func = getfmain! ) ->
+export getCurrentDirectory = ( func = getfmain!, withTrailingSlash = true ) ->
     if func
         if fenv := getfenv( func )
             if dirPath := rawget( fenv, "__dirname" )
+                if withTrailingSlash
+                    dirPath ..= "/"
+
                 return dirPath
 
         fpath = getfpath( func )
         if IsURL( fpath )
-            return getDirectory( URL( fpath ).pathname )
+            return getDirectory( URL( fpath ).pathname, withTrailingSlash )
 
-        return getDirectory( "/" .. fpath )
+        return getDirectory( "/" .. fpath, withTrailingSlash )
 
     return "/"
 
@@ -168,9 +171,12 @@ export splitPath = ( path ) ->
     basename, dir = stripDirectory( path )
     return root, dir, basename
 
-export dirname = ( path ) ->
-    path = getDirectory( path )
+export dirname = ( path, withTrailingSlash = true ) ->
+    path = getDirectory( path, withTrailingSlash )
     if path == ""
+        if withTrailingSlash
+            return "./"
+
         return "."
 
     return path
@@ -224,6 +230,9 @@ export normalize = ( path ) ->
         if isAbs
             return "/"
 
+        if trailingSlashes
+            return "./"
+
         return "."
 
     if trailingSlashes
@@ -263,21 +272,16 @@ export join = ( ... ) ->
 -- prepended
 export resolve = ( ... ) ->
     resolvedPath = ""
-    isAbs = false
-    paths = {...}
+    paths = { ... }
 
     for index = #paths, 1, -1
         path = paths[ index ]
         if path and path ~= ""
             resolvedPath = join( normalize( path ), resolvedPath )
             if isAbsolute( resolvedPath )
-                isAbs = true
-                break
+                return resolvedPath
 
-    unless isAbs
-        resolvedPath = join( getCurrentDirectory!, resolvedPath )
-
-    return fixFileName( resolvedPath )
+    return getCurrentDirectory( nil, true ) .. resolvedPath
 
 -- Returns the relative path from "from" to "to"
 -- If no relative path can be solved, then "to" is returned

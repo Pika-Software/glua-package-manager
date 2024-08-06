@@ -906,11 +906,11 @@ do
 
     asyncCompile = async ( filePath, gamePath, env, config ) ->
         filePath, directoryPath = stripDirectory( filePath, true )
-        filePath = directoryPath .. getFileName( filePath )
+        filePath = directoryPath .. getFileName( filePath, false )
 
         extensions = {}
         for fileName in *Find( filePath .. ".*", gamePath )
-            extensions[ getExtension( fileName ) ] = true
+            extensions[ getExtension( fileName, false ) ] = true
 
         local extension
         if extensions.yue
@@ -970,11 +970,11 @@ do
             gamePath = "WORKSHOP"
 
         filePath, directoryPath = stripDirectory( filePath, true )
-        filePath = directoryPath .. getFileName( filePath )
+        filePath = directoryPath .. getFileName( filePath, false )
 
         extensions = {}
         for fileName in *Find( filePath .. ".*", gamePath )
-            extensions[ getExtension( fileName ) ] = true
+            extensions[ getExtension( fileName, false ) ] = true
 
         local extension
         if extensions.yue

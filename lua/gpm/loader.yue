@@ -3,8 +3,8 @@ import gpm, getmetatable, setmetatable, rawset from _G
 import environment from gpm
 
 import debug, string, path, table, file, util, isurl, isstring, ArgAssert, URL, NotImplementedError, ModuleError, Promise, error, pcall, PackageError from environment
-import getCurrentFile, getCurrentDirectory, stripExtension from path
 import async, await, reject, SafeAwait from Promise
+import stripExtension from path
 import getfpath from debug
 import Find from file
 
@@ -294,7 +294,7 @@ do
                 fileDir = getDirectory( filePath, true )
 
                 -- if not package.* file was given in url, try to find it smartly
-                if getFileName( filePath ) ~= "package"
+                if getFileName( filePath, false ) ~= "package"
                     files = Find( fileDir .. "/package.*", gamePath, true )
                     if #files == 1
                         filePath = fileDir .. files[ 1 ]
@@ -303,7 +303,7 @@ do
                         -- Smartly decide which file to use
                         values = {} -- [ext] = filePath
                         for _, fileName in *files
-                            values[ getExtension( fileName ) ] = fileName
+                            values[ getExtension( fileName, false ) ] = fileName
 
                         filePath = fileDir .. values.yue or values.moon or values.lua or values[ 1 ]
 
