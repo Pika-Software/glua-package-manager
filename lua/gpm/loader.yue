@@ -233,18 +233,19 @@ do
             __tostring: =>
                 return format( "Package: %p [%s@%s]", @, @name, @version )
 
-            new: ( filePath, info ) =>
-                @path = filePath
+            new: ( url, info ) =>
+                @path = url.pathname
+                @file = url
 
                 unless info
-                    @name = match( filePath, ".*packages/([^/]+)" ) or getFileName( filePath, false )
+                    @name = match( @path, ".*packages/([^/]+)" ) or getFileName( @path, false )
                     @version = Version( "0.1.0" )
                     return nil
 
                 -- name
                 name = info.name
                 unless isstring( name )
-                    name = match( filePath, ".*packages/([^/]+)" ) or getFileName( filePath, false )
+                    name = match( @path, ".*packages/([^/]+)" ) or getFileName( @path, false )
 
                 if not name or name == ""
                     name = format( "%p", @ )
@@ -360,7 +361,8 @@ do
                         error PackageError "file '#{filePath}' does not contain valid package info (empty or cannot be parsed)"
                         return nil
 
-                    return Package( filePath, info )
+                    url = URL( file.AbsoluteGamePath(filePath, gamePath), "file:///" )
+                    return Package( url, info )
 
                 error PackageError "package info '" .. filePath .. "' execution error: " .. result
                 return nil
@@ -917,24 +919,45 @@ do
     import display from environment.Error
     import Logger from gpm
 
-    loader.StartupPackage = async ( packageURL ) ->
-        pkg = await Package.read( packageURL )
-        unless pkg and pkg.autorun
-            return -- ignore packages that arent meant to be executed at startup
-
-        Logger\Debug( "Package autorun: " .. pkg\__tostring! )
-
-        await loader.AsyncImport( pkg.name, ESM.resolve, nil, packageURL, pkg.env )
-        return
-
-
     loader.Startup = async ->
-        base = URL( "file:///lua/packages/" )
-        tasks = []
+        local base = URL( "file:///lua/packages/" )
+        local tasks = []
+
+        Logger\Info( "Parsing `packages/` directory..." )
 
         _, folders = Find( "packages/*", file.LuaPath, true )
         for folderName in *folders
-            tasks[] = loader.StartupPackage( URL( folderName .. "/", base ) )
+            packageURL = URL( folderName .. "/", base )
+            tasks[] = Package.read( packageURL ) -- TODO: addcsluafile
+
+        local packages = [] -- do not remove local here, packages is defined above
+        local results = await Promise.allSettled(tasks)
+        for result in *results
+            if result.value
+                packages[] = result.value
+            elseif result.status == "rejected"
+                display( result.reason )
+
+        -- TODO: Resolve dependencies
+
+        -- Package structure logging
+        Logger\Info( "Directory 'packages/' have in total %d packages", #packages )
+
+        for pkg in *packages
+            flags = []
+            if pkg.autorun
+                flags[] = " (autorun)"
+    
+            Logger\Info( "\t- %s [%s]%s", pkg.name, pkg.version, table.concat(flags, " ") )
+            -- print dependencies
+
+        -- Autorun packages
+        Logger\Info( "Executing (autorun) packages..." )
+
+        tasks = []
+        for pkg in *packages
+            if pkg.autorun
+                tasks[] = loader.AsyncImport( pkg.name, ESM.resolve, nil, pkg.file, pkg.env )
 
         -- Handle all failed startups
         results = await Promise.allSettled( tasks )
