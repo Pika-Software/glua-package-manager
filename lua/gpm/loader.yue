@@ -2,10 +2,9 @@ _G = _G
 import gpm, getmetatable, setmetatable, rawset from _G
 import environment from gpm
 
-import debug, string, path, table, file, util, pairs, isurl, isstring, ArgAssert, URL, NotImplementedError, ModuleError, error, pcall, PackageError, CLIENT from environment
-import await, async, reject, SafeAwait, STATE_REJECTED from environment.Promise
-import stripExtension, getDirectory from path
-import NormalizeGamePath, Find from file
+import debug, string, path, table, file, util, pairs, isurl, isstring, ArgAssert, URL, NotImplementedError, ModuleError, error, pcall, PackageError from environment
+import async, await, reject, SafeAwait from Promise
+import stripExtension from path
 import getfpath from debug
 import IsEmpty from table
 
@@ -215,6 +214,7 @@ do
 
     do
 
+        import STATE_REJECTED from Promise
         import AsyncCompile from file
         import Logger from util
         import Merge from table
@@ -914,15 +914,25 @@ do
 do
 
     import display from environment.Error
-    import resolve from ESM
     import Logger from gpm
 
+    loader.StartupPackage = async ( packageURL ) ->
+        pkg = await Package.read( packageURL )
+        unless pkg and pkg.autorun
+            return -- ignore packages that arent meant to be executed at startup
+
+        Logger\Debug( "Package autorun: " .. pkg\__tostring! )
+
+        await loader.AsyncImport( pkg.name, ESM.resolve, nil, packageURL, pkg.env )
+        return
+
     loader.Startup = async ->
-        base = URL( "file:///lua/" )
+        base = URL( "file:///lua/packages/" )
+        tasks = []
 
         _, folders = Find( "packages/*", file.LuaPath, true )
-        for directoryName in *folders
-            ok, result = SafeAwait resolve( directoryName, base )
+        for folderName in *folders
+            ok, result = SafeAwait resolve( folderName, base )
             unless ok
                 display( result )
                 continue
