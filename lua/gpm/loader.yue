@@ -1,19 +1,18 @@
 _G = _G
-import gpm, getmetatable, setmetatable, rawset from _G
+import gpm from _G
 import environment from gpm
-
-import debug, string, path, table, file, util, pairs, isurl, isstring, ArgAssert, URL, NotImplementedError, ModuleError, error, pcall, PackageError from environment
-import async, await, reject, SafeAwait from Promise
-import stripExtension from path
+import debug, string, path, file, util, pairs, isurl, isstring, ArgAssert, URL, NotImplementedError, ModuleError, error, pcall, PackageError, Promise from environment
+import stripExtension, getDirectory from path
+import NormalizeGamePath, Find from file
+import IsEmpty from environment.table
+import await, async from Promise
 import getfpath from debug
-import IsEmpty from table
 
 file.CreateDir( "/data/gpm/vfs", true )
 
 _G.hook.Add "ShutDown", "GLua Package Manager::VFS", ->
     file.Delete( "/data/gpm/vfs" )
     return nil
-
 
 if SERVER
 
@@ -143,11 +142,11 @@ import IsFile from file
 local Module, Package
 do
 
+    import getmetatable, setmetatable, tobool from _G
     import getFileName, getExtension from path
     import AsyncWrite, Time from file
     import PathFromURL from string
     import Version from util
-    import tobool from _G
 
     startTime = environment.os.time! - ( gpm.StartTime or 0 )
 
@@ -214,10 +213,11 @@ do
 
     do
 
+        import Merge from environment.table
         import STATE_REJECTED from Promise
         import AsyncCompile from file
         import Logger from util
-        import Merge from table
+        import rawset from _G
 
         default = environment.Color( 50, 100, 200 )\DoCorrection!
         environmentMetatable = { __index: environment }
@@ -762,6 +762,7 @@ local findSource
 do
 
     import SourceError from environment
+    import reject from Promise
 
     sources = loader.Sources
     unless istable( sources )
@@ -926,36 +927,17 @@ do
         await loader.AsyncImport( pkg.name, ESM.resolve, nil, packageURL, pkg.env )
         return
 
+
     loader.Startup = async ->
         base = URL( "file:///lua/packages/" )
         tasks = []
 
         _, folders = Find( "packages/*", file.LuaPath, true )
         for folderName in *folders
-            ok, result = SafeAwait resolve( folderName, base )
-            unless ok
-                display( result )
-                continue
+            tasks[] = loader.StartupPackage( URL( folderName .. "/", base ) )
 
-            :resolved, :package = result
-            unless package and package.autorun
-                continue
-
-            Logger\Debug( "Package autorun: " .. package\__tostring! )
-
-            source = findSource( resolved.scheme )
-            unless source
-                continue
-
-            :env = package
-
-            ok, result = SafeAwait source\FetchInfo( resolved, base, env, nil )
-            unless ok
-                display( result )
-                continue
-
-            ok, result = SafeAwait source\Install( resolved, result, base, env, nil )
-            unless ok
-                display( result )
-
-        return nil
+        -- Handle all failed startups
+        results = await Promise.allSettled( tasks )
+        for result in *results
+            if result.status == "rejected"
+                display( result.reason )
