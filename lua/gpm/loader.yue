@@ -2,7 +2,7 @@ _G = _G
 import gpm, getmetatable, setmetatable, rawset from _G
 import environment from gpm
 
-import debug, string, path, table, file, util, pairs, isurl, isstring, ArgAssert, URL, NotImplementedError, ModuleError, error, pcall, PackageError from environment
+import debug, string, path, table, file, util, pairs, isurl, isstring, ArgAssert, URL, NotImplementedError, ModuleError, error, pcall, PackageError, Promise from environment
 import async, await, reject, SafeAwait, STATE_REJECTED from environment.Promise
 import stripExtension from path
 import getfpath from debug
@@ -820,38 +820,28 @@ do
 do
 
     import display from environment.Error
-    import resolve from ESM
     import Logger from gpm
 
+    loader.StartupPackage = async ( packageURL ) ->
+        pkg = await Package.read( packageURL )
+        unless pkg and pkg.autorun
+            return -- ignore packages that arent meant to be executed at startup
+
+        Logger\Debug( "Package autorun: " .. pkg\__tostring! )
+
+        await loader.AsyncImport( pkg.name, ESM.resolve, nil, packageURL, pkg.env )
+        return
+
     loader.Startup = async ->
-        base = URL( "file:///lua/" )
+        base = URL( "file:///lua/packages/" )
+        tasks = []
 
         _, folders = Find( "packages/*", file.LuaPath, true )
         for folderName in *folders
-            ok, result = SafeAwait resolve( folderName, base )
-            unless ok
-                display( result )
-                continue
+            tasks[] = await loader.StartupPackage( URL( folderName .. "/", base ) )
 
-            :resolved, :package = result
-            unless package and package.autorun
-                continue
-
-            Logger\Debug( "Package autorun: " .. package\__tostring! )
-
-            source = findSource( resolved.scheme )
-            unless source
-                continue
-
-            :env = package
-
-            ok, result = SafeAwait source\FetchInfo( resolved, base, env, nil )
-            unless ok
-                display( result )
-                continue
-
-            ok, result = SafeAwait source\Install( resolved, result, base, env, nil )
-            unless ok
-                display( result )
-
-        return nil
+        -- Handle all failed startups
+        results = await Promise.allSettled( tasks )
+        for result in *results
+            if result.status == "rejected"
+                display( result.reason )
