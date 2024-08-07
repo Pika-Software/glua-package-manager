@@ -2,17 +2,99 @@ _G = _G
 import gpm, getmetatable, setmetatable, rawset from _G
 import environment from gpm
 
-import debug, string, path, table, file, util, pairs, isurl, isstring, ArgAssert, URL, NotImplementedError, ModuleError, error, pcall, PackageError from environment
-import async, await, reject, SafeAwait, STATE_REJECTED from environment.Promise
-import stripExtension from path
+import debug, string, path, table, file, util, pairs, isurl, isstring, ArgAssert, URL, NotImplementedError, ModuleError, error, pcall, PackageError, CLIENT from environment
+import await, async, reject, SafeAwait, STATE_REJECTED from environment.Promise
+import stripExtension, getDirectory from path
+import NormalizeGamePath, Find from file
 import getfpath from debug
-import Find from file
+import IsEmpty from table
 
 file.CreateDir( "/data/gpm/vfs", true )
 
 _G.hook.Add "ShutDown", "GLua Package Manager::VFS", ->
     file.Delete( "/data/gpm/vfs" )
     return nil
+
+
+if SERVER
+
+    import AsyncRead, Exists, LuaGamePaths, AbsoluteGamePath from file
+    import getCurrentFile, getCurrentDirectory, getFile from path
+    import File from environment.addon
+    import AddCSLuaFile from _G
+
+    addFile = async ( filePath, gamePath, mountTable ) ->
+        content = await AsyncRead( filePath, gamePath, true )
+        unless IsBytecode( content )
+            mountTable[ "/lua/" .. filePath .. ".lua" ] = content
+
+        return nil
+
+    addFilePath = ( filePath, gamePath, mountTable, isLuaGamePath ) ->
+        files, dirs = Find( filePath, gamePath, true )
+        basePath = getDirectory( filePath, true )
+        searchable = getFile( filePath )
+
+        for index = 1, #files
+            fileName, extension = stripExtension( files[ index ] )
+
+            if isLuaGamePath
+                if extension == "lua" or Exists( basePath .. fileName .. ".lua", gamePath, true )
+                    AddCSLuaFile( basePath .. fileName .. ".lua" )
+
+            elseif extension == "txt"
+                await addFile( basePath .. fileName .. "." .. extension, gamePath, mountTable )
+
+        for directoryName in *dirs
+            directoryPath = basePath .. directoryName
+            if directoryPath == filePath
+                addFilePath( directoryPath .. "/*", gamePath, mountTable, isLuaGamePath )
+            else
+                addFilePath( directoryPath .. "/" .. searchable, gamePath, mountTable, isLuaGamePath )
+
+        return nil
+
+    asyncAddCSLuaFile = async ( filePath, gamePath ) ->
+        mountTable = {}
+        addFilePath( filePath, gamePath, mountTable, LuaGamePaths[ gamePath ] or false )
+
+        if IsEmpty( mountTable )
+            return nil
+
+        f = File!
+        f\SetTitle( "gpm.ACSLF::" .. AbsoluteGamePath( filePath, gamePath ) )
+
+        for fileName, content in pairs( mountTable )
+            f\SetFile( fileName, content, false )
+
+        for fileName in *await( f\AsyncMount( false ) )
+            AddCSLuaFile( fileName )
+
+        return nil
+
+    environment.AddCSLuaFile = ( filePath = "", gamePath, skipNormalize ) ->
+        if filePath == "" or getFile( filePath ) == "."
+            fenv = getfenv( 2 )
+            if m := fenv and fenv.__module
+                filePath = m.file
+            else
+                filePath = getCurrentFile!
+
+        elseif filePath == "./"
+            fenv = getfenv( 2 )
+            if m := fenv and fenv.__module
+                filePath = m.directory .. "/*"
+            else
+                filePath = getCurrentDirectory( nil, true ) .. "*"
+
+        unless skipNormalize
+            filePath, gamePath = NormalizeGamePath( filePath, gamePath )
+
+        return asyncAddCSLuaFile( filePath, gamePath )
+
+else
+
+    environment.AddCSLuaFile = environment.debug.fempty
 
 :loader = gpm
 unless istable( loader )
@@ -47,7 +129,7 @@ if SERVER or MENU_DLL
 if SERVER
     filePath = "/lua/gpm/vfs/repositories.lua"
     file.Set( filePath, "return '" .. util.TableToJSON( repositories, false ) .. "'", "GLua Package Manager::Repositories" )
-    file.AddCSLuaFile( filePath )
+    environment.AddCSLuaFile( filePath )
 
 if CLIENT
     repositories = include( "gpm/vfs/repositories.lua" )
@@ -57,19 +139,25 @@ if CLIENT
 -- Resolves specifier as it is package specifier
 -- See https://nodejs.org/api/esm.html#resolution-algorithm-specification PACKAGE_RESOLVE
 import sub, byte, find, match, gsub, format, StartsWith, IsURL from string
-import IsFile, NormalizeGamePath from file
+import IsFile from file
 
 local Module, Package
 do
 
-    import getDirectory, getFileName, getExtension from path
+    import getFileName, getExtension from path
     import AsyncWrite, Time from file
     import PathFromURL from string
-    import IsEmpty from table
     import Version from util
     import tobool from _G
 
     startTime = environment.os.time! - ( gpm.StartTime or 0 )
+
+    -- cache files have different paths for client and server
+    getCachePath = ( url ) ->
+        if CLIENT
+            return "/lua/gpm/vfs/" .. stripExtension( PathFromURL( url ) ) .. ".lua"
+
+        return "/data/gpm/vfs/" .. stripExtension( PathFromURL( url ) ) .. ".txt"
 
     class Module
         __tostring: =>
@@ -81,8 +169,9 @@ do
 
             @name = getfpath( location ) or "unknown"
 
-            :pathname = url
-            setfenv( location, setmetatable({ __module: @, __filename: pathname, __dirname: getDirectory( pathname, false ) }, { __index: env, __newindex: env }) )
+            __filename = @file = url.pathname
+            __dirname = @directory = getDirectory( __filename, false )
+            setfenv( location, setmetatable({ __module: @, :__filename, :__dirname }, { __index: env, __newindex: env }) )
 
             modules[ url.href ] = @
             return nil
@@ -99,8 +188,13 @@ do
 
         @get: ( url ) -> modules[ url.href ]
 
+        @getCachePath: getCachePath
+
         @cache: async ( url, content ) ->
-            filePath = "/data/gpm/vfs/" .. stripExtension( PathFromURL( url ) ) .. ".txt"
+            filePath = getCachePath( url )
+            if CLIENT
+                return filePath
+
             if IsFile( filePath ) and Time( filePath ) >= startTime
                 return filePath
 
@@ -827,8 +921,8 @@ do
         base = URL( "file:///lua/" )
 
         _, folders = Find( "packages/*", file.LuaPath, true )
-        for folderName in *folders
-            ok, result = SafeAwait resolve( folderName, base )
+        for directoryName in *folders
+            ok, result = SafeAwait resolve( directoryName, base )
             unless ok
                 display( result )
                 continue

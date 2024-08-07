@@ -587,6 +587,9 @@ do
 string.IsASCII = ( byte0 ) ->
     return byte0 >= 0 and byte0 <= 255
 
+string.IsBytecode = ( str ) ->
+    return byte( str, 1 ) == 0x1B --[[ byte code marker ]]
+
 -- table
 unless table.unpack
     table.unpack = _G.unpack

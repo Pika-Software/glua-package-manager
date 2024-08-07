@@ -68,9 +68,10 @@ do
 
     import CompileString, gmbc_load_bytecode, setfenv from _G
     import yue, moon from environment
+    import IsBytecode from string
 
     environment.loadstring = ( code, identifier, handleError = true, ignoreBytecode ) ->
-        if not ignoreBytecode and byte( code, 1 ) == 0x1b
+        if not ignoreBytecode and IsBytecode( code )
             if byteCodeSupported
                 return gmbc_load_bytecode( code )
 
@@ -96,7 +97,7 @@ do
                     modes[ byte0 ] = true
 
                 local func
-                if modes[ 0x62 --[[ b ]] ] and byte( chunk, 1 ) == 0x1B --[[ byte code marker ]]
+                if modes[ 0x62 --[[ b ]] ] and IsBytecode( chunk )
                     if byteCodeSupported
                         func = gmbc_load_bytecode( chunk )
 
