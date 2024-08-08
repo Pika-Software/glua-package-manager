@@ -2,8 +2,8 @@ _G = _G
 import gpm from _G
 import environment from gpm
 import debug, string, path, file, util, pairs, isurl, isstring, ArgAssert, URL, NotImplementedError, ModuleError, error, pcall, PackageError, Promise from environment
+import NormalizeGamePath, AbsoluteGamePath, Find from file
 import stripExtension, getDirectory from path
-import NormalizeGamePath, Find from file
 import IsEmpty from environment.table
 import await, async from Promise
 import getfpath from debug
@@ -16,8 +16,8 @@ _G.hook.Add "ShutDown", "GLua Package Manager::VFS", ->
 
 if SERVER
 
-    import AsyncRead, Exists, LuaGamePaths, AbsoluteGamePath from file
     import getCurrentFile, getCurrentDirectory, getFile from path
+    import AsyncRead, Exists, LuaGamePaths from file
     import File from environment.addon
     import AddCSLuaFile from _G
 
@@ -142,82 +142,84 @@ import IsFile from file
 local Module, Package
 do
 
-    import getmetatable, setmetatable, tobool from _G
-    import getFileName, getExtension from path
-    import AsyncWrite, Time from file
-    import PathFromURL from string
-    import Version from util
-
-    startTime = environment.os.time! - ( gpm.StartTime or 0 )
-
-    -- cache files have different paths for client and server
-    getCachePath = ( url ) ->
-        if CLIENT
-            return "/lua/gpm/vfs/" .. stripExtension( PathFromURL( url ) ) .. ".lua"
-
-        return "/data/gpm/vfs/" .. stripExtension( PathFromURL( url ) ) .. ".txt"
-
-    class Module
-        __tostring: =>
-            return format( "Module: %p [%s]", @, @name )
-
-        new: ( @location, @url, @env = _G ) =>
-            unless isurl( url )
-                error ModuleError "url is " .. type( url ) .. ", expected URL"
-
-            @name = getfpath( location ) or "unknown"
-
-            __filename = @file = url.pathname
-            __dirname = @directory = getDirectory( __filename, false )
-            setfenv( location, setmetatable({ __module: @, :__filename, :__dirname }, { __index: env, __newindex: env }) )
-
-            modules[ url.href ] = @
-            return nil
-
-        run: ( ... ) =>
-            -- if result := @result
-            --     return result
-
-            -- result = @result = async( @location )( ... )
-            -- return result
-            return async( @location )( ... )
-
-        @getAll: -> modules
-
-        @get: ( url ) -> modules[ url.href ]
-
-        @getCachePath: getCachePath
-
-        @cache: async ( url, content ) ->
-            filePath = getCachePath( url )
-            if CLIENT
-                return filePath
-
-            if IsFile( filePath ) and Time( filePath ) >= startTime
-                return filePath
-
-            return AsyncWrite( filePath, content )
-
-        @run: ( location, url, env ) ->
-            m = modules[ url.href ]
-            unless m
-                m = Module( location, url, env )
-
-            return m\run!
-
-    loader.Module = Module
-
-    environment.ismodule = ( any ) ->
-        metatable = getmetatable( any )
-        return metatable and metatable.__class == Module
+    import getmetatable, setmetatable from _G
 
     do
 
+        import AsyncWrite, Time from file
+        import PathFromURL from string
+
+        startTime = environment.os.time! - ( gpm.StartTime or 0 )
+
+        -- cache files have different paths for client and server
+        getCachePath = ( url ) ->
+            if CLIENT
+                return "/lua/gpm/vfs/" .. stripExtension( PathFromURL( url ) ) .. ".lua"
+
+            return "/data/gpm/vfs/" .. stripExtension( PathFromURL( url ) ) .. ".txt"
+
+        class Module
+            __tostring: =>
+                return format( "Module: %p [%s]", @, @name )
+
+            new: ( @location, @url, @env = _G ) =>
+                unless isurl( url )
+                    error ModuleError "url is " .. type( url ) .. ", expected URL"
+
+                @name = getfpath( location ) or "unknown"
+
+                __filename = @file = url.pathname
+                __dirname = @directory = getDirectory( __filename, false )
+                setfenv( location, setmetatable({ __module: @, :__filename, :__dirname }, { __index: env, __newindex: env }) )
+
+                modules[ url.href ] = @
+                return nil
+
+            run: ( ... ) =>
+                -- if result := @result
+                --     return result
+
+                -- result = @result = async( @location )( ... )
+                -- return result
+                return async( @location )( ... )
+
+            @getAll: -> modules
+
+            @get: ( url ) -> modules[ url.href ]
+
+            @getCachePath: getCachePath
+
+            @cache: async ( url, content ) ->
+                filePath = getCachePath( url )
+                if CLIENT
+                    return filePath
+
+                if IsFile( filePath ) and Time( filePath ) >= startTime
+                    return filePath
+
+                return AsyncWrite( filePath, content )
+
+            @run: ( location, url, env ) ->
+                m = modules[ url.href ]
+                unless m
+                    m = Module( location, url, env )
+
+                return m\run!
+
+        loader.Module = Module
+
+        environment.ismodule = ( any ) ->
+            metatable = getmetatable( any )
+            return metatable and metatable.__class == Module
+
+    do
+
+        import getFileName, getExtension from path
         import Merge from environment.table
         import STATE_REJECTED from Promise
+        import Version, Logger from util
+        import rawset, tobool from _G
         import AsyncCompile from file
-        import Logger from util
-        import rawset from _G
 
         default = environment.Color( 50, 100, 200 )\DoCorrection!
         environmentMetatable = { __index: environment }
@@ -228,6 +230,27 @@ do
                 rawset( tbl, key, new )
                 return new
         }
+
+        parse = async ( filePath, gamePath, config ) ->
+            compileResult = await AsyncCompile( filePath, {}, config, gamePath, true )
+            await Module.cache( "file://" .. compileResult.path, compileResult.content )
+            func = compileResult.func
+
+            info = {}
+            setfenv( func, info )
+            success, result = pcall( func )
+            if success
+                if istable( result )
+                    Merge( info, result )
+
+                if IsEmpty( info )
+                    error PackageError "file '#{filePath}' does not contain valid package info (empty or cannot be parsed)"
+                    return nil
+
+                return Package( URL( AbsoluteGamePath( filePath, gamePath ), "file:///" ), info )
+
+            error PackageError "package info '" .. filePath .. "' execution error: " .. result
+            return nil
 
         class Package
             __tostring: =>
@@ -345,27 +368,7 @@ do
 
             -- directly reads package info from given filePath and creates Package
             -- do not use this method directly, use Package.read instead
-            @parse: async ( filePath, gamePath, config ) ->
-                compileResult = await AsyncCompile( filePath, {}, config, gamePath, true )
-                await Module.cache( "file://" .. compileResult.path, compileResult.content )
-                func = compileResult.func
-
-                info = {}
-                setfenv( func, info )
-                success, result = pcall( func )
-                if success
-                    if istable( result )
-                        Merge( info, result )
-
-                    if IsEmpty( info )
-                        error PackageError "file '#{filePath}' does not contain valid package info (empty or cannot be parsed)"
-                        return nil
-
-                    url = URL( file.AbsoluteGamePath(filePath, gamePath), "file:///" )
-                    return Package( url, info )
-
-                error PackageError "package info '" .. filePath .. "' execution error: " .. result
-                return nil
+            @parse: parse
 
             -- Finds a package info in given url.
             -- If package.* file was not given in path, tries to find it.
@@ -419,7 +422,7 @@ do
                     config[ key ] = value
 
                 -- also cache result so next calls will return current package
-                promise = Package.parse( filePath, gamePath, config )
+                promise = parse( filePath, gamePath, config )
                 packages[ url.href ] = promise
                 return promise
 
@@ -947,7 +950,7 @@ do
             flags = []
             if pkg.autorun
                 flags[] = " (autorun)"
-    
+
             Logger\Info( "\t- %s [%s]%s", pkg.name, pkg.version, table.concat(flags, " ") )
             -- print dependencies
 
