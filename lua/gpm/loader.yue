@@ -113,21 +113,20 @@ if SERVER or MENU_DLL
 
     repositories = Query( "SELECT * FROM `gpm.repository`" ) or {}
 
-    length = #repositories
-    if length == 0
+    count = #repositories
+    if count == 0
         Query( "INSERT INTO `gpm.repository` ( URL ) VALUES ( 'https://raw.githubusercontent.com/Pika-Software/.github/main/gpm/repositories.json' )" )
         repositories = Query( "SELECT * FROM `gpm.repository`" ) or {}
 
-    for index = 1, length
+    for index = 1, count
         repository = repositories[ index ]
         repository.Packages = Query( "SELECT * FROM `gpm.packages` WHERE RepositoryID = " .. repository.ID ) or {}
 
     loader.Repositories = repositories
 
 if SERVER
-    filePath = "/lua/gpm/vfs/repositories.lua"
-    file.Set( filePath, "return '" .. util.TableToJSON( repositories, false ) .. "'", "GLua Package Manager::Repositories" )
-    environment.AddCSLuaFile( filePath )
+    file.Set( "/lua/gpm/vfs/repositories.lua", "return '" .. util.TableToJSON( repositories, false ) .. "'", "GLua Package Manager::Repositories" )
+    _G.AddCSLuaFile( "lua/gpm/vfs/repositories.lua" )
 
 if CLIENT
     repositories = include( "gpm/vfs/repositories.lua" )
@@ -252,26 +251,26 @@ do
             error PackageError "package info '" .. filePath .. "' execution error: " .. result
             return nil
 
+        emptyTable = {}
+
         class Package
             __tostring: =>
                 return format( "Package: %p [%s@%s]", @, @name, @version )
 
-            new: ( url, info ) =>
-                @path = url.pathname
-                @file = url
+            new: ( @url, info ) =>
+                filePath = @file = url.pathname
+                @directory = getDirectory( filePath, false )
 
                 unless info
-                    @name = match( @path, ".*packages/([^/]+)" ) or getFileName( @path, false )
-                    @version = Version( "0.1.0" )
-                    return nil
+                    info = emptyTable
 
                 -- name
-                name = info.name
-                unless isstring( name )
-                    name = match( @path, ".*packages/([^/]+)" ) or getFileName( @path, false )
+                :name = info
+                unless isstring( name ) and match( name, "^[a-zA-Z_][%w ~<>_&+%-]*" )
+                    name = match( filePath, ".*packages/([^/]+)" ) or getFileName( filePath, false )
 
-                if not name or name == ""
-                    name = format( "%p", @ )
+                    if name == ""
+                        error PackageError "invalid package name: '" .. name .. "'"
 
                 @name = name
 
@@ -318,17 +317,6 @@ do
 
                 @dependencies = dependencies
 
-                -- logger
-                :logger = info
-                unless istable( logger )
-                    logger = {
-                        interpolation: true
-                        disabled: false
-                        color: default
-                    }
-
-                @logger = logger
-
                 -- description
                 :description = info
                 unless isstring( description )
@@ -350,21 +338,32 @@ do
 
                 @homepage = homepage
 
-                -- package logger
+                -- logger
+                :logger = info
+                unless istable( logger )
+                    logger = {
+                        interpolation: true
+                        disabled: false
+                        color: default
+                    }
+
+                @logger = logger
+
+                local packageLogger
                 if logger
                     if logger.disabled
-                        logger = nil
+                        packageLogger = nil
                     else
-                        logger = Logger( name .. "@" .. version\__tostring!, logger.color, logger.interpolation )
+                        packageLogger = Logger( name .. "@" .. version\__tostring!, logger.color, logger.interpolation )
                 else
-                    logger = Logger( name .. "@" .. version\__tostring! )
+                    packageLogger = Logger( name .. "@" .. version\__tostring! )
 
                 @__hooks = setmetatable( {}, hooksMeta )
                 @__prefix = @__tostring! .. "::"
                 @__timers = {}
 
                 -- package environment
-                @env = setmetatable( { __package: @, Logger: logger }, environmentMetatable )
+                @env = setmetatable( { __package: @, Logger: packageLogger }, environmentMetatable )
 
             -- directly reads package info from given filePath and creates Package
             -- do not use this method directly, use Package.read instead
@@ -920,50 +919,73 @@ do
 do
 
     import display from environment.Error
+    import allSettled from Promise
+    import concat from table
     import Logger from gpm
 
     loader.Startup = async ->
-        local base = URL( "file:///lua/packages/" )
-        local tasks = []
-
-        Logger\Info( "Parsing `packages/` directory..." )
-
         _, folders = Find( "packages/*", file.LuaPath, true )
-        for folderName in *folders
-            packageURL = URL( folderName .. "/", base )
-            tasks[] = Package.read( packageURL ) -- TODO: addcsluafile
+        Logger\Info( "Parsing `packages/` directory..." )
+        base = URL( "file:///lua/packages/" )
 
-        local packages = [] -- do not remove local here, packages is defined above
-        local results = await Promise.allSettled(tasks)
-        for result in *results
+        readTasks, taskCount = {}, 0
+        for folderName in *folders
+            taskCount += 1
+            readTasks[ taskCount ] = Package.read( URL( folderName .. "/", base ) ) -- TODO: addcsluafile
+
+        -- no :>
+        pkgs, pkgCount = {}, 0
+
+        for result in *await( allSettled( readTasks ) )
             if result.value
-                packages[] = result.value
+                pkgCount += 1
+                pkgs[ pkgCount ] = result.value
+
             elseif result.status == "rejected"
                 display( result.reason )
 
         -- TODO: Resolve dependencies
+        -- ukdev: I think we need make dependencies resolving in package loading process, because dependencies also can have their dependencies
+
+        if pkgCount == 0
+            Logger\Info( "No packages found :<" )
+            return nil
 
         -- Package structure logging
-        Logger\Info( "Directory 'packages/' have in total %d packages", #packages )
+        Logger\Info( "Directory 'packages/' have in total %d packages", pkgCount )
 
-        for pkg in *packages
-            flags = []
+        importTasks, taskCount = {}, 0
+
+        for index = 1, pkgCount
+            pkg = pkgs[ index ]
+
+            flags, count = {}, 0
             if pkg.autorun
-                flags[] = " (autorun)"
+                count += 1
+                flags[ count ] = "autorun"
 
-            Logger\Info( "\t- %s [%s]%s", pkg.name, pkg.version, table.concat(flags, " ") )
+                taskCount += 1
+                importTasks[ taskCount ] = pkg
+
+            if count == 0
+                Logger\Info( "    - %s [%s]", pkg.name, pkg.version )
+            else
+                Logger\Info( "    - %s [%s] (%s)", pkg.name, pkg.version, concat( flags, ", ", 1, count ) )
+
             -- print dependencies
 
         -- Autorun packages
-        Logger\Info( "Executing (autorun) packages..." )
+        if taskCount == 0
+            Logger\Info( "No packages to execute :<" )
+            return nil
 
-        tasks = []
-        for pkg in *packages
-            if pkg.autorun
-                tasks[] = loader.AsyncImport( pkg.name, ESM.resolve, nil, pkg.file, pkg.env )
+        Logger\Info( "Executing %d autorun packages...", taskCount )
+
+        for index = 1, taskCount
+            pkg = importTasks[ index ]
+            importTasks[ index ] = loader.AsyncImport( pkg.name, ESM.resolve, nil, pkg.url, pkg.env )
 
         -- Handle all failed startups
-        results = await Promise.allSettled( tasks )
-        for result in *results
+        for result in *await( allSettled( importTasks ) )
             if result.status == "rejected"
                 display( result.reason )
