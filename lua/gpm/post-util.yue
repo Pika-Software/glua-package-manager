@@ -212,7 +212,7 @@ do
     import struct, deflate, os, Color from environment
     import char, reverse, format from string
     import clamp from math
-    import CRC32 from util
+    import CRC from util
     import io from struct
     import time from os
 
@@ -565,7 +565,7 @@ do
 
             content = data.content = method[ 2 ]( @Read( compressedSize ) )
 
-            if doCRC and content and crc ~= CRC32( content )
+            if doCRC and content and crc ~= CRC( content )
                 return data, "crc-32 mismatch"
 
             return data
@@ -597,7 +597,7 @@ do
             @WriteTime( unixTime )
 
             -- CRC-32
-            @WriteULong( tonumber( CRC32( content ), 10 ) )
+            @WriteULong( tonumber( CRC( content ), 10 ) )
             fileSize = len( content )
 
             content = method[ 1 ]( content )
