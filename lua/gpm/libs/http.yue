@@ -74,8 +74,8 @@ do
         timer.Create "GLua Package Manager::HTTP", 60, 0, ->
             time = SysTime!
 
-            for index = 1, length
-                cache = requestCache[ methods[ index ] ]
+            for method in *methods
+                cache = requestCache[ method ]
                 for href, data in pairs( cache )
                     if ( time - data[ 2 ] ) > cacheLifetime
                         cache[ href ] = nil
@@ -223,55 +223,22 @@ do
     import File from environment.addon
     import error, URL from environment
 
-    tbl = setmetatable( {}, { __mode: "v" } )
-
     http.Fetch = ( url, headers, timeout ) ->
-        tbl.url = url
-        tbl.method = "GET"
-        tbl.headers = headers
-        tbl.timeout = timeout
-        tbl.parameters = nil
-        tbl.cache = false
-        return HTTP( tbl )
+        return HTTP( { :url, method: "GET", :headers, :timeout } )
 
     http.Post = ( url, parameters, headers, timeout ) ->
-        tbl.url = url
-        tbl.method = "POST"
-        tbl.headers = headers
-        tbl.timeout = timeout
-        tbl.parameters = parameters
-        tbl.cache = false
-        return HTTP( tbl )
+        return HTTP( { :url, method: "POST", :headers, :timeout, :parameters } )
 
     cachedFetch = http.CachedFetch = ( url, headers, timeout ) ->
-        tbl.url = url
-        tbl.method = "GET"
-        tbl.headers = headers
-        tbl.timeout = timeout
-        tbl.parameters = nil
-        tbl.cache = true
-        return HTTP( tbl )
+        return HTTP( { :url, method: "GET", :headers, :timeout, cache: true } )
 
     http.CachedPost = ( url, parameters, headers, timeout ) ->
-        tbl.url = url
-        tbl.method = "POST"
-        tbl.headers = headers
-        tbl.timeout = timeout
-        tbl.parameters = parameters
-        tbl.cache = true
-        return HTTP( tbl )
+        return HTTP( { :url, method: "POST", :headers, :timeout, :parameters, cache: true } )
 
     http.FileInfo = async ( href, headers, timeout ) ->
         directoryPath, fileName = stripFile( URL( href ).pathname )
 
-        tbl.url = href
-        tbl.method = "HEAD"
-        tbl.headers = headers
-        tbl.timeout = timeout
-        tbl.parameters = nil
-        tbl.cache = false
-
-        result = await HTTP( tbl )
+        result = await HTTP( { url: href, method: "HEAD", :headers, :timeout } )
 
         if result.status ~= 200
             error WebClientError "request failed " .. href .. " ( " .. statusCodes[ result.status ] .. " [" .. result.status .. "] )"
