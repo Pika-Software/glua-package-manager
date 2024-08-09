@@ -59,6 +59,7 @@ do
         "Sandblast ♪"
         "That's me!"
         "I see you."
+        "Light Up ♪"
     }
 
     count = #splashes + 1
