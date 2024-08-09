@@ -211,219 +211,217 @@ do
             metatable = getmetatable( any )
             return metatable and metatable.__class == Module
 
-    do
+    import getFileName, getExtension from path
+    import Merge from environment.table
+    import STATE_REJECTED from Promise
+    import Version, Logger from util
+    import rawset, tobool from _G
+    import AsyncCompile from file
 
-        import getFileName, getExtension from path
-        import Merge from environment.table
-        import STATE_REJECTED from Promise
-        import Version, Logger from util
-        import rawset, tobool from _G
-        import AsyncCompile from file
+    default = environment.Color( 50, 100, 200 )\DoCorrection!
+    environmentMetatable = { __index: environment }
 
-        default = environment.Color( 50, 100, 200 )\DoCorrection!
-        environmentMetatable = { __index: environment }
+    hooksMeta = {
+        __index: ( tbl, key ) ->
+            new = {}
+            rawset( tbl, key, new )
+            return new
+    }
 
-        hooksMeta = {
-            __index: ( tbl, key ) ->
-                new = {}
-                rawset( tbl, key, new )
-                return new
-        }
+    parse = async ( filePath, gamePath, config ) ->
+        compileResult = await AsyncCompile( filePath, {}, config, gamePath, true )
+        await Module.cache( "file://" .. compileResult.path, compileResult.content )
+        func = compileResult.func
 
-        parse = async ( filePath, gamePath, config ) ->
-            compileResult = await AsyncCompile( filePath, {}, config, gamePath, true )
-            await Module.cache( "file://" .. compileResult.path, compileResult.content )
-            func = compileResult.func
+        info = {}
+        setfenv( func, info )
+        success, result = pcall( func )
+        if success
+            if istable( result )
+                Merge( info, result )
 
-            info = {}
-            setfenv( func, info )
-            success, result = pcall( func )
-            if success
-                if istable( result )
-                    Merge( info, result )
+            if IsEmpty( info )
+                error PackageError "file '#{filePath}' does not contain valid package info (empty or cannot be parsed)"
+                return nil
 
-                if IsEmpty( info )
-                    error PackageError "file '#{filePath}' does not contain valid package info (empty or cannot be parsed)"
-                    return nil
+            return Package( URL( AbsoluteGamePath( filePath, gamePath ), "file:///" ), info )
 
-                return Package( URL( AbsoluteGamePath( filePath, gamePath ), "file:///" ), info )
+        error PackageError "package info '" .. filePath .. "' execution error: " .. result
+        return nil
 
-            error PackageError "package info '" .. filePath .. "' execution error: " .. result
-            return nil
+    emptyTable = {}
 
-        emptyTable = {}
+    class Package
+        __tostring: =>
+            return format( "Package: %p [%s@%s]", @, @name, @version )
 
-        class Package
-            __tostring: =>
-                return format( "Package: %p [%s@%s]", @, @name, @version )
+        new: ( @url, info ) =>
+            filePath = @file = url.pathname
+            @directory = getDirectory( filePath, false )
 
-            new: ( @url, info ) =>
-                filePath = @file = url.pathname
-                @directory = getDirectory( filePath, false )
+            unless info
+                info = emptyTable
 
-                unless info
-                    info = emptyTable
+            -- name
+            :name = info
+            unless isstring( name ) and match( name, "^[a-zA-Z_][%w ~<>_&+%-]*" )
+                name = match( filePath, ".*packages/([^/]+)" ) or getFileName( filePath, false )
 
-                -- name
-                :name = info
-                unless isstring( name ) and match( name, "^[a-zA-Z_][%w ~<>_&+%-]*" )
-                    name = match( filePath, ".*packages/([^/]+)" ) or getFileName( filePath, false )
+                if name == ""
+                    error PackageError "invalid package name: '" .. name .. "'"
 
-                    if name == ""
-                        error PackageError "invalid package name: '" .. name .. "'"
+            @name = name
 
-                @name = name
+            -- version
+            :version = info
+            unless isstring( version )
+                version = "0.1.0"
 
-                -- version
-                :version = info
-                unless isstring( version )
-                    version = "0.1.0"
+            version = Version( version )
+            @version = version
 
-                version = Version( version )
-                @version = version
+            -- autorun
+            @autorun = tobool( info.autorun )
 
-                -- autorun
-                @autorun = tobool( info.autorun )
+            -- send
+            :send = info
+            unless istable( send )
+                send = {}
 
-                -- send
-                :send = info
-                unless istable( send )
-                    send = {}
+            @send = send
 
-                @send = send
+            -- exports
+            :exports = info
+            if isstring( exports )
+                exports = { [ "." ]: exports }
+            elseif not istable( exports )
+                exports = nil
 
-                -- exports
-                :exports = info
-                if isstring( exports )
-                    exports = { [ "." ]: exports }
-                elseif not istable( exports )
-                    exports = nil
+            @exports = exports
 
-                @exports = exports
+            -- imports
+            :imports = info
+            if isstring( imports )
+                imports = { [ "." ]: imports }
+            elseif not istable( imports )
+                imports = nil
 
-                -- imports
-                :imports = info
-                if isstring( imports )
-                    imports = { [ "." ]: imports }
-                elseif not istable( imports )
-                    imports = nil
+            @imports = imports
 
-                @imports = imports
+            -- dependencies
+            :dependencies = info
+            unless istable( dependencies )
+                dependencies = nil
 
-                -- dependencies
-                :dependencies = info
-                unless istable( dependencies )
-                    dependencies = nil
+            @dependencies = dependencies
 
-                @dependencies = dependencies
+            -- description
+            :description = info
+            unless isstring( description )
+                description = "Description not provided"
 
-                -- description
-                :description = info
-                unless isstring( description )
-                    description = "Description not provided"
+            @description = description
 
-                @description = description
+            -- license
+            :license = info
+            unless isstring( license )
+                license = "License not provided"
 
-                -- license
-                :license = info
-                unless isstring( license )
-                    license = "License not provided"
+            @license = license
 
-                @license = license
+            -- homepage
+            :homepage = info
+            unless isstring( homepage )
+                homepage = "Homepage not provided"
 
-                -- homepage
-                :homepage = info
-                unless isstring( homepage )
-                    homepage = "Homepage not provided"
+            @homepage = homepage
 
-                @homepage = homepage
+            -- logger
+            :logger = info
+            unless istable( logger )
+                logger = {
+                    interpolation: true
+                    disabled: false
+                    color: default
+                }
 
-                -- logger
-                :logger = info
-                unless istable( logger )
-                    logger = {
-                        interpolation: true
-                        disabled: false
-                        color: default
-                    }
+            @logger = logger
 
-                @logger = logger
-
-                local packageLogger
-                if logger
-                    if logger.disabled
-                        packageLogger = nil
-                    else
-                        packageLogger = Logger( name .. "@" .. version\__tostring!, logger.color, logger.interpolation )
+            local packageLogger
+            if logger
+                if logger.disabled
+                    packageLogger = nil
                 else
-                    packageLogger = Logger( name .. "@" .. version\__tostring! )
+                    packageLogger = Logger( name .. "@" .. version\__tostring!, logger.color, logger.interpolation )
+            else
+                packageLogger = Logger( name .. "@" .. version\__tostring! )
 
-                @__hooks = setmetatable( {}, hooksMeta )
-                @__prefix = @__tostring! .. "::"
-                @__timers = {}
+            @__hooks = setmetatable( {}, hooksMeta )
+            @__prefix = @__tostring! .. "::"
+            @__timers = {}
 
-                -- package environment
-                @env = setmetatable( { __package: @, Logger: packageLogger }, environmentMetatable )
+            -- package environment
+            @env = setmetatable( { __package: @, Logger: packageLogger }, environmentMetatable )
 
-            -- directly reads package info from given filePath and creates Package
-            -- do not use this method directly, use Package.read instead
-            @parse: parse
+        -- directly reads package info from given filePath and creates Package
+        -- do not use this method directly, use Package.read instead
+        @parse: parse
 
-            -- Finds a package info in given url.
-            -- If package.* file was not given in path, tries to find it.
-            -- Also caches the package by URL.
-            @read: async ( url ) ->
-                if isstring( url )
-                    url = URL( url )
+        -- Finds a package info in given url.
+        -- If package.* file was not given in path, tries to find it.
+        -- Also caches the package by URL.
+        @read: async ( url ) ->
+            if isstring( url )
+                url = URL( url )
 
-                unless isurl( url )
-                    error PackageError "invalid url '" .. url.href .. "'"
+            unless isurl( url )
+                error PackageError "invalid url '" .. url.href .. "'"
 
-                if url.scheme ~= "file"
-                    -- error PackageError "unsupported scheme '" .. url.scheme .. "' ('" .. url.href .. "')"
-                    return nil
+            if url.scheme ~= "file"
+                -- error PackageError "unsupported scheme '" .. url.scheme .. "' ('" .. url.href .. "')"
+                return nil
 
-                unless istable( url.path )
-                    -- error PackageError "invalid path '" .. url.pathname .. "' ('" .. url.href .. "')"
-                    return nil
+            unless istable( url.path )
+                -- error PackageError "invalid path '" .. url.pathname .. "' ('" .. url.href .. "')"
+                return nil
 
-                cached = packages[ url.href ]
-                if cached
-                    if cached.state ~= STATE_REJECTED
-                        return cached
+            cached = packages[ url.href ]
+            if cached
+                if cached.state ~= STATE_REJECTED
+                    return cached
 
-                    -- clear cache if parsing failed
-                    packages[ url.href ] = nil
+                -- clear cache if parsing failed
+                packages[ url.href ] = nil
 
-                filePath, gamePath = NormalizeGamePath( url.pathname )
-                fileDir = getDirectory( filePath, true )
+            filePath, gamePath = NormalizeGamePath( url.pathname )
+            fileDir = getDirectory( filePath, true )
 
-                -- if not package.* file was given in url, try to find it smartly
-                if getFileName( filePath, false ) ~= "package"
-                    files = Find( fileDir .. "/package.*", gamePath, true )
-                    if #files == 1
-                        filePath = fileDir .. files[ 1 ]
+            -- if not package.* file was given in url, try to find it smartly
+            if getFileName( filePath, false ) ~= "package"
+                files = Find( fileDir .. "/package.*", gamePath, true )
+                if #files == 1
+                    filePath = fileDir .. files[ 1 ]
 
-                    elseif #files > 1
-                        -- Smartly decide which file to use
-                        values = {} -- [ext] = filePath
-                        for fileName in *files
-                            values[ getExtension( fileName, false ) ] = fileName
+                elseif #files > 1
+                    -- Smartly decide which file to use
+                    values = {} -- [ext] = filePath
+                    for fileName in *files
+                        values[ getExtension( fileName, false ) ] = fileName
 
-                        filePath = fileDir .. values.yue or values.moon or values.lua or values[ 1 ]
+                    filePath = fileDir .. values.yue or values.moon or values.lua or values[ 1 ]
 
-                unless IsFile( filePath, gamePath, true )
-                    -- error PackageError "file '" .. filePath .. "' does not exist for packageURL '" .. url.href .. "'"
-                    return nil
+            unless IsFile( filePath, gamePath, true )
+                -- error PackageError "file '" .. filePath .. "' does not exist for packageURL '" .. url.href .. "'"
+                return nil
 
-                config = {}
-                for key, value in url.searchParams\iterator!
-                    config[ key ] = value
+            config = {}
+            for key, value in url.searchParams\iterator!
+                config[ key ] = value
 
-                -- also cache result so next calls will return current package
-                promise = parse( filePath, gamePath, config )
-                packages[ url.href ] = promise
-                return promise
+            -- also cache result so next calls will return current package
+            promise = parse( filePath, gamePath, config )
+            packages[ url.href ] = promise
+            return promise
 
     environment.ispackage = ( any ) ->
         metatable = getmetatable( any )

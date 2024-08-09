@@ -88,6 +88,7 @@ do
                 requestCache[ parameters.method ][ parameters.url ] = nil
 
             @Reject( WebClientError "failed to make http request" )
+            return nil
 
     queue = {}
     timer.Simple 0, ->
