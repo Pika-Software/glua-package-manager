@@ -87,7 +87,7 @@ class RepositoryHandler extends BaseSourceHandler
                 error SourceError "Failed to download the repository."
                 return nil
 
-            return MountZIPData( response, url.href )
+            return MountZIPData( response.body, url.href )
 
         :path = info
         pathStart, pathEnd = 1, #path
