@@ -119,7 +119,7 @@ do
 
             data = requestCache[ method ][ url ]
             if data
-                return promise\Resolve( data[ 1 ] )
+                return data[1] -- yeah, here we can just remove previous promise
 
             requestCache[ method ][ url ] = { promise, SysTime! }
 
