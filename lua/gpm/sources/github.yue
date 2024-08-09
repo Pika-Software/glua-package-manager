@@ -5,15 +5,16 @@ import await, async, load, SourceError, ModuleError, error, isstring from enviro
 import BaseSource, BaseSourceHandler, Module from gpm.loader
 import Base64Decode, JSONToTable from environment.util
 import MountZIPData from environment.file
-import CachedFetch from environment.http
 import getExtension from environment.path
+import CachedFetch from environment.http
+import ByteSplit from environment.string
 import insert from environment.table
 
 class RepositoryHandler extends BaseSourceHandler
     FetchInfo: async ( url ) =>
         segments = url.path
         if isstring( segments )
-            error SourceError "url '#{url}' has invalid path"
+            segments = ByteSplit( segments, 0x2F --[[ / ]] )
 
         if url.hostname
             insert( segments, 1, url.hostname )
