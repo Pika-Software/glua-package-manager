@@ -12,6 +12,9 @@ import insert from environment.table
 class RepositoryHandler extends BaseSourceHandler
     FetchInfo: async ( url ) =>
         segments = url.path
+        if isstring( segments )
+            error SourceError "url '#{url}' has invalid path"
+
         if url.hostname
             insert( segments, 1, url.hostname )
 
@@ -25,9 +28,9 @@ class RepositoryHandler extends BaseSourceHandler
             error SourceError "Repository name not specified."
             return nil
 
-        headers = {
-            ["Authorization"]: "Bearer " .. ( url.username or "" ) .. ( url.password or "" )
-        }
+        headers = {}
+        if url.username or url.password
+            headers[ "Authorization" ] = "Bearer " .. ( url.username or "" ) .. ( url.password or "" )
 
         url.username = nil
         url.password = nil
