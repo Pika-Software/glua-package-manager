@@ -17,13 +17,16 @@ do
             name = url.pathname
             if not name or name == ""
                 error SourceError "Binary module name is not specified!"
-                return
+                return nil
 
-            unless IsBinaryModuleInstalled( name )
-                error SourceError "Binary module " .. name .. " is not installed locally!"
-                return
+            if IsBinaryModuleInstalled( name )
+                require( name )
+                return name
 
-            require( name )
+            error SourceError "Binary module " .. name .. " is not installed locally!"
+            return nil
+
+        Run: async ( url, name ) =>
             return _G[ name ]
 
     class BinarySource extends BaseSource
@@ -32,19 +35,14 @@ do
 
 do
 
-    import File from environment.addon
+    import MountGMA from file
 
     class GMAHandler extends BaseSourceHandler
         ShouldHandle: ( url ) =>
             return getExtension( url.pathname, false ) == "gma"
 
-        Install: async ( url ) =>
-            f = File!
-            await f\AsyncRead( url.pathname, true, true )
-            unless f\VerifyCRC!
-                error SourceError "Invalid CRC checksum for '" .. url.href .. "'"
-
-            return f\AsyncMount( false )
+        Run: async ( url ) =>
+            return MountGMA( url.pathname )
 
     local ZIPHandler
     do

@@ -1,7 +1,7 @@
 _G = _G
 import gpm from _G
 import environment from gpm
-import debug, string, path, file, util, pairs, isurl, isstring, ArgAssert, URL, NotImplementedError, ModuleError, error, pcall, PackageError, Promise from environment
+import debug, string, path, file, util, pairs, isurl, isstring, ArgAssert, URL, ModuleError, error, pcall, PackageError, Promise from environment
 import NormalizeGamePath, AbsoluteGamePath, Find from file
 import stripExtension, getDirectory from path
 import IsEmpty from environment.table
@@ -693,9 +693,10 @@ do
 local Require
 do
 
-    PACKAGE_PATHS = { "./?.lua", "./?/init.lua" }
+    import tostring, NotImplementedError from environment
     import IsBinaryModuleInstalled from util
-    import tostring from environment
+
+    PACKAGE_PATHS = { "./?.lua", "./?/init.lua" }
 
     isRequireSyntax = ( modname ) ->
         return match( modname, "^[%a%d_%-.]+$" )
@@ -785,12 +786,14 @@ do
         __tostring: =>
             return format( "%s: %p", @@__name or "unknown source handler", @ )
 
-        FetchInfo: async ( url, base, env, parent ) =>
+        FetchInfo: async ( url, base ) =>
             return nil
 
-        Install: async ( url, info, base, env, parent ) =>
-            error NotImplementedError "Source:Install( url, info, base, env, parent )"
-            return
+        Install: async ( url, installInfo ) =>
+            return nil
+
+        Run: async ( url, runInfo, env, parent ) =>
+            return nil
 
     class loader.BaseSource
         __tostring: =>
@@ -812,11 +815,14 @@ do
 
             return reject SourceError "No handler found for URL '#{url}' (" .. name .. ")"
 
-        FetchInfo: ( url, base, env, parent ) =>
-            return @CallHandler( "FetchInfo", url, base, env, parent )
+        FetchInfo: ( url, base ) =>
+            return @CallHandler( "FetchInfo", url, base )
 
-        Install: ( url, info, base, env, parent ) =>
-            return @CallHandler( "Install", url, info, base, env, parent )
+        Install: ( url, installInfo ) =>
+            return @CallHandler( "Install", url, installInfo )
+
+        Run: ( url, runInfo, env, parent ) =>
+            return @CallHandler( "Run", url, runInfo, env, parent )
 
     parseFileURL = loader.ParseFileURL = ( any ) ->
         if isurl( any )
@@ -847,11 +853,7 @@ do
             env = package.env or env
 
         source = findSource( resolved.scheme )
-
-        unless info
-            info = await source\FetchInfo( resolved, base, env, parent )
-
-        return source\Install( resolved, info, base, env, parent )
+        return source\Run( resolved, await( source\Install( resolved, info or await( source\FetchInfo( resolved, base ) ) ) ), env, parent )
 
     local getImportMeta
     do
