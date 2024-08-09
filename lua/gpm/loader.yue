@@ -946,6 +946,8 @@ do
 
         -- TODO: Resolve dependencies
         -- ukdev: I think we need make dependencies resolving in package loading process, because dependencies also can have their dependencies
+        -- retr0: Proper way to do this is to create dedicated function ReasolveDependencies, which can recursevly resolve dependencies
+        -- retr0: I will implement this, no problem
 
         if pkgCount == 0
             Logger\Info( "No packages found :<" )
