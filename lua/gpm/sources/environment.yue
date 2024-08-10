@@ -1,22 +1,12 @@
 _G = _G
-import gpm from _G
-import async, environment, loader from gpm
+import environment, loader from _G.gpm
 import sub, gsub from environment.string
 import GetValue from environment.table
 
 class EnvironmentSourceHandler extends loader.BaseSourceHandler
-    Run: async ( url, _, package ) =>
-        local source
-        if url.scheme == "gpm"
-            if package
-                source = package.env
-
-            unless source
-                source = environment
-        else
-            source = _G
-
+    Run: ( url ) =>
         :pathname = url
+        source = url.scheme == "gpm" and environment or _G
         if pathname and pathname ~= "" and pathname ~= "/"
             return GetValue( source, gsub( sub( pathname, 2 ), "/", "." ) )
 
@@ -24,4 +14,4 @@ class EnvironmentSourceHandler extends loader.BaseSourceHandler
 
 class EnvironmentSource extends loader.BaseSource
 
-EnvironmentSource( "gpm", "garrysmod", "gmod" )\RegisterHandler( EnvironmentSourceHandler! )
+EnvironmentSource( "gpm", "gmod" )\RegisterHandler( EnvironmentSourceHandler! )

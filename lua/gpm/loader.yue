@@ -693,7 +693,7 @@ do
 local Require
 do
 
-    import tostring, NotImplementedError from environment
+    import NotImplementedError from environment
     import IsBinaryModuleInstalled from util
 
     PACKAGE_PATHS = { "./?.lua", "./?/init.lua" }
@@ -726,9 +726,12 @@ do
             if resolved := isOpaque and resolveFile( @, filePath, base )
                 return { :resolved }
 
-            if StartsWith( filePath, "gpm/" ) or StartsWith( filePath, "garrysmod/" ) or StartsWith( filePath, "gmod/" )
+            if StartsWith( filePath, "gpm/" ) or StartsWith( filePath, "gmod/" )
                 protocol, filePath = match( filePath, "^(.-)/(.*)" )
-                filePath = tostring( URL( protocol .. ":///" .. filePath ) )
+                filePath = URL( protocol .. ":///" .. filePath ).href
+
+            if filePath == "gpm" or filePath == "gmod"
+                filePath ..= ":///"
 
             success, resolved = try await ESM.resolve( isOpaque and filePath or modname, base )
             if success
@@ -786,13 +789,13 @@ do
         __tostring: =>
             return format( "%s: %p", @@__name or "unknown source handler", @ )
 
-        FetchInfo: async ( url, base ) =>
+        FetchInfo: ( url, base ) =>
             return nil
 
-        Install: async ( url, installInfo ) =>
+        Install: ( url, info ) =>
             return nil
 
-        Run: async ( url, runInfo, env, parent ) =>
+        Run: ( url, info, env, parent ) =>
             return nil
 
     class loader.BaseSource
@@ -818,11 +821,11 @@ do
         FetchInfo: ( url, base ) =>
             return @CallHandler( "FetchInfo", url, base )
 
-        Install: ( url, installInfo ) =>
-            return @CallHandler( "Install", url, installInfo )
+        Install: ( url, info ) =>
+            return @CallHandler( "Install", url, info )
 
-        Run: ( url, runInfo, env, parent ) =>
-            return @CallHandler( "Run", url, runInfo, env, parent )
+        Run: ( url, info, env, parent ) =>
+            return @CallHandler( "Run", url, info, env, parent )
 
     parseFileURL = loader.ParseFileURL = ( any ) ->
         if isurl( any )
@@ -835,9 +838,11 @@ do
         url = parseFileURL( any )
         unless url
             error SourceError "Invalid URL: #{any}"
+            return nil
 
         unless url.scheme
             error SourceError "Invalid protocol for URL: #{any}"
+            return nil
 
         return url
 
@@ -853,7 +858,9 @@ do
             env = package.env or env
 
         source = findSource( resolved.scheme )
-        return source\Run( resolved, await( source\Install( resolved, info or await( source\FetchInfo( resolved, base ) ) ) ), env, parent )
+        info or= await source\FetchInfo( resolved, base )
+        info = await source\Install( resolved, info )
+        return source\Run( resolved, info, env, parent )
 
     local getImportMeta
     do

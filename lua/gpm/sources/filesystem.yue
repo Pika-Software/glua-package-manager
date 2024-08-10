@@ -15,7 +15,7 @@ do
     binnaries = {}
 
     class BinarySourceHandler extends BaseSourceHandler
-        Install: async ( url ) =>
+        Install: ( url ) =>
             name = url.pathname
             if not name or name == ""
                 error SourceError "Binary module name is not specified!"
@@ -32,7 +32,7 @@ do
             error SourceError "Binary module " .. name .. " is not installed locally!"
             return nil
 
-        Run: async ( url, name ) =>
+        Run: ( url, name ) =>
             return _G[ name ]
 
     class BinarySource extends BaseSource
@@ -40,39 +40,6 @@ do
     BinarySource( "dll" )\RegisterHandler( BinarySourceHandler! )
 
 do
-
-    import MountGMA from file
-
-    class GMAHandler extends BaseSourceHandler
-        ShouldHandle: ( url ) =>
-            return getExtension( url.pathname, false ) == "gma"
-
-        Run: async ( url ) =>
-            return MountGMA( url.pathname )
-
-    local ZIPHandler
-    do
-
-        import MountZIP from file
-
-        promises = {}
-
-        task = ( filePath ) ->
-            promise = promises[ filePath ]
-            if promise and promise.state == STATE_PENDING
-                return promise
-
-            filePath, gamePath = NormalizeGamePath( filePath, gamePath )
-            promise = MountZIP( filePath, gamePath, true )
-            promises[ filePath ] = promise
-            return promise
-
-        class ZIPHandler extends BaseSourceHandler
-            ShouldHandle: ( url ) =>
-                return getExtension( url.pathname, false ) == "zip"
-
-            Install: async ( url ) =>
-                return task( url.pathname )
 
     local LuaHandler
     do
@@ -108,9 +75,9 @@ do
             Install: async ( url, _, __, env ) =>
                 return Module.run( await( task( url ) ), url, env )
 
+            Run: async
+
     class FileSource extends BaseSource
 
     fs = FileSource( "file" )
     fs\RegisterHandler( LuaHandler! )
-    fs\RegisterHandler( ZIPHandler! )
-    fs\RegisterHandler( GMAHandler! )
