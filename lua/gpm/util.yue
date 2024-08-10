@@ -1184,14 +1184,15 @@ do
             return ( @rear - @front ) + 1
 
         isEmpty: =>
-            return @rear == 0
+            :rear = @
+            return rear == 0 or @front > rear
 
         isFull: =>
             return @length! == @size
 
         enqueue: ( value ) =>
             if @isFull!
-                return
+                return nil
 
             rear = @rear + 1
             @rear = rear
@@ -1239,6 +1240,19 @@ do
         empty: =>
             for index = @front, @rear
                 @[ index ] = nil
+
+        iterator: =>
+            @optimize!
+
+            :front, :rear = @
+            front -= 1
+
+            return ->
+                if rear == 0 or front >= rear
+                    return nil
+
+                front += 1
+                return front, @[ front ]
 
         @__base.push = @__base.enqueue
         @__base.pop = @__base.dequeue

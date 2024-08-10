@@ -12,6 +12,8 @@ do
     import IsBinaryModuleInstalled from environment.util
     import require from _G
 
+    binnaries = {}
+
     class BinarySourceHandler extends BaseSourceHandler
         Install: async ( url ) =>
             name = url.pathname
@@ -19,7 +21,11 @@ do
                 error SourceError "Binary module name is not specified!"
                 return nil
 
+            if binnaries[ name ]
+                return _G[ name ]
+
             if IsBinaryModuleInstalled( name )
+                binnaries[ name ] = true
                 require( name )
                 return name
 

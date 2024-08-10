@@ -58,27 +58,29 @@ do
             cacheLifetime = tonumber( new ) * 60
         "GLua Package Manager::HTTP" )
 
-    requestCache = {}
+    requestCache = {
+        ["GET"]: {},
+        ["POST"]: {},
+        ["HEAD"]: {},
+        ["PUT"]: {},
+        ["DELETE"]: {},
+        ["PATCH"]: {},
+        ["OPTIONS"]: {}
+    }
 
     do
 
+        methods = { "GET", "POST", "HEAD", "PUT", "DELETE", "PATCH", "OPTIONS" }
         import pairs from _G
 
-        methods = http.Methods = { "GET", "POST", "HEAD", "PUT", "DELETE", "PATCH", "OPTIONS" }
-        length = #methods
-        methods.n = length
-
-        for index = 1, length
-            requestCache[ methods[ index ] ] = {}
-
         timer.Create "GLua Package Manager::HTTP", 60, 0, ->
-            time = SysTime!
+            sysTime = SysTime!
 
-            for method in *methods
-                cache = requestCache[ method ]
-                for href, data in pairs( cache )
-                    if ( time - data[ 2 ] ) > cacheLifetime
-                        cache[ href ] = nil
+            for index = 1, 7
+                requests = requestCache[ methods[ index ] ]
+                for href, data in pairs( requests )
+                    if ( sysTime - data[ 2 ] ) > cacheLifetime
+                        requests[ href ] = nil
 
     request = ( parameters ) =>
         if client( parameters ) or not returnsState

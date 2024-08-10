@@ -5,7 +5,7 @@ import sub, gsub from environment.string
 import GetValue from environment.table
 
 class EnvironmentSourceHandler extends loader.BaseSourceHandler
-    Install: async ( url, _, __, env, package ) =>
+    Run: async ( url, _, package ) =>
         local source
         if url.scheme == "gpm"
             if package
