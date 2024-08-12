@@ -34,8 +34,10 @@ commands = {
         hint: ( args ) ->
     }
     update: {
-        help: "Updates a package"
+        help: "Updates package list from repositories"
         call: ( args ) ->
+            -- loader.GetVersions!
+
         hint: ( args ) ->
     },
     list: {

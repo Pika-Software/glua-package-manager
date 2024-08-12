@@ -654,6 +654,7 @@ do
     import isnumber, tonumber, isstring, tostring from _G
     import match, find, gsub, ByteCount from string
     import isuint, max from math
+    import sort from table
 
     compare = ( a, b ) ->
         return a == b and 0 or a < b and -1 or 1
@@ -1045,6 +1046,16 @@ do
 
         fromNumber: ( uint ) ->
             return Version( band( uint, 0x3ff ), band( rshift( uint, 10 ), 0x7ff ), band( rshift( uint, 21 ), 0x7ff ) )
+
+        select: ( target, versions ) ->
+            sort( versions, ( a, b ) -> a > b )
+
+            for index = 1, #versions
+                version = Version( versions[ index ] )
+                if version % target
+                    return version, index
+
+            return nil, -1
     }
 
     versions = {}

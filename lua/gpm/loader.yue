@@ -1,12 +1,13 @@
 _G = _G
 import gpm from _G
 import environment from gpm
-import debug, string, path, file, util, pairs, isurl, isstring, ArgAssert, URL, ModuleError, error, pcall, PackageError, Promise from environment
+import debug, string, path, table, file, util, pairs, isurl, isstring, ArgAssert, URL, ModuleError, error, pcall, PackageError, Promise from environment
 import NormalizeGamePath, AbsoluteGamePath, Find from file
 import stripExtension, getDirectory from path
-import IsEmpty from environment.table
 import await, async from Promise
 import getfpath from debug
+import IsEmpty from table
+import Version from util
 
 file.CreateDir( "/data/gpm/vfs", true )
 
@@ -96,47 +97,166 @@ else
 
 :loader = gpm
 unless istable( loader )
-    -- Modules and Packages are tables with format: [url] = Module/Package
     loader = gpm.loader = {}
 
+-- Modules and Packages are tables with format: [url] = Module/Package
 packages = loader.Packages = {}
 modules = loader.Modules = {}
-
-local repositories
-
-if SERVER or MENU_DLL
-    import Query from _G.sql
-
-    Query( "CREATE TABLE IF NOT EXISTS `gpm.table_version` ( Name TEXT PRIMARY KEY NOT NULL, Version INT )" )
-    Query( "CREATE TABLE IF NOT EXISTS `gpm.repository` ( ID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, URL TEXT NOT NULL )" )
-    Query( "CREATE TABLE IF NOT EXISTS `gpm.packages` ( Name TEXT PRIMARY KEY NOT NULL, URL TEXT UNIQUE NOT NULL, InstalledVersion TEXT, RepositoryID INTEGER DEFAULT 0 NOT NULL, FOREIGN KEY(repositoryID) REFERENCES `gpm.repository` (ID) )" )
-
-    repositories = Query( "SELECT * FROM `gpm.repository`" ) or {}
-
-    count = #repositories
-    if count == 0
-        Query( "INSERT INTO `gpm.repository` ( URL ) VALUES ( 'https://raw.githubusercontent.com/Pika-Software/.github/main/gpm/repositories.json' )" )
-        repositories = Query( "SELECT * FROM `gpm.repository`" ) or {}
-
-    for index = 1, count
-        repository = repositories[ index ]
-        repository.Packages = Query( "SELECT * FROM `gpm.packages` WHERE RepositoryID = " .. repository.ID ) or {}
-
-    loader.Repositories = repositories
-
-if SERVER
-    file.Set( "/lua/gpm/vfs/repositories.lua", "return '" .. util.TableToJSON( repositories, false ) .. "'", "GLua Package Manager::Repositories" )
-    _G.AddCSLuaFile( "lua/gpm/vfs/repositories.lua" )
-
-if CLIENT
-    repositories = include( "gpm/vfs/repositories.lua" )
-    if repositories
-        repositories = loader.Repositories = util.JSONToTable( repositories )
 
 -- Resolves specifier as it is package specifier
 -- See https://nodejs.org/api/esm.html#resolution-algorithm-specification PACKAGE_RESOLVE
 import sub, byte, find, match, gsub, format, StartsWith, IsURL from string
 import IsFile from file
+
+local repositories
+do
+
+    import JSONToTable from util
+
+    if SERVER or MENU_DLL
+        import Query from _G.sql
+
+        Query( "CREATE TABLE IF NOT EXISTS `gpm.table_version` ( Name TEXT PRIMARY KEY NOT NULL, Version INT )" )
+        Query( "CREATE TABLE IF NOT EXISTS `gpm.repository` ( ID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, URL TEXT NOT NULL )" )
+        Query( "CREATE TABLE IF NOT EXISTS `gpm.packages` ( ID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, Name TEXT NOT NULL, URL TEXT UNIQUE NOT NULL, Version TEXT NOT NULL, RepositoryID INTEGER DEFAULT 0 NOT NULL, FOREIGN KEY(RepositoryID) REFERENCES `gpm.repository` (ID) )" )
+        Query( "CREATE TABLE IF NOT EXISTS `gpm.installed_packages` ( ID INTEGER UNIQUE NOT NULL, FOREIGN KEY(ID) REFERENCES `gpm.packages` (ID) )" )
+
+        repositories = Query( "SELECT * FROM `gpm.repository`" ) or {}
+
+        count = #repositories
+        if count == 0
+            Query( "INSERT INTO `gpm.repository` ( URL ) VALUES ( 'https://raw.githubusercontent.com/Pika-Software/gpm-repositories/main/main.json' )" )
+            repositories = Query( "SELECT * FROM `gpm.repository`" ) or {}
+
+        for index = 1, count
+            repository = repositories[ index ]
+            repository.Packages = Query( "SELECT * FROM `gpm.packages` WHERE RepositoryID = " .. repository.ID ) or {}
+
+        loader.Repositories = repositories
+
+    if SERVER
+        file.Set( "/lua/gpm/vfs/repositories.lua", "return '" .. util.TableToJSON( repositories, false ) .. "'", "GLua Package Manager::Repositories" )
+        _G.AddCSLuaFile( "lua/gpm/vfs/repositories.lua" )
+
+    if CLIENT
+        repositories = include( "gpm/vfs/repositories.lua" )
+        if repositories
+            repositories = loader.Repositories = JSONToTable( repositories )
+
+    import SafeAwait, AllSettled from Promise
+    import Fetch from environment.http
+
+    fetchVersions = async ( href ) ->
+        unless IsURL( href )
+            return nil
+
+        url = URL( href )
+        if url.scheme ~= "https"
+            return nil
+
+        searchable = match( url.pathname, "^/([^/]+/[^/]+)/?$" )
+        unless searchable
+            return nil
+
+        ok, result = SafeAwait( Fetch( "https://api.github.com/repos/" .. searchable .. "/tags" ) )
+        if ok and result.status == 200
+            json = JSONToTable( result.body )
+            if json
+                versions, length = {}, 0
+                for data in *json
+                    length += 1
+                    versions[ length ] = data
+
+                return versions
+
+        return nil
+
+    fetchRepository = async ( repository, specifier ) ->
+        packages = repository.Packages
+        id = repository.ID
+        length = #packages
+
+        unless repository.Fetched
+            ok, result = SafeAwait( Fetch( repository.URL ) )
+            if ok and result.status == 200
+                json = JSONToTable( result.body )
+                if json
+                    for name, url in pairs( json )
+                        exists = false
+                        for index = 1, length
+                            package = packages[ index ]
+                            if package.Name == name
+                                package.URL = url
+                                exists = true
+                                break
+
+                        unless exists
+                            length += 1
+                            packages[ length ] = {
+                                RepositoryID: id,
+                                Name: name,
+                                URL: url
+                            }
+
+                    repository.Fetched = true
+
+        if specifier
+            for index = 1, length
+                package = packages[ index ]
+                if specifier == package.Name
+                    versions = package.Versions
+                    if versions
+                        return versions
+
+                    ok, result = SafeAwait( fetchVersions( package.URL ) )
+                    if ok
+                        package.Versions = result
+                        return result
+
+            return nil
+
+        for index = 1, length
+            packages[ index ] = fetchVersions( packages[ index ].URL )
+
+        -- result = await AllSettled( packages )
+        -- for i = 1, length
+        --     :value = result[ i ]
+        --     package = packages[ i ]
+
+        --     versions = package.Versions or {}
+        --     length = #versions
+
+        --     if value
+        --         for value in *value
+        --             for j = 1, length
+        --                 exists = false
+        --                 version = versions[ j ]
+        --                 if value.name == version
+        --                     exists = true
+        --                     break
+
+
+
+        return versions
+
+    loader.GetVersions = async ( specifier ) ->
+        tasks, length = {}, 0
+        for repository in *repositories
+            length += 1
+            tasks[ length ] = fetchRepository( repository, specifier )
+
+        result, length = {}, 0
+        for promise in *await( AllSettled( tasks ) )
+            :value = promise
+            if value
+                for version in *value
+                    length += 1
+                    result[ length ] = version
+
+        return {
+            Versions: result,
+            Length: length
+        }
 
 local Module, Package
 do
@@ -161,17 +281,34 @@ do
             __tostring: =>
                 return format( "Module: %p [%s]", @, @name )
 
-            new: ( @location, @url, @env = _G ) =>
+            new: ( @url, @env = _G ) =>
                 unless isurl( url )
                     error ModuleError "url is " .. type( url ) .. ", expected URL"
 
-                @name = getfpath( location ) or "unknown"
+                @name = "unknown"
 
-                __filename = @file = url.pathname
-                __dirname = @directory = getDirectory( __filename, false )
-                setfenv( location, setmetatable({ __module: @, :__filename, :__dirname }, { __index: env, __newindex: env }) )
+                @file = url.pathname
+                @directory = getDirectory( __filename, false )
 
                 modules[ url.href ] = @
+                return nil
+
+            load: async =>
+                if @func
+                    return @func
+
+                config = {}
+                env = setmetatable({ __module: @, __filename: @file, __dirname: @directory }, { __index: @env, __newindex: @env })
+
+                if @url.scheme == "file"
+                    filePath, gamePath = NormalizeGamePath( url.pathname )
+
+                    compileResult = await AsyncCompile( filePath, env, config, gamePath, true )
+                    @func = func = compileResult.func
+                    @name = getfpath( func ) or "unknown"
+                    return func
+
+                error ModuleError "unsupported scheme '" .. @url.scheme .. "' ('" .. @url.href .. "')"
                 return nil
 
             run: ( ... ) =>
@@ -186,22 +323,23 @@ do
 
             @get: ( url ) -> modules[ url.href ]
 
-            @getCachePath: getCachePath
+            -- @getCachePath: getCachePath
 
-            @cache: async ( url, content ) ->
-                filePath = getCachePath( url )
-                if CLIENT
-                    return filePath
+            -- @cache: async ( url, content ) ->
+            --     filePath = getCachePath( url )
+            --     if CLIENT
+            --         return filePath
 
-                if IsFile( filePath ) and Time( filePath ) >= startTime
-                    return filePath
+            --     if IsFile( filePath ) and Time( filePath ) >= startTime
+            --         return filePath
 
-                return AsyncWrite( filePath, content )
+            --     return AsyncWrite( filePath, content )
 
-            @run: ( location, url, env ) ->
+            @run: async ( url, env ) ->
                 m = modules[ url.href ]
                 unless m
                     m = Module( location, url, env )
+                    await m\load!
 
                 return m\run!
 
@@ -212,11 +350,11 @@ do
             return metatable and metatable.__class == Module
 
     import getFileName, getExtension from path
-    import Merge from environment.table
     import STATE_REJECTED from Promise
-    import Version, Logger from util
     import rawset, tobool from _G
     import AsyncCompile from file
+    import Merge from table
+    import Logger from util
 
     default = environment.Color( 50, 100, 200 )\DoCorrection!
     environmentMetatable = { __index: environment }
@@ -284,11 +422,12 @@ do
             @autorun = tobool( info.autorun )
 
             -- send
-            :send = info
-            unless istable( send )
-                send = {}
+            if SERVER
+                :send = info
+                unless istable( send )
+                    send = {}
 
-            @send = send
+                @send = send
 
             -- exports
             :exports = info
@@ -532,24 +671,21 @@ do
                 return packageDependencyResolve( @, packageName, target, packageSubpath )
 
         packageDependencyResolve = ( name, target, subpath ) =>
-            if not target or #target == 0
+            if not target
                 error PackageError "invalid dependency target '#{target}' for '#{name}'"
 
-            -- TODO: add installed package resolving
-            unless IsURL( target )
-                error PackageError "unsupported dependency target '#{target}' from '#{name}'"
+            -- Retrieving all version of the package
+            _, folders = Find( "gpm/vfs/packages/" .. name .. "/*", file.LuaPath, true ) -- lets hope that package installer will create correct versions of the package
+            version = Version.select( target, folders )
+            unless version
+                versions_str = table.concat( folders, ", " )
+                error PackageError "could not find installed #{name} with version selector #{target} (available versions: [#{versions_str}])"
 
-            target = URL( target )
-
-            -- Convert target url to file:///
-            if target.scheme ~= "file"
-                error PackageError "unsupported scheme #{target.scheme} ('#{target}') from '{#name}'"
-
-            packageURL = URL( ".", target ) -- remove file from url (basically same as path.dirname)
+            packageURL = URL( "file:///lua/gpm/vfs/packages/" .. name .. "/" .. tostring(version) .. "/" )
             unless IsDir( packageURL.pathname )
-                return
+                error PackageError "#{packagePath} should exists but it does not :? (#{name} with target #{target})"
 
-            pjson = @pjson = await Package.read( packageURL )
+            psjon = @pjson = await Package.read( packageURL )
             if pjson and pjson.exports
                 return packageExportsResolve( @, packageURL, subpath, pjson.exports )
 
@@ -827,6 +963,78 @@ do
         Run: ( url, info, env, parent ) =>
             return @CallHandler( "Run", url, info, env, parent )
 
+    class loader.Source
+        __tostring: =>
+            return format( "%s %p", @__name, @ )
+
+        new: ( ... ) =>
+            for protocol in *{ ... }
+                if isurl( protocol )
+                    protocol = protocol.scheme
+
+                old = sources[ protocol ]
+                if old
+                    Logger\Warn( "Protocol '#{old}' has been overwritten by '#{protocol}'." )
+
+                sources[ protocol ] = @
+                Logger\Debug( "  - #{@} was registered for #{protocol}:"  )
+
+        @get: ( protocol ) ->
+            if isurl( protocol )
+                protocol = protocol.scheme
+
+            return sources[ protocol ]
+
+        --[[
+
+            -- Sources API
+
+            WebSource: "http", "https"
+            http://dom.com/path/to/
+
+            isPackage = path.GetFile( pathname ) == ""
+            url.path[#url.path] == "" -- is directory
+
+            -- GetWorkingDirectory( url: URL ) => URL file:/// *SHARED
+            -- FetchInfo { package: Package, metadata: {...} } *SERVER
+            -- Install *SERVER
+
+            pkg = Package( ... )
+            files = {...}
+
+            data/gpm/vfs/packages/package1/0.1.0/package.lua
+
+            data/gpm/vfs/packages/package1/0.1.0/package.lua -- server
+            lua/gpm/vfs/packages/package1/0.1.0/package.lua -- client
+
+            client:
+            server:
+            menu:
+
+            gpm/vfs/modules/github/ukgamer/gpm/path/to/file.lua
+            gpm/vfs/modules/com/github/ukgamer/gpm/ .. package.lua
+
+            gpm/vfs/modules/com/github/ukgamer/gpm/ => {
+                folder/file.lua
+                package.lua
+                init.lua
+            }
+
+            -- packages/units/package.lua
+            dependencies = {
+                ["ukgamer"] = "github:ukgamer/gpm/main/lua/package/package1", -- packages/units/packages/ukgamer
+                package1: "^1.0.0" 1.2.3 1.2.0 1.4.0
+            }
+
+            packages/pkg1/packages/units@1.0.1
+            -- packages/pkg2/packages/units@2.0.3
+            -- packages/pkg3/packages/units@2.0.3 2.0.4
+            packages/pkg4/packages/units@1.0.1
+            packages/units@2.0.3
+
+            gpm.Import "ukgamer" -> gpm/vfs/github/ukgamer/gpm/path/to/file.lua
+        ]]
+
     parseFileURL = loader.ParseFileURL = ( any ) ->
         if isurl( any )
             return any
@@ -857,10 +1065,13 @@ do
         if package
             env = package.env or env
 
-        source = findSource( resolved.scheme )
-        info or= await source\FetchInfo( resolved, base )
-        info = await source\Install( resolved, info )
-        return source\Run( resolved, info, env, parent )
+        print("asyncImport", package, env, resolved) -- location, url, env
+        return Module.run( resolved, package, env )
+
+        -- source = findSource( resolved.scheme )
+        -- info or= await source\FetchInfo( resolved, base )
+        -- info = await source\Install( resolved, info )
+        -- return source\Run( resolved, info, env, parent )
 
     local getImportMeta
     do
@@ -955,6 +1166,8 @@ do
         -- ukdev: I think we need make dependencies resolving in package loading process, because dependencies also can have their dependencies
         -- retr0: Proper way to do this is to create dedicated function ReasolveDependencies, which can recursevly resolve dependencies
         -- retr0: I will implement this, no problem
+        -- gLua Package Manager or GLua Package Manager? :D
+        -- gpm GPM :>
 
         if pkgCount == 0
             Logger\Info( "No packages found :<" )
