@@ -138,7 +138,8 @@ do
                 @name = "unknown"
 
                 @file = url.pathname
-                @directory = getDirectory( __filename, false )
+                @directory = getDirectory( url.pathname, false )
+                @env = setmetatable({ __module: @, __filename: @file, __dirname: @directory }, { __index: @env, __newindex: @env })
 
                 modules[ url.href ] = @
                 return nil
@@ -148,12 +149,11 @@ do
                     return @func
 
                 config = {}
-                env = setmetatable({ __module: @, __filename: @file, __dirname: @directory }, { __index: @env, __newindex: @env })
 
                 if @url.scheme == "file"
-                    filePath, gamePath = NormalizeGamePath( url.pathname )
+                    filePath, gamePath = NormalizeGamePath( @url.pathname )
 
-                    compileResult = await AsyncCompile( filePath, env, config, gamePath, true )
+                    compileResult = await file.AsyncCompile( filePath, @env, config, gamePath, true )
                     @func = func = compileResult.func
                     @name = getfpath( func ) or "unknown"
                     return func
@@ -167,7 +167,10 @@ do
 
                 -- result = @result = async( @location )( ... )
                 -- return result
-                return async( @location )( ... )
+                if not @func
+                    error ModuleError "module #{@url} was not loaded"
+
+                return async( @func )( ... )
 
             @getAll: -> modules
 
@@ -188,7 +191,7 @@ do
             @run: async ( url, env ) ->
                 m = modules[ url.href ]
                 unless m
-                    m = Module( location, url, env )
+                    m = Module( url, env )
                     await m\load!
 
                 return m\run!
@@ -916,7 +919,7 @@ do
             env = package.env or env
 
         print("asyncImport", package, env, resolved) -- location, url, env
-        return Module.run( resolved, package, env )
+        return Module.run( resolved, env )
 
         -- source = findSource( resolved.scheme )
         -- info or= await source\FetchInfo( resolved, base )
