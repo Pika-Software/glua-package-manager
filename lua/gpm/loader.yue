@@ -218,7 +218,7 @@ do
 
     parse = async ( filePath, gamePath, config ) ->
         compileResult = await AsyncCompile( filePath, {}, config, gamePath, true )
-        await Module.cache( "file://" .. compileResult.path, compileResult.content )
+        -- await Module.cache( "file://" .. compileResult.path, compileResult.content )
         func = compileResult.func
 
         info = {}
