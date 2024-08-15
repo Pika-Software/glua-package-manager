@@ -81,10 +81,9 @@ do
 
     finalizePromise = ( promise, other ) ->
         success, err = try finalizePromiseUnsafe( promise, other )
-        if success
-            return nil
+        unless success
+            reject( other, err )
 
-        reject( other, err )
         return nil
 
 finalize = ( promise ) ->
@@ -123,7 +122,6 @@ fulfill = ( promise, value ) ->
     finalize( promise )
     return nil
 
-local resolve
 do
 
     import TypeError from environment
