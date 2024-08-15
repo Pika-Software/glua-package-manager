@@ -291,15 +291,16 @@ do
         environment.isthread = ( any ) ->
             return getmetatable( any ) == metatable
 
-environment.iscallable = ( obj ) ->
-    if isfunction( obj )
-        return true
+do
 
-    metatable = getmetatable( obj )
-    if metatable and metatable.__call
-        return true
+    fn_meta = metatables[ "function" ]
 
-    return false
+    environment.iscallable = ( obj ) ->
+        metatable = getmetatable( obj )
+        if metatable and ( metatable == fn_meta or metatable.__call )
+            return true
+
+        return false
 
 util.FindMetaTable = ( name ) ->
     assert( isstring( name ), "bad argument #1 to \'util.FindMetaTable\' (string expected)" )
