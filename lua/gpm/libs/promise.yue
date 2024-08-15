@@ -357,6 +357,9 @@ do
         return err
 
     environment.async = Promise.Async = Promise.async = ( fn ) ->
+        if not iscallable( fn )
+            return PromiseError "Async function must be a function"
+
         return ( ... ) ->
             promise = Promise!
             STACK_SIZE += 1
