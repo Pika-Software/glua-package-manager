@@ -4,9 +4,9 @@ import environment from gpm
 import debug, string, path, table, file, util, pairs, isurl, isstring, ArgAssert, URL, ModuleError, error, pcall, PackageError, Promise from environment
 import NormalizeGamePath, AbsoluteGamePath, Find from file
 import stripExtension, getDirectory from path
+import concat, IsEmpty from table
 import await, async from Promise
 import getfpath from debug
-import IsEmpty from table
 import Version from util
 
 file.CreateDir( "/data/gpm/vfs", true )
@@ -189,6 +189,9 @@ do
             --     return AsyncWrite( filePath, content )
 
             @run: async ( url, env ) ->
+                unless isurl( url )
+                    error ModuleError "url is " .. type( url ) .. ", expected URL"
+
                 m = modules[ url.href ]
                 unless m
                     m = Module( url, env )
@@ -284,18 +287,14 @@ do
 
             -- exports
             :exports = info
-            if isstring( exports )
-                exports = { [ "." ]: exports }
-            elseif not istable( exports )
+            unless isstring( exports ) or istable( exports )
                 exports = nil
 
             @exports = exports
 
             -- imports
             :imports = info
-            if isstring( imports )
-                imports = { [ "." ]: imports }
-            elseif not istable( imports )
+            unless isstring( imports ) or istable( imports )
                 imports = nil
 
             @imports = imports
@@ -531,18 +530,18 @@ do
             _, folders = Find( "gpm/vfs/packages/" .. name .. "/*", file.LuaPath, true ) -- lets hope that package installer will create correct versions of the package
             version = Version.select( target, folders )
             unless version
-                versions_str = table.concat( folders, ", " )
+                versions_str = concat( folders, ", " )
                 error PackageError "could not find installed #{name} with version selector #{target} (available versions: [#{versions_str}])"
 
             packageURL = URL( "file:///lua/gpm/vfs/packages/" .. name .. "/" .. tostring(version) .. "/" )
             unless IsDir( packageURL.pathname )
                 error PackageError "#{packagePath} should exists but it does not :? (#{name} with target #{target})"
 
-            psjon = @pjson = await Package.read( packageURL )
+            pjson = @pjson = await Package.read( packageURL )
             if pjson and pjson.exports
                 return packageExportsResolve( @, packageURL, subpath, pjson.exports )
 
-            return URL( packageSubpath, packageURL )
+            return URL( subpath, packageURL )
 
         exportsStartsWithDot = ( exports, packageURL ) =>
             if istable( exports )
@@ -991,7 +990,6 @@ do
 
     import display from environment.Error
     import allSettled from Promise
-    import concat from table
     import Logger from gpm
 
     loader.Startup = async ->

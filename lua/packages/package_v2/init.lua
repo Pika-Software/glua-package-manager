@@ -7,13 +7,15 @@ local function print( ... )
     Logger:Info( table.concat(tbl, "\t" ) )
 end
 
-local submodule = include "submodule.lua"
+require "abc"
 
-print("Got from submodule:", submodule)
--- Promise.delay(1):await()
+-- local submodule = include "submodule.lua"
 
-print("I am", __package )
-require "b"
+-- print("Got from submodule:", submodule)
+-- -- Promise.delay(1):await()
+
+-- print("I am", __package )
+-- require "b"
 
 
 return "this package is da best"
