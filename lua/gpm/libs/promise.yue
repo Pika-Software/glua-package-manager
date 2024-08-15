@@ -22,59 +22,179 @@
     SOFTWARE.
 --]]
 _G = _G
+import pcall, xpcall from _G
 import environment from _G.gpm
-import error, getmetatable, pcall, xpcall, ipairs, istable from _G
-import Error, TypeError, RuntimeError, PromiseError, isstring, iserror, iscallable from environment
+import PromiseError, iscallable from environment
 import create, resume, yield, running from coroutine
-import format, match from environment.string
-import remove from environment.table
-import captureStack from Error
+import format, match from _G.string
 import Simple from timer
-
--- getThenable = (obj) ->
---     thenFn = obj.Then or obj.next
---     return iscallable(thenFn) and thenFn
-
--- getAwaitable = (obj) ->
---     awaitable = obj.Await or obj.await
---     return iscallable(awaitable) and awaitable
 
 once = ->
     wasCalled = false
-    return (wrappedFn) ->
-        return (...) ->
-            if wasCalled then return ...
+    return ( wrappedFn ) ->
+        return ( ... ) ->
+            if wasCalled
+                return ...
+
             wasCalled = true
-            return wrappedFn(...)
+            return wrappedFn( ... )
 
-class HTTPError extends Error
+local Promise, isPromise
 
-class Promise
-    @VERSION: "2.1.0"
-    @AUTHOR: "Retro"
-    @URL: "https://github.com/dankmolot/gm_promise"
+do
 
-    STATE_PENDING = 1
-    STATE_FULFILLED = 2
-    STATE_REJECTED = 3
+    import getmetatable from _G
 
-    IsPromise = (any) ->
+    isPromise = ( any ) ->
         metatable = getmetatable( any )
         return metatable and metatable.__class == Promise
 
-    new: (executor) =>
-        @state = STATE_PENDING
-        @resolving = false
+    environment.ispromise = isPromise
 
-        if iscallable executor
+-- Promise states
+STATE_PENDING = 1
+STATE_FULFILLED = 2
+STATE_REJECTED = 3
+
+-- Internal functions
+local resolve, reject, finalizePromise
+do
+
+    finalizePromiseUnsafe = ( promise, other ) ->
+        :state = promise
+        if state == STATE_FULFILLED
+            if onFulfilled := other.onFulfilled
+                resolve( other, onFulfilled( promise.value ) )
+            else
+                resolve( other, promise.value )
+
+        elseif state == STATE_REJECTED
+            if onRejected := other.onRejected
+                resolve( other, onRejected( promise.reason ) )
+            else
+                reject( other, promise.reason )
+
+        if onFinally := other.onFinally
+            onFinally!
+
+        return nil
+
+    finalizePromise = ( promise, other ) ->
+        success, err = try finalizePromiseUnsafe( promise, other )
+        if success
+            return nil
+
+        reject( other, err )
+        return nil
+
+finalize = ( promise ) ->
+    if promise.state == STATE_PENDING
+        return nil
+
+    Simple 0, ->
+        :queue = promise
+        if queue
+            index = 1
+
+            value = queue[ index ]
+            while value
+                finalizePromise( promise, value )
+                queue[ index ] = nil
+
+                index += 1
+                value = queue[ index ]
+
+        return nil
+
+    return nil
+
+reject = ( promise, reason ) ->
+    if promise.state ~= STATE_PENDING
+        return
+
+    promise.state = STATE_REJECTED
+    promise.reason = reason
+    finalize( promise )
+    return nil
+
+fulfill = ( promise, value ) ->
+    promise.state = STATE_FULFILLED
+    promise.value = value
+    finalize( promise )
+    return nil
+
+local resolve
+do
+
+    import TypeError from environment
+
+    resolve = ( promise, value ) ->
+        if promise.state ~= STATE_PENDING
+            return nil
+
+        if value == promise
+            return reject promise, TypeError "Cannot resolve a promise with itself"
+
+        promise.resolving = true
+        promise.onFulfilled = nil
+        promise.onRejected = nil
+        promise.onFinally = nil
+
+        if isPromise( value )
+            if value.state == STATE_PENDING
+                value.queue = {} unless value.queue
+                value.queue[] = promise
+            else
+                finalizePromise( value, promise )
+        else
+            fulfill( promise, value )
+
+        return nil
+
+try2resolve = ( promise, value ) ->
+    unless promise.resolving
+        resolve( promise, value )
+
+    return promise
+
+try2reject = ( promise, reason ) ->
+    unless promise.resolving
+        reject( promise, reason )
+
+    return promise
+
+__then = ( promise, onFulfilled, onRejected, onFinally ) ->
+    p = Promise!
+    if iscallable( onFulfilled )
+        p.onFulfilled = onFulfilled
+
+    if iscallable( onRejected )
+        p.onRejected = onRejected
+
+    if iscallable( onFinally )
+        p.onFinally = onFinally
+
+    unless promise.queue
+        promise.queue = {}
+
+    promise.queue[] = p
+    finalize( promise )
+    return p
+
+-- Promise class
+class Promise
+    new: ( executor ) =>
+        @state = STATE_PENDING
+
+        if iscallable( executor )
             @resolving = true
             once_wrapper = once!
-            onFulfill = once_wrapper (value) -> resolve( @, value )
-            onReject = once_wrapper (reason) -> reject( @, reason )
+            onReject = once_wrapper( ( reason ) -> reject( @, reason ) )
+            xpcall( executor, onReject, once_wrapper( ( value ) -> resolve( @, value ) ), onReject )
+        else
+            @resolving = false
 
-            try executor onFulfill, onReject
-            catch err
-                onReject err
+        return nil
 
     __tostring: =>
         return switch @state
@@ -87,115 +207,117 @@ class Promise
             else
                 format "Promise %p { <state>: \"invalid\" }", @
 
-    finalizePromiseUnsafe = (p) =>
-        :onFulfilled, :onRejected, :onFinally = p
-        switch @state
-            when STATE_FULFILLED
-                if onFulfilled then resolve( p, onFulfilled(@value) )
-                else resolve( p, @value )
-            when STATE_REJECTED
-                if onRejected then resolve( p, onRejected(@reason) )
-                else reject( p, @reason )
+    -- https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/then
+    Then: __then
 
-        if onFinally
-            onFinally!
+    -- https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/catch
+    Catch: ( onRejected ) =>
+        return __then( @, nil, onRejected )
 
-        return
+    -- https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/finally
+    Finally: ( onFinally ) =>
+        return __then( @, nil, nil, onFinally )
 
-    finalizePromise = (p) =>
-        unless success, err := try finalizePromiseUnsafe( @, p )
-            reject( p, err )
+-- Promise version information
+Promise.VERSION = "2.1.1-gpm"
+Promise.AUTHOR = "Pika-Software"
+Promise.URL = "https://github.com/dankmolot/gm_promise"
 
-    finalize = =>
-        if @state == STATE_PENDING
-            return
+-- Setting locals to class
+Promise.STATE_PENDING = STATE_PENDING
+Promise.STATE_FULFILLED = STATE_FULFILLED
+Promise.STATE_REJECTED = STATE_REJECTED
 
-        Simple 0, ->
-            queue = @queue
-            index = 1
-            while queue and queue[index]
-                finalizePromise( @, queue[index] )
-                queue[index] = nil
-                index += 1
+-- is promise object check function
+Promise.IsPromise = isPromise
 
-    fulfill = (value) =>
-        @state = STATE_FULFILLED
-        @value = value
-        finalize( @ )
+-- Promise error alias
+Promise.PromiseError = PromiseError
 
-    resolveThenable = (obj, thenable) =>
-        once_wrapper = once!
-        onFulfill = once_wrapper (value) -> resolve( @, value )
-        onReject = once_wrapper (reason) -> reject( @, reason )
-        unless ok, err := try thenable( obj, onFulfill, onReject )
-            onReject err
+-- global call stack
+CALL_STACK, STACK_SIZE = {}, 0
 
-    resolve = (value) =>
-        if @state != STATE_PENDING
-            return
+-- instance data
+do
 
-        if value == @
-            return reject @, TypeError "Cannot resolve a promise with itself"
+    base = Promise.__base
 
+    -- Aliases for instance methods
+    base.then = base.next = base.andThen = __then
+    base.finally = base.Finally
+    base.catch = base.Catch
 
-        @resolving = true
-        @onFulfilled = nil
-        @onRejected = nil
-        @onFinally = nil
+    -- Await functions
+    do
 
-        if IsPromise value
-            if value.state == STATE_PENDING
-                value.queue = {} unless value.queue
-                value.queue[] = @
-            else
-                finalizePromise( value, @ )
-        -- elseif istable value
-        --     ok, thenable = try getThenable(value)
-        --     unless ok then return reject( @, thenable )
+        import error from _G
 
-        --     if thenable
-        --         resolveThenable( @, value, thenable )
-        --     else
-        --         fulfill( @, value )
-        else
-            fulfill( @, value )
+        safeAwait = ( promise ) ->
+            co = running!
+            unless co
+                return false, PromiseError "Cannot await in main thread"
 
-    reject = (reason) =>
-        if @state != STATE_PENDING
-            return
+            local _success, _value, waiting, stack
 
-        @state = STATE_REJECTED
-        @reason = reason
-        finalize( @ )
+            finish = ( success, value ) ->
+                if waiting
+                    STACK_SIZE += 1
+                    CALL_STACK[ STACK_SIZE ] = stack -- push previous stack
+                    resume( co, success, value )
+                else
+                    _success, _value = success, value
 
-    Resolve = (value) => unless @resolving then resolve( @, value )
+            wait = ->
+                if _success ~= nil
+                    return _success, _value
 
-    Reject = (reason) => unless @resolving then reject( @, reason )
+                waiting = true
+                stack = CALL_STACK[ STACK_SIZE ] -- pop current stack
+                CALL_STACK[ STACK_SIZE ] = nil
+                STACK_SIZE -= 1
+                return yield!
 
-    @Resolve: (value) ->
-        p = Promise!
-        Resolve( p, value )
-        return p
+            if isPromise( promise )
+                :state = promise
+                if state == STATE_FULFILLED
+                    return true, promise.value
 
-    @Reject: (reason) ->
-        p = Promise!
-        Reject( p, reason )
-        return p
+                elseif state == STATE_REJECTED
+                    return false, promise.reason
 
-    Then = (onFulfilled, onRejected, onFinally) =>
-        p = Promise!
-        p.onFulfilled = onFulfilled if iscallable onFulfilled
-        p.onRejected = onRejected if iscallable onRejected
-        p.onFinally = onFinally if iscallable onFinally
-        @queue = {} unless @queue
-        @queue[] = p
-        finalize( @ )
-        return p
+                else
+                    once_wrapper = once!
+                    __then( promise, once_wrapper( ( value ) -> finish( true, value ) ), once_wrapper( ( reason ) -> finish( false, reason ) ) )
+                    return wait!
 
-    Catch = (onRejected) => return Then( @, nil, onRejected )
-    Finally = (onFinally) => return Then( @, nil, nil, onFinally )
+            return true, promise
 
-    CALL_STACK = {}
+        base.SafeAwait = safeAwait
+        base.safeAwait = safeAwait
+        environment.safeAwait = safeAwait
+
+        environment.await = base.Await = base.await = ( promise ) ->
+            ok, result = safeAwait( promise )
+            if ok
+                return result
+
+            return error( result )
+
+    -- Resolve functions
+    Promise.Resolve = Promise.resolve = ( value ) -> return try2resolve( Promise!, value )
+    base.Resolve = base.resolve = try2resolve
+
+    -- Reject functions
+    Promise.Reject = Promise.reject = ( reason ) -> return try2reject( Promise!, reason )
+    base.Reject = base.reject = try2reject
+
+    environment.util.RegisterMetaTable( "Promise", base )
+
+-- Async function
+do
+
+    import isstring, iserror, RuntimeError from environment
+    import captureStack from environment.Error
 
     transformError = (err) ->
         if isstring( err )
@@ -205,219 +327,183 @@ class Promise
 
         if iserror( err )
             stack = err.stack
-            length = #stack
+            stackSize = #stack
 
-            if length >= 2 and stack[length - 1].name == "xpcall"
-                stack[length - 1] = nil -- remove xpcall stack
-                stack[length] = nil -- remove promise wrapper stack
+            if stackSize >= 2 and stack[ stackSize - 1 ].name == "xpcall"
+                stack[ stackSize - 1 ] = nil -- remove xpcall stack
+                stack[ stackSize ] = nil -- remove promise wrapper stack
 
-            if #stack == 0 -- if stack is empty, remove debug information
+            stackSize = #stack
+            if stackSize == 0 -- if stack is empty, remove debug information
                 err.fileName = nil
                 err.lineNumber = nil
 
-            lastStack = CALL_STACK[#CALL_STACK]
+            lastStack = CALL_STACK[ STACK_SIZE ] -- peek current stack
             if lastStack
-                if #stack > 0 and not stack[#stack].name
-                    stack[#stack].name = lastStack[1].name -- set previous stack name since it's the name of the function
+                if stackSize > 0 and not stack[ stackSize ].name
+                    stack[ stackSize ].name = lastStack[ 1 ].name -- set previous stack name since it's the name of the function
 
                 -- Append previous stack to the current stack
                 for entry in *lastStack[2,]
-                    stack[] = entry
+                    stackSize += 1
+                    stack[ stackSize ] = entry
 
-            if first := stack[1]
-                @fileName or= first.short_src
-                @lineNumber or= first.currentline
+            if first := stack[ 1 ]
+                err.fileName or= first.short_src
+                err.lineNumber or= first.currentline
 
         return err
 
-    @Async: (fn) ->
-        return (...) ->
-            p = Promise!
+    environment.async = Promise.Async = Promise.async = ( fn ) ->
+        return ( ... ) ->
+            promise = Promise!
+            STACK_SIZE += 1
+            CALL_STACK[ STACK_SIZE ] = captureStack! -- push stack
 
-            CALL_STACK[] = captureStack! -- push stack
-
-            co = create (...) ->
+            resume( create( ( ... ) ->
                 success, result = xpcall( fn, transformError, ... )
                 if success
-                    Resolve( p, result )
+                    try2resolve( promise, result )
                 else
-                    Reject( p, result )
+                    try2reject( promise, result )
 
-                CALL_STACK[#CALL_STACK] = nil -- pop stack
+                CALL_STACK[ STACK_SIZE ] = nil -- pop stack
+                return nil
+            ), ... )
 
-            resume( co, ... )
-            return p
+            return promise
 
-    SafeAwait = (p) ->
-        co = running!
-        unless co
-            return false, PromiseError "Cannot await in main thread"
+-- https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/all
+Promise.All = Promise.all = ( promises ) ->
+    promise = Promise!
 
-        local _success, _value, waiting, stack
+    count = #promises
+    if count == 0
+        try2resolve( promise, {} )
+        return promise
 
-        finish = (success, value) ->
-            if waiting
-                CALL_STACK[] = stack -- push previous stack
-                resume co, success, value
-            else
-                _success, _value = success, value
+    failed = false
+    onReject = ( reason ) ->
+        try2reject( promise, reason )
+        failed = true
+        return nil
 
-        wait = ->
-            if _success != nil
-                return _success, _value
-            waiting = true
-            stack = remove( CALL_STACK ) -- pop current stack
-            return yield!
-
-        once_wrapper = once!
-        onResolve = once_wrapper (value) -> finish( true, value )
-        onReject = once_wrapper (reason) -> finish( false, reason )
-
-        if IsPromise p
-            switch p.state
-                when STATE_FULFILLED
-                    return true, p.value
-                when STATE_REJECTED
-                    return false, p.reason
-                else
-                    Then( p, onResolve, onReject )
-                    return wait!
-
-        -- thenable = istable(p) and getThenable(p)
-        -- if iscallable( thenable )
-        --     pcall( thenable, p, onResolve, onReject )
-        --     return wait!
-
-        return true, p
-
-    Await = (p) ->
-        -- awaitable = istable(p) and getAwaitable(p)
-        -- if awaitable and not IsPromise(p)
-        --     return awaitable(p)
-
-        ok, result = SafeAwait(p)
-        if ok
-            return result
-
-        return error( result )
-
-    @All: (promises) ->
-        p = Promise!
-        count = #promises
-        values = {}
+    values = {}
+    takeValue = ->
+        count -= 1
         if count == 0
-            Resolve( p, values )
+            try2resolve( promise, values )
 
-        for i, promise in ipairs promises
-            if IsPromise promise
-                promise\Then (value) ->
-                        values[i] = value
-                        count -= 1
-                        if count == 0
-                            Resolve( p, values ),
-                    (reason) -> Reject( p, reason )
-            else
-                values[i] = promise
-                count -= 1
-                if count == 0
-                    Resolve( p, values )
+        return nil
 
-        return p
+    for index = 1, count
+        other = promises[ index ]
+        if isPromise( other )
+            __then(
+                other,
+                ( value ) ->
+                    values[ index ] = value
+                    takeValue!,
+                onReject
+            )
+        else
+            values[ index ] = other
+            takeValue!
 
-    @AllSettled: (promises) ->
-        p = Promise!
-        count = #promises
-        values = {}
+        if failed
+            break
+
+    return promise
+
+-- https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/allSettled
+Promise.AllSettled = Promise.allSettled = ( promises ) ->
+    promise = Promise!
+
+    count = #promises
+    if count == 0
+        try2resolve( promise, {} )
+        return promise
+
+    results = {}
+    takeValue = ->
+        count -= 1
         if count == 0
-            Resolve( p, values )
+            try2resolve( promise, results )
 
-        for i, promise in ipairs promises
-            promise\Then (value) ->
-                    values[i] = { status: "fulfilled", value: value }
-                    count -= 1
-                    if count == 0
-                        Resolve( p, values ),
-                (reason) ->
-                    values[i] = { status: "rejected", reason: reason }
-                    if count == 0
-                        Resolve( p, values )
+        return nil
 
-        return p
+    for index = 1, count
+        __then(
+            promises[ index ],
+            ( value ) ->
+                results[ index ] = { status: "fulfilled", :value }
+                takeValue!,
+            ( reason ) ->
+                results[ index ] = { status: "rejected", :reason }
+                takeValue!
+        )
 
-    @Any: (promises) ->
-        p = Promise!
-        count = #promises
-        reasons = {}
+    return promise
+
+-- https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/any
+Promise.Any = Promise.any = ( promises ) ->
+    promise = Promise!
+
+    count = #promises
+    if count == 0
+        return try2reject( promise, PromiseError "No promises to resolve" )
+
+    fulfilled = false
+    onSuccess = ( value ) ->
+        try2resolve( promise, value )
+        fulfilled = true
+        return nil
+
+    reasons = {}
+    takeValue = ->
+        count -= 1
         if count == 0
-            Reject( p, PromiseError "No promises to resolve" )
+            try2reject( promise, reasons )
 
-        for i, promise in ipairs promises
-            promise\Then (value) -> Resolve( p, value ),
-                (reason) ->
-                    reasons[i] = reason
-                    count -= 1
-                    if count == 0
-                        Resolve( p, values )
+        return nil
 
-        return p
+    for index = 1, count
+        __then( promises[ index ], onSuccess, ( reason ) ->
+            reasons[ index ] = reason
+            takeValue!
+        )
 
-    @Race: (promises) ->
-        p = Promise!
-        for promise in *promises
-            promise\Then (value) -> Resolve( p, value ),
-                (reason) -> Reject( p, reason )
+        if fulfilled
+            break
 
-        return p
+    return promise
 
-    @Delay: (time, value) ->
-        p = Promise!
-        Simple time, -> Resolve( p, value )
-        return p
+-- https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/race
+Promise.Race = Promise.race = ( promises ) ->
+    promise = Promise!
 
-    @HTTP: (options) ->
-        p = Promise!
+    count = #promises
+    if count == 0
+        return promise
 
-        options.success = (code, body, headers) ->
-            Resolve( p, { :code, :body, :headers } )
-            return
+    onResolve = ( value ) ->
+        try2resolve( promise, value )
+        return nil
 
-        options.failed = (err) ->
-            Reject( p, HTTPError err )
-            return -- for better stacktrace
+    onReject = ( reason ) ->
+        try2reject( promise, reason )
+        return nil
 
-        unless ok := HTTP options
-            Reject( p, HTTPError "failed to make http request" )
+    for index = 1, count
+        __then( promises[ index ], onResolve, onReject )
 
-        return p
+    return promise
 
-    -- Setting locals to class
-    @__base.STATE_PENDING = STATE_PENDING
-    @__base.STATE_FULFILLED = STATE_FULFILLED
-    @__base.STATE_REJECTED = STATE_REJECTED
+-- A custom delay feature that stops the promise chain for a specified amount of time
+Promise.Delay = Promise.delay = ( time, value ) ->
+    promise = Promise!
+    Simple time, -> resolve( promise, value )
+    return promise
 
-    @__base.IsPromise = IsPromise
-
-    @__base.Resolve = @__base.resolve = Resolve
-    @__base.Reject = @__base.reject = Reject
-    @__base.Then = @__base.then = @__base.next = @__base.andThen = Then
-    @__base.Catch = @__base.catch = Catch
-    @__base.Finally = @__base.finally = Finally
-
-    @__base.SafeAwait = @__base.safeAwait = SafeAwait
-    @__base.Await = @__base.await = Await
-
-    @resolve = @Resolve
-    @reject = @Reject
-
-    @async = @Async
-
-    @all = @All
-    @allSettled = @AllSettled
-    @any = @Any
-    @race = @Race
-    @delay = @Delay
-    @http = @HTTP
-
-    @PromiseError = PromiseError
-
-export default Promise
+environment.Promise = Promise
+gpm.Logger\Loaded( "gm_promise v%s", Promise.VERSION )

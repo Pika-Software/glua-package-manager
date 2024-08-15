@@ -138,42 +138,29 @@ deflate = include( "libs/3rd-party/deflate.lua" )
 Logger\Loaded( "LibDeflate v%s", deflate._VERSION )
 environment.deflate = deflate
 
+-- gm_promise ( modified for gpm )
+include( "libs/promise.lua" )
+
+-- gm_url
 do
 
     import RegisterMetaTable from environment.util
+    url = include( "libs/url.lua" )
 
-    -- gm_promise
-    do
+    environment.IsURLSearchParams = url.IsURLSearchParams
+    URLSearchParams = environment.URLSearchParams = url.URLSearchParams
+    RegisterMetaTable( "URLSearchParams", URLSearchParams.__base )
 
-        promise = include( "libs/promise.lua" )
+    environment.isurl = url.IsURL
+    URL = environment.URL = url.URL
+    RegisterMetaTable( "URL", URL.__base )
 
-        environment.async = promise.async
-        environment.await = promise.await
-        environment.Promise = promise
+    import http from environment
 
-        RegisterMetaTable( "Promise", promise.__base )
-
-        Logger\Loaded( "gm_promise v%s", promise.VERSION )
-
-    -- gm_url
-    do
-
-        url = include( "libs/url.lua" )
-
-        environment.IsURLSearchParams = url.IsURLSearchParams
-        URLSearchParams = environment.URLSearchParams = url.URLSearchParams
-        RegisterMetaTable( "URLSearchParams", URLSearchParams.__base )
-
-        environment.isurl = url.IsURL
-        URL = environment.URL = url.URL
-        RegisterMetaTable( "URL", URL.__base )
-
-        import http from environment
-
-        http.EncodeURIComponent = url.encodeURIComponent
-        http.DecodeURIComponent = url.decodeURIComponent
-        http.EncodeURI = url.encodeURI
-        http.DecodeURI = url.decodeURI
+    http.EncodeURIComponent = url.encodeURIComponent
+    http.DecodeURIComponent = url.decodeURIComponent
+    http.EncodeURI = url.encodeURI
+    http.DecodeURI = url.decodeURI
 
 -- Utils & Libs
 include( "post-util.lua" )
