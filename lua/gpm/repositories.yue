@@ -1,0 +1,228 @@
+_G = _G
+import gpm from _G
+import environment from gpm
+import util from environment
+import JSONToTable, Version from util
+
+local repositories
+if SERVER or MENU_DLL
+    import Query from _G.sql
+
+    Query( "CREATE TABLE IF NOT EXISTS `gpm.table_version` ( Name TEXT PRIMARY KEY NOT NULL, Version INT )" )
+    Query( "CREATE TABLE IF NOT EXISTS `gpm.repository` ( ID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, URL TEXT NOT NULL )" )
+    Query( "CREATE TABLE IF NOT EXISTS `gpm.packages` ( ID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, Name TEXT NOT NULL, URL TEXT UNIQUE NOT NULL, Version TEXT NOT NULL, Installed BOOLEAN DEFAULT 0 NOT NULL, RepositoryID INTEGER DEFAULT 0 NOT NULL, FOREIGN KEY(RepositoryID) REFERENCES `gpm.repository` (ID) )" )
+
+    repositories = Query( "SELECT * FROM `gpm.repository`" ) or {}
+
+    count = #repositories
+    if count == 0
+        Query( "INSERT INTO `gpm.repository` ( URL ) VALUES ( 'https://raw.githubusercontent.com/Pika-Software/gpm-repositories/main/main.json' )" )
+        repositories = Query( "SELECT * FROM `gpm.repository`" ) or {}
+
+    for index = 1, count
+        repository = repositories[ index ]
+        repository.Packages = Query( "SELECT * FROM `gpm.packages` WHERE RepositoryID = " .. repository.ID ) or {}
+
+    gpm.Repositories = repositories
+
+if SERVER
+    environment.file.Set( "/lua/gpm/vfs/repositories.lua", "return '" .. util.TableToJSON( repositories, false ) .. "'", "GLua Package Manager::Repositories" )
+    _G.AddCSLuaFile( "lua/gpm/vfs/repositories.lua" )
+
+if CLIENT
+    repositories = include( "gpm/vfs/repositories.lua" )
+    if repositories
+        repositories = gpm.Repositories = JSONToTable( repositories )
+
+import await, async, SafeAwait, AllSettled from environment.Promise
+import IsURL, match, find from environment.string
+import sort from environment.table
+import URL, pairs from environment
+
+local request
+do
+
+    import CachedFetch from environment.http
+
+    local api_token
+    if environment.SERVER
+        api_token = _G.CreateConVar( "gpm_github_token", "", _G.bit.bor( _G.FCVAR_ARCHIVE, _G.FCVAR_PROTECTED ), "https://github.com/settings/tokens" )
+
+    request = ( href ) ->
+        local headers
+        if api_token
+            token = api_token\GetString!
+            if token and token ~= ""
+                headers = { Authorization: "Bearer " .. token }
+
+        return CachedFetch( href, headers )
+
+fetchPackages = async ( repository, href, name ) ->
+    unless IsURL( href )
+        return nil
+
+    url = URL( href )
+    if url.scheme ~= "https"
+        return nil
+
+    user, repo = match( url.pathname, "^/([^/]+)/([^/]+)/?$" )
+    unless user and repo
+        return nil
+
+    name or= repo
+
+    ok, response = SafeAwait( request( "https://api.github.com/repos/" .. user .. "/" .. repo .. "/tags" ) )
+    if not ok or response.status ~= 200
+        return nil
+
+    tags = JSONToTable( response.body )
+    unless tags
+        return nil
+
+    versions, length = {}, 0
+    for tag in *tags
+        length += 1
+        versions[ length ] = {
+            Name: name,
+            Repository: repository,
+            Version: Version( tag.name ),
+            URL: tag.zipball_url
+        }
+
+    return versions
+
+searchPackages = ( repository, pattern, version, withPattern ) ->
+    latest = version == "latest"
+    packages, count = {}, 0
+
+    for package in *repository.Packages
+        if pattern
+            if withPattern
+                unless find( package.Name, pattern, 1, false )
+                    continue
+
+            elseif package.Name ~= pattern
+                continue
+
+        if version and not ( latest or package.Version % version )
+            continue
+
+        count += 1
+        packages[ count ] = package
+
+    sort( packages, ( a, b ) -> a.Version > b.Version )
+
+    if latest and count > 1
+        for index = 2, count
+            packages[ index ] = nil
+
+    return packages
+
+performPackage = ( repository, package ) ->
+    name, version = package.Name, package.Version
+    packages = repository.Packages
+    exists = false
+
+    for other in *packages
+        if other.Name == name and other.Version == version
+            other.URL = package.URL
+            exists = true
+            break
+
+    if exists
+        return nil
+
+    packages[] = package
+    return nil
+
+updateRepository = async ( repository, map, pattern, withPattern ) ->
+    tasks, length = {}, 0
+    if pattern
+        for name, href in pairs( map )
+            if withPattern
+                if find( name, pattern, 1, false )
+                    length += 1
+                    tasks[ length ] = fetchPackages( repository, href, name )
+
+            elseif name == pattern
+                length += 1
+                tasks[ length ] = fetchPackages( repository, href, name )
+
+    else
+        for name, href in pairs( map )
+            length += 1
+            tasks[ length ] = fetchPackages( repository, href, name )
+
+    if length == 0
+        return nil
+
+    if length == 1
+        packages = await( tasks[ 1 ] )
+        if packages
+            for package in *packages
+                performPackage( repository, package )
+
+        return nil
+
+    for result in *await( AllSettled( tasks ) )
+        packages = result.value
+        if packages
+            for package in *packages
+                performPackage( repository, package )
+
+    return nil
+
+fetchRepository = async ( repository, specifier, withPattern, offlineMode ) ->
+    packages = repository.Packages
+
+    unless specifier
+        if offline
+            return packages
+
+        success, response = SafeAwait( request( repository.URL ) )
+        if not success or response.status ~= 200
+            return packages
+
+        map = JSONToTable( response.body, true, true )
+        unless map
+            return packages
+
+        await updateRepository( repository, map, nil, false )
+        return packages
+
+    name, version = match( specifier, "^([^@]+)@(.+)$" )
+    if offline
+        return searchPackages( repository, name, version, withPattern )
+
+    success, response = SafeAwait( request( repository.URL ) )
+    if not success or response.status ~= 200
+        return searchPackages( repository, name, version, withPattern )
+
+    map = JSONToTable( response.body, true, true )
+    unless map
+        return searchPackages( repository, name, version, withPattern )
+
+    await updateRepository( repository, map, name, withPattern )
+    return searchPackages( repository, name, version, withPattern )
+
+gpm.LookupRepositories = async ( specifier, offlineMode, withPattern = false ) ->
+    tasks, length = {}, 0
+    for repository in *repositories
+        length += 1
+        tasks[ length ] = fetchRepository( repository, specifier, withPattern, offlineMode )
+
+    if length == 0
+        return tasks
+
+    if length == 1
+        return await( tasks[ 1 ] )
+
+    packages, length = {}, 0
+    for promise in *await( AllSettled( tasks ) )
+        :value = promise
+        if value
+            for package in *value
+                length += 1
+                packages[ length ] = package
+
+    return packages

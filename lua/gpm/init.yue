@@ -23,6 +23,7 @@ if SERVER
     for fileName in *Find( "gpm/sources/*.lua", "lsv" )
         AddCSLuaFile( "gpm/sources/" .. fileName )
 
+    AddCSLuaFile( "gpm/repositories.lua" )
     AddCSLuaFile( "gpm/post-util.lua" )
     AddCSLuaFile( "gpm/loader.lua" )
     AddCSLuaFile( "gpm/init.lua" )
@@ -36,8 +37,10 @@ do
     gpm.UserName = username
 
     splashes = {
+        "Millions of pieces without a tether"
         "Why are we always looking for more?"
         "Don't worry, " .. username .. " :>"
+        "Take it in and breathe the light"
         "Don't bring your light near me."
         "Big Brother is watching you"
         "Hello, " .. username .. "!"
@@ -56,6 +59,7 @@ do
         "Hello World!"
         "Star Glide ♪"
         "Once Again ♪"
+        "Data Loss ♪"
         "Sandblast ♪"
         "That's me!"
         "I see you."
@@ -171,9 +175,13 @@ do
         http.EncodeURI = url.encodeURI
         http.DecodeURI = url.decodeURI
 
+-- Utils & Libs
 include( "post-util.lua" )
 include( "libs/file.lua" )
 include( "libs/http.lua" )
+
+-- Package Manager
+include( "repositories.lua" )
 include( "loader.lua" )
 
 if SERVER
