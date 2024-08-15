@@ -57,7 +57,7 @@ do
 
         return CachedFetch( href, headers )
 
-fetchPackages = async ( repository, href, name ) ->
+fetchPackages = async ( href, name ) ->
     unless IsURL( href )
         return nil
 
@@ -84,7 +84,6 @@ fetchPackages = async ( repository, href, name ) ->
         length += 1
         versions[ length ] = {
             Name: name,
-            Repository: repository,
             Version: Version( tag.name ),
             URL: tag.zipball_url
         }
@@ -142,16 +141,16 @@ updateRepository = async ( repository, map, pattern, withPattern ) ->
             if withPattern
                 if find( name, pattern, 1, false )
                     length += 1
-                    tasks[ length ] = fetchPackages( repository, href, name )
+                    tasks[ length ] = fetchPackages( href, name )
 
             elseif name == pattern
                 length += 1
-                tasks[ length ] = fetchPackages( repository, href, name )
+                tasks[ length ] = fetchPackages( href, name )
 
     else
         for name, href in pairs( map )
             length += 1
-            tasks[ length ] = fetchPackages( repository, href, name )
+            tasks[ length ] = fetchPackages( href, name )
 
     if length == 0
         return nil
