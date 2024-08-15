@@ -599,6 +599,21 @@ unless table.pack
     table.pack = ( ... ) ->
         return { n: select( "#", ... ), ... }
 
+table.Add = ( destination, source, isSequential ) ->
+    length = #destination
+    if isSequential
+        for index = 1, #source
+            destination[ length + index ] = source[ index ]
+
+    else
+
+        -- shitty garry implementation
+        for _, value in pairs( source )
+            length += 1
+            destination[ length ] = value
+
+    return destination
+
 table.Invert = ( tbl ) ->
     for key, value in pairs( tbl )
         tbl[ value ] = key
