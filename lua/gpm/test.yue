@@ -24,7 +24,7 @@ bench = (name, fn) ->
 import URL from gpm
 import FindSource from gpm.loader
 main = async ->
-    -- await gpm.Import( "package_v2" )
+    await gpm.Import( "package_v2" )
     -- resolved = URL( "github://Pika-Software/units" ) -- vfs github/Pika-Software/units/package.lua
     -- source = FindSource( resolved.scheme )
 
