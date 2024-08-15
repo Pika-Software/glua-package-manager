@@ -79,7 +79,7 @@ do
             for index = 1, 7
                 requests = requestCache[ methods[ index ] ]
                 for href, data in pairs( requests )
-                    if ( sysTime - data[ 2 ] ) > cacheLifetime
+                    if ( sysTime - data[ 2 ] ) > data[ 3 ]
                         requests[ href ] = nil
 
     request = ( parameters ) =>
@@ -122,9 +122,11 @@ do
 
             data = requestCache[ method ][ url ]
             if data
-                return data[1] -- yeah, here we can just remove previous promise
+                return data[ 1 ] -- yeah, here we can just remove previous promise
 
-            requestCache[ method ][ url ] = { promise, SysTime! }
+            requestCache[ method ][ url ] = { promise, SysTime!, parameters.cacheLifetime or cacheLifetime }
+
+        parameters.cacheLifetime = nil
 
         parameters.success = ( status, body, headers ) ->
             promise\Resolve( { :status, :body, :headers } )
@@ -232,11 +234,11 @@ do
     http.Post = ( url, parameters, headers, timeout ) ->
         return HTTP( { :url, method: "POST", :headers, :timeout, :parameters } )
 
-    cachedFetch = http.CachedFetch = ( url, headers, timeout ) ->
-        return HTTP( { :url, method: "GET", :headers, :timeout, cache: true } )
+    cachedFetch = http.CachedFetch = ( url, headers, timeout, cacheLifetime ) ->
+        return HTTP( { :url, method: "GET", :headers, :timeout, cache: true, :cacheLifetime } )
 
-    http.CachedPost = ( url, parameters, headers, timeout ) ->
-        return HTTP( { :url, method: "POST", :headers, :timeout, :parameters, cache: true } )
+    http.CachedPost = ( url, parameters, headers, timeout, cacheLifetime ) ->
+        return HTTP( { :url, method: "POST", :headers, :timeout, :parameters, cache: true, :cacheLifetime } )
 
     http.FileInfo = async ( href, headers, timeout ) ->
         directoryPath, fileName = stripFile( URL( href ).pathname )
