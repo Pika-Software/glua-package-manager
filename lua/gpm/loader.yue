@@ -162,11 +162,6 @@ do
                 return nil
 
             run: ( ... ) =>
-                -- if result := @result
-                --     return result
-
-                -- result = @result = async( @location )( ... )
-                -- return result
                 if not @func
                     error ModuleError "module #{@url} was not loaded"
 
@@ -821,15 +816,18 @@ do
 
         new: ( ... ) =>
             for protocol in *{ ... }
-                if isurl( protocol )
-                    protocol = protocol.scheme
+                @register( protocol )
 
-                old = sources[ protocol ]
-                if old
-                    Logger\Warn( "Protocol '#{old}' has been overwritten by '#{protocol}'." )
+        register: ( protocol ) =>
+            if isurl( protocol )
+                protocol = protocol.scheme
 
-                sources[ protocol ] = @
-                Logger\Debug( "  - #{@} was registered for #{protocol}:"  )
+            old = sources[ protocol ]
+            if old
+                Logger\Warn( "Protocol '#{old}' has been overwritten by '#{protocol}'." )
+
+            sources[ protocol ] = @
+            Logger\Debug( "  - #{@} was registered for #{protocol}:"  )
 
         @get: ( protocol ) ->
             if isurl( protocol )
