@@ -317,7 +317,7 @@ do
     import isstring, iserror, RuntimeError from environment
     import captureStack from environment.Error
 
-    transformError = (err) ->
+    transformError = ( err ) ->
         if isstring( err )
             file, line, message = match( err, "^([A-Za-z0-9%-_/.]+):(%d+): (.*)" )
             if file and line
