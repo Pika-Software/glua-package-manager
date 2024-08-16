@@ -818,6 +818,12 @@ do
             for protocol in *{ ... }
                 @register( protocol )
 
+            if not @FetchInfo
+                logger\Warn( "Source #{@} does not implement :FetchInfo method. May cause errors." )
+
+            if not @Install
+                logger\Warn( "Source #{@} does not implement :FetchInfo method. May cause errors." )
+
         register: ( protocol ) =>
             if isurl( protocol )
                 protocol = protocol.scheme
@@ -834,6 +840,9 @@ do
                 protocol = protocol.scheme
 
             return sources[ protocol ]
+
+        WorkingDirectory: ( url ) =>
+            return URL( path.join("file:///lua/gpm/vfs/modules/", string.PathFromURL(url), "") )
 
         --[[
 
