@@ -328,4 +328,19 @@ do
 
         _, versions = Find( "gpm/vfs/packages/" .. name .. "/*", "LUA" )
         sort( versions, str_sort )
-        return versions[ 1 ]
+
+        local result
+        if version
+            for str in *versions
+                result = Version( str )
+                if result % version
+                    break
+
+        else
+            result = Version( versions[ 1 ] )
+
+        return {
+            Name: name,
+            URL: "file:///gpm/vfs/packages/" .. name .. "/" .. result,
+            Version: result
+        }
