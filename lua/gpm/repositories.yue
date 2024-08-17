@@ -2,7 +2,7 @@ _G = _G
 import gpm from _G
 import Query from _G.sql
 import environment from gpm
-import istable, util, CLIENT, SERVER, MENU_DLL from environment
+import istable, util, CLIENT, SERVER, MENU_DLL, ArgAssert from environment
 import JSONToTable, Version from util
 
 if SERVER or MENU_DLL
@@ -308,3 +308,24 @@ repositories.LookupRepositories = async ( name, version, offlineMode, withPatter
                 packages[ length ] = package
 
     return packages
+
+do
+
+    str_sort = ( a, b ) ->
+        return a < b
+
+    import Find from _G.file
+
+    repositories.FindPackage = async ( name, version, offlineMode, withPattern ) ->
+        ArgAssert( name, 1, "string" )
+
+        packages = await repositories.LookupRepositories( name, version, offlineMode, withPattern )
+        sort( packages, sort_fn )
+
+        package = packages[ 1 ]
+        if package
+            return package
+
+        _, versions = Find( "gpm/vfs/packages/" .. name .. "/*", "lsv" )
+        sort( versions, str_sort )
+        return versions[ 1 ]
