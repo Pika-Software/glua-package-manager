@@ -648,7 +648,7 @@ do
             unless isurl( url )
                 url = URL( url )
 
-            if url.hostname == ""
+            if not url.hostname or url.hostname == ""
                 return url.scheme .. url.pathname
 
             return url.scheme .. "/" .. concat( Flip( ByteSplit( url.hostname, 0x2E --[[ . ]] ) ), "/" ) .. url.pathname
