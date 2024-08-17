@@ -752,6 +752,7 @@ do
 
     import SourceError from environment
     import reject from Promise
+    import Logger from gpm
 
     sources = loader.Sources
     unless istable( sources )
@@ -812,11 +813,17 @@ do
 
     class loader.Source
         __tostring: =>
-            return format( "%s %p", @__name, @ )
+            return format( "%s %p", @@__name, @ )
 
         new: ( ... ) =>
             for protocol in *{ ... }
                 @register( protocol )
+
+            if not @FetchInfo
+                Logger\Warn( "Source #{@} does not implement :FetchInfo method. May cause errors." )
+
+            if not @Install
+                Logger\Warn( "Source #{@} does not implement :Install method. May cause errors." )
 
         register: ( protocol ) =>
             if isurl( protocol )
@@ -824,7 +831,7 @@ do
 
             old = sources[ protocol ]
             if old
-                Logger\Warn( "Protocol '#{old}' has been overwritten by '#{protocol}'." )
+                Logger\Warn( "Protocol '#{protocol}' has been registered by '#{@}'. (was #{old})" )
 
             sources[ protocol ] = @
             Logger\Debug( "  - #{@} was registered for #{protocol}:"  )
@@ -834,6 +841,9 @@ do
                 protocol = protocol.scheme
 
             return sources[ protocol ]
+
+        WorkingDirectory: ( url ) =>
+            return URL( path.join("file:///lua/gpm/vfs/modules/", string.PathFromURL(url), "") )
 
         --[[
 
@@ -988,7 +998,6 @@ do
 
     import display from environment.Error
     import allSettled from Promise
-    import Logger from gpm
 
     loader.Startup = async ->
         _, folders = Find( "packages/*", file.LuaPath, true )
