@@ -326,6 +326,6 @@ do
         if package
             return package
 
-        _, versions = Find( "gpm/vfs/packages/" .. name .. "/*", "lsv" )
+        _, versions = Find( "gpm/vfs/packages/" .. name .. "/*", "LUA" )
         sort( versions, str_sort )
         return versions[ 1 ]
