@@ -25,69 +25,80 @@ import environment from _G.gpm
 import isstring, tostring, ErrorNoHaltWithStack, ErrorNoHalt, getmetatable from gpm.environment
 import getstack from environment.debug
 import format, rep from string
+luaClass = environment.class
 import concat from table
 
-export class Error
-    name: "Error"
-    @__inherited: ( child ) =>
-        child.__base.name = child.__name or @name
+local errorClass
+export iserror = ( obj, name = "Error" ) ->
+    metatable = getmetatable( obj )
+    cls = metatable and metatable.__class
+    while cls
+        if cls.__name == name
+            return true
 
-    new: ( @message, @fileName, @lineNumber, stackPos ) =>
-        @stack = stack = getstack( stackPos or 3 )
+        cls = cls.__parent
 
-        if first := stack[1]
-            @fileName or= first.short_src
-            @lineNumber or= first.currentline
+    return false
 
-    __tostring: =>
-        if @fileName
-            return format( "%s:%d: %s: %s", @fileName, @lineNumber or 0, @name, @message )
+errorClass = luaClass(
+    "Error",
+    {
+        name: "Error"
 
-        return @name .. ": " .. @message
+        new: ( @message, @fileName, @lineNumber, stackPos ) =>
+            @stack = stack = getstack( stackPos or 3 )
 
-    display: =>
-        if isstring( @ )
-            return ErrorNoHaltWithStack( @ )
+            if first := stack[1]
+                @fileName or= first.short_src
+                @lineNumber or= first.currentline
 
-        lines, length = { "\n[ERROR] " .. tostring( @ ) }, 1
+            return nil
 
-        stack = @stack
-        for index = 1, #stack
+        __tostring: =>
+            if @fileName
+                return format( "%s:%d: %s: %s", @fileName, @lineNumber or 0, @name, @message )
+
+            return @name .. ": " .. @message
+
+        display: =>
+            if isstring( @ )
+                return ErrorNoHaltWithStack( @ )
+
+            lines, length = { "\n[ERROR] " .. tostring( @ ) }, 1
+
+            stack = @stack
+            for index = 1, #stack
+                length += 1
+                info = stack[ index ]
+                lines[ length ] = format( "%s %d. %s - %s:%d", rep( " ", index ), index, info.name or "unknown", info.short_src, info.currentline )
+
             length += 1
-            info = stack[ index ]
-            lines[ length ] = format( "%s %d. %s - %s:%d", rep( " ", index ), index, info.name or "unknown", info.short_src, info.currentline )
+            lines[ length ] = "\n"
 
-        length += 1
-        lines[ length ] = "\n"
+            ErrorNoHalt concat( lines, "\n", 1, length )
+            return nil
+    },
+    {
+        __inherited: ( child ) =>
+            child.__base.name = child.__name or @name
 
-        ErrorNoHalt concat( lines, "\n", 1, length )
-        return nil
+        captureStack: ( stackPos ) ->
+            return getstack( stackPos or 1 )
 
-    @captureStack: ( stackPos ) ->
-        return getstack( stackPos or 1 )
+        is: iserror
+    }
+)
 
-    @is: ( obj, name = "Error" ) ->
-        meta = getmetatable( obj )
-        cls = meta and meta.__class
-        while cls
-            if cls.__name == name
-                return true
-
-            cls = cls.__parent
-
-        return false
-
-export iserror = Error.is
-
-export class NotImplementedError extends Error
-export class CodeCompileError extends Error
-export class FileSystemError extends Error
-export class WebClientError extends Error
-export class RuntimeError extends Error
-export class PackageError extends Error
-export class PromiseError extends Error
-export class ModuleError extends Error
-export class SourceError extends Error
-export class AddonError extends Error
-export class RangeError extends Error
-export class TypeError extends Error
+export NotImplementedError = luaClass( "NotImplementedError", nil, nil, errorClass )
+export CodeCompileError = luaClass( "CodeCompileError", nil, nil, errorClass )
+export FileSystemError = luaClass( "FileSystemError", nil, nil, errorClass )
+export WebClientError = luaClass( "WebClientError", nil, nil, errorClass )
+export RuntimeError = luaClass( "RuntimeError", nil, nil, errorClass )
+export PackageError = luaClass( "PackageError", nil, nil, errorClass )
+export PromiseError = luaClass( "PromiseError", nil, nil, errorClass )
+export ModuleError = luaClass( "ModuleError", nil, nil, errorClass )
+export SourceError = luaClass( "SourceError", nil, nil, errorClass )
+export AddonError = luaClass( "AddonError", nil, nil, errorClass )
+export RangeError = luaClass( "RangeError", nil, nil, errorClass )
+export TypeError = luaClass( "TypeError", nil, nil, errorClass )
+export Error = errorClass

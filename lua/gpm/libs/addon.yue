@@ -171,7 +171,9 @@ import equal from environment.path
 import time from environment.os
 import Empty from table
 
-class File
+sidePrefix = _G.SERVER and "s" or _G.CLIENT and "c" or _G.MENU_DLL and "m" or "u"
+
+_module_0.File = environment.class( "File", {
     Identity: "GMAD"
     FormatVersion: 3
 
@@ -522,8 +524,6 @@ class File
         await AsyncWrite( filePath, @GetBinary( doCRC ) )
         return @
 
-    sidePrefix = _G.SERVER and "s" or _G.CLIENT and "c" or _G.MENU_DLL and "m" or "u"
-
     Mount: ( doCRC ) =>
         filePath = "/data/gpm/mount/" .. MD5( @title .. time! .. sidePrefix ) .. ".gma"
         @Write( filePath, doCRC )
@@ -543,7 +543,6 @@ class File
             error AddonError result
 
         return result
-
-_module_0.File = File
+} )
 
 return _module_0

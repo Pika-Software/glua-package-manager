@@ -284,353 +284,354 @@ do
         }
     }
 
-    class ByteStream extends struct.Cursor
-        @CompressionMethods: compressionMethods
-        __tostring: =>
-            return format( "ByteStream: %p [%d/%d]", @, @position, @size )
+    seek = ( position ) =>
+        @Flush!
 
-        IsValid: =>
-            return @data ~= nil
+        if position
+            ArgAssert( position, 2, "number" )
+            position = clamp( position, 0, @size )
+        else
+            position = 0
 
-        EndOfFile: =>
-            return @position >= @size
+        @position = position
+        return position
 
-        Size: =>
-            return @size
+    util.ByteStream = environment.class(
+        "ByteStream",
+        {
+            __tostring: =>
+                return format( "ByteStream: %p [%d/%d]", @, @position, @size )
 
-        Tell: =>
-            return @position
+            IsValid: =>
+                return @data ~= nil
 
-        Close: =>
-            @Flush!
-            @position = 0
+            EndOfFile: =>
+                return @position >= @size
 
-        Seek: ( position ) =>
-            @Flush!
+            Size: =>
+                return @size
 
-            if position
-                ArgAssert( position, 2, "number" )
-                position = clamp( position, 0, @size )
-            else
-                position = 0
+            Tell: =>
+                return @position
 
-            @position = position
-            return position
+            Close: =>
+                @Flush!
+                @position = 0
 
-        @__base.SeekTo = @__base.Seek
+            Seek: seek
+            SeekTo: seek
 
-        SeekToBegin: =>
-            return @Seek( 0 )
+            SeekToBegin: =>
+                return @Seek( 0 )
 
-        SeekToEnd: =>
-            return @Seek( @size - @position )
+            SeekToEnd: =>
+                return @Seek( @size - @position )
 
-        SkipEmpty: =>
-            while not @EndOfFile!
-                if @ReadByte! ~= 0
-                    @Skip( -1 )
-                    break
+            SkipEmpty: =>
+                while not @EndOfFile!
+                    if @ReadByte! ~= 0
+                        @Skip( -1 )
+                        break
 
-        Skip: ( bytes ) =>
-            if bytes
+            Skip: ( bytes ) =>
+                if bytes
+                    ArgAssert( bytes, 2, "number" )
+                else
+                    bytes = 1
+
+                return @Seek( @position + bytes )
+
+            -- Byte read
+            Read: ( bytes ) =>
+                :position, :size = @
+
+                if bytes == "*a" or bytes == nil
+                    bytes = size
+
                 ArgAssert( bytes, 2, "number" )
-            else
-                bytes = 1
 
-            return @Seek( @position + bytes )
+                if bytes > 0
+                    if position >= size
+                        return nil, "eof"
 
-        -- Byte read
-        Read: ( bytes ) =>
-            :position, :size = @
+                    return sub( @data, position + 1, @Skip( bytes ) )
 
-            if bytes == "*a" or bytes == nil
-                bytes = size
+                if bytes < 0
+                    if position <= 0
+                        return nil, "sof"
 
-            ArgAssert( bytes, 2, "number" )
+                    return reverse( sub( @data, position + 1, @Skip( bytes ) ) )
 
-            if bytes > 0
+            ReadAll: =>
+                @SeekToBegin!
+                return @Read( @size )
+
+            -- String
+            ReadString: =>
+                :position, :size = @
                 if position >= size
-                    return nil, "eof"
+                    return
 
-                return sub( @data, position + 1, @Skip( bytes ) )
+                bytes, data = 0, @data
+                for index = position, size
+                    if byte( data, index + 1 ) == 0
+                        break
 
-            if bytes < 0
-                if position <= 0
-                    return nil, "sof"
+                    bytes += 1
 
-                return reverse( sub( @data, position + 1, @Skip( bytes ) ) )
+                if bytes == 0
+                    return
 
-        ReadAll: =>
-            @SeekToBegin!
-            return @Read( @size )
+                return @Read( bytes ), @Skip( 1 )
 
-        -- String
-        ReadString: =>
-            :position, :size = @
-            if position >= size
-                return
+            WriteString: ( str ) =>
+                ArgAssert( str, 1, "string" )
+                return @Write( str .. "\0" )
 
-            bytes, data = 0, @data
-            for index = position, size
-                if byte( data, index + 1 ) == 0
-                    break
+            -- Line
+            ReadLine: =>
+                :position, :size = @
+                if position >= size
+                    return
 
-                bytes += 1
+                bytes, data = 0, @data
+                for index = position, size
+                    if byte( data, index + 1 ) == 0xA --[[ \n ]]
+                        break
 
-            if bytes == 0
-                return
+                    bytes += 1
 
-            return @Read( bytes ), @Skip( 1 )
+                if bytes == 0
+                    return "", @Skip( 1 )
 
-        WriteString: ( str ) =>
-            ArgAssert( str, 1, "string" )
-            return @Write( str .. "\0" )
+                return @Read( bytes ), @Skip( 1 )
 
-        -- Line
-        ReadLine: =>
-            :position, :size = @
-            if position >= size
-                return
+            WriteLine: ( str ) =>
+                ArgAssert( str, 1, "string" )
+                return @Write( str .. "\n" )
 
-            bytes, data = 0, @data
-            for index = position, size
-                if byte( data, index + 1 ) == 0xA --[[ \n ]]
-                    break
+            -- Byte
+            ReadByte: =>
+                if @EndOfFile!
+                    return
 
-                bytes += 1
+                return byte( @data, @Skip( 1 ) )
 
-            if bytes == 0
-                return "", @Skip( 1 )
+            WriteByte: ( number ) =>
+                return @Write( char( number ) )
 
-            return @Read( bytes ), @Skip( 1 )
+            -- Boolean
+            ReadBool: =>
+                switch @ReadByte!
+                    when 0
+                        return false
 
-        WriteLine: ( str ) =>
-            ArgAssert( str, 1, "string" )
-            return @Write( str .. "\n" )
+                    when 1
+                        return true
 
-        -- Byte
-        ReadByte: =>
-            if @EndOfFile!
-                return
-
-            return byte( @data, @Skip( 1 ) )
-
-        WriteByte: ( number ) =>
-            return @Write( char( number ) )
-
-        -- Boolean
-        ReadBool: =>
-            switch @ReadByte!
-                when 0
-                    return false
-
-                when 1
-                    return true
-
-            return nil
-
-        WriteBool: ( bool ) =>
-            return @WriteByte( bool and 1 or 0 )
-
-        -- UInt
-        ReadUInt: ( bytes, endianness ) =>
-            ArgAssert( bytes, 2, "number", 4 )
-            setEndianness( endianness or "little" )
-            return readUInt( nil, @Read( bytes ), bytes )
-
-        WriteUInt: ( number, bytes, endianness ) =>
-            ArgAssert( number, 1, "number", 4 )
-            ArgAssert( bytes, 2, "number", 4 )
-            setEndianness( endianness or "little" )
-            return @Write( writeUInt( nil, number, bytes ) )
-
-        -- UShort
-        ReadUShort: ( endianness ) =>
-            return @ReadUInt( 2, endianness )
-
-        WriteUShort: ( number, endianness ) =>
-            return @WriteUInt( number, 2, endianness )
-
-        -- ULong
-        ReadULong: ( endianness ) =>
-            return @ReadUInt( 4, endianness )
-
-        WriteULong: ( number, endianness ) =>
-            return @WriteUInt( number, 4, endianness )
-
-        -- UInt64
-        ReadUInt64: ( endianness ) =>
-            return @ReadUInt( 8, endianness )
-
-        WriteUInt64: ( number, endianness ) =>
-            @WriteUInt( number, 8, endianness )
-
-        -- Int
-        ReadInt: ( bytes, endianness ) =>
-            ArgAssert( bytes, 2, "number", 4 )
-            setEndianness( endianness or "little" )
-            return readInt( nil, @Read( bytes ), bytes )
-
-        WriteInt: ( number, bytes, endianness ) =>
-            ArgAssert( number, 1, "number", 4 )
-            ArgAssert( bytes, 2, "number", 4 )
-            setEndianness( endianness or "little" )
-            return @Write( writeInt( nil, number, bytes ) )
-
-        -- Short
-        ReadShort: ( endianness ) =>
-            return @ReadInt( 2, endianness )
-
-        WriteShort: ( number, endianness ) =>
-            return @WriteInt( number, 2, endianness )
-
-        -- Long
-        ReadLong: ( endianness ) =>
-            return @ReadInt( 4, endianness )
-
-        WriteLong: ( number, endianness ) =>
-            return @WriteInt( number, 4, endianness )
-
-        -- Int64
-        ReadInt64: ( endianness ) =>
-            return @ReadInt( 8, endianness )
-
-        WriteInt64: ( number, endianness ) =>
-            return @WriteInt( number, 8, endianness )
-
-        -- Float
-        ReadFloat: ( endianness ) =>
-            setEndianness( endianness or "little" )
-            return readFloat( nil, @Read( 4 ), 4 )
-
-        WriteFloat: ( number, endianness ) =>
-            ArgAssert( number, 2, "number" )
-            setEndianness( endianness or "little" )
-            return @Write( writeFloat( nil, number, 4 ) )
-
-        -- Double
-        ReadDouble: ( endianness ) =>
-            setEndianness( endianness or "little" )
-            return readDouble( nil, @Read( 8 ), 8 )
-
-        WriteDouble: ( number, endianness ) =>
-            ArgAssert( number, 2, "number" )
-            setEndianness( endianness or "little" )
-            return @Write( writeDouble( nil, number, 8 ) )
-
-        -- Quad
-        ReadQuad: ( endianness ) =>
-            setEndianness( endianness or "little" )
-            return readQuad( nil, @Read( 16 ), 16 )
-
-        WriteQuad: ( number, endianness ) =>
-            ArgAssert( number, 2, "number" )
-            setEndianness( endianness or "little" )
-            return @Write( writeQuad( nil, number, 16 ) )
-
-        -- Time
-        ReadTime: =>
-            return dos2unix( @ReadUShort!, @ReadUShort! )
-
-        WriteTime: ( u ) =>
-            t, d = unix2dos( u )
-            @WriteUShort( t )
-            return @WriteUShort( d )
-
-        -- ZipFile ( https://medium.com/@felixstridsberg/the-zip-file-format-6c8a160d1c34 )
-        ReadZipFile: ( doCRC ) =>
-            if @Read( 4 ) ~= "PK\x03\x04"
-                return
-
-            data = {}
-
-            @Skip( 4 )
-
-            compressionMethod = data.compression = @ReadUShort!
-            data.time = @ReadTime!
-
-            crc = data.crc = @ReadULong!
-            compressedSize = @ReadULong!
-            data.size = @ReadULong!
-
-            pathLength = @ReadUShort!
-            extraLength = @ReadUShort!
-
-            data.path = @Read( pathLength )
-            @Skip( extraLength )
-
-            method = compressionMethods[ compressionMethod ]
-            unless method
-                return data, "compression method not supported"
-
-            content = data.content = method[ 2 ]( @Read( compressedSize ) )
-
-            if doCRC and content and crc ~= CRC( content )
-                return data, "crc-32 mismatch"
-
-            return data
-
-        WriteZipFile: ( fileName, content, compressionMethod = 0, unixTime = time! ) =>
-            ArgAssert( fileName, 1, "string" )
-            ArgAssert( content, 2, "string" )
-            ArgAssert( compressionMethod, 3, "number" )
-            ArgAssert( unixTime, 4, "number" )
-
-            -- signature
-            @Write( "PK\x03\x04" )
-
-            -- Version needed to extract (minimum)
-            @WriteUShort( 0 )
-
-            -- General purpose bit flag
-            @WriteUShort( 0 )
-
-            method = compressionMethods[ compressionMethod ]
-            unless method
-                error "Unsupported compression method: " .. compressionMethod
                 return nil
 
-            -- Compression method
-            @WriteUShort( compressionMethod )
+            WriteBool: ( bool ) =>
+                return @WriteByte( bool and 1 or 0 )
 
-            -- Modification time
-            @WriteTime( unixTime )
+            -- UInt
+            ReadUInt: ( bytes, endianness ) =>
+                ArgAssert( bytes, 2, "number", 4 )
+                setEndianness( endianness or "little" )
+                return readUInt( nil, @Read( bytes ), bytes )
 
-            -- CRC-32
-            @WriteULong( tonumber( CRC( content ), 10 ) )
-            fileSize = len( content )
+            WriteUInt: ( number, bytes, endianness ) =>
+                ArgAssert( number, 1, "number", 4 )
+                ArgAssert( bytes, 2, "number", 4 )
+                setEndianness( endianness or "little" )
+                return @Write( writeUInt( nil, number, bytes ) )
 
-            content = method[ 1 ]( content )
+            -- UShort
+            ReadUShort: ( endianness ) =>
+                return @ReadUInt( 2, endianness )
 
-            -- Compressed size
-            @WriteULong( len( content ) )
+            WriteUShort: ( number, endianness ) =>
+                return @WriteUInt( number, 2, endianness )
 
-            -- Uncompressed size
-            @WriteULong( fileSize )
+            -- ULong
+            ReadULong: ( endianness ) =>
+                return @ReadUInt( 4, endianness )
 
-            -- File name length
-            @WriteUShort( len( fileName ) )
+            WriteULong: ( number, endianness ) =>
+                return @WriteUInt( number, 4, endianness )
 
-            -- Extra field length
-            @WriteUShort( 0 )
+            -- UInt64
+            ReadUInt64: ( endianness ) =>
+                return @ReadUInt( 8, endianness )
 
-            @Write( fileName )
-            return @Write( content )
+            WriteUInt64: ( number, endianness ) =>
+                @WriteUInt( number, 8, endianness )
 
-        -- Color
-        ReadColor: =>
-            return Color( byte( @Read( 4 ) ) )
+            -- Int
+            ReadInt: ( bytes, endianness ) =>
+                ArgAssert( bytes, 2, "number", 4 )
+                setEndianness( endianness or "little" )
+                return readInt( nil, @Read( bytes ), bytes )
 
-        WriteColor: ( color ) =>
-            return @Write( char( color.r, color.g, color.b, color.a ) )
+            WriteInt: ( number, bytes, endianness ) =>
+                ArgAssert( number, 1, "number", 4 )
+                ArgAssert( bytes, 2, "number", 4 )
+                setEndianness( endianness or "little" )
+                return @Write( writeInt( nil, number, bytes ) )
 
-    util.ByteStream = ByteStream
+            -- Short
+            ReadShort: ( endianness ) =>
+                return @ReadInt( 2, endianness )
 
-    environment.IsByteStream = ( any ) ->
-        metatable = getmetatable( any )
-        return metatable and metatable.__class == ByteStream
+            WriteShort: ( number, endianness ) =>
+                return @WriteInt( number, 2, endianness )
 
-    util.RegisterMetaTable( "ByteStream", ByteStream.__base )
+            -- Long
+            ReadLong: ( endianness ) =>
+                return @ReadInt( 4, endianness )
+
+            WriteLong: ( number, endianness ) =>
+                return @WriteInt( number, 4, endianness )
+
+            -- Int64
+            ReadInt64: ( endianness ) =>
+                return @ReadInt( 8, endianness )
+
+            WriteInt64: ( number, endianness ) =>
+                return @WriteInt( number, 8, endianness )
+
+            -- Float
+            ReadFloat: ( endianness ) =>
+                setEndianness( endianness or "little" )
+                return readFloat( nil, @Read( 4 ), 4 )
+
+            WriteFloat: ( number, endianness ) =>
+                ArgAssert( number, 2, "number" )
+                setEndianness( endianness or "little" )
+                return @Write( writeFloat( nil, number, 4 ) )
+
+            -- Double
+            ReadDouble: ( endianness ) =>
+                setEndianness( endianness or "little" )
+                return readDouble( nil, @Read( 8 ), 8 )
+
+            WriteDouble: ( number, endianness ) =>
+                ArgAssert( number, 2, "number" )
+                setEndianness( endianness or "little" )
+                return @Write( writeDouble( nil, number, 8 ) )
+
+            -- Quad
+            ReadQuad: ( endianness ) =>
+                setEndianness( endianness or "little" )
+                return readQuad( nil, @Read( 16 ), 16 )
+
+            WriteQuad: ( number, endianness ) =>
+                ArgAssert( number, 2, "number" )
+                setEndianness( endianness or "little" )
+                return @Write( writeQuad( nil, number, 16 ) )
+
+            -- Time
+            ReadTime: =>
+                return dos2unix( @ReadUShort!, @ReadUShort! )
+
+            WriteTime: ( u ) =>
+                t, d = unix2dos( u )
+                @WriteUShort( t )
+                return @WriteUShort( d )
+
+            -- ZipFile ( https://medium.com/@felixstridsberg/the-zip-file-format-6c8a160d1c34 )
+            ReadZipFile: ( doCRC ) =>
+                if @Read( 4 ) ~= "PK\x03\x04"
+                    return
+
+                data = {}
+
+                @Skip( 4 )
+
+                compressionMethod = data.compression = @ReadUShort!
+                data.time = @ReadTime!
+
+                crc = data.crc = @ReadULong!
+                compressedSize = @ReadULong!
+                data.size = @ReadULong!
+
+                pathLength = @ReadUShort!
+                extraLength = @ReadUShort!
+
+                data.path = @Read( pathLength )
+                @Skip( extraLength )
+
+                method = compressionMethods[ compressionMethod ]
+                unless method
+                    return data, "compression method not supported"
+
+                content = data.content = method[ 2 ]( @Read( compressedSize ) )
+
+                if doCRC and content and crc ~= CRC( content )
+                    return data, "crc-32 mismatch"
+
+                return data
+
+            WriteZipFile: ( fileName, content, compressionMethod = 0, unixTime = time! ) =>
+                ArgAssert( fileName, 1, "string" )
+                ArgAssert( content, 2, "string" )
+                ArgAssert( compressionMethod, 3, "number" )
+                ArgAssert( unixTime, 4, "number" )
+
+                -- signature
+                @Write( "PK\x03\x04" )
+
+                -- Version needed to extract (minimum)
+                @WriteUShort( 0 )
+
+                -- General purpose bit flag
+                @WriteUShort( 0 )
+
+                method = compressionMethods[ compressionMethod ]
+                unless method
+                    error "Unsupported compression method: " .. compressionMethod
+                    return nil
+
+                -- Compression method
+                @WriteUShort( compressionMethod )
+
+                -- Modification time
+                @WriteTime( unixTime )
+
+                -- CRC-32
+                @WriteULong( tonumber( CRC( content ), 10 ) )
+                fileSize = len( content )
+
+                content = method[ 1 ]( content )
+
+                -- Compressed size
+                @WriteULong( len( content ) )
+
+                -- Uncompressed size
+                @WriteULong( fileSize )
+
+                -- File name length
+                @WriteUShort( len( fileName ) )
+
+                -- Extra field length
+                @WriteUShort( 0 )
+
+                @Write( fileName )
+                return @Write( content )
+
+            -- Color
+            ReadColor: =>
+                return Color( byte( @Read( 4 ) ) )
+
+            WriteColor: ( color ) =>
+                return @Write( char( color.r, color.g, color.b, color.a ) )
+
+        },
+        {
+            CompressionMethods: compressionMethods
+        },
+        struct.Cursor
+    )
 
 -- Version
 do
@@ -1073,9 +1074,3 @@ do
             versions[ obj\__tostring! ] = obj
             return obj
     } )
-
-    environment.IsVersion = ( any ) ->
-        metatable = getmetatable( any )
-        return metatable and metatable.__class == Version
-
-    util.RegisterMetaTable( "Version", Version.__base )

@@ -144,16 +144,13 @@ include( "libs/promise.lua" )
 -- gm_url
 do
 
-    import RegisterMetaTable from environment.util
     url = include( "libs/url.lua" )
 
     environment.IsURLSearchParams = url.IsURLSearchParams
-    URLSearchParams = environment.URLSearchParams = url.URLSearchParams
-    RegisterMetaTable( "URLSearchParams", URLSearchParams.__base )
+    environment.URLSearchParams = url.URLSearchParams
 
     environment.isurl = url.IsURL
-    URL = environment.URL = url.URL
-    RegisterMetaTable( "URL", URL.__base )
+    environment.URL = url.URL
 
     import http from environment
 

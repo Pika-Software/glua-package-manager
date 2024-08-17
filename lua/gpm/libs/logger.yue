@@ -103,7 +103,7 @@ developer = GetConVar( "developer" )
 debugFilter = ->
     return developer\GetInt! > 0
 
-class Logger
+loggerClass = environment.class( "Logger", {
     __tostring: =>
         return format( "Logger: %p [%s]", @, @title )
 
@@ -133,19 +133,10 @@ class Logger
             log( @, debug, "DEBUG ", ... )
 
         return nil
+} )
 
-util.Logger = Logger
+util.Logger = loggerClass
 
-do
-
-    import getmetatable from _G
-
-    environment.IsLogger = ( any ) ->
-        metatable = getmetatable( any )
-        return metatable and metatable.__class == Logger
-
-util.RegisterMetaTable( "Logger", Logger.__base )
-
-logger = Logger( "gpm@" .. gpm.VERSION, environment.Color( 180, 180, 255 ), false )
+logger = loggerClass( "gpm@" .. gpm.VERSION, environment.Color( 180, 180, 255 ), false )
 gpm.Logger = logger
 return logger

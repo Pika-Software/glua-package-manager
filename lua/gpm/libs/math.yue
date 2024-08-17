@@ -1,3 +1,4 @@
+_G = _G
 import getmetatable, math from _G
 import abs, atan2, ceil, min, max, random, sqrt, pow, floor, log, pi from math
 
@@ -204,7 +205,7 @@ export inpoly = (x, y, poly) ->
 
     return inside
 
-export class Point
+export Point = _G.gpm.environment.class( "Point", {
     new: (x, y) =>
         assert isfinite(x), "x must be finite"
         assert isfinite(y), "y must be finite"
@@ -252,5 +253,4 @@ export class Point
     ontangent: (c1, c2) => ontangent(@[1], @[2], c1[1], c1[2], c2[1], c2[2])
 
     inpoly: (poly) => inpoly(@[1], @[2], poly)
-
-export ispoint = (any) -> getmetatable(any) == Point
+} )

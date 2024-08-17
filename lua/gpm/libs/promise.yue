@@ -26,6 +26,7 @@ import pcall, xpcall from _G
 import environment from _G.gpm
 import PromiseError, iscallable from environment
 import create, resume, yield, running from coroutine
+import captureStack from environment.Error
 import format, match from _G.string
 import Simple from timer
 
@@ -39,7 +40,7 @@ once = ->
             wasCalled = true
             return wrappedFn( ... )
 
-local Promise, isPromise
+local promiseClass, isPromise
 
 do
 
@@ -47,7 +48,7 @@ do
 
     isPromise = ( any ) ->
         metatable = getmetatable( any )
-        return metatable and metatable.__class == Promise
+        return metatable and metatable.__class == promiseClass
 
     environment.ispromise = isPromise
 
@@ -162,7 +163,7 @@ try2reject = ( promise, reason ) ->
     return promise
 
 __then = ( promise, onFulfilled, onRejected, onFinally ) ->
-    p = Promise!
+    p = promiseClass!
     if iscallable( onFulfilled )
         p.onFulfilled = onFulfilled
 
@@ -179,143 +180,13 @@ __then = ( promise, onFulfilled, onRejected, onFinally ) ->
     finalize( promise )
     return p
 
--- Promise class
-class Promise
-    new: ( executor ) =>
-        @state = STATE_PENDING
-
-        if iscallable( executor )
-            @resolving = true
-            once_wrapper = once!
-            onReject = once_wrapper( ( reason ) -> reject( @, reason ) )
-            xpcall( executor, onReject, once_wrapper( ( value ) -> resolve( @, value ) ), onReject )
-        else
-            @resolving = false
-
-        return nil
-
-    __tostring: =>
-        return switch @state
-            when STATE_PENDING
-                format "Promise %p { <state>: \"pending\" }", @
-            when STATE_FULFILLED
-                format "Promise %p { <state>: \"fulfilled\", <value>: %s }", @, @value
-            when STATE_REJECTED
-                format "Promise %p { <state>: \"rejected\", <reason>: %s }", @, @reason
-            else
-                format "Promise %p { <state>: \"invalid\" }", @
-
-    -- https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/then
-    Then: __then
-
-    -- https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/catch
-    Catch: ( onRejected ) =>
-        return __then( @, nil, onRejected )
-
-    -- https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/finally
-    Finally: ( onFinally ) =>
-        return __then( @, nil, nil, onFinally )
-
--- Promise version information
-Promise.VERSION = "2.1.1-gpm"
-Promise.AUTHOR = "Pika-Software"
-Promise.URL = "https://github.com/dankmolot/gm_promise"
-
--- Setting locals to class
-Promise.STATE_PENDING = STATE_PENDING
-Promise.STATE_FULFILLED = STATE_FULFILLED
-Promise.STATE_REJECTED = STATE_REJECTED
-
--- is promise object check function
-Promise.IsPromise = isPromise
-
--- Promise error alias
-Promise.PromiseError = PromiseError
-
 -- global call stack
 CALL_STACK, STACK_SIZE = {}, 0
 
--- instance data
-do
-
-    base = Promise.__base
-
-    -- Aliases for instance methods
-    base.then = base.next = base.andThen = __then
-    base.finally = base.Finally
-    base.catch = base.Catch
-
-    -- Await functions
-    do
-
-        import error from _G
-
-        safeAwait = ( promise ) ->
-            co = running!
-            unless co
-                return false, PromiseError "Cannot await in main thread"
-
-            local _success, _value, waiting, stack
-
-            finish = ( success, value ) ->
-                if waiting
-                    STACK_SIZE += 1
-                    CALL_STACK[ STACK_SIZE ] = stack -- push previous stack
-                    resume( co, success, value )
-                else
-                    _success, _value = success, value
-
-            wait = ->
-                if _success ~= nil
-                    return _success, _value
-
-                waiting = true
-                stack = CALL_STACK[ STACK_SIZE ] -- pop current stack
-                CALL_STACK[ STACK_SIZE ] = nil
-                STACK_SIZE -= 1
-                return yield!
-
-            if isPromise( promise )
-                :state = promise
-                if state == STATE_FULFILLED
-                    return true, promise.value
-
-                elseif state == STATE_REJECTED
-                    return false, promise.reason
-
-                else
-                    once_wrapper = once!
-                    __then( promise, once_wrapper( ( value ) -> finish( true, value ) ), once_wrapper( ( reason ) -> finish( false, reason ) ) )
-                    return wait!
-
-            return true, promise
-
-        base.SafeAwait = safeAwait
-        base.safeAwait = safeAwait
-        environment.safeAwait = safeAwait
-
-        environment.await = base.Await = base.await = ( promise ) ->
-            ok, result = safeAwait( promise )
-            if ok
-                return result
-
-            return error( result )
-
-    -- Resolve functions
-    Promise.Resolve = Promise.resolve = ( value ) -> return try2resolve( Promise!, value )
-    base.Resolve = base.resolve = try2resolve
-
-    -- Reject functions
-    Promise.Reject = Promise.reject = ( reason ) -> return try2reject( Promise!, reason )
-    base.Reject = base.reject = try2reject
-
-    environment.util.RegisterMetaTable( "Promise", base )
-
--- Async function
+local transformError
 do
 
     import isstring, iserror, RuntimeError from environment
-    import captureStack from environment.Error
 
     transformError = ( err ) ->
         if isstring( err )
@@ -356,159 +227,318 @@ do
 
         return err
 
-    environment.async = Promise.Async = Promise.async = ( fn ) ->
-        if not iscallable( fn )
-            return PromiseError "Async function must be a function"
+-- safe await
+safeAwait = ( promise ) ->
+    co = running!
+    unless co
+        return false, PromiseError "Cannot await in main thread"
 
-        return ( ... ) ->
-            promise = Promise!
+    local _success, _value, waiting, stack
+
+    finish = ( success, value ) ->
+        if waiting
             STACK_SIZE += 1
-            CALL_STACK[ STACK_SIZE ] = captureStack! -- push stack
+            CALL_STACK[ STACK_SIZE ] = stack -- push previous stack
+            resume( co, success, value )
+        else
+            _success, _value = success, value
 
-            resume( create( ( ... ) ->
-                success, result = xpcall( fn, transformError, ... )
-                if success
-                    try2resolve( promise, result )
+    wait = ->
+        if _success ~= nil
+            return _success, _value
+
+        waiting = true
+        stack = CALL_STACK[ STACK_SIZE ] -- pop current stack
+        CALL_STACK[ STACK_SIZE ] = nil
+        STACK_SIZE -= 1
+        return yield!
+
+    if isPromise( promise )
+        :state = promise
+        if state == STATE_FULFILLED
+            return true, promise.value
+
+        elseif state == STATE_REJECTED
+            return false, promise.reason
+
+        else
+            once_wrapper = once!
+            __then( promise, once_wrapper( ( value ) -> finish( true, value ) ), once_wrapper( ( reason ) -> finish( false, reason ) ) )
+            return wait!
+
+    return true, promise
+
+local await
+do
+
+    import error from _G
+
+    await = ( promise ) ->
+        ok, result = safeAwait( promise )
+        if ok
+            return result
+
+        return error( result )
+
+-- Promise class
+promiseClass = environment.class(
+    "Promise",
+    {
+        new: ( executor ) =>
+            @state = STATE_PENDING
+
+            if iscallable( executor )
+                @resolving = true
+                once_wrapper = once!
+                onReject = once_wrapper( ( reason ) -> reject( @, reason ) )
+                xpcall( executor, onReject, once_wrapper( ( value ) -> resolve( @, value ) ), onReject )
+            else
+                @resolving = false
+
+            return nil
+
+        __tostring: =>
+            return switch @state
+                when STATE_PENDING
+                    format "Promise %p { <state>: \"pending\" }", @
+                when STATE_FULFILLED
+                    format "Promise %p { <state>: \"fulfilled\", <value>: %s }", @, @value
+                when STATE_REJECTED
+                    format "Promise %p { <state>: \"rejected\", <reason>: %s }", @, @reason
                 else
-                    try2reject( promise, result )
+                    format "Promise %p { <state>: \"invalid\" }", @
 
-                CALL_STACK[ STACK_SIZE ] = nil -- pop stack
+        -- https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/then
+        Then: __then
+        then: __then
+        next: __then
+        andThen: __then
+
+        -- https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/catch
+        Catch: ( onRejected ) =>
+            return __then( @, nil, onRejected )
+
+        -- https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/finally
+        Finally: ( onFinally ) =>
+            return __then( @, nil, nil, onFinally )
+
+        -- resolve
+        Resolve: try2resolve
+        resolve: try2resolve
+
+        -- reject
+        Reject: try2reject
+        reject: try2reject
+
+        -- safe await
+        SafeAwait: safeAwait
+        :safeAwait
+
+        -- await
+        Await: await
+        :await
+    },
+    {
+        -- Promise version information
+        VERSION: "2.1.1-gpm",
+        AUTHOR: "Pika-Software",
+        URL: "https://github.com/dankmolot/gm_promise",
+
+        -- Setting locals to class
+        :STATE_PENDING,
+        :STATE_FULFILLED,
+        :STATE_REJECTED,
+
+        -- is promise object check function
+        IsPromise: isPromise,
+
+        -- Promise error alias
+        :PromiseError
+
+        -- https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/resolve
+        Resolve: ( value ) ->
+            return try2resolve( promiseClass!, value )
+
+        -- https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/reject
+        Reject: ( reason ) ->
+            return try2reject( promiseClass!, reason )
+
+        -- Async function
+        Async: ( fn ) ->
+            if not iscallable( fn )
+                return PromiseError "Async function must be a function"
+
+            return ( ... ) ->
+                promise = promiseClass!
+                STACK_SIZE += 1
+                CALL_STACK[ STACK_SIZE ] = captureStack! -- push stack
+
+                resume( create( ( ... ) ->
+                    success, result = xpcall( fn, transformError, ... )
+                    if success
+                        try2resolve( promise, result )
+                    else
+                        try2reject( promise, result )
+
+                    CALL_STACK[ STACK_SIZE ] = nil -- pop stack
+                    return nil
+                ), ... )
+
+                return promise
+
+        -- https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/all
+        All: ( promises ) ->
+            promise = promiseClass!
+
+            count = #promises
+            if count == 0
+                try2resolve( promise, {} )
+                return promise
+
+            failed = false
+            onReject = ( reason ) ->
+                try2reject( promise, reason )
+                failed = true
                 return nil
-            ), ... )
+
+            values = {}
+            takeValue = ->
+                count -= 1
+                if count == 0
+                    try2resolve( promise, values )
+
+                return nil
+
+            for index = 1, count
+                other = promises[ index ]
+                if isPromise( other )
+                    __then(
+                        other,
+                        ( value ) ->
+                            values[ index ] = value
+                            takeValue!,
+                        onReject
+                    )
+                else
+                    values[ index ] = other
+                    takeValue!
+
+                if failed
+                    break
 
             return promise
 
--- https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/all
-Promise.All = Promise.all = ( promises ) ->
-    promise = Promise!
+        -- https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/allSettled
+        AllSettled: ( promises ) ->
+            promise = promiseClass!
 
-    count = #promises
-    if count == 0
-        try2resolve( promise, {} )
-        return promise
+            count = #promises
+            if count == 0
+                try2resolve( promise, {} )
+                return promise
 
-    failed = false
-    onReject = ( reason ) ->
-        try2reject( promise, reason )
-        failed = true
-        return nil
+            results = {}
+            takeValue = ->
+                count -= 1
+                if count == 0
+                    try2resolve( promise, results )
 
-    values = {}
-    takeValue = ->
-        count -= 1
-        if count == 0
-            try2resolve( promise, values )
+                return nil
 
-        return nil
+            for index = 1, count
+                __then(
+                    promises[ index ],
+                    ( value ) ->
+                        results[ index ] = { status: "fulfilled", :value }
+                        takeValue!,
+                    ( reason ) ->
+                        results[ index ] = { status: "rejected", :reason }
+                        takeValue!
+                )
 
-    for index = 1, count
-        other = promises[ index ]
-        if isPromise( other )
-            __then(
-                other,
-                ( value ) ->
-                    values[ index ] = value
-                    takeValue!,
-                onReject
-            )
-        else
-            values[ index ] = other
-            takeValue!
+            return promise
 
-        if failed
-            break
+        -- https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/any
+        Any: ( promises ) ->
+            promise = promiseClass!
 
-    return promise
+            count = #promises
+            if count == 0
+                return try2reject( promise, PromiseError "No promises to resolve" )
 
--- https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/allSettled
-Promise.AllSettled = Promise.allSettled = ( promises ) ->
-    promise = Promise!
+            fulfilled = false
+            onSuccess = ( value ) ->
+                try2resolve( promise, value )
+                fulfilled = true
+                return nil
 
-    count = #promises
-    if count == 0
-        try2resolve( promise, {} )
-        return promise
+            reasons = {}
+            takeValue = ->
+                count -= 1
+                if count == 0
+                    try2reject( promise, reasons )
 
-    results = {}
-    takeValue = ->
-        count -= 1
-        if count == 0
-            try2resolve( promise, results )
+                return nil
 
-        return nil
+            for index = 1, count
+                __then( promises[ index ], onSuccess, ( reason ) ->
+                    reasons[ index ] = reason
+                    takeValue!
+                )
 
-    for index = 1, count
-        __then(
-            promises[ index ],
-            ( value ) ->
-                results[ index ] = { status: "fulfilled", :value }
-                takeValue!,
-            ( reason ) ->
-                results[ index ] = { status: "rejected", :reason }
-                takeValue!
-        )
+                if fulfilled
+                    break
 
-    return promise
+            return promise
 
--- https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/any
-Promise.Any = Promise.any = ( promises ) ->
-    promise = Promise!
+        -- https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/race
+        Race: ( promises ) ->
+            promise = promiseClass!
 
-    count = #promises
-    if count == 0
-        return try2reject( promise, PromiseError "No promises to resolve" )
+            count = #promises
+            if count == 0
+                return promise
 
-    fulfilled = false
-    onSuccess = ( value ) ->
-        try2resolve( promise, value )
-        fulfilled = true
-        return nil
+            onResolve = ( value ) ->
+                try2resolve( promise, value )
+                return nil
 
-    reasons = {}
-    takeValue = ->
-        count -= 1
-        if count == 0
-            try2reject( promise, reasons )
+            onReject = ( reason ) ->
+                try2reject( promise, reason )
+                return nil
 
-        return nil
+            for index = 1, count
+                __then( promises[ index ], onResolve, onReject )
 
-    for index = 1, count
-        __then( promises[ index ], onSuccess, ( reason ) ->
-            reasons[ index ] = reason
-            takeValue!
-        )
+            return promise
 
-        if fulfilled
-            break
+        -- A custom delay feature that stops the promise chain for a specified amount of time
+        Delay: ( time, value ) ->
+            promise = promiseClass!
+            Simple time, -> resolve( promise, value )
+            return promise
+    }
+)
 
-    return promise
+do
 
--- https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/race
-Promise.Race = Promise.race = ( promises ) ->
-    promise = Promise!
+    -- Few aliases for instance methods
+    base = promiseClass.__base
+    base.finally = base.Finally
+    base.catch = base.Catch
 
-    count = #promises
-    if count == 0
-        return promise
+-- Lower case aliases for static methods
+environment.async = promiseClass.async = promiseClass.Async
+promiseClass.resolve = promiseClass.Resolve
+promiseClass.reject = promiseClass.Reject
+promiseClass.all = promiseClass.All
+promiseClass.allSettled = promiseClass.AllSettled
+promiseClass.any = promiseClass.Any
+promiseClass.race = promiseClass.Race
+promiseClass.delay = promiseClass.Delay
 
-    onResolve = ( value ) ->
-        try2resolve( promise, value )
-        return nil
+environment.Promise = promiseClass
+environment.safeAwait = safeAwait
+environment.await = await
 
-    onReject = ( reason ) ->
-        try2reject( promise, reason )
-        return nil
-
-    for index = 1, count
-        __then( promises[ index ], onResolve, onReject )
-
-    return promise
-
--- A custom delay feature that stops the promise chain for a specified amount of time
-Promise.Delay = Promise.delay = ( time, value ) ->
-    promise = Promise!
-    Simple time, -> resolve( promise, value )
-    return promise
-
-environment.Promise = Promise
-gpm.Logger\Loaded( "gm_promise v%s", Promise.VERSION )
+gpm.Logger\Loaded( "gm_promise v%s", promiseClass.VERSION )

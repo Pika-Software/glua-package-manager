@@ -38,10 +38,11 @@ do
 
         return length
 
-metatables = {}
+:isbool, :isnumber, :isstring, :isfunction = _G
+local argAssert, findMetaTable, registerMetaTable
 do
 
-    import FindMetaTable, RegisterMetaTable, rawset from _G
+    import FindMetaTable, RegisterMetaTable, TypeID, rawset, type from _G
     import Count from table
 
     static = {
@@ -74,7 +75,7 @@ do
         "bf_read": 26
         "ConVar": 27
         "IMesh": 28
-        "VMatrix": 29
+        "VMatrix": 29 -- approved by retr0
         "CSoundPatch": 30
         "pixelvis_handle_t": 31
         "dlight_t": 32
@@ -92,51 +93,79 @@ do
         "Color": 255
     }
 
-    setmetatable( metatables, {
-        __index: ( tbl, key ) ->
-            value = FindMetaTable( key )
-            unless istable( value )
+    metatables = {}
+
+    findMetaTable = util.FindMetaTable = ( name ) ->
+        argAssert( name, 1, "string" )
+
+        metatable = metatables[ name ]
+        unless metatable
+            metatable = FindMetaTable( name )
+            unless istable( metatable )
                 return nil
 
-            rawset( tbl, key, value )
-
-            if id := static[ key ]
-                rawset( value, "MetaID", id )
-            else
-                rawset( value, "MetaID", value.MetaID or ( Count( metatables ) + 256 ) )
-
-            rawset( value, "MetaName", key )
-            return value
-
-        __newindex: ( tbl, key, value ) ->
-            value = FindMetaTable( key ) or value
-            unless istable( value )
+            id = static[ name ] or rawget( metatable, "MetaID" ) or rawget( metatable, "__metatable_id" ) or ( 256 + Count( metatables ) )
+            if not isnumber( id ) or id < 0
                 return nil
 
+            rawset( metatable, "__metatable_id", id )
+            rawset( metatable, "__metatable_name", name )
+            rawset( metatable, "MetaName", name )
+            rawset( metatable, "MetaID", id )
+            metatables[ name ] = metatable
+
+        return metatable
+
+    registerMetaTable = util.RegisterMetaTable = ( name, new ) ->
+        argAssert( name, 1, "string" )
+        argAssert( new, 2, "table" )
+
+        old = findMetaTable( name )
+        unless old
             if RegisterMetaTable
-                RegisterMetaTable( key, value )
+                RegisterMetaTable( name, new )
 
-            rawset( tbl, key, value )
+            id = static[ name ] or rawget( new, "MetaID" ) or rawget( new, "__metatable_id" ) or ( 256 + Count( metatables ) )
+            if not isnumber( id ) or id < 0
+                return nil
 
-            if id := static[ key ]
-                rawset( value, "MetaID", id )
-            else
-                rawset( value, "MetaID", value.MetaID or ( Count( metatables ) + 256 ) )
+            rawset( new, "__metatable_id", id )
+            rawset( new, "__metatable_name", name )
+            rawset( new, "MetaName", name )
+            rawset( new, "MetaID", id )
+            metatables[ name ] = new
+            return new
 
-            rawset( value, "MetaName", key )
-            return nil
-    } )
+        if new ~= old
+            id = static[ name ] or rawget( old, "MetaID" ) or rawget( old, "__metatable_id" ) or ( 256 + Count( metatables ) )
+            if not isnumber( id ) or id < 0
+                return nil
 
-do
+            for key in pairs( old )
+                old[ key ] = nil
 
-    import type from _G
-    :TypeID = _G
+            setmetatable( old, { __index: new, __newindex: new } )
+
+            rawset( old, "__metatable_name", name )
+            rawset( old, "__metatable_id", id )
+            rawset( old, "MetaName", name )
+            rawset( old, "MetaID", id )
+
+        return old
 
     type_fn = environment.type = ( any ) ->
+        local name
+
         metatable = getmetatable( any )
         if metatable
-            if name := rawget( metatable, "MetaName" )
-                return name
+            cls = rawget( metatable, "__class" )
+            if cls
+                name = rawget( cls, "__name" )
+            else
+                name = rawget( metatable, "__metatable_name" ) or rawget( metatable, "MetaName" )
+
+        if name
+            return name
 
         return type( any )
 
@@ -148,7 +177,8 @@ do
         environment.TypeID = ( any ) ->
             metatable = getmetatable( any )
             if metatable
-                if id := rawget( metatable, "MetaID" )
+                id = rawget( metatable, "__metatable_id" )
+                if id
                     return id
 
             return TypeID( any )
@@ -158,18 +188,154 @@ do
         environment.TypeID = ( any ) ->
             metatable = getmetatable( any )
             if metatable
-                if id := rawget( metatable, "MetaID" )
+                id = rawget( metatable, "__metatable_id" )
+                if id
                     return id
 
             -- TYPE_TABLE
             return 5
 
-:isbool, :isnumber, :isstring, :isfunction = _G
+    environment.isinstance = environment.instanceof = ( any, a, b, ... ) ->
+        if isstring( a )
+            if isstring( b )
+                a = { a, b, ... }
+            else
+                return type_fn( any ) == a
+
+        name = type_fn( any )
+        for str in *a
+            if name == str
+                return true
+
+        return false
+
+    argAssert = environment.ArgAssert = ( value, num, expected, errorlevel = 3 ) ->
+        name = type_fn( value )
+
+        if name == expected
+            return value
+
+        elseif isfunction( expected )
+            ok, expected = expected( value, num, name )
+            if ok
+                return value
+
+        elseif istable( expected )
+            length = #expected
+            for index = 1, length
+                if name == expected[ index ]
+                    return value
+
+            expected = "[ " .. concat( expected, "/", 1, length ) .. " ]"
+
+        error( "bad argument #" .. num .. " to \'" .. ( getinfo( 2, "n" ).name or "unknown" ) .. "\' (" .. expected .. " expected, got " .. name .. ")", errorlevel )
+        return nil
+
+local luaClass
+do
+
+    tostring_class = ( cls ) ->
+        return format( "@class '%s': %p", cls.__name, cls )
+
+    tostring_object = ( obj ) ->
+        return format( "@object '%s': %p", obj.__class.__name, obj )
+
+    luaClass = environment.class = ( name, base, static, parent ) ->
+        argAssert( name, 1, "string" )
+
+        if base
+            argAssert( base, 2, "table" )
+        else
+            base = {}
+
+        if static
+            argAssert( static, 3, "table" )
+        else
+            static = {}
+
+        if base.__index == nil
+            base.__index = base
+
+        init = base.new
+        base.new = nil
+
+        if parent == nil
+            setmetatable( static, {
+                __tostring: tostring_class
+                __index: base
+
+                __call: ( cls, ... ) ->
+                    obj = setmetatable( {}, base )
+
+                    :__init = cls
+                    if __init
+                        obj = __init( obj, ... ) or obj
+
+                    return obj
+            } )
+
+        else
+            argAssert( parent, 4, "table" )
+
+            if parent.__class == nil
+                if parent.__base == nil
+                    error "invalid parent", 2
+            else
+                parent = parent.__class
+
+            parent_base = parent.__base
+            setmetatable( base, parent_base )
+
+            if init == nil
+                init = ( obj, ... ) ->
+                    return static.__parent.__init( obj, ... )
+
+            for key, value in pairs( parent_base )
+                if sub( key, 1, 2 ) == "__" and rawget( base, key ) == nil and not ( key == "__index" and value == parent_base )
+                    base[ key ] = value
+
+            static.__parent = parent
+
+            setmetatable( static, {
+                __tostring: tostring_class
+
+                __call: ( cls, ... ) ->
+                    obj = setmetatable( {}, base )
+
+                    :__init = cls
+                    if __init
+                        obj = __init( obj, ... ) or obj
+
+                    return obj
+
+                __index: ( cls, key ) ->
+                    value = rawget( base, key )
+                    if value == nil
+                        parent = rawget( cls, "__parent" )
+                        if parent
+                            value = parent[ key ]
+
+                    return value
+            } )
+
+        static.__init = init
+        static.__name = name
+        static.__base = base
+
+        if base.__tostring == nil
+            base.__tostring = tostring_object
+
+        base.__class = static
+
+        if parent ~= nil and parent.__inherited
+            parent.__inherited( parent, static )
+
+        return static
+
 do
 
     getmetatabled = debug.getmetatable or getmetatable
     setmetatabled = debug.setmetatable or setmetatable
-    import type from _G
 
     -- nil
     object = nil
@@ -180,9 +346,7 @@ do
             metatable = {}
             setmetatabled( object, metatable )
 
-        metatables[ "nil" ] = metatable
-        rawset( metatable, "MetaName", "nil" )
-        rawset( metatable, "MetaID", 0 )
+        registerMetaTable( "nil", metatable )
 
     -- boolean
     object = false
@@ -193,16 +357,10 @@ do
             metatable = {}
             setmetatabled( object, metatable )
 
-        metatables[ "boolean" ] = metatable
-        rawset( metatable, "MetaName", "boolean" )
-        rawset( metatable, "MetaID", 1 )
+        registerMetaTable( "boolean", metatable )
 
         isbool = ( any ) ->
             return getmetatable( any ) == metatable
-
-    unless isbool
-        isbool = ( any ) ->
-            return type( any ) == "boolean"
 
     environment.isbool = isbool
 
@@ -215,16 +373,10 @@ do
             metatable = {}
             setmetatabled( object, metatable )
 
-        metatables[ "number" ] = metatable
-        rawset( metatable, "MetaName", "number" )
-        rawset( metatable, "MetaID", 3 )
+        registerMetaTable( "number", metatable )
 
         isnumber = ( any ) ->
             return getmetatable( any ) == metatable
-
-    unless isnumber
-        isnumber = ( any ) ->
-            return type( any ) == "number"
 
     environment.isnumber = isnumber
 
@@ -237,16 +389,10 @@ do
             metatable = {}
             setmetatabled( object, metatable )
 
-        metatables[ "string" ] = metatable
-        rawset( metatable, "MetaName", "string" )
-        rawset( metatable, "MetaID", 4 )
+        registerMetaTable( "string", metatable )
 
         isstring = ( any ) ->
             return getmetatable( any ) == metatable
-
-    unless isstring
-        isstring = ( any ) ->
-            return type( any ) == "string"
 
     environment.isstring = isstring
 
@@ -259,16 +405,17 @@ do
             metatable = {}
             setmetatabled( object, metatable )
 
-        metatables[ "function" ] = metatable
-        rawset( metatable, "MetaName", "function" )
-        rawset( metatable, "MetaID", 6 )
+        registerMetaTable( "function", metatable )
 
         isfunction = ( any ) ->
             return getmetatable( any ) == metatable
 
-    unless isfunction
-        isfunction = ( any ) ->
-            return type( any ) == "function"
+        environment.iscallable = ( obj ) ->
+            tbl = getmetatable( obj )
+            if tbl and ( tbl == metatable or tbl.__call )
+                return true
+
+            return false
 
     environment.isfunction = isfunction
 
@@ -284,55 +431,10 @@ do
             metatable = {}
             setmetatabled( object, metatable )
 
-        metatables[ "thread" ] = metatable
-        rawset( metatable, "MetaName", "thread" )
-        rawset( metatable, "MetaID", 8 )
+        registerMetaTable( "thread", metatable )
 
         environment.isthread = ( any ) ->
             return getmetatable( any ) == metatable
-
-do
-
-    fn_meta = metatables[ "function" ]
-
-    environment.iscallable = ( obj ) ->
-        metatable = getmetatable( obj )
-        if metatable and ( metatable == fn_meta or metatable.__call )
-            return true
-
-        return false
-
-util.FindMetaTable = ( name ) ->
-    assert( isstring( name ), "bad argument #1 to \'util.FindMetaTable\' (string expected)" )
-    return metatables[ name ]
-
-util.RegisterMetaTable = ( name, new, id ) ->
-    assert( isstring( name ), "bad argument #1 to \'util.RegisterMetaTable\' (string expected)" )
-    assert( istable( new ), "bad argument #2 to \'util.RegisterMetaTable\' (table expected)" )
-    assert( isnumber( id ) and id > 255 or id == nil, "bad argument #3 to \'util.RegisterMetaTable\' (number expected)" )
-
-    old = metatables[ name ]
-    unless old
-        metatables[ name ] = new
-        id = new.MetaID = id or new.MetaID or -1
-        return id
-
-    id = id or old.MetaID
-
-    if old ~= new
-        for key in pairs( old )
-            old[ key ] = nil
-
-        for key, value in pairs( new )
-            old[ key ] = value
-
-        old.MetaName = name
-        old.MetaID = id
-
-        new.MetaName = name
-        new.MetaID = id
-
-    return id
 
 debug.fcall = ( func, ... ) ->
     return func( ... )
@@ -369,33 +471,6 @@ do
             return gsub( gsub( sub( info.source, 2 ), "^(.-)(lua/.*)$", lff ), "^(.-)([%w_]+/gamemode/.*)$", lff )
 
         return ""
-
-local ArgAssert
-do
-
-    import type from environment
-
-    ArgAssert = environment.ArgAssert = ( value, num, expected, errorlevel = 3 ) ->
-        name = type( value )
-
-        if name == expected
-            return value
-
-        elseif isfunction( expected )
-            ok, expected = expected( value, num, name )
-            if ok
-                return value
-
-        elseif istable( expected )
-            length = #expected
-            for index = 1, length
-                if name == expected[ index ]
-                    return value
-
-            expected = "[ " .. concat( expected, "/", 1, length ) .. " ]"
-
-        error( "bad argument #" .. num .. " to \'" .. ( getinfo( 2, "n" ).name or "unknown" ) .. "\' (" .. expected .. " expected, got " .. name .. ")", errorlevel )
-        return nil
 
 -- string
 string.slice = sub
@@ -817,316 +892,242 @@ do
 
 do
 
-    import abs, clamp, floor from math
+    import abs, clamp, floor, lerp from math
     import rshift, band from _G.bit
     import tonumber from _G
     import char from string
 
-    metatable = metatables.Color
-    environment.TYPE_COLOR = metatable.TypeID
+    -- color correction credits goes to 0x00000ED (https://github.com/0x00000ED)
+    colorCorrection = {
+        [0]: 0, 5, 8, 10, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
+        22, -- lost 15
+        23, 24, 25, 26, 27, 28,
+        28, -- lost 22
+        29, 30, 31, 32, 33, 34, 35,
+        35, -- lost 30
+        36, 37, 38, 39, 40, 41, 42,
+        42, -- lost 38
+        43, 44, 45, 46, 47, 48, 49, 50, 51,
+        51, -- lost 48
+        52, 53, 54, 55, 56, 57, 58, 59, 60,
+        60, -- lost 58
+        61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73,
+        73, -- lost 72
+        74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88,
+        88, -- lost 88
+        89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109,
+        109, -- lost 110
+        111,
+        111, -- lost 112
+        113,
+        113, -- lost 114
+        114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132,
+        133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151,
+        152, 153, 154, 155, 156, 157,
+        157, -- lost 159
+        158, 159, 160, 162, 163, 164, 165,
+        165, -- lost 167
+        167, 168,
+        168, -- lost 170
+        170,
+        170, -- lost 172
+        172,
+        172, -- lost 174
+        174,
+        174, -- lost 176
+        176, 177,
+        177, -- lost 179
+        178, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197,
+        198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216,
+        217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 236, 237,
+        237, -- lost 238
+        238, 239, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255
+    }
 
-    environment.Color = setmetatable(
+    base = findMetaTable( "Color" )
+    environment.TYPE_COLOR = base.__metatable_id
+    vconst = 1 / 255
+
+    local colorClass
+    internal = setmetatable(
         {
-            FromHex: ( hex ) ->
-                if isnumber( hex )
-                    return setmetatable( {
-                        r: rshift( band( hex, 0xFF0000 ), 16 ),
-                        g: rshift( band( hex, 0xFF00 ), 8 ),
-                        b: band( hex, 0xFF )
-                    }, metatable )
+            __tostring: =>
+                return format( "%d %d %d %d", @r, @g, @b, @a )
 
-                if byte( hex, 1 ) == 0x23 --[[ # ]]
-                    hex = sub( hex, 2 )
+            __eq: base.__eq
 
-                local r, g, b
-                switch len( hex )
-                    when 3
-                        r, g, b = byte( hex, 1, 3 )
-                        r = tonumber( char( r, r ), 16 )
-                        g = tonumber( char( g, g ), 16 )
-                        b = tonumber( char( b, b ), 16 )
+            __unm: =>
+                return @Copy!\Invert!
 
-                    when 6
-                        r = tonumber( sub( hex, 1, 2 ), 16 )
-                        g = tonumber( sub( hex, 3, 4 ), 16 )
-                        b = tonumber( sub( hex, 5, 6 ), 16 )
+            __add: ( color ) =>
+                return colorClass( @r + color.r, @g + color.g, @b + color.b, @a + color.a )
 
-                    else
-                        error "invalid hex color: " .. hex
+            __sub: ( color ) =>
+                return colorClass( @r - color.r, @g - color.g, @b - color.b, @a - color.a )
 
-                return setmetatable( { :r, :g, :b, a: 255 }, metatable )
+            __mul: ( other ) =>
+                if isnumber( other )
+                    return colorClass( @r * other, @g * other, @b * other, @a * other )
 
-            FromBinary: ( binary ) ->
-                local color
-                switch len( binary )
-                    when 1
-                        color = {
-                            r: byte( binary, 1 ),
-                            g: 0,
-                            b: 0,
-                            a: 255
-                        }
+                return colorClass( @r * other.r, @g * other.g, @b * other.b, @a * other.a )
 
-                    when 2
-                        color = {
-                            r: byte( binary, 1 ),
-                            g: byte( binary, 2 ),
-                            b: 0,
-                            a: 255
-                        }
+            __div: ( other ) =>
+                if isnumber( other )
+                    return colorClass( @r / other, @g / other, @b / other, @a / other )
 
-                    when 3
-                        color = {
-                            r: byte( binary, 1 ),
-                            g: byte( binary, 2 ),
-                            b: byte( binary, 3 ),
-                            a: 255
-                        }
+                return colorClass( @r / other.r, @g / other.g, @b / other.b, @a / other.a )
 
-                    else
-                        color = {
-                            r: byte( binary, 1 ),
-                            g: byte( binary, 2 ),
-                            b: byte( binary, 3 ),
-                            a: byte( binary, 4 )
-                        }
+            __lt: ( other ) =>
+                return ( @r + @g + @b + @a ) < ( other.r + other.g + other.b + other.a )
 
-                return setmetatable( color, metatable )
+            __le: ( other ) =>
+                return ( @r + @g + @b + @a ) <= ( other.r + other.g + other.b + other.a )
 
-            FromVector: ( vector ) ->
-                return setmetatable( {
-                    r: vector[ 1 ] * 255,
-                    g: vector[ 2 ] * 255,
-                    b: vector[ 3 ] * 255,
-                    a: 255
-                }, metatable )
+            __concat: ( value ) =>
+                return @ToHex! .. tostring( value )
 
-            FromHSL: ( hue, saturation, lightness ) ->
-                return setmetatable( HSLToColor( hue, saturation, lightness ), metatable )
-
-            FromHSV: ( hue, saturation, brightness ) ->
-                return setmetatable( HSVToColor( hue, saturation, brightness ), metatable )
-
-            FromHWB: ( hue, saturation, brightness ) ->
-                return setmetatable( HSVToColor( hue, 1 - saturation / ( 1 - brightness ), 1 - brightness ), metatable )
-
-            FromCMYK: ( cyan, magenta, yellow, black ) ->
-                cyan, magenta, yellow, black = cyan * 0.01, magenta * 0.01, yellow * 0.01, black * 0.01
-                mk = 1 - black
-
-                return setmetatable( {
-                    r: ( 1 - cyan ) * mk * 255,
-                    g: ( 1 - magenta ) * mk * 255,
-                    b: ( 1 - yellow ) * mk * 255,
-                    a: 255
-                }, metatable )
-
-            FromTable: ( tbl ) ->
-                return setmetatable( { r: tbl[ 1 ] or 0, g: tbl[ 2 ] or 0, b: tbl[ 3 ] or 0, a: tbl[ 4 ] or 255 }, metatable )
-
-        },
-        {
-            __call: ( r, g, b, a ) =>
+            new: ( r, g, b, a ) =>
                 if istable( r )
                     a = a or r[ 4 ] or r.a
                     b = b or r[ 3 ] or r.b
                     g = g or r[ 2 ] or r.g
                     r = r[ 1 ] or r.r
 
-                return setmetatable( { r: r or 0, g: g or 0, b: b or 0, a: a or 255 }, metatable )
+                r or= 0
+                g or= 0
+                b or= 0
+                a or= 255
+
+                @r = clamp( r, 0, 255 )
+                @g = clamp( g, 0, 255 )
+                @b = clamp( b, 0, 255 )
+                @a = clamp( a, 0, 255 )
+
+            DoCorrection: =>
+                @r = colorCorrection[ @r ]
+                @g = colorCorrection[ @g ]
+                @b = colorCorrection[ @b ]
+                return @
+
+            Copy: =>
+                return colorClass( @r, @g, @b, @a )
+
+            ToTable: =>
+                return { @r, @g, @b, @a }
+
+            ToHex: =>
+                return format( "#%02x%02x%02x", @r, @g, @b )
+
+            ToBinary: =>
+                return char( @r, @g, @b, @a )
+
+            ToVector: =>
+                return Vector( @r * vconst, @g * vconst, @b * vconst )
+
+            ToHSL: _G.ColorToHSL
+            ToHSV: _G.ColorToHSV
+
+            ToHWB: =>
+                hue, saturation, brightness = @ToHSV!
+                return hue, ( 100 - saturation ) * brightness, 100 - brightness
+
+            ToCMYK: =>
+                m = max( @r, @g, @b )
+                return ( m - @r ) / m * 100, ( m - @g ) / m * 100, ( m - @b ) / m * 100, min( @r, @g, @b ) / 2.55
+
+            Lerp: ( color, frac ) =>
+                frac = clamp( frac, 0, 1 )
+                return colorClass( lerp( frac, @r, color.r ), lerp( frac, @g, color.g ), lerp( frac, @b, color.b ), lerp( frac, @a, color.a ) )
+
+            LerpTo: ( color, frac ) =>
+                frac = clamp( frac, 0, 1 )
+                @r = lerp( frac, @r, color.r )
+                @g = lerp( frac, @g, color.g )
+                @b = lerp( frac, @b, color.b )
+                @a = lerp( frac, @a, color.a )
+                return @
+
+            Invert: =>
+                @r, @g, @b = clamp( abs( 255 - @r ), 0, 255 ), clamp( abs( 255 - @g ), 0, 255 ), clamp( abs( 255 - @b ), 0, 255 )
+                return @
+
+        },
+        {
+            __index: base,
+            __newindex: base
         }
     )
 
-    do
-
-        -- color correction credits goes to 0x00000ED (https://github.com/0x00000ED)
-        colorCorrection = {
-            [0]: 0, 5, 8, 10, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
-            22, -- lost 15
-            23, 24, 25, 26, 27, 28,
-            28, -- lost 22
-            29, 30, 31, 32, 33, 34, 35,
-            35, -- lost 30
-            36, 37, 38, 39, 40, 41, 42,
-            42, -- lost 38
-            43, 44, 45, 46, 47, 48, 49, 50, 51,
-            51, -- lost 48
-            52, 53, 54, 55, 56, 57, 58, 59, 60,
-            60, -- lost 58
-            61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73,
-            73, -- lost 72
-            74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88,
-            88, -- lost 88
-            89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109,
-            109, -- lost 110
-            111,
-            111, -- lost 112
-            113,
-            113, -- lost 114
-            114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132,
-            133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151,
-            152, 153, 154, 155, 156, 157,
-            157, -- lost 159
-            158, 159, 160, 162, 163, 164, 165,
-            165, -- lost 167
-            167, 168,
-            168, -- lost 170
-            170,
-            170, -- lost 172
-            172,
-            172, -- lost 174
-            174,
-            174, -- lost 176
-            176, 177,
-            177, -- lost 179
-            178, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197,
-            198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216,
-            217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 236, 237,
-            237, -- lost 238
-            238, 239, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255
-        }
-
-        metatable.DoCorrection = =>
-            @r = colorCorrection[ @r ]
-            @g = colorCorrection[ @g ]
-            @b = colorCorrection[ @b ]
-            return @
-
-    metatable.Copy = =>
-        return setmetatable( { r: @r, g: @g, b: @b, a: @a }, metatable )
-
-    do
-
-        fixNumber = ( number ) ->
-            return clamp( floor( number ), 0, 255 )
-
-        metatable.Fix = =>
-            @r = fixNumber( @r )
-            @g = fixNumber( @g )
-            @b = fixNumber( @b )
-            return @
-
-    metatable.ToTable = =>
-        return { @r, @g, @b, @a }
-
-    metatable.ToHex = =>
-        return format( "#%02x%02x%02x", @r, @g, @b )
-
-    metatable.ToBinary = =>
-        return char( @r, @g, @b, @a )
-
-    do
-
-        vconst = 1 / 255
-
-        metatable.Normalize = =>
-            @r *= vconst
-            @g *= vconst
-            @b *= vconst
-            return @
-
-        metatable.ToVector = =>
-            return Vector( @r * vconst, @g * vconst, @b * vconst )
-
-    metatable.GetNormalized = =>
-        return @Copy!\Normalize!
-
-    metatable.ToHSL = _G.ColorToHSL
-    metatable.ToHSV = _G.ColorToHSV
-
-    metatable.ToHWB = =>
-        hue, saturation, brightness = @ToHSV!
-        return hue, ( 100 - saturation ) * brightness, 100 - brightness
-
-    metatable.ToCMYK = =>
-        m = max( @r, @g, @b )
-        return ( m - @r ) / m * 100, ( m - @g ) / m * 100, ( m - @b ) / m * 100, min( @r, @g, @b ) / 2.55
-
-    do
-
-        import lerp, clamp01 from math
-
-        metatable.Lerp = ( color, frac ) =>
-            frac = clamp01( frac )
-            return setmetatable( {
-                r: lerp( frac, @r, color.r ),
-                g: lerp( frac, @g, color.g ),
-                b: lerp( frac, @b, color.b ),
-                a: lerp( frac, @a, color.a )
-            }, metatable )
-
-        metatable.LerpTo = ( color, frac ) =>
-            frac = clamp01( frac )
-            @r = lerp( frac, @r, color.r )
-            @g = lerp( frac, @g, color.g )
-            @b = lerp( frac, @b, color.b )
-            @a = lerp( frac, @a, color.a )
-            return @
-
-    metatable.Invert = =>
-        @r, @g, @b = clamp( abs( 255 - @r ), 0, 255 ), clamp( abs( 255 - @g ), 0, 255 ), clamp( abs( 255 - @b ), 0, 255 )
-        return @
-
-    metatable.__unm = =>
-        return @Copy!\Invert!
-
-    metatable.__add = ( color ) =>
-        return setmetatable( {
-            r: clamp( @r + color.r, 0, 255 ),
-            g: clamp( @g + color.g, 0, 255 ),
-            b: clamp( @b + color.b, 0, 255 ),
-            a: clamp( @a + color.a, 0, 255 )
-        }, metatable )
-
-    metatable.__sub = ( color ) =>
-        return setmetatable( {
-            r: clamp( @r - color.r, 0, 255 ),
-            g: clamp( @g - color.g, 0, 255 ),
-            b: clamp( @b - color.b, 0, 255 ),
-            a: clamp( @a - color.a, 0, 255 )
-        }, metatable )
-
-    metatable.__mul = ( other ) =>
-        local r, g, b, a
-        if isnumber( other )
-            r, g, b, a = clamp( @r * other, 0, 255 ), clamp( @g * other, 0, 255 ), clamp( @b * other, 0, 255 ), clamp( @a * other, 0, 255 )
-        else
-            r, g, b, a = clamp( @r * other.r, 0, 255 ), clamp( @g * other.g, 0, 255 ), clamp( @b * other.b, 0, 255 ), clamp( @a * other.a, 0, 255 )
-
-        return setmetatable( { :r, :g, :b, :a }, metatable )
-
-    metatable.__div = ( other ) =>
-        local r, g, b, a
-        if isnumber( other )
-            r, g, b, a = clamp( @r / other, 0, 255 ), clamp( @g / other, 0, 255 ), clamp( @b / other, 0, 255 ), clamp( @a / other, 0, 255 )
-        else
-            r, g, b, a = clamp( @r / other.r, 0, 255 ), clamp( @g / other.g, 0, 255 ), clamp( @b / other.b, 0, 255 ), clamp( @a / other.a, 0, 255 )
-
-        return setmetatable( { :r, :g, :b, :a }, metatable )
-
-    metatable.__lt = ( other ) =>
-        return ( @r + @g + @b + @a ) < ( other.r + other.g + other.b + other.a )
-
-    metatable.__le = ( other ) =>
-        return ( @r + @g + @b + @a ) <= ( other.r + other.g + other.b + other.a )
-
-    metatable.__concat = ( value ) =>
-        return @ToHex! .. tostring( value )
-
     -- i really hate this
     environment.ColorAlpha = ( color, alpha ) ->
-        return setmetatable( { r: color.r, g: color.g, b: color.b, a: alpha }, metatable )
+        return colorClass( color.r, color.g, color.b, alpha )
 
     environment.IsColor = ( any ) ->
-        return getmetatable( any ) == metatable
+        return getmetatable( any ) == internal
 
     environment.iscolor = ( any ) ->
-        return getmetatable( any ) == metatable or ( istable( any ) and isnumber( any.r ) and isnumber( any.g ) and isnumber( any.b ) and isnumber( any.a ) )
+        return getmetatable( any ) == internal or ( istable( any ) and isnumber( any.r ) and isnumber( any.g ) and isnumber( any.b ) and isnumber( any.a ) )
+
+    colorClass = luaClass( "Color", internal, {
+        FromHex: ( hex ) ->
+            if isnumber( hex )
+                return colorClass( rshift( band( hex, 0xFF0000 ), 16 ), rshift( band( hex, 0xFF00 ), 8 ), band( hex, 0xFF ) )
+
+            if byte( hex, 1 ) == 0x23 --[[ # ]]
+                hex = sub( hex, 2 )
+
+            length = len( hex )
+            if length == 3
+                r, g, b = byte( hex, 1, 3 )
+                return colorClass( tonumber( char( r, r ), 16 ), tonumber( char( g, g ), 16 ), tonumber( char( b, b ), 16 ) )
+
+            if length == 6
+                return colorClass( tonumber( sub( hex, 1, 2 ), 16 ), tonumber( sub( hex, 3, 4 ), 16 ), tonumber( sub( hex, 5, 6 ), 16 ) )
+
+            return colorClass!
+
+        FromBinary: ( binary ) ->
+            length = len( binary )
+            if length == 1
+                return colorClass( byte( binary, 1 ), 0, 0, 255 )
+
+            if length == 2
+                return colorClass( byte( binary, 1 ), byte( binary, 2 ), 0, 255 )
+
+            if length == 3
+                return colorClass( byte( binary, 1 ), byte( binary, 2 ), byte( binary, 3 ), 255 )
+
+            return colorClass( byte( binary, 1 ), byte( binary, 2 ), byte( binary, 3 ), byte( binary, 4 ) )
+
+        FromVector: ( vector ) ->
+            return colorClass( vector[ 1 ] * 255, vector[ 2 ] * 255, vector[ 3 ] * 255, 255 )
+
+        FromHSL: ( hue, saturation, lightness ) ->
+            return colorClass( HSLToColor( hue, saturation, lightness ) )
+
+        FromHSV: ( hue, saturation, brightness ) ->
+            return colorClass( HSVToColor( hue, saturation, brightness ) )
+
+        FromHWB: ( hue, saturation, brightness ) ->
+            return colorClass( HSVToColor( hue, 1 - saturation / ( 1 - brightness ), 1 - brightness ) )
+
+        FromCMYK: ( cyan, magenta, yellow, black ) ->
+            cyan, magenta, yellow, black = cyan * 0.01, magenta * 0.01, yellow * 0.01, black * 0.01
+            mk = 1 - black
+
+            return colorClass( ( 1 - cyan ) * mk * 255, ( 1 - magenta ) * mk * 255, ( 1 - yellow ) * mk * 255, 255 )
+
+        FromTable: ( tbl ) ->
+            return colorClass( tbl )
+
+    }, luaClass( "ColorBase", base ) )
+
+    environment.Color = colorClass
 
 -- Stack
 do
 
-    class Stack
+    util.Stack = luaClass( "Stack", {
         __tostring: =>
             return format( "Stack: %p [%d/%d]", @, @pointer, @size )
 
@@ -1168,13 +1169,7 @@ do
 
             @pointer = 0
 
-    util.Stack = Stack
-
-    isStack = environment.IsStack = ( any ) ->
-        metatable = getmetatable( any )
-        return metatable and metatable.__class == Stack
-
-    util.RegisterMetaTable( "Stack", Stack.__base )
+    }, nil, nil, true )
 
 -- Queue
 do
@@ -1187,7 +1182,31 @@ do
 
     --]]
 
-    class Queue
+    enqueue = ( value ) =>
+        if @isFull!
+            return nil
+
+        rear = @rear + 1
+        @rear = rear
+        @[ rear ] = value
+
+    dequeue = =>
+        if @isEmpty!
+            return nil
+
+        front = @front
+        value = @[ front ]
+        @[ front ] = nil
+
+        front += 1
+        @front = front
+
+        if ( front * 2 ) >= @rear
+            @optimize!
+
+        return value
+
+    util.Queue = luaClass( "Queue", {
         __tostring: =>
             return format( "Queue: %p [%d/%d]", @, @pointer, @size )
 
@@ -1206,29 +1225,11 @@ do
         isFull: =>
             return @length! == @size
 
-        enqueue: ( value ) =>
-            if @isFull!
-                return nil
+        push: enqueue
+        pop: dequeue
 
-            rear = @rear + 1
-            @rear = rear
-            @[ rear ] = value
-
-        dequeue: =>
-            if @isEmpty!
-                return nil
-
-            front = @front
-            value = @[ front ]
-            @[ front ] = nil
-
-            front += 1
-            @front = front
-
-            if ( front * 2 ) >= @rear
-                @optimize!
-
-            return value
+        :enqueue
+        :dequeue
 
         get: ( index ) =>
             return @[ @front + index ]
@@ -1270,16 +1271,7 @@ do
                 front += 1
                 return front, @[ front ]
 
-        @__base.push = @__base.enqueue
-        @__base.pop = @__base.dequeue
-
-    util.Queue = Queue
-
-    isQueue = environment.IsQueue = ( any ) ->
-        metatable = getmetatable( any )
-        return metatable and metatable.__class == Queue
-
-    util.RegisterMetaTable( "Queue", Queue.__base )
+    }, nil, nil, true )
 
 -- Garry's Mod hooks
 do
@@ -1294,9 +1286,9 @@ do
         import IsEmpty from table
 
         lib.Add = ( eventName, identifier, func, priority ) ->
-            ArgAssert( eventName, 1, "string" )
-            ArgAssert( identifier, 2, "string" )
-            ArgAssert( func, 3, "function" )
+            argAssert( eventName, 1, "string" )
+            argAssert( identifier, 2, "string" )
+            argAssert( func, 3, "function" )
 
             if fenv := getfenv( 2 )
                 if pkg := fenv.__package
@@ -1307,8 +1299,8 @@ do
             return Add( eventName, identifier, func, priority )
 
         lib.Remove = ( eventName, identifier ) ->
-            ArgAssert( eventName, 1, "string" )
-            ArgAssert( identifier, 2, "string" )
+            argAssert( eventName, 1, "string" )
+            argAssert( identifier, 2, "string" )
 
             if fenv := getfenv( 2 )
                 if pkg := fenv.__package
@@ -1344,8 +1336,8 @@ do
         import unpack from table
 
         lib.Adjust = ( identifier, delay, repetitions, func ) ->
-            ArgAssert( identifier, 1, "string" )
-            ArgAssert( delay, 2, "number" )
+            argAssert( identifier, 1, "string" )
+            argAssert( delay, 2, "number" )
 
             if fenv := getfenv( 2 )
                 if pkg := fenv.__package
@@ -1363,10 +1355,10 @@ do
             return Adjust( identifier, delay, repetitions, func )
 
         lib.Create = ( identifier, delay, repetitions, func ) ->
-            ArgAssert( identifier, 1, "string" )
-            ArgAssert( delay, 2, "number" )
-            ArgAssert( repetitions, 3, "number" )
-            ArgAssert( func, 4, "function" )
+            argAssert( identifier, 1, "string" )
+            argAssert( delay, 2, "number" )
+            argAssert( repetitions, 3, "number" )
+            argAssert( func, 4, "function" )
 
             if fenv := getfenv( 2 )
                 if pkg := fenv.__package
@@ -1384,7 +1376,7 @@ do
             return Create( identifier, delay, repetitions, func )
 
         lib.Exists = ( identifier ) ->
-            ArgAssert( identifier, 1, "string" )
+            argAssert( identifier, 1, "string" )
 
             if fenv := getfenv( 2 )
                 if pkg := fenv.__package
@@ -1393,7 +1385,7 @@ do
             return Exists( identifier )
 
         lib.Pause = ( identifier ) ->
-            ArgAssert( identifier, 1, "string" )
+            argAssert( identifier, 1, "string" )
 
             if fenv := getfenv( 2 )
                 if pkg := fenv.__package
@@ -1402,7 +1394,7 @@ do
             return Pause( identifier )
 
         lib.Remove = ( identifier ) ->
-            ArgAssert( identifier, 1, "string" )
+            argAssert( identifier, 1, "string" )
 
             if fenv := getfenv( 2 )
                 if pkg := fenv.__package
@@ -1413,7 +1405,7 @@ do
             return Remove( identifier )
 
         lib.RepsLeft = ( identifier ) ->
-            ArgAssert( identifier, 1, "string" )
+            argAssert( identifier, 1, "string" )
 
             if fenv := getfenv( 2 )
                 if pkg := fenv.__package
@@ -1422,7 +1414,7 @@ do
             return RepsLeft( identifier )
 
         lib.Start = ( identifier ) ->
-            ArgAssert( identifier, 1, "string" )
+            argAssert( identifier, 1, "string" )
 
             if fenv := getfenv( 2 )
                 if pkg := fenv.__package
@@ -1431,7 +1423,7 @@ do
             return Start( identifier )
 
         lib.Stop = ( identifier ) ->
-            ArgAssert( identifier, 1, "string" )
+            argAssert( identifier, 1, "string" )
 
             if fenv := getfenv( 2 )
                 if pkg := fenv.__package
@@ -1440,7 +1432,7 @@ do
             return Stop( identifier )
 
         lib.TimeLeft = ( identifier ) ->
-            ArgAssert( identifier, 1, "string" )
+            argAssert( identifier, 1, "string" )
 
             if fenv := getfenv( 2 )
                 if pkg := fenv.__package
@@ -1449,7 +1441,7 @@ do
             return TimeLeft( identifier )
 
         lib.Toggle = ( identifier ) ->
-            ArgAssert( identifier, 1, "string" )
+            argAssert( identifier, 1, "string" )
 
             if fenv := getfenv( 2 )
                 if pkg := fenv.__package
@@ -1458,7 +1450,7 @@ do
             return Toggle( identifier )
 
         lib.UnPause = ( identifier ) ->
-            ArgAssert( identifier, 1, "string" )
+            argAssert( identifier, 1, "string" )
 
             if fenv := getfenv( 2 )
                 if pkg := fenv.__package
@@ -1474,7 +1466,7 @@ do
             return {}
 
         lib.NextTick = util.NextTick = ( func, ... ) ->
-            ArgAssert( func, 1, "function" )
+            argAssert( func, 1, "function" )
             args = { ... }
 
             Simple 0, ->

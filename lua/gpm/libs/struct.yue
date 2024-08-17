@@ -31,92 +31,84 @@ import string, math, table, tonumber, assert, ArgAssert, isstring, isnumber from
 import char, byte, len, sub, format, match, find, rep from string
 import trunc, floor, min, max, pow2, mod2 from math
 import concat, unpack from table
+luaClass = environment.class
 
 registry = {}
 _module_0 = { :registry }
 
 -- https://github.com/ToxicFrog/vstruct/blob/master/cursor.lua
-do
+_module_0.Cursor = luaClass( "Cursor", {
+    __tostring: =>
+        return format( "Cursor: %p [%d/%d]", @, @position, @size )
 
-    import getmetatable from _G
+    new: ( @data = "" ) =>
+        assert( isstring( data ), "data must be a string" )
+        @size = len( data )
+        @position = 0
+        @buffer = {}
 
-    class Cursor
-        __tostring: =>
-            return format( "Cursor: %p [%d/%d]", @, @position, @size )
+    Flush: =>
+        :buffer = @
 
-        new: ( @data = "" ) =>
-            assert( isstring( data ), "data must be a string" )
-            @size = len( data )
-            @position = 0
-            @buffer = {}
+        length = #buffer
+        if length == 0
+            return
 
-        Flush: =>
-            :buffer = @
+        :data, :position, :size = @
 
-            length = #buffer
-            if length == 0
-                return
+        if position > size
+            data ..= rep( "\0", position - size )
+            size = len( data )
 
-            :data, :position, :size = @
+        content = concat( buffer, "", 1, length )
 
-            if position > size
-                data ..= rep( "\0", position - size )
-                size = len( data )
+        for index = 1, length
+            buffer[ index ] = nil
 
-            content = concat( buffer, "", 1, length )
+        length = len( content )
+        data = sub( data, 1, position ) .. content .. sub( data, position + length + 1, size )
+        @position = position + length
+        @data, @size = data, len( data )
 
-            for index = 1, length
-                buffer[ index ] = nil
+    Seek: ( whence = "cur", offset = 0 ) =>
+        @Flush!
 
-            length = len( content )
-            data = sub( data, 1, position ) .. content .. sub( data, position + length + 1, size )
-            @position = position + length
-            @data, @size = data, len( data )
+        :position, :size = @
 
-        Seek: ( whence = "cur", offset = 0 ) =>
-            @Flush!
+        switch whence
+            when "cur"
+                position += offset
 
-            :position, :size = @
+            when "end"
+                position = size + offset
 
-            switch whence
-                when "cur"
-                    position += offset
+            when "set"
+                position = offset
 
-                when "end"
-                    position = size + offset
+            else
+                error "bad argument #1 to 'Seek' (invalid option)", 2
+                return nil
 
-                when "set"
-                    position = offset
+        position = @position = min( max( position, 0 ), size )
+        return position
 
-                else
-                    error "bad argument #1 to 'Seek' (invalid option)", 2
-                    return nil
+    Write: ( str ) =>
+        @buffer[] = str
 
-            position = @position = min( max( position, 0 ), size )
-            return position
+    Read: ( length = 1 ) =>
+        @Flush!
 
-        Write: ( str ) =>
-            @buffer[] = str
+        :position, :size = @
 
-        Read: ( length = 1 ) =>
-            @Flush!
+        if position > size
+            return nil, "eof"
 
-            :position, :size = @
+        if length == "*a"
+            length = size
 
-            if position > size
-                return nil, "eof"
-
-            if length == "*a"
-                length = size
-
-            @position = min( position + length, size )
-            return sub( @data, position + 1, position + length )
-
-    _module_0.Cursor = Cursor
-
-    _module_0.IsCursor = ( any ) ->
-        metatable = getmetatable( any )
-        return metatable and metatable.__class == Cursor
+        @position = min( position + length, size )
+        return sub( @data, position + 1, position + length )
+} )
 
 -- https://github.com/ToxicFrog/vstruct/blob/master/init.lua
 explode = _module_0.explode = ( number, size = 0 ) ->
@@ -1193,7 +1185,7 @@ do
     import gmatch from string
 
     -- https://github.com/ToxicFrog/vstruct/blob/master/ast/Node.lua
-    class Node
+    nodeClass = luaClass( "Node", {
         new: =>
             @size = 0
 
@@ -1216,20 +1208,21 @@ do
         WriteBits: ( bits, context ) =>
             for child in *@
                 child\WriteBits( bits, context )
+    } )
 
-    ast.Node = Node
+    ast.Node = nodeClass
 
     -- https://github.com/ToxicFrog/vstruct/blob/master/ast/List.lua
-    class List extends Node
-    ast.List = List
+    listClass = luaClass( "List", nil, nil, nodeClass )
+    ast.List = listClass
 
     -- https://github.com/ToxicFrog/vstruct/blob/master/ast/Table.lua
-    local Table
+    local tableClass
     do
 
-        import Read, ReadBits from Node
+        import Read, ReadBits from nodeClass
 
-        class Table extends Node
+        tableClass = luaClass( "Table", {
             Read: ( fileDescriptor ) =>
                 tbl = {}
                 Read( @, fileDescriptor, tbl )
@@ -1240,14 +1233,16 @@ do
                 ReadBits( @, bits, tbl )
                 return tbl
 
-        ast.Table = Table
+        }, nil, nodeClass )
+
+        ast.Table = tableClass
 
     -- https://github.com/ToxicFrog/vstruct/blob/master/ast/Number.lua
     -- A node that holds either a number, or a reference to an already-read, named field which contains a number.
-    local Number
+    local numberClass
     do
 
-        class Number extends Node
+        numberClass = luaClass( "Number", {
             new: ( text ) =>
                 if match( text, "^#" )
                     @key = sub( text, 2, len( text ) )
@@ -1279,15 +1274,17 @@ do
 
                 return true
 
-    ast.Number = Number
+        }, nil, nodeClass )
+
+    ast.Number = numberClass
 
     -- https://github.com/ToxicFrog/vstruct/blob/master/ast/Root.lua
-    local Root
+    local rootClass
     do
 
         import Host from endianness
 
-        class Root extends Node
+        rootClass = luaClass( "Root", {
             new: ( children ) =>
                 @[ 1 ] = children
                 @size = children.size
@@ -1302,10 +1299,12 @@ do
                 @[1]\Write( fileDescriptor, { :data, n: 1 } )
                 return nil
 
-    ast.Root = Root
+        }, nil, nodeClass )
+
+    ast.Root = rootClass
 
     -- https://github.com/ToxicFrog/vstruct/blob/master/ast/Repeat.lua
-    class Repeat extends Node
+    repeatClass = luaClass( "Repeat", {
         new: ( @count, @child ) =>
             if count.value and child.size
                 @size = count\Get( nil ) * child.size
@@ -1333,10 +1332,12 @@ do
             for _ = 1, @count\Get( data.data )
                 child\WriteBits( bits, data )
 
-    ast.Repeat = Repeat
+    }, nil, nodeClass )
+
+    ast.Repeat = repeatClass
 
     -- https://github.com/ToxicFrog/vstruct/blob/master/ast/Name.lua
-    local Name
+    local nameClass
     do
 
         import tostring from environment
@@ -1378,7 +1379,7 @@ do
                 n: 1
             }
 
-        class Name extends Node
+        nameClass = luaClass( "Name", {
             new: ( @key, @child ) =>
                 @size = child.size
 
@@ -1396,10 +1397,12 @@ do
                 @child\WriteBits( bits, get( context, @key ) )
                 return nil
 
-    ast.Name = Name
+        }, nil, nodeClass )
+
+    ast.Name = nameClass
 
     -- https://github.com/ToxicFrog/vstruct/blob/master/ast/Bitpack.lua
-    local Bitpack
+    local bitpackClass
     do
 
         -- return an iterator over the individual bits in buffer
@@ -1440,7 +1443,7 @@ do
                 if bit0 == 7
                     index += delta
 
-        class Bitpack extends Node
+        bitpackClass = luaClass( "Bitpack", {
             new: ( size ) =>
                 @size = 0
                 @total_size = size
@@ -1463,10 +1466,12 @@ do
                 @WriteBits( bitpacker( buffer, @size ), context )
                 fileDescriptor\Write( char( unpack( buffer ) ) )
 
-    ast.Bitpack = Bitpack
+        }, nil, nodeClass )
+
+    ast.Bitpack = bitpackClass
 
     -- https://github.com/ToxicFrog/vstruct/blob/master/ast/IO.lua
-    class IO extends Node
+    ioClass = luaClass( "IO", {
         new: ( @name, args ) =>
             argv, n = { has_backrefs: false }, 0
 
@@ -1482,7 +1487,7 @@ do
 
                     elseif match( arg, "^#[%a_][%w_.]*$" )
                         argv.has_backrefs = true
-                        argv[ n ] = Number( arg )
+                        argv[ n ] = numberClass( arg )
 
                     else
                         argv[ n ] = arg
@@ -1539,7 +1544,9 @@ do
         GetArgvContext: ( context ) =>
             return @GetArgv( ( context.parent or context ).data )
 
-    ast.IO = IO
+    }, nil, nodeClass )
+
+    ast.IO = ioClass
 
     local iterator
     do
@@ -1571,14 +1578,14 @@ do
                 return ast_next( lex )
 
         ast_repetition = ast.repetition = ( lex ) ->
-            count = Number( lex.next!.text )
+            count = numberClass( lex.next!.text )
             ast_require( lex, "*" )
-            return Repeat( count, ast_next( lex ) )
+            return repeatClass( count, ast_next( lex ) )
 
         ast_group = ast.group = ( lex ) ->
             ast_require( lex, "(" )
 
-            group = List!
+            group = listClass!
             group.tag = "group"
 
             for value in ast_next_until( lex, ")" )
@@ -1593,7 +1600,7 @@ do
             ast_raw_table = ast.raw_table = ( lex ) ->
                 ast_require( lex, "{" )
 
-                group = Table!
+                group = tableClass!
 
                 for value in ast_next_until( lex, "}" )
                     group\Append( value )
@@ -1602,21 +1609,21 @@ do
                 return group
 
             ast_table = ast.table = ( lex ) ->
-                return Name( nil, ast_raw_table( lex ) )
+                return nameClass( nil, ast_raw_table( lex ) )
 
             ast_raw_io = ast.raw_io = ( lex ) ->
                 name = lex.next!.text
                 value = lex.peek!
 
                 if value and value.type == "number" and not lex.whitespace!
-                    return IO( name, lex.next!.text )
+                    return ioClass( name, lex.next!.text )
 
-                return IO( name, nil )
+                return ioClass( name, nil )
 
             ast_io = ast.io = ( lex ) ->
                 value = ast_raw_io( lex )
                 if value.hasvalue
-                    return Name( nil, value )
+                    return nameClass( nil, value )
 
                 return value
 
@@ -1627,13 +1634,13 @@ do
                     when "io"
                         value = ast_raw_io( lex )
                         if value.hasvalue
-                            return Name( name, value )
+                            return nameClass( name, value )
 
                         ast_error( lex, "value (io specifier or table) - format '" .. name .. "' has no value" )
                         return nil
 
                     when "{"
-                        return Name( name, ast_raw_table( lex ) )
+                        return nameClass( name, ast_raw_table( lex ) )
 
                 ast_error( lex, "value (io specifier or table)" )
                 return nil
@@ -1641,7 +1648,7 @@ do
         ast_bitpack = ast.bitpack = ( lex ) ->
             ast_require( lex, "[" )
 
-            bitpack = Bitpack( tonumber( ast_require( lex, "number" ).text ) )
+            bitpack = bitpackClass( tonumber( ast_require( lex, "number" ).text ) )
             ast_require( lex, "|" )
 
             for value in ast_next_until( lex, "]" )
@@ -1654,7 +1661,7 @@ do
         ast_control = ast.control = ( lex ) ->
             name = lex.next!.text
             ast_require( lex, ":" )
-            return Name( name, ast_next( lex ) )
+            return nameClass( name, ast_next( lex ) )
 
         ast_splice = ast.splice = ( lex ) ->
             name = lex.next!.text
@@ -1709,12 +1716,12 @@ do
         import lexer from _module_0
 
         ast.parse = ( source ) ->
-            root = List!
+            root = listClass!
 
             for node in iterator( lexer( source ) )
                 root\Append( node )
 
-            return Root( root )
+            return rootClass( root )
 
 -- https://github.com/ToxicFrog/vstruct/blob/master/api.lua
 api = _module_0.api = {}
