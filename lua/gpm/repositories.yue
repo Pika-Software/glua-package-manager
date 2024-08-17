@@ -143,17 +143,20 @@ do
 
         return nil
 
-searchPackages = repositories.SearchPackages = ( repository, pattern, version, withPattern ) ->
+sort_fn = ( a, b ) ->
+    return a.Version > b.Version
+
+searchPackages = repositories.SearchPackages = ( repository, name, version, withPattern ) ->
     latest = version == "latest"
     packages, count = {}, 0
 
     for package in *repository.Packages
-        if pattern
+        if name
             if withPattern
-                unless find( package.Name, pattern, 1, false )
+                unless find( package.Name, name, 1, false )
                     continue
 
-            elseif package.Name ~= pattern
+            elseif package.Name ~= name
                 continue
 
         if version and not ( latest or package.Version % version )
@@ -162,7 +165,7 @@ searchPackages = repositories.SearchPackages = ( repository, pattern, version, w
         count += 1
         packages[ count ] = package
 
-    sort( packages, ( a, b ) -> a.Version > b.Version )
+    sort( packages, sort_fn )
 
     if latest and count > 1
         for index = 2, count
@@ -249,10 +252,10 @@ updateRepository = repositories.UpdateRepository = async ( repository, map, patt
 
     return nil
 
-fetchRepository = repositories.FetchRepository = async ( repository, specifier, withPattern, offlineMode ) ->
+fetchRepository = repositories.FetchRepository = async ( repository, name, version, withPattern, offlineMode ) ->
     packages = repository.Packages
 
-    unless specifier
+    unless name or version
         if offline
             return packages
 
@@ -267,7 +270,6 @@ fetchRepository = repositories.FetchRepository = async ( repository, specifier, 
         await updateRepository( repository, map, nil, false )
         return packages
 
-    name, version = match( specifier, "^([^@]+)@(.+)$" )
     if offline
         return searchPackages( repository, name, version, withPattern )
 
@@ -282,11 +284,11 @@ fetchRepository = repositories.FetchRepository = async ( repository, specifier, 
     await updateRepository( repository, map, name, withPattern )
     return searchPackages( repository, name, version, withPattern )
 
-repositories.LookupRepositories = async ( specifier, offlineMode, withPattern = false ) ->
+repositories.LookupRepositories = async ( name, version, offlineMode, withPattern = false ) ->
     tasks, length = {}, 0
     for repository in *list
         length += 1
-        tasks[ length ] = fetchRepository( repository, specifier, withPattern, offlineMode )
+        tasks[ length ] = fetchRepository( repository, name, version, withPattern, offlineMode )
 
     if length == 0
         return tasks

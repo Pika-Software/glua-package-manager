@@ -6,11 +6,6 @@ import byte, sub, gsub, format, len, find from string
 import concat, remove from table
 import getinfo from debug
 
--- my cool math '^'
-math = setmetatable( _G.include( "gpm/libs/math.lua" ), table.SandboxMetatable( _G.math ) )
-import min, max from math
-environment.math = math
-
 do
 
     import running from coroutine
@@ -108,8 +103,8 @@ do
             if not isnumber( id ) or id < 0
                 return nil
 
-            rawset( metatable, "__metatable_id", id )
             rawset( metatable, "__metatable_name", name )
+            rawset( metatable, "__metatable_id", id )
             rawset( metatable, "MetaName", name )
             rawset( metatable, "MetaID", id )
             metatables[ name ] = metatable
@@ -129,8 +124,8 @@ do
             if not isnumber( id ) or id < 0
                 return nil
 
-            rawset( new, "__metatable_id", id )
             rawset( new, "__metatable_name", name )
+            rawset( new, "__metatable_id", id )
             rawset( new, "MetaName", name )
             rawset( new, "MetaID", id )
             metatables[ name ] = new
@@ -435,6 +430,11 @@ do
 
         environment.isthread = ( any ) ->
             return getmetatable( any ) == metatable
+
+-- my cool math '^'
+math = setmetatable( _G.include( "gpm/libs/math.lua" ), table.SandboxMetatable( _G.math ) )
+import min, max from math
+environment.math = math
 
 debug.fcall = ( func, ... ) ->
     return func( ... )
@@ -1053,10 +1053,11 @@ do
 
         },
         {
-            __index: base,
-            __newindex: base
+            __index: base
         }
     )
+
+    internal.__index = internal
 
     -- i really hate this
     environment.ColorAlpha = ( color, alpha ) ->
@@ -1120,7 +1121,7 @@ do
         FromTable: ( tbl ) ->
             return colorClass( tbl )
 
-    }, luaClass( "ColorBase", base ) )
+    } )
 
     environment.Color = colorClass
 
