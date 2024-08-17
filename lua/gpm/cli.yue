@@ -40,6 +40,21 @@ commands = {
 
         hint: ( args ) ->
     },
+    upgrade: {
+        help: "WIP"
+        call: ( args ) ->
+        hint: ( args ) ->
+    },
+    purge: {
+        help: "WIP"
+        call: ( args ) ->
+        hint: ( args ) ->
+    },
+    pull: {
+        help: "WIP"
+        call: ( args ) ->
+        hint: ( args ) ->
+    },
     list: {
         help: "Lists installed packages"
         call: ( args ) ->
