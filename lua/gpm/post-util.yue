@@ -832,7 +832,7 @@ do
         "Version",
         {
             __tostring: =>
-                return numbersToString( @major, @minor, @patch, @prerelease, @build )
+                return @__string
 
             new: ( major, minor, patch, preRelease, build ) =>
                 major, minor, patch, preRelease, build = parse( major, minor, patch, preRelease, build )
@@ -844,10 +844,11 @@ do
 
                 @major, @minor, @patch, @prerelease, @build = major, minor, patch, preRelease, build
                 versions[ str ] = @
+                @__string = str
                 return nil
 
             __eq: ( other ) =>
-                return @major == other.major and @minor == other.minor and @patch == other.patch and @prerelease == other.prerelease
+                return @__string == other.__string
 
             __lt: ( other ) =>
                 if @major ~= other.major
