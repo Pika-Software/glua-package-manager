@@ -217,6 +217,7 @@ do
             return new
     }
 
+    -- TODO: maybe allow urls and strings instead of just local file asyncompile?
     parse = async ( filePath, gamePath, config ) ->
         compileResult = await AsyncCompile( filePath, {}, config, gamePath, true )
         -- await Module.cache( "file://" .. compileResult.path, compileResult.content )
