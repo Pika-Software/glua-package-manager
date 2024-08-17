@@ -241,7 +241,7 @@ do
 
     emptyTable = {}
 
-    class Package
+    environment.Package = class Package
         __tostring: =>
             return format( "Package: %p [%s@%s]", @, @name, @version )
 
@@ -832,7 +832,7 @@ do
 
             old = sources[ protocol ]
             if old
-                Logger\Warn( "Protocol '#{protocol}' has been registered by '#{@}'. (was #{old})" )
+                Logger\Warn( "Protocol '#{protocol}' has been reregistered by '#{@}'. (was #{old})" )
 
             sources[ protocol ] = @
             Logger\Debug( "  - #{@} was registered for #{protocol}:"  )
@@ -844,7 +844,7 @@ do
             return sources[ protocol ]
 
         WorkingDirectory: ( url ) =>
-            return URL( path.join("file:///lua/gpm/vfs/modules/", string.PathFromURL(url), "") )
+            return URL( path.join("file:///lua/gpm/vfs/modules/", string.PathFromURL(url) ) .. "/" )
 
         --[[
 
