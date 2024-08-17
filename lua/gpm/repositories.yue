@@ -341,6 +341,6 @@ do
 
         return {
             Name: name,
-            URL: "file:///gpm/vfs/packages/" .. name .. "/" .. result,
+            URL: "file:///lua/gpm/vfs/packages/" .. name .. "/" .. result,
             Version: result
         }
