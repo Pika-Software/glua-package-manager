@@ -23,6 +23,7 @@ unless istable( list )
         if count == 0
             Query( "INSERT INTO `gpm.repository` ( URL ) VALUES ( 'https://raw.githubusercontent.com/Pika-Software/gpm-repositories/main/main.json' )" )
             list = Query( "SELECT * FROM `gpm.repository`" ) or {}
+            count = #list
 
         for index = 1, count
             repository = list[ index ]
@@ -197,19 +198,21 @@ syncSQL = repositories.SyncSQL = ( repository ) ->
     if CLIENT
         return nil
 
-    Query( "BEGIN;" )
-    repositoryID = repository.ID
-    Query( "INSERT OR REPLACE INTO `gpm.repository` ( ID, URL ) VALUES ( " .. repositoryID .. ", '" .. repository.URL .. "' )" )
+    -- TODO: WIP waiting retro's cool sql library
 
-    for package in *repository.Packages
-        packageID = package.ID
-        if packageID
-            Query( "INSERT OR REPLACE INTO `gpm.packages` ( ID, RepositoryID, URL, Installed ) VALUES ( " .. packageID .. ", " .. repositoryID .. ", '" .. package.URL .. "', " .. ( package.Installed and "1" or "0" ) .. " )" )
-        else
-            Query( "INSERT OR REPLACE INTO `gpm.packages` ( RepositoryID, Name, Version, URL ) VALUES ( " .. repositoryID .. ", '" .. package.Name .. "', '" .. tostring( package.Version ) .. "', '" .. package.URL .. "' )" )
+    -- Query( "BEGIN;" )
+    -- repositoryID = repository.ID
+    -- Query( "INSERT OR REPLACE INTO `gpm.repository` ( ID, URL ) VALUES ( " .. repositoryID .. ", '" .. repository.URL .. "' )" )
 
-    Query( "COMMIT;" )
-    return nil
+    -- for package in *repository.Packages
+    --     packageID = package.ID
+    --     if packageID
+    --         Query( "REPLACE INTO `gpm.packages` ( ID, Name, URL, Version, Installed, RepositoryID ) VALUES ( " .. packageID .. ", '" .. package.Name .. "', '" .. package.URL .. "', '" .. tostring( package.Version ) .. "', " .. ( package.Installed and 1 or 0 ) .. ", " .. repositoryID .. " )" )
+    --     else
+    --         Query( "INSERT INTO `gpm.packages` ( Name, URL, Version, Installed, RepositoryID ) VALUES ( '" .. package.Name .. "', '" .. package.URL .. "', '" .. tostring( package.Version ) .. "', " .. ( package.Installed and 1 or 0 ) .. ", " .. repositoryID .. " )" )
+
+    -- Query( "COMMIT;" )
+    -- return nil
 
 updateRepository = repositories.UpdateRepository = async ( repository, map, pattern, withPattern ) ->
     tasks, length = {}, 0

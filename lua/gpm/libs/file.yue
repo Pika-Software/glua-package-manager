@@ -368,9 +368,22 @@ do
 local append, read, write
 do
 
-    local open
+    legacy = util.FindMetaTable( "File" )
+    base = {}
+
     do
 
+        import getmetatable from _G
+
+        environment.isfile = ( any ) ->
+            metatable = getmetatable( any )
+            return metatable == base or metatable == legacy
+
+    local fileClass
+    do
+
+        import setmetatable from debug
+        luaClass = environment.class
         import Open from file
 
         writeModes = {
@@ -380,7 +393,7 @@ do
             ["wb"]: true
         }
 
-        open = lib.Open = ( filePath, fileMode, gamePath, skipNormalize ) ->
+        legacy.new = ( filePath, fileMode, gamePath, skipNormalize ) =>
             unless skipNormalize
                 if filePath == "memory" and not gamePath
                     return ByteStream!
@@ -392,48 +405,53 @@ do
                 if directoryPath ~= "" and directoryPath ~= "/"
                     createDir( directoryPath, true, gamePath, true )
 
-            return Open( filePath, fileMode, gamePath )
+            f = Open( filePath, fileMode, gamePath )
+            if f
+                setmetatable( f, @.__class.__base )
+                return true, f
 
-    File = util.FindMetaTable( "File" )
+            return true, nil
+
+        fileLegacyClass = luaClass( "File: Legacy", legacy )
+        lib.FileLegacy = fileLegacyClass
+
+        fileClass = luaClass( "File", base, nil, fileLegacyClass )
+        lib.File = fileClass
+
+        lib.Open = ( filePath, fileMode, gamePath, skipNormalize ) ->
+            return fileClass( filePath, fileMode, gamePath, skipNormalize )
+
+    import Close, Read, Write, EndOfFile from legacy
 
     do
 
-        import getmetatable from _G
-
-        environment.isfile = ( any ) ->
-            return getmetatable( any ) == File
-
-    import Close, Read, Write, EndOfFile from File
-
-    do
-
-        import ReadULong, WriteULong, ReadByte, WriteByte, Seek, Skip, Tell from File
+        import ReadULong, WriteULong, ReadByte, WriteByte, Seek, Skip, Tell from legacy
 
         do
 
             import tostring from _G
 
-            File.IsValid = ( fileHandle ) ->
+            base.IsValid = ( fileHandle ) ->
                 return tostring( fileHandle ) ~= "File [NULL]"
 
-        File.SeekToBegin = ( fileHandle ) ->
+        base.SeekToBegin = ( fileHandle ) ->
             return Seek( fileHandle, 0 )
 
         do
 
-            import Size from File
+            import Size from legacy
 
-            File.SeekToEnd = ( fileHandle ) ->
+            base.SeekToEnd = ( fileHandle ) ->
                 return Seek( fileHandle, Size( fileHandle ) )
 
-        File.SkipEmpty = ( fileHandle ) ->
+        base.SkipEmpty = ( fileHandle ) ->
             while not EndOfFile( fileHandle )
                 if ReadByte( fileHandle ) ~= 0
                     Skip( fileHandle, -1 )
                     break
 
         -- String
-        File.ReadString = ( fileHandle ) ->
+        base.ReadString = ( fileHandle ) ->
             startPos, length = Tell( fileHandle ), 0
             while not EndOfFile( fileHandle ) and ReadByte( fileHandle ) ~= 0
                 length += 1
@@ -443,41 +461,41 @@ do
             Skip( fileHandle, 1 )
             return data
 
-        File.WriteString = ByteStream.WriteString
+        base.WriteString = ByteStream.WriteString
 
         -- Line
-        File.WriteLine = ByteStream.WriteLine
+        base.WriteLine = ByteStream.WriteLine
 
-        unless File.ReadUInt64
-            File.ReadUInt64 = ( fileHandle ) ->
+        unless base.ReadUInt64
+            base.ReadUInt64 = ( fileHandle ) ->
                 number = ReadULong( fileHandle )
                 Skip( fileHandle, 4 )
                 return number
 
-        unless File.WriteUInt64
-            File.WriteUInt64 = ( fileHandle, number ) ->
+        unless base.WriteUInt64
+            base.WriteUInt64 = ( fileHandle, number ) ->
                 WriteULong( fileHandle, number )
                 WriteULong( fileHandle, 0 )
                 return
 
-        File.ReadAll = ( fileHandle ) ->
+        base.ReadAll = ( fileHandle ) ->
             Seek( fileHandle, 0 )
             return Read( fileHandle, Size( fileHandle ) )
 
         -- UnixTime
-        File.ReadTime = ByteStream.ReadTime
-        File.WriteTime = ByteStream.WriteTime
+        base.ReadTime = ByteStream.ReadTime
+        base.WriteTime = ByteStream.WriteTime
 
         -- ZipFile
-        File.ReadZipFile = ByteStream.ReadZipFile
-        File.WriteZipFile = ByteStream.WriteZipFile
+        base.ReadZipFile = ByteStream.ReadZipFile
+        base.WriteZipFile = ByteStream.WriteZipFile
 
         -- Color
-        File.ReadColor = ByteStream.ReadColor
-        File.WriteColor = ByteStream.WriteColor
+        base.ReadColor = ByteStream.ReadColor
+        base.WriteColor = ByteStream.WriteColor
 
     append = lib.Append = ( filePath, content, gamePath, skipNormalize ) ->
-        fileHandle = open( filePath, "ab", gamePath, skipNormalize )
+        fileHandle = fileClass( filePath, "ab", gamePath, skipNormalize )
         if fileHandle
             Write( fileHandle, content )
             Close( fileHandle )
@@ -486,12 +504,12 @@ do
         return false
 
     read = lib.Read = ( filePath, gamePath, length, skipNormalize ) ->
-        fileHandle = open( filePath, "rb", gamePath, skipNormalize )
+        fileHandle = fileClass( filePath, "rb", gamePath, skipNormalize )
         if fileHandle
             return Read( fileHandle, length ), Close( fileHandle )
 
     write = lib.Write = ( filePath, content, gamePath, skipNormalize ) ->
-        fileHandle = open( filePath, "wb", gamePath, skipNormalize )
+        fileHandle = fileClass( filePath, "wb", gamePath, skipNormalize )
         if fileHandle
             Write( fileHandle, content )
             Close( fileHandle )
@@ -501,11 +519,11 @@ do
 
     do
 
-        import ReadLine from File
+        import ReadLine from legacy
         import gsub from string
 
         readLines = lib.Lines = ( filePath, gamePath, skipNormalize ) ->
-            fileHandle = open( filePath, "rb", gamePath, skipNormalize )
+            fileHandle = fileClass( filePath, "rb", gamePath, skipNormalize )
             if fileHandle
                 lines, length = {}, 0
 
@@ -822,7 +840,6 @@ do
 
     import stripDirectory, getFileName, getExtension from path
     import load from environment
-    import Open from file
 
     extension2mode = {
         luac: "bt"
@@ -960,7 +977,7 @@ do
 do
 
     addon = environment.addon = include( "addon.lua" )
-    import File, IsFilePathAllowed from addon
+    import GMA, IsFilePathAllowed from addon
     import isstring from environment
     import equal from path
     import pairs from _G
@@ -990,7 +1007,7 @@ do
             uniqueName = content or uniqueName
             title, length = {}, 0
 
-            f = File!
+            gma = GMA!
             for fileName, fileContent in pairs( filePath )
                 ArgAssert( fileName, 1, "string" )
                 ArgAssert( fileContent, 2, "string" )
@@ -1005,17 +1022,17 @@ do
                 unless IsFilePathAllowed( subPath )
                     error FileSystemError "File '" .. subPath .. "' cannot be written.", 2
 
-                f\SetFile( subPath, fileContent, false )
+                gma\SetFile( subPath, fileContent, false )
 
                 length += 1
                 title[ length ] = fileName
 
             if isstring( uniqueName )
-                f\SetTitle( uniqueName )
+                gma\SetTitle( uniqueName )
             else
-                f\SetTitle( concat( title, ";", 1, length ) )
+                gma\SetTitle( concat( title, ";", 1, length ) )
 
-            return f\Mount( false )
+            return gma\Mount( false )
 
         ArgAssert( filePath, 1, "string" )
         ArgAssert( content, 2, "string" )
@@ -1029,14 +1046,14 @@ do
         unless IsFilePathAllowed( filePath )
             error FileSystemError "File '" .. filePath .. "' cannot be written.", 2
 
-        f = File!
+        gma = GMA!
         if isstring( uniqueName )
-            f\SetTitle( uniqueName )
+            gma\SetTitle( uniqueName )
         else
-            f\SetTitle( filePath )
+            gma\SetTitle( filePath )
 
-        f\SetFile( filePath, content, false )
-        return f\Mount( false )
+        gma\SetFile( filePath, content, false )
+        return gma\Mount( false )
 
     iterateZipFiles = lib.IterateZipFiles = ( fileHandle, doCRC ) ->
         unless fileHandle
@@ -1048,19 +1065,19 @@ do
             return fileHandle\ReadZipFile( doCRC )
 
     lib.MountGMAData = async ( data, uniqueName, verifyCRC ) ->
-        f = File( data, false )
+        gma = GMA( data, false )
 
-        if verifyCRC and not f\VerifyCRC!
-            error FileSystemError "Invalid CRC checksum for '" .. f\GetTitle! .. "'"
+        if verifyCRC and not gma\VerifyCRC!
+            error FileSystemError "Invalid CRC checksum for '" .. gma\GetTitle! .. "'"
 
         if uniqueName
-            f\SetTitle( uniqueName )
+            gma\SetTitle( uniqueName )
 
-        return f\AsyncMount( false )
+        return gma\AsyncMount( false )
 
     mountZIPData = lib.MountZIPData = async ( data, uniqueName ) ->
-        f = File!
-        f\SetTitle( uniqueName )
+        gma = GMA!
+        gma\SetTitle( uniqueName )
 
         local isInFolder, last
         temp = {}
@@ -1087,9 +1104,9 @@ do
 
         for filePath, content in pairs( files )
             if IsFilePathAllowed( filePath )
-                f\SetFile( filePath, content )
+                gma\SetFile( filePath, content )
 
-        return f\AsyncMount( false )
+        return gma\AsyncMount( false )
 
     asyncMount = async ( filePath, gamePath ) ->
         return await mountZIPData( await( asyncRead( filePath, gamePath, true ) ), "file:///" .. filePath )

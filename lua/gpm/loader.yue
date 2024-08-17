@@ -19,7 +19,7 @@ if SERVER
 
     import getCurrentFile, getCurrentDirectory, getFile from path
     import AsyncRead, Exists, LuaGamePaths from file
-    import File from environment.addon
+    import GMA from environment.addon
     import AddCSLuaFile from _G
 
     addFile = async ( filePath, gamePath, mountTable ) ->
@@ -60,13 +60,13 @@ if SERVER
         if IsEmpty( mountTable )
             return nil
 
-        f = File!
-        f\SetTitle( "gpm.ACSLF::" .. AbsoluteGamePath( filePath, gamePath ) )
+        gma = GMA!
+        gma\SetTitle( "gpm.ACSLF::" .. AbsoluteGamePath( filePath, gamePath ) )
 
         for fileName, content in pairs( mountTable )
-            f\SetFile( fileName, content, false )
+            gma\SetFile( fileName, content, false )
 
-        for fileName in *await( f\AsyncMount( false ) )
+        for fileName in *await( gma\AsyncMount( false ) )
             AddCSLuaFile( fileName )
 
         return nil

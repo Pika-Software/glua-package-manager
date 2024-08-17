@@ -225,7 +225,7 @@ do
     import stripFile, stripExtension from environment.path
     import MountZIPData from environment.file
     import ByteSplit from environment.string
-    import File from environment.addon
+    import GMA from environment.addon
     import error, URL from environment
 
     http.Fetch = ( url, headers, timeout ) ->
@@ -295,12 +295,12 @@ do
         filePath, extension = stripExtension( url.pathname )
 
         if extension == "gma"
-            f = File( result.body, true )
-            unless f\VerifyCRC!
+            gma = GMA( result.body, true )
+            unless gma\VerifyCRC!
                 error WebClientError "Invalid CRC checksum for '" .. url.href .. "'"
 
-            f\SetTitle( url.href )
-            return f\AsyncMount( false )
+            gma\SetTitle( url.href )
+            return gma\AsyncMount( false )
 
         if extension == "zip"
             return MountZIPData( result.body, url.href )
@@ -322,8 +322,8 @@ do
         else
             filePath = "data_static/gpm/downloads/" .. filePath .. extension .. ".dat"
 
-        f = File!
-        f\SetTitle( url.href )
-        f\AddFile( filePath, result.body, false )
-        await f\AsyncMount( false )
+        gma = GMA!
+        gma\SetTitle( url.href )
+        gma\AddFile( filePath, result.body, false )
+        await gma\AsyncMount( false )
         return filePath

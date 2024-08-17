@@ -264,7 +264,9 @@ do
 
                     :__init = cls
                     if __init
-                        obj = __init( obj, ... ) or obj
+                        override, new = __init( obj, ... )
+                        if override
+                            return new
 
                     return obj
             } )
@@ -299,7 +301,9 @@ do
 
                     :__init = cls
                     if __init
-                        obj = __init( obj, ... ) or obj
+                        override, new = __init( obj, ... )
+                        if override
+                            return new
 
                     return obj
 

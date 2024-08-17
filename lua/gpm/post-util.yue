@@ -840,12 +840,12 @@ do
 
                 version = versions[ str ]
                 if version and version.major == major and version.minor == minor and version.patch == patch and version.prerelease == preRelease and version.build == build
-                    return version
+                    return true, version
 
                 @major, @minor, @patch, @prerelease, @build = major, minor, patch, preRelease, build
                 versions[ str ] = @
                 @__string = str
-                return nil
+                return false, nil
 
             __eq: ( other ) =>
                 return @__string == other.__string

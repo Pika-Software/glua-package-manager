@@ -5,7 +5,7 @@ import await, async, SourceError, error from environment
 import BaseSource, BaseSourceHandler, Module from gpm.loader
 import MountZIPData from environment.file
 import CachedFetch from environment.http
-import File from environment.addon
+import GMA from environment.addon
 
 local getExtension
 do
@@ -128,12 +128,12 @@ class GMAHandler extends BaseSourceHandler
         return result.body
 
     Install: async ( url, data ) =>
-        f = File( data, url.href, true )
+        gma = GMA( data, url.href, true )
 
-        unless f\VerifyCRC!
+        unless gma\VerifyCRC!
             error SourceError "Invalid CRC checksum for '" .. url.href .. "'"
 
-        return await f\AsyncMount( false )
+        return await gma\AsyncMount( false )
 
 class ZIPHandler extends BaseSourceHandler
     ShouldHandle: ( url ) =>
