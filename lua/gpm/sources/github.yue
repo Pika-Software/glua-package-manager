@@ -1,25 +1,24 @@
 -- Seconds iteration of github source handler
-import path, string, table, http, util, loader from gpm -- libraries
-import isstring, istable, async, await from gpm -- functions
+import path, string, table, http, util, loader, file from gpm -- libraries
+import isstring, istable, async, await, pairs from gpm -- functions
+import URL, Package, SourceError from gpm -- classes
+
+-- TODO: Create GithubAPI class to handle requests
 
 -- url syntax: github:user/repo[/branch]
 -- github://[apiToken@]user/repo[/branch]
 class GithubSource extends loader.Source
     APIRequest = ( url, ... ) ->
+        args = { ... }
+        parts = string.IsURL( url ) and { url } or { "https://api.github.com", url }
         headers = { "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" }
-        if string.IsURL( url )
-            params = ...
-            if istable( params )
-                table.Merge( headers, params )
-        else
-            parts = { "https://api.github.com", url }
-            for arg in *{ ... }
-                if isstring( arg )
-                    parts[] = arg
-                elseif istable( arg )
-                    table.Merge( headers, arg )
+        for arg in *{ ... }
+            if isstring( arg )
+                parts[] = arg
+            elseif istable( arg )
+                table.Merge( headers, arg )
 
-            url = table.concat( parts, "/" )
+        url = table.concat( parts, "/" )
         
         res = await http.CachedFetch( url, headers )
         if res.status == 200
@@ -35,34 +34,51 @@ class GithubSource extends loader.Source
         res = APIRequest( "repos", user, repository, auth ) -- GET /repos/:owner/:repo
         return res.default_branch
 
-    WalkTreeForPackageInfo = ( tree ) ->
-        local subfolder
-        for entry in *tree
-            if entry.type == "blob" and string.match( entry.path, "^package%..+$" )
-                return entry
-
-            if entry.type == "tree" and ( entry.path == "lua" or entry.path == "packages" or entry.path == repository )
-                subfolder_url = entry.url
-                -- TODO: FINISH THIS
+    -- pattern: priority
+    PACKAGE_PATH_PRIORITIES = {
+        "^package%..+$": 10
+        "package.yue": 11
+        "package.moon": 12
+        "package.lua": 15
+        "package%..+": 20
+    }
 
     FindPackageInfo = ( user, repository, branch, auth ) ->
-        local file_url
-        local subfolder_url
-
-        res = APIRequest( "repos", user, repository, "git", "trees", branch, auth ) -- GET /repos/:owner/:repo/git/trees/:tree_sha
-        for entry in *res.tree
-            if entry.type == "blob" and string.match( entry.path, "^package%..+$" )
-                file_url = entry.url
-                break
-
-            if entry.path == "lua" or entry.path == "packages" or entry.path == repository
-                subfolder_url = entry.url
-    
-        -- No package.lua in root, lets walk through subfolders and try to find it
-
-
+        -- you might say, why recursive? well, github api rate limits us to 60 requests per hour, so we need to minimize them
+        res = APIRequest( "repos", user, repository, "git", "trees", branch .. "?recursive=1", auth ) -- GET /repos/:owner/:repo/git/trees/:tree_sha
         
-    
+        entries = []
+        for entry in *res.tree
+            if entry.type == "blob" and string.match( entry.path, "package%..+$" )
+                entries[] = entry
+
+        if #entries == 1
+            return entries[1]
+        
+        -- welp, we have multiple package.lua files, lets try to find the correct one
+        priority = math.huge -- 0 is the highest priority
+        package_entry = nil
+        for entry in *entries
+            for pattern, p in pairs PACKAGE_PATH_PRIORITIES
+                if string.match( entry.path, pattern )
+                    if pattern == entry.path
+                        p = p - 10 -- paths that match the exact pattern are more important
+                    
+                    if p < priority
+                        priority = p
+                        package_entry = entry
+                    
+                    -- TODO: check if we have duplicates (i.e packages/a/package.lua and packages/b/package.lua)
+
+        return package_entry
+
+    FetchFile = ( entry, auth ) ->
+        res = APIRequest( entry.url, auth ) -- GET /repos/:owner/:repo/git/blobs/:file_sha
+        return {
+            data: util.Base64Decode( res.content )
+            size: res.size
+            path: entry.path
+        }
 
     FetchInfo: async ( url ) =>
         segments = string.ByteSplit( url.pathname, 0x2F --[[ / ]] )
@@ -82,8 +98,29 @@ class GithubSource extends loader.Source
         unless branch
             error SourceError "Failed to get default branch for '#{user}/#{repository}'."
 
-        package_info_url = FindPackageInfo( user, repository, branch, auth )
+        package_entry = FindPackageInfo( user, repository, branch, auth )
+        unless package_entry
+                    error SourceError "Failed to find package file in #{user}/#{repository} (#{branch})."
+
+        res = FetchFile( package_entry, auth )
+        packageURL = URL( path.getFile( res.path ), @WorkingDirectory( url ) )
+        file.Set( packageURL.pathname, res.data )
+
+        pkg = await Package.read( packageURL )
+        unless pkg
+            error SourceError "Failed to read package file from #{packageURL}. (url = #{url})"
         
+        return {
+            package: pkg,
+            metadata: {
+                user: user,
+                repository: repository,
+                branch: branch,
+                auth: auth
+            }
+        }
+
+
 
 
 GithubSource( "github" )
