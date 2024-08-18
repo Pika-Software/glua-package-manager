@@ -1,7 +1,7 @@
 -- Seconds iteration of github source handler
 import path, string, table, http, util, loader, file from gpm -- libraries
-import isstring, istable, async, await, pairs from gpm -- functions
-import URL, Package, SourceError from gpm -- classes
+import isstring, istable, tostring, async, await, pairs from gpm -- functions
+import URL, Package, SourceError, Logger from gpm -- classes
 
 -- TODO: Create GithubAPI class to handle requests
 
@@ -94,6 +94,7 @@ class GithubSource extends loader.Source
         if url.username or url.password
             auth = { "Authorization": "Bearer " .. ( url.username or "" ) .. ( url.password or "" ) }
 
+        Logger\Debug( "Fetching information for Github repository '%s'...", table.concat(segments, "/") )
         branch = segments[ 3 ] or GetDefaultBranch( user, repository, auth )
         unless branch
             error SourceError "Failed to get default branch for '#{user}/#{repository}'."
@@ -104,7 +105,7 @@ class GithubSource extends loader.Source
 
         res = FetchFile( package_entry, auth )
         packageURL = URL( path.getFile( res.path ), @WorkingDirectory( url ) )
-        file.Set( packageURL.pathname, res.data )
+        file.Set( packageURL.pathname, res.data ) -- TODO: prevent overwriting existing files
 
         pkg = await Package.read( packageURL )
         unless pkg
@@ -112,14 +113,41 @@ class GithubSource extends loader.Source
         
         return {
             package: pkg,
+            url: url,
             metadata: {
                 user: user,
                 repository: repository,
                 branch: branch,
-                auth: auth
+                auth: auth,
+                package_entry: package_entry
             }
         }
 
+    Install: async ( info ) =>
+        Logger\Debug( "Installing package '%s@%s' from Github repository '%s/%s/%s'...", info.package.name, info.package.version, info.metadata.user, info.metadata.repository, info.metadata.branch )
+        -- TODO: cache files
+
+        res = await http.CachedFetch("https://api.github.com/repos/#{info.metadata.user}/#{info.metadata.repository}/zipball/#{info.metadata.branch}", info.metadata.auth)
+        if res.status != 200
+            error SourceError "Failed to fetch zipball from Github repository '#{info.metadata.user}/#{info.metadata.repository}/#{info.metadata.branch}' (#{res.status})."
+
+        root = path.getDirectory( info.metadata.package_entry.path )
+        rootLength = #root + 1 -- +1 to remove the trailing slash
+
+        for entry, err in file.IterateZipFiles( util.ByteStream(res.body), false ) -- entry: { path, content }
+            if err
+                Logger\Debug( "Skipping file from zipball '%s/%s/%s' with path '%s' and reason '%s'", info.metadata.user, info.metadata.repository, info.metadata.branch, entry.path, err )
+                continue
+            
+            -- first remove first directory from the path (appended by github)
+            entryPath = string.sub( entry.path, string.indexOf(entry.path, "/") + 1 )
+
+            -- then remove the root directory
+            entryPath = string.sub( entryPath, rootLength )
+            if entryPath == ""
+                continue
+
+            print("must mount", entryPath, #entry.content)
 
 
 
