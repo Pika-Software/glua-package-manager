@@ -857,8 +857,8 @@ do
             url.path[#url.path] == "" -- is directory
 
             -- GetWorkingDirectory( url: URL ) => URL file:/// *SHARED
-            -- FetchInfo { package: Package, metadata: {...} } *SERVER
-            -- Install *SERVER
+            -- FetchInfo( url: URL ) => { package: Package, url: URL, metadata: {...} } *SERVER
+            -- Install( info: DataFromFetchInfo ) *SERVER
 
             pkg = Package( ... )
             files = {...}
