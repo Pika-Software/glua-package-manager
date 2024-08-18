@@ -319,28 +319,29 @@ do
     repositories.FindPackage = async ( name, version, offlineMode, withPattern ) ->
         ArgAssert( name, 1, "string" )
 
+        _, folders = Find( "gpm/vfs/packages/" .. name .. "/*", "LUA" )
+        sort( folders, str_sort )
+
+        local result
+        if version
+            for str in *folders
+                result = Version( str )
+                if result % version
+                    break
+
+        else
+            result = Version( folders[ 1 ] )
+
+        if result
+            return {
+                Name: name,
+                URL: "file:///lua/gpm/vfs/packages/" .. name .. "/" .. result,
+                Version: result
+            }
+
         packages = await repositories.LookupRepositories( name, version, offlineMode, withPattern )
         sort( packages, sort_fn )
 
         package = packages[ 1 ]
         if package
             return package
-
-        _, versions = Find( "gpm/vfs/packages/" .. name .. "/*", "LUA" )
-        sort( versions, str_sort )
-
-        local result
-        if version
-            for str in *versions
-                result = Version( str )
-                if result % version
-                    break
-
-        else
-            result = Version( versions[ 1 ] )
-
-        return {
-            Name: name,
-            URL: "file:///lua/gpm/vfs/packages/" .. name .. "/" .. result,
-            Version: result
-        }
