@@ -229,107 +229,121 @@ do
 local luaClass
 do
 
-    tostring_class = ( cls ) ->
-        return format( "@class '%s': %p", cls.__name, cls )
+    class__call = ( cls, ... ) ->
+        init = rawget( cls, "__init" )
+        unless init
+            parent = rawget( cls, "__parent" )
+            if parent
+                init = rawget( parent, "__init" )
+
+        base = rawget( cls, "__base" )
+        unless base
+            error "class '#{cls}' has been corrupted", 2
+
+        obj = setmetatable( {}, base )
+        if init
+            override, new = init( obj, ... )
+            if override
+                return new
+
+        return obj
+
+    extends__index = ( cls, key ) ->
+        base = rawget( cls, "__base" )
+        unless base
+            return nil
+
+        value = rawget( base, key )
+        if value == nil
+            parent = rawget( cls, "__parent" )
+            if parent
+                value = parent[ key ]
+
+        return value
+
+    luaExtends = environment.extends = ( cls, parent ) ->
+        argAssert( cls, 1, "class" )
+        argAssert( parent, 2, "class" )
+
+        base = rawget( cls, "__base" )
+        unless base
+            error "class '#{cls}' has been corrupted", 2
+
+        metatable = getmetatable( cls )
+        unless metatable
+            error "metatable of class '#{cls}' has been corrupted", 2
+
+        base_parent = rawget( parent, "__base" )
+        unless base_parent
+            error "invalid parent", 2
+
+        if metatable.__index ~= base
+            error "class '#{cls}' has already been extended", 2
+
+        metatable.__index = extends__index
+        setmetatable( base, { __index: base_parent } )
+
+        for key, value in pairs( base_parent )
+            if sub( key, 1, 2 ) == "__" and rawget( base, key ) == nil and not ( key == "__index" and value == base_parent )
+                rawset( base, key, value )
+
+        inherited = rawget( parent, "__inherited" )
+        if inherited
+            inherited( parent, cls )
+
+        rawset( cls, "__parent", parent )
+        rawset( base, "__class", cls )
+        return cls
 
     tostring_object = ( obj ) ->
         return format( "@object '%s': %p", obj.__class.__name, obj )
+
+    tostring_class = ( cls ) ->
+        return format( "@class '%s': %p", cls.__name, cls )
 
     luaClass = environment.class = ( name, base, static, parent ) ->
         argAssert( name, 1, "string" )
 
         if base
             argAssert( base, 2, "table" )
+            rawset( base, "__index", rawget( base, "__index" ) or base )
+            rawset( base, "__tostring", rawget( base, "__tostring" ) or tostring_object )
         else
-            base = {}
+            base = { __tostring: tostring_object }
+            base.__index = base
 
         if static
             argAssert( static, 3, "table" )
+
+            rawset( static, "__init", rawget( base, "new" ) )
+            rawset( static, "__name", name )
+            rawset( static, "__base", base )
         else
-            static = {}
+            static = {
+                __init: rawget( base, "new" ),
+                __name: name,
+                __base: base
+            }
 
-        if base.__index == nil
-            base.__index = base
+        rawset( base, "new", nil )
 
-        init = base.new
-        base.new = nil
+        setmetatable( static, {
+            __tostring: tostring_class
+            __metatable_name: "class"
+            __call: class__call
+            __metatable_id: 5
+            __index: base
+        } )
 
-        if parent == nil
-            setmetatable( static, {
-                __tostring: tostring_class
-                __index: base
-
-                __call: ( cls, ... ) ->
-                    obj = setmetatable( {}, base )
-
-                    :__init = cls
-                    if __init
-                        override, new = __init( obj, ... )
-                        if override
-                            return new
-
-                    return obj
-            } )
-
+        if parent ~= nil
+            luaExtends( static, parent )
         else
-            argAssert( parent, 4, "table" )
-
-            if parent.__class == nil
-                if parent.__base == nil
-                    error "invalid parent", 2
-            else
-                parent = parent.__class
-
-            parent_base = parent.__base
-            setmetatable( base, parent_base )
-
-            if init == nil
-                init = ( obj, ... ) ->
-                    return static.__parent.__init( obj, ... )
-
-            for key, value in pairs( parent_base )
-                if sub( key, 1, 2 ) == "__" and rawget( base, key ) == nil and not ( key == "__index" and value == parent_base )
-                    base[ key ] = value
-
-            static.__parent = parent
-
-            setmetatable( static, {
-                __tostring: tostring_class
-
-                __call: ( cls, ... ) ->
-                    obj = setmetatable( {}, base )
-
-                    :__init = cls
-                    if __init
-                        override, new = __init( obj, ... )
-                        if override
-                            return new
-
-                    return obj
-
-                __index: ( cls, key ) ->
-                    value = rawget( base, key )
-                    if value == nil
-                        parent = rawget( cls, "__parent" )
-                        if parent
-                            value = parent[ key ]
-
-                    return value
-            } )
-
-        static.__init = init
-        static.__name = name
-        static.__base = base
-
-        if base.__tostring == nil
-            base.__tostring = tostring_object
-
-        base.__class = static
-
-        if parent ~= nil and parent.__inherited
-            parent.__inherited( parent, static )
+            rawset( base, "__class", static )
 
         return static
+
+    environment.extend = ( parent, name, base, static ) ->
+        return luaClass( name, base, static, parent )
 
 do
 
