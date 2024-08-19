@@ -24,8 +24,8 @@
 import environment from _G.gpm
 import isstring, tostring, ErrorNoHaltWithStack, ErrorNoHalt, getmetatable from gpm.environment
 import getstack from environment.debug
+classExtend = environment.extend
 import format, rep from string
-luaClass = environment.class
 import concat from table
 
 local errorClass
@@ -40,7 +40,7 @@ export iserror = ( obj, name = "Error" ) ->
 
     return false
 
-errorClass = luaClass(
+errorClass = environment.class(
     "Error",
     {
         name: "Error"
@@ -89,16 +89,16 @@ errorClass = luaClass(
     }
 )
 
-export NotImplementedError = luaClass( "NotImplementedError", nil, nil, errorClass )
-export CodeCompileError = luaClass( "CodeCompileError", nil, nil, errorClass )
-export FileSystemError = luaClass( "FileSystemError", nil, nil, errorClass )
-export WebClientError = luaClass( "WebClientError", nil, nil, errorClass )
-export RuntimeError = luaClass( "RuntimeError", nil, nil, errorClass )
-export PackageError = luaClass( "PackageError", nil, nil, errorClass )
-export PromiseError = luaClass( "PromiseError", nil, nil, errorClass )
-export ModuleError = luaClass( "ModuleError", nil, nil, errorClass )
-export SourceError = luaClass( "SourceError", nil, nil, errorClass )
-export AddonError = luaClass( "AddonError", nil, nil, errorClass )
-export RangeError = luaClass( "RangeError", nil, nil, errorClass )
-export TypeError = luaClass( "TypeError", nil, nil, errorClass )
+export NotImplementedError = classExtend( errorClass, "NotImplementedError" )
+export CodeCompileError = classExtend( errorClass, "CodeCompileError" )
+export FileSystemError = classExtend( errorClass, "FileSystemError" )
+export WebClientError = classExtend( errorClass, "WebClientError" )
+export RuntimeError = classExtend( errorClass, "RuntimeError" )
+export PackageError = classExtend( errorClass, "PackageError" )
+export PromiseError = classExtend( errorClass, "PromiseError" )
+export ModuleError = classExtend( errorClass, "ModuleError" )
+export SourceError = classExtend( errorClass, "SourceError" )
+export AddonError = classExtend( errorClass, "AddonError" )
+export RangeError = classExtend( errorClass, "RangeError" )
+export TypeError = classExtend( errorClass, "TypeError" )
 export Error = errorClass

@@ -383,7 +383,7 @@ do
     do
 
         import setmetatable from debug
-        luaClass = environment.class
+        newClass = environment.class
         import Open from file
 
         writeModes = {
@@ -395,9 +395,6 @@ do
 
         legacy.new = ( filePath, fileMode, gamePath, skipNormalize ) =>
             unless skipNormalize
-                if filePath == "memory" and not gamePath
-                    return ByteStream!
-
                 filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
             if writeModes[ fileMode ]
@@ -412,11 +409,11 @@ do
 
             return true, nil
 
-        fileLegacyClass = luaClass( "File: Legacy", legacy )
-        lib.FileLegacy = fileLegacyClass
+        fileLegacyClass = newClass( "File: Legacy", legacy )
+        util.FileLegacy = fileLegacyClass
 
-        fileClass = luaClass( "File", base, nil, fileLegacyClass )
-        lib.File = fileClass
+        fileClass = newClass( "File", base, nil, fileLegacyClass )
+        util.File = fileClass
 
         lib.Open = ( filePath, fileMode, gamePath, skipNormalize ) ->
             return fileClass( filePath, fileMode, gamePath, skipNormalize )

@@ -31,13 +31,13 @@ import string, math, table, tonumber, assert, ArgAssert, isstring, isnumber from
 import char, byte, len, sub, format, match, find, rep from string
 import trunc, floor, min, max, pow2, mod2 from math
 import concat, unpack from table
-luaClass = environment.class
+classExtend = environment.extend
 
 registry = {}
 _module_0 = { :registry }
 
 -- https://github.com/ToxicFrog/vstruct/blob/master/cursor.lua
-_module_0.Cursor = luaClass( "Cursor", {
+_module_0.Cursor = environment.class( "Cursor", {
     __tostring: =>
         return format( "Cursor: %p [%d/%d]", @, @position, @size )
 
@@ -1185,7 +1185,7 @@ do
     import gmatch from string
 
     -- https://github.com/ToxicFrog/vstruct/blob/master/ast/Node.lua
-    nodeClass = luaClass( "Node", {
+    nodeClass = environment.class( "Node", {
         new: =>
             @size = 0
 
@@ -1213,7 +1213,7 @@ do
     ast.Node = nodeClass
 
     -- https://github.com/ToxicFrog/vstruct/blob/master/ast/List.lua
-    listClass = luaClass( "List", nil, nil, nodeClass )
+    listClass = classExtend( nodeClass, "List" )
     ast.List = listClass
 
     -- https://github.com/ToxicFrog/vstruct/blob/master/ast/Table.lua
@@ -1222,7 +1222,7 @@ do
 
         import Read, ReadBits from nodeClass
 
-        tableClass = luaClass( "Table", {
+        tableClass = classExtend( nodeClass, "Table", {
             Read: ( fileDescriptor ) =>
                 tbl = {}
                 Read( @, fileDescriptor, tbl )
@@ -1233,7 +1233,7 @@ do
                 ReadBits( @, bits, tbl )
                 return tbl
 
-        }, nil, nodeClass )
+        } )
 
         ast.Table = tableClass
 
@@ -1242,7 +1242,7 @@ do
     local numberClass
     do
 
-        numberClass = luaClass( "Number", {
+        numberClass = classExtend( nodeClass, "Number", {
             new: ( text ) =>
                 if match( text, "^#" )
                     @key = sub( text, 2, len( text ) )
@@ -1274,7 +1274,7 @@ do
 
                 return true
 
-        }, nil, nodeClass )
+        } )
 
     ast.Number = numberClass
 
@@ -1284,7 +1284,7 @@ do
 
         import Host from endianness
 
-        rootClass = luaClass( "Root", {
+        rootClass = classExtend( nodeClass, "Root", {
             new: ( children ) =>
                 @[ 1 ] = children
                 @size = children.size
@@ -1299,12 +1299,12 @@ do
                 @[1]\Write( fileDescriptor, { :data, n: 1 } )
                 return nil
 
-        }, nil, nodeClass )
+        } )
 
     ast.Root = rootClass
 
     -- https://github.com/ToxicFrog/vstruct/blob/master/ast/Repeat.lua
-    repeatClass = luaClass( "Repeat", {
+    repeatClass = classExtend( nodeClass, "Repeat", {
         new: ( @count, @child ) =>
             if count.value and child.size
                 @size = count\Get( nil ) * child.size
@@ -1332,7 +1332,7 @@ do
             for _ = 1, @count\Get( data.data )
                 child\WriteBits( bits, data )
 
-    }, nil, nodeClass )
+    } )
 
     ast.Repeat = repeatClass
 
@@ -1379,7 +1379,7 @@ do
                 n: 1
             }
 
-        nameClass = luaClass( "Name", {
+        nameClass = classExtend( nodeClass, "Name", {
             new: ( @key, @child ) =>
                 @size = child.size
 
@@ -1397,7 +1397,7 @@ do
                 @child\WriteBits( bits, get( context, @key ) )
                 return nil
 
-        }, nil, nodeClass )
+        } )
 
     ast.Name = nameClass
 
@@ -1443,7 +1443,7 @@ do
                 if bit0 == 7
                     index += delta
 
-        bitpackClass = luaClass( "Bitpack", {
+        bitpackClass = classExtend( nodeClass, "Bitpack", {
             new: ( size ) =>
                 @size = 0
                 @total_size = size
@@ -1466,12 +1466,12 @@ do
                 @WriteBits( bitpacker( buffer, @size ), context )
                 fileDescriptor\Write( char( unpack( buffer ) ) )
 
-        }, nil, nodeClass )
+        } )
 
     ast.Bitpack = bitpackClass
 
     -- https://github.com/ToxicFrog/vstruct/blob/master/ast/IO.lua
-    ioClass = luaClass( "IO", {
+    ioClass = classExtend( nodeClass, "IO", {
         new: ( @name, args ) =>
             argv, n = { has_backrefs: false }, 0
 
@@ -1544,7 +1544,7 @@ do
         GetArgvContext: ( context ) =>
             return @GetArgv( ( context.parent or context ).data )
 
-    }, nil, nodeClass )
+    } )
 
     ast.IO = ioClass
 

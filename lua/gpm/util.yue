@@ -226,7 +226,7 @@ do
         error( "bad argument #" .. num .. " to \'" .. ( getinfo( 2, "n" ).name or "unknown" ) .. "\' (" .. expected .. " expected, got " .. name .. ")", errorlevel )
         return nil
 
-local luaClass
+local newClass
 do
 
     class__call = ( cls, ... ) ->
@@ -280,6 +280,7 @@ do
         if metatable.__index ~= base
             error "class '#{cls}' has already been extended", 2
 
+        rawset( base, "__tostring", nil )
         metatable.__index = extends__index
         setmetatable( base, { __index: base_parent } )
 
@@ -301,7 +302,7 @@ do
     tostring_class = ( cls ) ->
         return format( "@class '%s': %p", cls.__name, cls )
 
-    luaClass = environment.class = ( name, base, static, parent ) ->
+    newClass = environment.class = ( name, base, static, parent ) ->
         argAssert( name, 1, "string" )
 
         if base
@@ -343,7 +344,7 @@ do
         return static
 
     environment.extend = ( parent, name, base, static ) ->
-        return luaClass( name, base, static, parent )
+        return newClass( name, base, static, parent )
 
 do
 
@@ -962,8 +963,6 @@ do
         238, 239, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255
     }
 
-    base = findMetaTable( "Color" )
-    environment.TYPE_COLOR = base.__metatable_id
     vconst = 1 / 255
 
     local colorClass
@@ -972,7 +971,8 @@ do
             __tostring: =>
                 return format( "%d %d %d %d", @r, @g, @b, @a )
 
-            __eq: base.__eq
+            __eq: =>
+                return @r == other.r and @g == other.g and @b == other.b and @a == other.a
 
             __unm: =>
                 return @Copy!\Invert!
@@ -1071,7 +1071,7 @@ do
 
         },
         {
-            __index: base
+            __index: findMetaTable( "Color" )
         }
     )
 
@@ -1087,7 +1087,7 @@ do
     environment.iscolor = ( any ) ->
         return getmetatable( any ) == internal or ( istable( any ) and isnumber( any.r ) and isnumber( any.g ) and isnumber( any.b ) and isnumber( any.a ) )
 
-    colorClass = luaClass( "Color", internal, {
+    colorClass = newClass( "Color", internal, {
         FromHex: ( hex ) ->
             if isnumber( hex )
                 return colorClass( rshift( band( hex, 0xFF0000 ), 16 ), rshift( band( hex, 0xFF00 ), 8 ), band( hex, 0xFF ) )
@@ -1146,7 +1146,7 @@ do
 -- Stack
 do
 
-    util.Stack = luaClass( "Stack", {
+    util.Stack = newClass( "Stack", {
         __tostring: =>
             return format( "Stack: %p [%d/%d]", @, @pointer, @size )
 
@@ -1225,7 +1225,7 @@ do
 
         return value
 
-    util.Queue = luaClass( "Queue", {
+    util.Queue = newClass( "Queue", {
         __tostring: =>
             return format( "Queue: %p [%d/%d]", @, @pointer, @size )
 

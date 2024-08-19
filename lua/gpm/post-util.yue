@@ -4,7 +4,7 @@ import getmetatable, setmetatable, istable from _G
 import bit, math, string, table, util, ArgAssert, isfunction, error from environment
 import band, bor, lshift, rshift from bit
 import byte, sub, len from string
-luaClass = environment.class
+newClass = environment.class
 import fdiv from math
 
 do
@@ -297,7 +297,7 @@ do
         @position = position
         return position
 
-    util.ByteStream = luaClass(
+    util.ByteStream = newClass(
         "ByteStream",
         {
             __tostring: =>
@@ -828,7 +828,7 @@ do
         return a > b
 
     local versionClass
-    versionClass = luaClass(
+    versionClass = newClass(
         "Version",
         {
             __tostring: =>
