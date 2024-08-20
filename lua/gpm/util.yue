@@ -261,6 +261,12 @@ do
 
         return value
 
+    tostring_object = ( obj ) ->
+        return format( "@object '%s': %p", obj.__class.__name, obj )
+
+    tostring_class = ( cls ) ->
+        return format( "@class '%s': %p", cls.__name, cls )
+
     luaExtends = environment.extends = ( cls, parent ) ->
         argAssert( cls, 1, "class" )
         argAssert( parent, 2, "class" )
@@ -280,7 +286,9 @@ do
         if metatable.__index ~= base
             error "class '#{cls}' has already been extended", 2
 
-        rawset( base, "__tostring", nil )
+        if rawget( base, "__tostring" ) == tostring_object
+            rawset( base, "__tostring", nil )
+
         metatable.__index = extends__index
         setmetatable( base, { __index: base_parent } )
 
@@ -295,12 +303,6 @@ do
         rawset( cls, "__parent", parent )
         rawset( base, "__class", cls )
         return cls
-
-    tostring_object = ( obj ) ->
-        return format( "@object '%s': %p", obj.__class.__name, obj )
-
-    tostring_class = ( cls ) ->
-        return format( "@class '%s': %p", cls.__name, cls )
 
     newClass = environment.class = ( name, base, static, parent ) ->
         argAssert( name, 1, "string" )
