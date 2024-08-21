@@ -522,16 +522,24 @@ do
             if not target
                 error PackageError "invalid dependency target '#{target}' for '#{name}'"
 
-            -- Retrieving all version of the package
-            _, folders = Find( "gpm/vfs/packages/" .. name .. "/*", file.LuaPath, true ) -- lets hope that package installer will create correct versions of the package
-            version = Version.select( target, folders )
-            unless version
-                versions_str = concat( folders, ", " )
-                error PackageError "could not find installed #{name} with version selector #{target} (available versions: [#{versions_str}])"
+            packageURL = nil
+            if string.IsURL( target ) -- source lookup
+                source = loader.Source.get( target )
+                unless source
+                    error PackageError "source for '#{target}' not found"
 
-            packageURL = URL( "file:///lua/gpm/vfs/packages/" .. name .. "/" .. tostring(version) .. "/" )
-            unless IsDir( packageURL.pathname )
-                error PackageError "#{packagePath} should exists but it does not :? (#{name} with target #{target})"
+                packageURL = source\WorkingDirectory( target ) -- our package must be in the root directory, I hope
+            else -- version lookup
+                -- Retrieving all version of the package
+                _, folders = Find( "gpm/vfs/packages/" .. name .. "/*", file.LuaPath, true ) -- lets hope that package installer will create correct versions of the package
+                version = Version.select( target, folders )
+                unless version
+                    versions_str = concat( folders, ", " )
+                    error PackageError "could not find installed #{name} with version selector #{target} (available versions: [#{versions_str}])"
+
+                packageURL = URL( "file:///lua/gpm/vfs/packages/" .. name .. "/" .. tostring(version) .. "/" )
+                unless IsDir( packageURL.pathname )
+                    error PackageError "#{packagePath} should exists but it does not :? (#{name} with target #{target})"
 
             pjson = @pjson = await Package.read( packageURL )
             if pjson and pjson.exports
@@ -838,7 +846,9 @@ do
             Logger\Debug( "  - #{@} was registered for #{protocol}:"  )
 
         @get: ( protocol ) ->
-            if isurl( protocol )
+            if isstring( protocol ) and string.IsURL( protocol )
+                protocol = URL( protocol ).scheme
+            elseif isurl( protocol )
                 protocol = protocol.scheme
 
             return sources[ protocol ]
@@ -858,7 +868,7 @@ do
 
             -- GetWorkingDirectory( url: URL ) => URL file:/// *SHARED
             -- FetchInfo( url: URL ) => { package: Package, url: URL, metadata: {...} } *SERVER
-            -- Install( info: DataFromFetchInfo ) *SERVER
+            -- Install( info: DataFromFetchInfo, workdir: string? ) *SERVER
 
             pkg = Package( ... )
             files = {...}
