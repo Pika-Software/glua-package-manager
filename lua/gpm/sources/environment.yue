@@ -14,4 +14,4 @@ class EnvironmentSourceHandler extends loader.BaseSourceHandler
 
 class EnvironmentSource extends loader.BaseSource
 
-EnvironmentSource( "gpm", "gmod" )\RegisterHandler( EnvironmentSourceHandler! )
+-- EnvironmentSource( "gpm", "gmod" )\RegisterHandler( EnvironmentSourceHandler! )

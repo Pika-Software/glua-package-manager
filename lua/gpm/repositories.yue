@@ -100,7 +100,7 @@ apis["github.com"] = ( url, name, parent ) ->
             Installed: false,
             Repository: parent,
             Version: Version( tag.name ),
-            URL: tag.zipball_url
+            URL: user .. "/" .. repository .. "/" .. tag.name
         }
 
     return versions
@@ -316,6 +316,7 @@ do
         return a < b
 
     import Find from _G.file
+    import tostring from _G
 
     repositories.FindPackage = async ( name, version, offlineMode, withPattern ) ->
         ArgAssert( name, 1, "string" )
@@ -347,7 +348,7 @@ do
             if versionObj
                 return {
                     Name: packageName,
-                    URL: "file:///lua/gpm/vfs/packages/" .. packageName .. "/" .. versionObj,
+                    URL: "file:///lua/gpm/vfs/packages/" .. packageName .. "/" .. tostring( versionObj ),
                     Version: versionObj
                 }
 

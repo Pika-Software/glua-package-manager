@@ -151,9 +151,9 @@ class ZIPHandler extends BaseSourceHandler
 
 class WebSource extends BaseSource
 
-ws = WebSource( "http", "https" )
-ws\RegisterHandler( LuaCodeHandler! )
-ws\RegisterHandler( TextHandler! )
-ws\RegisterHandler( JSONHandler! )
-ws\RegisterHandler( GMAHandler! )
-ws\RegisterHandler( ZIPHandler! )
+-- ws = WebSource( "http", "https" )
+-- ws\RegisterHandler( LuaCodeHandler! )
+-- ws\RegisterHandler( TextHandler! )
+-- ws\RegisterHandler( JSONHandler! )
+-- ws\RegisterHandler( GMAHandler! )
+-- ws\RegisterHandler( ZIPHandler! )
