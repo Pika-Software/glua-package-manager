@@ -287,7 +287,7 @@ fetchRepository = repositories.FetchRepository = async ( repository, name, versi
     await updateRepository( repository, map, name, withPattern )
     return searchPackages( repository, name, version, withPattern )
 
-repositories.LookupRepositories = async ( name, version, offlineMode, withPattern = false ) ->
+lookupRepositories = repositories.LookupRepositories = async ( name, version, offlineMode, withPattern = false ) ->
     tasks, length = {}, 0
     for repository in *list
         length += 1
@@ -307,6 +307,7 @@ repositories.LookupRepositories = async ( name, version, offlineMode, withPatter
                 length += 1
                 packages[ length ] = package
 
+    sort( packages, sort_fn )
     return packages
 
 do
@@ -319,31 +320,37 @@ do
     repositories.FindPackage = async ( name, version, offlineMode, withPattern ) ->
         ArgAssert( name, 1, "string" )
 
-        _, folders = Find( "gpm/vfs/packages/" .. name .. "/*", "LUA" )
-        sort( folders, str_sort )
-
-        local result
-        if version
-            ArgAssert( version, 2, "string" )
-
-            for str in *folders
-                result = Version( str )
-                if result % version
+        packageName = name
+        if withPattern
+            _, folders = Find( "gpm/vfs/packages/*", "LUA" )
+            for folderName for *folders
+                if find( folderName, name, 1, false )
+                    packageName = folderName
                     break
 
-        else
-            result = Version( folders[ 1 ] )
+        _, versions = Find( "gpm/vfs/packages/" .. packageName .. "/*", "LUA" )
+        if #versions > 0
+            sort( versions, str_sort )
 
-        if result
-            return {
-                Name: name,
-                URL: "file:///lua/gpm/vfs/packages/" .. name .. "/" .. result,
-                Version: result
-            }
+            local versionObj
+            if version
+                ArgAssert( version, 2, "string" )
 
-        packages = await repositories.LookupRepositories( name, version, offlineMode, withPattern )
-        sort( packages, sort_fn )
+                for folderName in *versions
+                    versionObj = Version( folderName )
+                    if versionObj % version
+                        break
 
-        package = packages[ 1 ]
+            else
+                versionObj = Version( versions[ 1 ] )
+
+            if versionObj
+                return {
+                    Name: packageName,
+                    URL: "file:///lua/gpm/vfs/packages/" .. packageName .. "/" .. versionObj,
+                    Version: versionObj
+                }
+
+        package = await( lookupRepositories( name, version, offlineMode, withPattern ) )[ 1 ]
         if package
             return package
