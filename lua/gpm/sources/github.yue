@@ -1,6 +1,6 @@
 -- Seconds iteration of github source handler
-import path, string, table, http, util, loader, file from gpm -- libraries
-import isstring, istable, tostring, async, await, pairs from gpm -- functions
+import path, string, table, http, util, loader, file, addon from gpm -- libraries
+import isstring, istable, isurl, tostring, async, await, pairs from gpm -- functions
 import URL, Package, SourceError, Logger from gpm -- classes
 
 -- TODO: Create GithubAPI class to handle requests
@@ -123,8 +123,12 @@ class GithubSource extends loader.Source
             }
         }
 
-    Install: async ( info ) =>
+    Install: async ( info, workdir ) =>
+        unless workdir
+            workdir = @WorkingDirectory( info.url ).pathname
+
         Logger\Debug( "Installing package '%s@%s' from Github repository '%s/%s/%s'...", info.package.name, info.package.version, info.metadata.user, info.metadata.repository, info.metadata.branch )
+
         -- TODO: cache files
 
         res = await http.CachedFetch("https://api.github.com/repos/#{info.metadata.user}/#{info.metadata.repository}/zipball/#{info.metadata.branch}", info.metadata.auth)
@@ -133,6 +137,9 @@ class GithubSource extends loader.Source
 
         root = path.getDirectory( info.metadata.package_entry.path )
         rootLength = #root + 1 -- +1 to remove the trailing slash
+
+        gma = addon.GMA()
+        gma\SetTitle( info.url.href )
 
         for entry, err in file.IterateZipFiles( util.ByteStream(res.body), false ) -- entry: { path, content }
             if err
@@ -147,8 +154,12 @@ class GithubSource extends loader.Source
             if entryPath == ""
                 continue
 
-            print("must mount", entryPath, #entry.content)
+            -- add working directory
+            entryPath = path.join( workdir, entryPath )
 
+            gma\SetFile( entryPath, entry.content )
+
+        await gma\AsyncMount()
 
 
 GithubSource( "github" )
