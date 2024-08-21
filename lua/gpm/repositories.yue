@@ -92,6 +92,7 @@ apis["github.com"] = ( url, name, parent ) ->
     unless tags
         return nil
 
+    -- TODO: change zipball_url to `github:user/repo/tag` format
     versions, length = {}, 0
     for tag in *tags
         length += 1
