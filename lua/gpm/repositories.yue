@@ -337,7 +337,7 @@ do
         if result
             return {
                 Name: name,
-                URL: "file:///lua/gpm/vfs/packages/" .. name .. "/" .. result,
+                URL: "file:///lua/gpm/vfs/packages/" .. name .. "/" .. tostring(result),
                 Version: result
             }
 

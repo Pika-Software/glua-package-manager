@@ -37,7 +37,7 @@ do
 
     class BinarySource extends BaseSource
 
-    BinarySource( "dll" )\RegisterHandler( BinarySourceHandler! )
+    -- BinarySource( "dll" )\RegisterHandler( BinarySourceHandler! )
 
 do
 
@@ -79,5 +79,5 @@ do
 
     class FileSource extends BaseSource
 
-    fs = FileSource( "file" )
-    fs\RegisterHandler( LuaHandler! )
+    -- fs = FileSource( "file" )
+    -- fs\RegisterHandler( LuaHandler! )

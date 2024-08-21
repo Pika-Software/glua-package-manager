@@ -150,7 +150,7 @@ class GithubSource extends loader.Source
             entryPath = string.sub( entry.path, string.indexOf(entry.path, "/") + 1 )
 
             -- then remove the root directory
-            entryPath = string.sub( entryPath, rootLength )
+            entryPath = string.sub( entryPath, rootLength ) -- TODO: check if string is even valid
             if entryPath == ""
                 continue
 
