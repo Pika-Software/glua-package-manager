@@ -7,7 +7,10 @@ local function print( ... )
     Logger:Info( table.concat(tbl, "\t" ) )
 end
 
-require "abc"
+-- require "abc"
+
+print("Importing units...")
+require "units/init"
 
 -- local submodule = include "submodule.lua"
 
