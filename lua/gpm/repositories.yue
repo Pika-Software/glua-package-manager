@@ -324,7 +324,7 @@ do
         packageName = name
         if withPattern
             _, folders = Find( "gpm/vfs/packages/*", "LUA" )
-            for folderName for *folders
+            for folderName in *folders
                 if find( folderName, name, 1, false )
                     packageName = folderName
                     break
