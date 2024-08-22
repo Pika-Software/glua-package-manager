@@ -637,7 +637,7 @@ do
 -- Version
 do
 
-    import ByteSplit from string
+    import ByteSplit, lower from string
 
     do
 
@@ -649,9 +649,9 @@ do
                 url = URL( url )
 
             if not url.hostname or url.hostname == ""
-                return url.scheme .. "/" .. url.pathname
+                return url.scheme .. "/" .. lower(url.pathname)
 
-            return url.scheme .. "/" .. concat( Flip( ByteSplit( url.hostname, 0x2E --[[ . ]] ) ), "/" ) .. url.pathname
+            return url.scheme .. "/" .. concat( Flip( ByteSplit( lower(url.hostname), 0x2E --[[ . ]] ) ), "/" ) .. lower(url.pathname)
 
     import isnumber, tonumber, isstring, tostring from _G
     import match, find, gsub, ByteCount from string
