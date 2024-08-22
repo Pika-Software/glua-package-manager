@@ -10,7 +10,7 @@ end
 -- require "abc"
 
 print("Importing units...")
-require "units/init"
+require "units/init.lua"
 
 -- local submodule = include "submodule.lua"
 
