@@ -1,83 +1,101 @@
-_G = _G
-import gpm from _G
-import environment from gpm
-import file, path, async, await, SourceError, error from environment
-import BaseSource, BaseSourceHandler, Module from gpm.loader
-import STATE_PENDING from environment.Promise
-import getExtension, equal from path
-import NormalizeGamePath from file
+import path, string, table, http, util, loader, file, addon from gpm -- libraries
+import isstring, istable, isurl, tostring, async, await, pairs from gpm -- functions
+import URL, Package, SourceError, Logger from gpm -- classes
 
-do
+class FileSource extends loader.Source
+    FetchInfo: async ( url ) =>
+        pkg = await Package.read( url )
 
-    import IsBinaryModuleInstalled from environment.util
-    import require from _G
+        return {
+            url: url,
+            package: nil,
+        }
 
-    binnaries = {}
+    Install: async ( info ) =>
 
-    class BinarySourceHandler extends BaseSourceHandler
-        Install: ( url ) =>
-            name = url.pathname
-            if not name or name == ""
-                error SourceError "Binary module name is not specified!"
-                return nil
+FileSource( "file" )
 
-            if binnaries[ name ]
-                return _G[ name ]
 
-            if IsBinaryModuleInstalled( name )
-                binnaries[ name ] = true
-                require( name )
-                return name
+-- _G = _G
+-- import gpm from _G
+-- import environment from gpm
+-- import file, path, async, await, SourceError, error from environment
+-- import BaseSource, BaseSourceHandler, Module from gpm.loader
+-- import STATE_PENDING from environment.Promise
+-- import getExtension, equal from path
+-- import NormalizeGamePath from file
 
-            error SourceError "Binary module " .. name .. " is not installed locally!"
-            return nil
+-- do
 
-        Run: ( url, name ) =>
-            return _G[ name ]
+--     import IsBinaryModuleInstalled from environment.util
+--     import require from _G
 
-    class BinarySource extends BaseSource
+--     binnaries = {}
 
-    -- BinarySource( "dll" )\RegisterHandler( BinarySourceHandler! )
+--     class BinarySourceHandler extends BaseSourceHandler
+--         Install: ( url ) =>
+--             name = url.pathname
+--             if not name or name == ""
+--                 error SourceError "Binary module name is not specified!"
+--                 return nil
 
-do
+--             if binnaries[ name ]
+--                 return _G[ name ]
 
-    local LuaHandler
-    do
+--             if IsBinaryModuleInstalled( name )
+--                 binnaries[ name ] = true
+--                 require( name )
+--                 return name
 
-        import AsyncCompile from file
-        import sub from _G.string
+--             error SourceError "Binary module " .. name .. " is not installed locally!"
+--             return nil
 
-        promises = {}
+--         Run: ( url, name ) =>
+--             return _G[ name ]
 
-        codeCompile = async ( url ) ->
-            config = {}
-            for key, value in url.searchParams\iterator!
-                config[ key ] = value
+--     class BinarySource extends BaseSource
 
-            filePath, gamePath = NormalizeGamePath( url.pathname )
-            compileResult = await AsyncCompile( filePath, nil, config, gamePath, true )
-            await Module.cache( "file://" .. compileResult.path, compileResult.content )
-            return compileResult.func
+--     -- BinarySource( "dll" )\RegisterHandler( BinarySourceHandler! )
 
-        task = ( url ) ->
-            promise = promises[ url.href ]
-            if promise and promise.state == STATE_PENDING
-                return promise
+-- do
 
-            promise = codeCompile( url )
-            promises[ url.href ] = promise
-            return promise
+--     local LuaHandler
+--     do
 
-        class LuaHandler extends BaseSourceHandler
-            ShouldHandle: ( url ) =>
-                return equal( sub( url.pathname, 1, 5 ), "/lua/" )
+--         import AsyncCompile from file
+--         import sub from _G.string
 
-            Install: async ( url, _, __, env ) =>
-                return Module.run( await( task( url ) ), url, env )
+--         promises = {}
 
-            Run: async
+--         codeCompile = async ( url ) ->
+--             config = {}
+--             for key, value in url.searchParams\iterator!
+--                 config[ key ] = value
 
-    class FileSource extends BaseSource
+--             filePath, gamePath = NormalizeGamePath( url.pathname )
+--             compileResult = await AsyncCompile( filePath, nil, config, gamePath, true )
+--             await Module.cache( "file://" .. compileResult.path, compileResult.content )
+--             return compileResult.func
 
-    -- fs = FileSource( "file" )
-    -- fs\RegisterHandler( LuaHandler! )
+--         task = ( url ) ->
+--             promise = promises[ url.href ]
+--             if promise and promise.state == STATE_PENDING
+--                 return promise
+
+--             promise = codeCompile( url )
+--             promises[ url.href ] = promise
+--             return promise
+
+--         class LuaHandler extends BaseSourceHandler
+--             ShouldHandle: ( url ) =>
+--                 return equal( sub( url.pathname, 1, 5 ), "/lua/" )
+
+--             Install: async ( url, _, __, env ) =>
+--                 return Module.run( await( task( url ) ), url, env )
+
+--             Run: async
+
+--     class FileSource extends BaseSource
+
+--     -- fs = FileSource( "file" )
+--     -- fs\RegisterHandler( LuaHandler! )
