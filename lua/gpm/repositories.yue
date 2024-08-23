@@ -100,7 +100,7 @@ apis["github.com"] = ( url, name, parent ) ->
             Installed: false,
             Repository: parent,
             Version: Version( tag.name ),
-            URL: user .. "/" .. repository .. "/" .. tag.name
+            URL: "github://" .. user .. "/" .. repository .. "/" .. tag.name
         }
 
     return versions
@@ -120,10 +120,12 @@ do
             if fn
                 return fn( url, name, parent )
 
-            if getExtension( url.pathname ) == "json"
-                ok, response = SafeAwait( request( url.href ) )
-                if not ok or response.status ~= 200
-                    return nil
+            if getExtension( url.pathname ) ~= "json"
+                return nil
+
+            ok, response = SafeAwait( request( url.href ) )
+            if not ok or response.status ~= 200
+                return nil
 
             tbl = JSONToTable( response.body )
             unless tbl
@@ -349,7 +351,8 @@ do
                 return {
                     Name: packageName,
                     URL: "file:///lua/gpm/vfs/packages/" .. packageName .. "/" .. tostring( versionObj ),
-                    Version: versionObj
+                    Version: versionObj,
+                    Installed: true
                 }
 
         package = await( lookupRepositories( name, version, offlineMode, withPattern ) )[ 1 ]
