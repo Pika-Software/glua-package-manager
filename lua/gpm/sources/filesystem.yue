@@ -5,13 +5,15 @@ import URL, Package, SourceError, Logger from gpm -- classes
 class FileSource extends loader.Source
     FetchInfo: async ( url ) =>
         pkg = await Package.read( url )
+        unless pkg
+            error SourceError "Failed to read or find package file for " .. url.href
 
         return {
             url: url,
-            package: nil,
+            package: pkg,
         }
 
-    Install: async ( info ) =>
+    -- Install: async ( info ) =>
 
 FileSource( "file" )
 

@@ -101,7 +101,8 @@ class GithubSource extends loader.Source
 
         -- first letäs try to find file locally
         workdir = @WorkingDirectory( url )
-        if ok, pkg := pcall( await, Package.read( url ) )
+        pkg = await Package.read( url )
+        if pkg
             return {
                 package: pkg,
                 url: url,
@@ -137,6 +138,7 @@ class GithubSource extends loader.Source
             workdir = @WorkingDirectory( info.url ).pathname
 
         unless info.metadata
+            -- TODO: if workdir is set, 
             return -- package is already installed
 
         Logger\Debug( "Installing package '%s@%s' from Github repository '%s/%s/%s'...", info.package.name, info.package.version, info.metadata.user, info.metadata.repository, info.metadata.branch )

@@ -9,16 +9,16 @@ end
 
 -- require "abc"
 
-print("Importing units...")
-require "units/init.lua"
+-- print("Importing units...")
+-- require "units/init.lua"
 
--- local submodule = include "submodule.lua"
+local submodule = include "submodule.lua"
 
--- print("Got from submodule:", submodule)
--- -- Promise.delay(1):await()
+print("Got from submodule:", submodule)
+-- Promise.delay(1):await()
 
--- print("I am", __package )
--- require "b"
+print("I am", __package )
+require "b"
 
 
 return "this package is da best"

@@ -102,6 +102,7 @@ unless istable( loader )
 -- Modules and Packages are tables with format: [url] = Module/Package
 packages = loader.Packages = {}
 modules = loader.Modules = {}
+loader.Dependencies = {} -- this one has [name@version or url] = Promise
 
 -- Resolves specifier as it is package specifier
 -- See https://nodejs.org/api/esm.html#resolution-algorithm-specification PACKAGE_RESOLVE
@@ -348,6 +349,7 @@ do
             @__hooks = setmetatable( {}, hooksMeta )
             @__prefix = @__tostring! .. "::"
             @__timers = {}
+            @__dependencies = {}
 
             -- package environment
             @env = setmetatable( { __package: @, Logger: packageLogger }, environmentMetatable )
@@ -763,7 +765,7 @@ do
 
     import SourceError from environment
     import reject from Promise
-    import Logger from gpm
+    import Logger, ispromise from gpm
 
     sources = loader.Sources
     unless istable( sources )
@@ -938,7 +940,12 @@ do
         if package
             env = package.env or env
 
-        print("asyncImport", package, env, resolved) -- location, url, env
+            -- if package has dependencies, wait until they are resolved
+            if package.__dependencies
+                for name, dep in pairs(package.__dependencies)
+                    if ispromise( dep )
+                        await dep
+
         return Module.run( resolved, env )
 
         -- source = findSource( resolved.scheme )
@@ -1013,7 +1020,26 @@ do
     import allSettled from Promise
     import Logger, Repositories from gpm
 
-    loader.InstallDependency = async ( pkg, name, target ) ->
+    loader.InstallDependency = async ( pkg, name, target, force ) ->
+        unless isstring( name )
+            error PackageError "invalid dependency name '#{name}' for '#{pkg}'"
+
+        -- caching installation so duplicate dependencies wont be installed two times
+        if force != true
+            ref = tostring( target )
+            unless string.IsURL( ref )
+                ref = name .. "@" .. target
+
+            task = loader.Dependencies[ ref ]
+            if task
+                return task
+            
+            loader.Dependencies[ ref ] = task = loader.InstallDependency( pkg, name, target, true )
+            unless pkg.__dependencies[ name ]
+                pkg.__dependencies[ name ] = task
+            
+            return task
+
         if istable( target )
             -- handle multiple
             return
@@ -1021,6 +1047,7 @@ do
         if not isstring( target )
             error PackageError "invalid dependency target '#{target}' for '#{name}' in '#{pkg}'"
 
+        workdir = nil
         unless string.IsURL( target )
             -- probably version
             res = await Repositories.FindPackage( name, target )
@@ -1028,6 +1055,7 @@ do
                 error PackageError "could not find package '#{name}' with version '#{target}' for '#{pkg}'"
 
             target = res.URL
+            workdir = "lua/gpm/vfs/packages/" .. name .. "/" .. tostring(target.Version) .. "/"
 
         url = URL( target )
         source = loader.Source.get( url )
@@ -1036,17 +1064,34 @@ do
             error PackageError "source for '#{url}' not found (dependency of '#{pkg}')"
 
         info = await source\FetchInfo( url )
-        await source\Install( info ) -- TODO: handle workdir
 
-        Logger\Info( "Installed dependency '%s' [%s] for '%s'", name, target, pkg.name )
+        if source.Install
+            await source\Install( info, workdir )
+            Logger\Info( "Installed dependency '%s' [%s] for '%s'", name, target, pkg.name )
+
+        pkg.__dependencies[name] = info.package
+
 
     loader.ResolveDependencies = async ( pkg ) ->
         if not pkg.dependencies
             return
 
+        tasks = {}
         for name, target in pairs( pkg.dependencies )
-            -- TODO: handle promises, make package unimportable until all dependencies are resolved
-            await loader.InstallDependency( pkg, name, target )
+            tasks[] = loader.InstallDependency( pkg, name, target )
+        
+        return Promise.all( tasks )
+
+    loader.InitializePackage = async ( pkg ) ->
+        await loader.ResolveDependencies( pkg )
+        unless pkg.autorun
+            return
+
+        Logger\Info( "Executing '%s@%s' package...", pkg.name, pkg.version )
+
+        -- TODO: addcsluafiles that are in pkg.send table
+        await loader.AsyncImport( pkg.name, ESM.resolve, nil, pkg.url, pkg.env )
+        return
 
     loader.Startup = async ->
         _, folders = Find( "packages/*", file.LuaPath, true )
@@ -1069,55 +1114,16 @@ do
             elseif result.status == "rejected"
                 display( result.reason )
 
-        -- TODO: Resolve dependencies
-        -- ukdev: I think we need make dependencies resolving in package loading process, because dependencies also can have their dependencies
-        -- retr0: Proper way to do this is to create dedicated function ReasolveDependencies, which can recursevly resolve dependencies
-        -- retr0: I will implement this, no problem
-        -- gLua Package Manager or GLua Package Manager? :D
-        -- gpm GPM :>
-        for index = 1, pkgCount
-            pkg = pkgs[ index ]
-            await loader.ResolveDependencies( pkg ) -- TODO: handle errors
-
         if pkgCount == 0
-            Logger\Info( "No packages found :<" )
+            Logger\Info( "No packages were found :<" )
             return nil
 
-        -- Package structure logging
-        Logger\Info( "Directory 'packages/' have in total %d packages", pkgCount )
+        Logger\Info( "Found %d packages! Initializing them...", pkgCount )
+        tasks = {}
+        for pkg in *pkgs
+            tasks[] = loader.InitializePackage( pkg )
 
-        importTasks, taskCount = {}, 0
-
-        for index = 1, pkgCount
-            pkg = pkgs[ index ]
-
-            flags, count = {}, 0
-            if pkg.autorun
-                count += 1
-                flags[ count ] = "autorun"
-
-                taskCount += 1
-                importTasks[ taskCount ] = pkg
-
-            if count == 0
-                Logger\Info( "    - %s [%s]", pkg.name, pkg.version )
-            else
-                Logger\Info( "    - %s [%s] (%s)", pkg.name, pkg.version, concat( flags, ", ", 1, count ) )
-
-            -- print dependencies
-
-        -- Autorun packages
-        if taskCount == 0
-            Logger\Info( "No packages to execute :<" )
-            return nil
-
-        Logger\Info( "Executing %d autorun packages...", taskCount )
-
-        for index = 1, taskCount
-            pkg = importTasks[ index ]
-            importTasks[ index ] = loader.AsyncImport( pkg.name, ESM.resolve, nil, pkg.url, pkg.env )
-
-        -- Handle all failed startups
-        for result in *await( allSettled( importTasks ) )
+        tasks = await allSettled( tasks )
+        for result in *tasks
             if result.status == "rejected"
                 display( result.reason )
