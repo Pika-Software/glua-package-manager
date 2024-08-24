@@ -267,7 +267,7 @@ do
     tostring_class = ( cls ) ->
         return format( "@class '%s': %p", cls.__name, cls )
 
-    luaExtends = environment.extends = ( cls, parent ) ->
+    classExtends = environment.extends = ( cls, parent ) ->
         argAssert( cls, 1, "class" )
         argAssert( parent, 2, "class" )
 
@@ -339,7 +339,7 @@ do
         } )
 
         if parent ~= nil
-            luaExtends( static, parent )
+            classExtends( static, parent )
         else
             rawset( base, "__class", static )
 
@@ -352,6 +352,21 @@ do
 
     getmetatabled = debug.getmetatable or getmetatable
     setmetatabled = debug.setmetatable or setmetatable
+
+    -- null
+    do
+
+        null = environment.null = _G.newproxy( true )
+        metatable = getmetatabled( null )
+        metatable.__metatable_name = "null"
+        metatable.__metatable_id = 0
+        metatable.MetaName = "null"
+        metatable.MetaID = 0
+
+        metatable.__tostring = ->
+            return "null"
+
+        registerMetaTable( "null", metatable )
 
     -- nil
     object = nil
@@ -1293,6 +1308,10 @@ do
                 return front, @[ front ]
 
     }, nil, nil, true )
+
+-- https://github.com/WilliamVenner/gmsv_workshop
+if _G.SERVER and util.IsBinaryModuleInstalled( "workshop" )
+    _G.require( "workshop" )
 
 -- Garry's Mod hooks
 do
