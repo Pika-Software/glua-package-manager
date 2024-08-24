@@ -99,12 +99,21 @@ class GithubSource extends loader.Source
         unless branch
             error SourceError "Failed to get default branch for '#{user}/#{repository}'."
 
+        -- first letäs try to find file locally
+        workdir = @WorkingDirectory( url )
+        if ok, pkg := pcall( await, Package.read( url ) )
+            return {
+                package: pkg,
+                url: url,
+                -- no metadata indicates that the package is locally installed
+            }
+
         package_entry = FindPackageInfo( user, repository, branch, auth )
         unless package_entry
-                    error SourceError "Failed to find package file in #{user}/#{repository} (#{branch})."
+            error SourceError "Failed to find package file in #{user}/#{repository} (#{branch})."
 
         res = FetchFile( package_entry, auth )
-        packageURL = URL( path.getFile( res.path ), @WorkingDirectory( url ) )
+        packageURL = URL( path.getFile( res.path ), workdir )
         file.Set( packageURL.pathname, res.data ) -- TODO: prevent overwriting existing files
 
         pkg = await Package.read( packageURL )
@@ -126,6 +135,9 @@ class GithubSource extends loader.Source
     Install: async ( info, workdir ) =>
         unless workdir
             workdir = @WorkingDirectory( info.url ).pathname
+
+        unless info.metadata
+            return -- package is already installed
 
         Logger\Debug( "Installing package '%s@%s' from Github repository '%s/%s/%s'...", info.package.name, info.package.version, info.metadata.user, info.metadata.repository, info.metadata.branch )
 
