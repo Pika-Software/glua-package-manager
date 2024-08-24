@@ -350,7 +350,7 @@ do
             if versionObj
                 return {
                     Name: packageName,
-                    URL: "file:///lua/gpm/vfs/packages/" .. packageName .. "/" .. tostring( versionObj ),
+                    URL: "file:///lua/gpm/vfs/packages/" .. packageName .. "/" .. tostring( versionObj ) .. "/",
                     Version: versionObj,
                     Installed: true
                 }
