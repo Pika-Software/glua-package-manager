@@ -165,6 +165,7 @@ do
     http.DecodeURI = url.decodeURI
 
 -- Utils & Libs
+include( "gpm/libs/yaml.lua" )
 include( "post-util.lua" )
 include( "libs/file.lua" )
 include( "libs/http.lua" )

@@ -1,0 +1,763 @@
+import environment from _G.gpm
+import type, tonumber, error, null from environment
+import char, byte, sub, gsub, find, match, format, len, gmatch, rep, StartsWith from environment.string
+import concat, insert, remove, IsEmpty, IsSequential from environment.table
+import inf, nan from environment.math
+import Date from environment.util
+
+UNESCAPES = {
+    ["0"]: "\x00"
+    ["z"]: "\x00"
+    ["N"]: "\x85"
+    ["a"]: "\x07"
+    ["b"]: "\x08"
+    ["t"]: "\x09"
+    ["n"]: "\x0a"
+    ["v"]: "\x0b"
+    ["f"]: "\x0c"
+    ["r"]: "\x0d"
+    ["e"]: "\x1b"
+    ["\\"]: "\\"
+}
+
+ltrim = ( str ) ->
+    return match( str, "^%s*(.-)$" )
+
+rtrim = ( str ) ->
+  return match( str, "^(.-)%s*$" )
+
+countindent = ( line ) ->
+    _, j = find( line, '^%s+' )
+    unless j
+        return 0, line
+
+    return j, sub( line, j + 1 )
+
+parsestring = ( line, stopper ) ->
+    b0 = byte( line, 1 )
+    if b0 == 0x20 --[[  ]] or b0 == 0x09 --[[ \t ]]
+        return parsestring( sub( line, 2 ) )
+
+    if b0 == 0x27 --[[ ' ]]
+        i = find( line, "'", 2, true )
+        unless i
+            return nil, line
+
+        return sub( line, 2, i - 1 ), sub( line, i + 1 )
+
+    stringLength = len( line )
+
+    if b0 == 0x22 --[[ " ]]
+        buffet, length = {}, 0
+        i = 2
+
+        while i < stringLength
+            b1 = byte( line, i )
+            if b1 == 0x5c --[[ \\ ]]
+                n = sub( line, i + 1, i + 1 )
+                if UNESCAPES[ n ] ~= nil
+                    length += 1
+                    buffet[ length ] = UNESCAPES[ n ]
+                elseif n == 'x'
+                    h = sub( i + 2, i + 3 )
+                    if find( h, '^[0-9a-fA-F]$' )
+                        i += 2
+                        length += 1
+                        buffet[ length ] = char( tonumber( h, 16 ) )
+                    else
+                        length += 1
+                        buffet[ length ] = 'x'
+                else
+                    length += 1
+                    buffet[ length ] = n
+
+                i += 1
+            elseif b1 == b0
+                break
+
+            else
+                length += 1
+                buffet[ length ] = char( b1 )
+
+            i += 1
+
+        return concat( buffet, "", 1, length ), sub( line, i + 1 )
+
+    -- flow style
+    if b0 == 0x7B --[[ { ]] or b0 == 0x5B --[[ [ ]]
+        return nil, line
+
+    -- block
+    if b0 == 0x7C --[[ | ]] or b0 == 0x3E --[[ > ]]
+        return nil, line
+
+    if b0 == 0x2D --[[ - ]] or b0 == 0x3A --[[ : ]]
+        if byte( line, 2 ) == 0x20 --[[   ]] or stringLength == 1
+            return nil, line
+
+    stopper or= ''
+
+    buffer, length = {}, 0
+    while stringLength > 0
+        b1 = byte( line, 1 )
+        if find( stopper, char( b1 ), 1, true )
+            break
+
+        elseif b1 == 0x3A --[[ : ]] and ( byte( line, 2 ) == 0x20 --[[   ]] or stringLength == 1 )
+            break
+
+        elseif b1 == 0x23 --[[ # ]] and byte( buffer[ length ], 1 ) == 0x20 --[[   ]]
+            break
+
+        else
+            length += 1
+            buffer[ length ] = char( b1 )
+
+        line = sub( line, 2 )
+        stringLength -= 1
+
+    return rtrim( concat( buffer, "", 1, length ) ), line
+
+isemptyline = ( line ) ->
+    return line == '' or find( line, '^%s*$', 1, false ) ~= nil or find( line, '^%s*#', 1, false ) ~= nil
+
+equalsline = ( line, needle ) ->
+    return StartsWith( line, needle ) and isemptyline( sub( line, #needle + 1 ) )
+
+checkdupekey = ( map, key ) ->
+    if map[ key ] ~= nil
+        -- print("found a duplicate key '"..key.."' in line: "..line)
+        suffix = 1
+        while map[ key .. '_' .. suffix ]
+            suffix += 1
+
+        key ..= '_' .. suffix
+
+    return key
+
+parseflowstyle = ( line, lines ) ->
+    stack, length = {}, 0
+    while true
+        if len( line ) == 0
+            if #lines == 0
+                break
+            else
+                line = remove( lines, 1 )
+
+        b = byte( line, 1 )
+        if b == 0x23 --[[ # ]]
+            line = ''
+
+        elseif b == 0x20 --[[   ]] or b == 0x9 --[[ \t ]] or b == 0xD --[[ \r ]] or b == 0xA --[[ \n ]]
+            line = sub( line, 2 )
+
+        elseif b == 0x7B --[[ { ]] or b == 0x5B --[[ [ ]]
+            insert( stack, { v: {}, t: char( b ) } )
+            line = sub( line, 2 )
+
+        elseif b == 0x3A --[[ : ]]
+            insert( stack, { v: remove( stack ).v, t: ':' } )
+            line = sub( line, 2 )
+
+        elseif b == 0x2C --[[ , ]]
+            value = remove( stack )
+            if value.t == ':' or value.t == '{' or value.t == '['
+                error( "failed to classify line: " .. line )
+
+            if stack[ #stack ].t == ':'
+                -- map
+                key = remove( stack )
+                key.v = checkdupekey( stack[ #stack ].v, key.v )
+                stack[ #stack ].v[ key.v ] = value.v
+
+            elseif stack[ #stack ].t == '{'
+                -- set
+                stack[ #stack ].v[ value.v ] = true
+
+            elseif stack[ #stack ].t == '['
+                -- seq
+                insert( stack[ #stack ].v, value.v )
+
+            line = sub( line, 2 )
+
+        elseif b == 0x7D --[[ } ]]
+            if stack[ #stack ].t == '{'
+                if #stack == 1
+                    break
+
+                stack[ #stack ].t = '}'
+                line = sub( line, 2 )
+            else
+                line = ',' .. line
+
+        elseif b == 0x5D --[[ ] ]]
+            if stack[ #stack ].t == '['
+                if #stack == 1
+                    break
+
+                stack[ #stack ].t = ']'
+                line = sub( line, 2 )
+            else
+                line = ',' .. line
+        else
+            s, rest = parsestring( line, ',{}[]' )
+            unless s
+                error( 'invalid flowstyle line: ' .. line )
+
+            insert( stack, { v: s, t: 's' } )
+            line = rest
+
+    return stack[ 1 ].v, line
+
+parseblockstylestring = ( line, lines, indent ) ->
+    if #lines == 0
+        error( "failed to find multi-line scalar content" )
+
+    firstindent = -1
+    endline = -1
+    s = {}
+
+    for i = 1, #lines
+        ln = lines[ i ]
+
+        idt = countindent( ln )
+        if idt <= indent
+            break
+
+        if ln == ''
+            insert( s, '' )
+        else
+            if firstindent == -1
+                firstindent = idt
+
+            elseif idt < firstindent
+                break
+
+            insert( s, sub( ln, firstindent + 1 ) )
+
+        endline = i
+
+    striptrailing, newlineatend, sep = true, true, '\n'
+
+    if line == '|'
+        striptrailing = true
+        newlineatend = true
+        sep = '\n'
+
+    elseif line == '|+'
+        striptrailing = false
+        newlineatend = true
+        sep = '\n'
+
+    elseif line == '|-'
+        striptrailing = true
+        newlineatend = false
+        sep = '\n'
+
+    elseif line == '>'
+        striptrailing = true
+        newlineatend = true
+        sep = ' '
+
+    elseif line == '>+'
+        striptrailing = false
+        newlineatend = true
+        sep = ' '
+
+    elseif line == '>-'
+        striptrailing = true
+        newlineatend = false
+        sep = ' '
+
+    else
+        error( 'invalid blockstyle string:' .. line )
+
+    eonl = 0
+    for i = #s, 1, -1
+        if s[ i ] == ''
+            remove( s, i )
+            eonl += 1
+
+    if striptrailing
+        eonl = 0
+
+    if newlineatend
+        eonl += 1
+
+    for i = endline, 1, -1
+        lines[ i ] = nil
+
+    return concat( s, sep ) .. rep( '\n', eonl )
+
+parsetimestamp = ( line ) ->
+    _, p1, y, m, d = find( line, '^(%d%d%d%d)%-(%d%d)%-(%d%d)' )
+    unless p1
+        return nil, line
+
+    lineLength = len( line )
+
+    if p1 == lineLength
+        return Date( y, m, d ), ''
+
+    _, p2, h, i, s = find( line, '^[Tt ](%d+):(%d+):(%d+)', p1 + 1 )
+    unless p2
+        return Date( y, m, d ), sub( line, p1 + 1 )
+
+    if p2 == lineLength
+        return Date( y, m, d, h, i, s ), ''
+
+    _, p3, f = find( line, '^%.(%d+)', p2 + 1 )
+    unless p3
+        p3 = p2
+        f = 0
+
+    zc = sub( line, p3 + 1, p3 + 1 )
+    _, p4, zs, z = find( line, '^ ?([%+%-])(%d+)', p3 + 1 )
+    if p4
+        z = tonumber( z )
+
+        _, p5, zi = find( line, '^:(%d+)', p4 + 1 )
+        if p5
+            z = z + tonumber( zi ) / 60
+
+        z = zs == '-' and -tonumber( z ) or tonumber( z )
+
+    elseif zc == 'Z'
+        p4 = p3 + 1
+        z = 0
+    else
+        p4 = p3
+        z = false
+
+    return Date( y, m, d, h, i, s, f )\ToLocal!, sub( line, p4 + 1 )
+
+nulls = { ["null"]: true, ["Null"]: true, ["NULL"]: true }
+trues = { ["true"]: true, ["True"]: true, ["TRUE"]: true }
+falses = { ["false"]: true, ["False"]: true, ["FALSE"]: true }
+nans = { [".nan"]: true, [".NaN"]: true, [".NAN"]: true }
+neginfs = { ["-inf"]: true, ["-Inf"]: true, ["-INF"]: true }
+infs = {
+    [".inf"]: true, [".Inf"]: true, [".INF"]: true,
+    ["+inf"]: true, ["+Inf"]: true, ["+INF"]: true
+}
+
+parsescalar = ( line, lines, indent ) ->
+    line = ltrim( line )
+    line = gsub( line, '^%s*#.*$', '' ) -- comment only -> ''
+    line = gsub( line, '^%s*', '' )  -- trim head spaces
+
+    if line == '' or line == '~'
+        return null
+
+    ts = parsetimestamp( line )
+    if ts
+        return ts
+
+    str = parsestring( line )
+
+    -- StartsWith quote ... string
+    -- not StartsWith quote ... maybe string
+    if str and ( StartsWith( line, '"' ) or StartsWith( line, "'" ) )
+        return str
+
+    -- unexpected tagchar
+    b0 = byte( line, 1 )
+    if b0 == 0x21 --[[ ! ]]
+        error( 'unsupported line: ' .. line )
+
+    if equalsline( line, '{}' )
+        return {}
+
+    if equalsline( line, '[]' )
+        return {}
+
+    if b0 == 0x7B --[[ { ]] or b0 == 0x5B --[[ [ ]]
+        return parseflowstyle( line, lines )
+
+    if b0 == 0x7C --[[ | ]] or b0 == 0x3E --[[ > ]]
+        return parseblockstylestring( line, lines, indent )
+
+    -- Regular unquoted string
+    line = gsub( line, '%s*#.*$', '' ) -- trim tail comment
+
+    if nulls[ line ]
+        return null
+
+    if trues[ line ]
+        return true
+
+    if falses[ line ]
+        return false
+
+    if infs[ line ]
+        return inf
+
+    if neginfs[ line ]
+        return -inf
+
+    if nans[ line ]
+        return nan
+
+    if find( line, '^[%+%-]?[0-9]+$', 1, false ) or find( line, '^[%+%-]?[0-9]+%.$', 1, false )
+        return tonumber( line )
+
+    if find( line, '^[%+%-]?[0-9]+%.[0-9]+$', 1, false )
+        return tonumber( line )
+
+    return str or line
+
+local parsemap
+parseseq = ( line, lines, indent ) ->
+    seq = {}
+    if line ~= ''
+        error( 'not seq line: ' .. line )
+
+    while #lines > 0
+        -- Check for a new document
+        line = lines[ 1 ]
+        if StartsWith( line, '---' )
+            while #lines > 0 and not StartsWith( lines, '---' )
+                remove( lines, 1 )
+
+            return seq
+
+        -- Check the indent level
+        level = countindent( line )
+        if level < indent
+            return seq
+
+        if level > indent
+            error( "found bad indenting in line: " .. line )
+
+        i, j = find( line, '%-%s+' )
+        unless i
+            i, j = find( line, '%-$' )
+            unless i
+                return seq
+
+        rest = sub( line, j + 1 )
+        if find( rest, '^[^\'\"%s]*:' )
+            -- Inline nested hash
+            lines[ 1 ] = rep( ' ', j ) .. rest
+            insert( seq, parsemap( '', lines, j ) )
+
+        elseif find( rest, '^%-%s+' )
+            -- Inline nested seq
+            lines[ 1 ] = rep( ' ', j ) .. rest
+            insert( seq, parseseq( '', lines, j ) )
+
+        elseif isemptyline( rest )
+            remove( lines, 1 )
+
+            if #lines == 0
+                insert( seq, null )
+                return seq
+
+            if find( lines[ 1 ], '^%s*%-' )
+                indent2 = countindent( lines[ 1 ] )
+                if indent2 == indent
+                    -- Null seqay entry
+                    insert( seq, null )
+                else
+                    insert( seq, parseseq( '', lines, indent2 ) )
+            else
+                -- - # comment
+                --   key: value
+                insert( seq, parsemap( '', lines, countindent( lines[ 1 ] ) ) )
+
+        elseif rest
+            -- Array entry with a value
+            remove( lines, 1 )
+            insert( seq, parsescalar( rest, lines ) )
+
+    return seq
+
+parseset = ( line, lines, indent ) ->
+    unless isemptyline( line )
+        error( 'not seq line: ' .. line )
+
+    set = {}
+    while #lines > 0
+        -- Check for a new document
+        line = lines[ 1 ]
+        if StartsWith( line, '---' )
+            while #lines > 0 and not StartsWith( lines, '---' )
+                remove( lines, 1 )
+
+            return set
+
+        -- Check the indent level
+        level = countindent( line )
+        if level < indent
+            return set
+
+        if level > indent
+            error( "found bad indenting in line: " .. line )
+
+        i, j = find( line, '%?%s+' )
+        unless i
+            i, j = find( line, '%?$' )
+            unless i
+                return set
+
+        rest = sub( line, j + 1 )
+        if find( rest, '^[^\'\"%s]*:' )
+            -- Inline nested hash
+            lines[ 1 ] = rep( ' ', j ) .. rest
+            set[ parsemap( '', lines, j ) ] = true
+
+        elseif find( rest, '^%s+$' )
+            remove( lines, 1 )
+
+            if #lines == 0
+                insert( set, null )
+                return set
+
+            if find( lines[ 1 ], '^%s*%?' )
+                indent2 = countindent( lines[ 1 ] )
+                if indent2 == indent
+                    -- Null array entry
+                    set[ null ] = true
+                else
+                    set[ parseseq( '', lines, indent2 ) ] = true
+
+        elseif rest
+            remove( lines, 1 )
+            set[ parsescalar( rest, lines ) ] = true
+        else
+            error( "failed to classify line: " .. line )
+
+    return set
+
+parsemap = ( line, lines, indent ) ->
+    unless isemptyline( line )
+        error( 'not map line: ' .. line )
+
+    map = {}
+    while #lines > 0
+        -- Check for a new document
+        line = lines[ 1 ]
+        if StartsWith( line, '---' )
+            while #lines > 0 and not StartsWith( lines, '---' )
+                remove(lines, 1)
+
+            return map
+
+        -- Check the indent level
+        level = countindent( line )
+        if level < indent
+            return map
+
+        if level > indent
+            error( "found bad indenting in line: " .. line )
+
+        -- Find the key
+        s, rest = parsestring( line )
+        local key
+
+        -- Quoted keys
+        if s and StartsWith( rest, ':' )
+            sc = parsescalar( s, {}, 0 )
+            if sc and not isstring( sc )
+                key = sc
+            else
+                key = s
+
+            line = sub( rest, 2 )
+        else
+            error( "failed to classify line: " .. line )
+
+        key = checkdupekey( map, key )
+        line = ltrim( line )
+
+        if byte( line, 1 ) == 0x21 --[[ ! ]]
+            -- ignore type
+            rh = ltrim( sub( line, 3 ) )
+            typename = match( rh, '^!?[^%s]+' )
+            line = ltrim( sub( rh, #typename + 1 ) )
+
+        if isemptyline( line )
+            -- An indent
+            remove( lines, 1 )
+            if #lines == 0
+                map[ key ] = null
+                return map
+
+            if find( lines[ 1 ], '^%s*%-' )
+                map[ key ] = parseseq( '', lines, countindent( lines[ 1 ] ) )
+            elseif find( lines[ 1 ], '^%s*%?' )
+                map[ key ] = parseset( '', lines, countindent( lines[ 1 ] ) )
+            else
+                indent2 = countindent( lines[ 1 ] )
+                if indent < indent2
+                    map[ key ] = parsemap( '', lines, indent2 )
+                else
+                    map[ key ] = null
+        else
+            remove( lines, 1 )
+            line = ltrim( line )
+            map[ key ] = parsescalar( line, lines, indent )
+
+    return map
+
+-- : (list<str>)->dict
+
+filter_fn = ( str ) ->
+    return not isemptyline( str )
+
+parsedocuments = ( lst, lst_len ) ->
+    lines, lines_len = {}, 0
+    for index = 1, lst_len
+        str = lst[ index ]
+        if filter_fn( str, index )
+            lines_len += 1
+            lines[ lines_len ] = str
+
+    if find( lines[ 1 ], '^%%YAML' )
+        remove( lines, 1 )
+        lines_len -= 1
+
+    root, length = {}, 0
+    in_document = false
+
+    while lines_len > 0
+        line = lines[ 1 ]
+
+        -- Do we have a document header?
+        local docright
+        if find( line, '^%-%-%-' )
+            -- Handle scalar documents
+            docright = sub( line, 4 )
+            in_document = true
+            remove( lines, 1 )
+            lines_len -= 1
+
+        if docright
+            unless find( docright, '^%s+$' ) or find( docright, '^%s+#' )
+                length += 1
+                root[ length ] = parsescalar( docright, lines )
+                lines_len = #lines
+
+        elseif lines_len == 0 or StartsWith( line, '---' )
+            -- A naked document
+            length += 1
+            root[ length ] = null
+
+            while lines_len > 0 and not find( lines[ 1 ], '---', 1, false )
+                remove( lines, 1 )
+                lines_len -= 1
+
+            in_document = false
+
+        elseif not in_document and length > 0
+            -- XXX The final '-+$' is to look for -- which ends up being an
+            -- error later.
+            -- only the first document can be explicit
+            error( 'parse error: ' .. line )
+
+        elseif find( line, '^%s*%-', 1, false )
+            -- An array at the root
+            length += 1
+            root[ length ] = parseseq( '', lines, 0 )
+            lines_len = #lines
+
+        elseif find( line, '^%s*[^%s]', 1, false )
+            -- A hash at the root
+            length += 1
+            root[ length ] = parsemap( '', lines, countindent( line ) )
+            lines_len = #lines
+
+        else
+            -- Shouldn't get here.  @lines have whitespace-only lines
+            -- stripped, and previous match is a line with any
+            -- non-whitespace.  So this clause should only be reachable via
+            -- a perlbug where \s is not symmetric with \S
+            -- uncoverable statement
+            error( 'parse error: ' .. line )
+
+    first = root[ 1 ]
+    if length > 1 and ( first == nil or first == null )
+        remove( root, 1 )
+        return root
+
+    return root
+
+serialize = ( tbl, indent, buffer, length ) ->
+    if IsEmpty( tbl )
+        return length
+
+    if IsSequential( tbl )
+        if indent == 0
+            error( "serialize error: no indent" )
+
+        spaces = rep( " ", indent )
+
+        for index = 1, #tbl
+            value = tbl[ index ]
+
+            typeName = type( value )
+            if typeName == "table"
+                length += 1
+                buffer[ length ] = spaces .. "- "
+                length = serialize( value, indent + 4, buffer, length )
+
+            else
+                if typeName == "Date"
+                    date = value\Copy!
+                    date\ToUTC!
+
+                    year, month, day = date\GetDate!
+                    hour, min, sec = date\GetTime!
+
+                    value = format( '%04d-%02d-%02dT%02d:%02d:%02d.%03d%s', year, month, day, hour, min, sec, date\GetMilliseconds!, date\GetTimeZone! )
+
+                length += 1
+                buffer[ length ] = spaces .. "- " .. tostring( value ) .. "\n"
+
+        return length
+
+    spaces = rep( " ", indent )
+
+    for key, value in pairs( tbl )
+        unless isstring( key )
+            error( "serialize error: key is not a string" )
+
+        typeName = type( value )
+        if typeName == "table"
+            length += 1
+            buffer[ length ] = spaces .. key .. ":\n"
+            length = serialize( value, indent + 4, buffer, length )
+
+        else
+            if typeName == "Date"
+                date = value\Copy!
+                date\ToUTC!
+
+                year, month, day = date\GetDate!
+                hour, min, sec = date\GetTime!
+
+                value = format( '%04d-%02d-%02dT%02d:%02d:%02d.%03d%s', year, month, day, hour, min, sec, date\GetMilliseconds!, date\GetTimeZone! )
+
+            length += 1
+            buffer[ length ] = spaces .. key .. ": " .. tostring( value ) .. "\n"
+
+    return length
+
+environment.yaml = {
+    serialize: ( tbl ) ->
+        buffer, length = {}, 0
+        length = serialize( tbl, 0, buffer, length )
+        return concat( buffer, "", 1, length )
+
+    deserialize: ( str ) ->
+        lines, length = {}, 0
+        for line in gmatch( str .. '\n', '(.-)\r?\n' )
+            length += 1
+            lines[ length ] = line
+
+        tbl = parsedocuments( lines, length )
+        if #tbl == 1
+            return tbl[ 1 ]
+
+        return tbl
+}

@@ -811,26 +811,23 @@ internal_methods.Copy = =>
 --[[ THE LOCAL DATE OBJECT METHODS ]]
 --
 internal_methods.ToLocal = =>
-    day_number, day_fraction = @__day_number, @__day_fraction
     bias = getbiasutc2( @ )
     if bias
         -- utc = local + bias; local = utc - bias
-        @__day_number = day_number
-        @__day_fraction = day_fraction - bias * MILLISECONDS
+        @__day_fraction -= bias * MILLISECONDS
         return @Normalize!
 
-    return nil
+    return @
 
 internal_methods.ToUTC = =>
     day_fraction = @__day_fraction
     bias = getbiasloc2( @__day_number, day_fraction )
     if bias
         -- utc = local + bias;
-        -- @__day_number = day_number
         @__day_fraction = day_fraction + bias * MILLISECONDS
         return @Normalize!
 
-    return nil
+    return @
 
 internal_methods.GetBIAS = =>
     return getbiasloc2( @__day_number, @__day_fraction ) / SECONDS

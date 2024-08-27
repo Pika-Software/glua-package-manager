@@ -1067,3 +1067,55 @@ do
     )
 
     util.Version = versionClass
+
+do
+
+    import GetValue, SetValue from table
+    import Create, Remove from environment.timer
+    import serialize, deserialize from environment.yaml
+    import IsFile, AsyncWrite, Read, Write from environment.file
+
+    environment.Config = environment.class( "Config", {
+        new: ( name, defaults ) =>
+            ArgAssert( name, 1, "string" )
+            @name = name
+
+            filePath = "/data/config/" .. name .. ".txt"
+            @timer = "GPM::Config - " .. name
+            @filepath = filePath
+
+            if IsFile( filePath )
+                @data = deserialize( Read( filePath ) )
+            elseif defaults
+                ArgAssert( defaults, 2, "table" )
+                Write( filePath, serialize( defaults ) )
+                @data = defaults
+            else
+                @data = {}
+
+            return nil
+
+        GetAll: =>
+            return @data
+
+        Get: ( key ) =>
+            return GetValue( @data, key )
+
+        Set: ( key, value ) =>
+            ArgAssert( key, 1, "string" )
+            SetValue( @data, key, value )
+            Create @timer, 1, 1, ->
+                @Write!
+
+            return nil
+
+        Write: =>
+            AsyncWrite( @filepath, serialize( @data ) )
+            Remove( @timer )
+            return nil
+
+        Read: =>
+            @data = deserialize( Read( @filepath ) )
+            return nil
+
+    } )
