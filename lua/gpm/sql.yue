@@ -46,7 +46,7 @@ sql.rollback = ->
 
 --]]
 
-do
+do --- http_cache table, used for etag caching in http library
     lib = sql.http_cache = {}
     
     lib.get = ( url ) ->
@@ -69,6 +69,22 @@ do
 
         sql.query( "insert or replace into 'gpm.http_cache' (url, etag, timestamp, content) values (?, ?, ?, ?)", url, etag, os.time(), content )
 
+do --- key-value store for gpm
+    lib = sql.store = {}
+
+    lib.set = ( key, value ) ->
+        ArgAssert( key, 1, "string" )
+        ArgAssert( value, 2, "string" )
+
+        sql.query( "insert or replace into 'gpm.store' values (?, ?)", key, value )
+        return
+    
+    lib.get = ( key ) ->
+        ArgAssert( key, 1, "string" )
+
+        result = sql.query( "select value from 'gpm.store' where key=?", key )
+        return result and result[1].value
+
 --[[
 
     Migrations
@@ -83,13 +99,18 @@ sql.migrations = [
     {
         name: "http_cache add primary key"
         execute: ->
-            sql.query "drop table if exists 'gpm.http_cache'"
-            sql.query [[create table 'gpm.http_cache' (
+            sql.query( "drop table if exists 'gpm.http_cache'" )
+            sql.query( [[create table 'gpm.http_cache' (
                 url text primary key, 
                 etag text,
                 timestamp int, 
                 content blob
-            )]]
+            )]] )
+    }
+    {
+        name: "added key-value store",
+        execute: ->
+            sql.query( "create table 'gpm.store' ( key text unique, value text )" )
     }
 ]
 
