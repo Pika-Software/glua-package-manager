@@ -1,0 +1,1144 @@
+--[[
+    Based on https://github.com/Tieske/date
+    Copyright (C) 2005-2006, by Jas Latrix (jastejada@yahoo.com)
+    Copyright (C) 2013-2021, by Thijs Schreijer
+    Licensed under MIT, http://opensource.org/licenses/MIT
+--]]
+
+_G = _G
+import environment from _G.gpm
+import pairs, error, tonumber, tostring, setmetatable from _G
+import format, lower, rep, len, sub, gsub, gmatch, find from environment.string
+import floor, abs, trunc, fmod, fdiv from environment.math
+import band, bor, lshift, rshift from environment.bit
+import time, date from environment.os
+import unpack from environment.table
+import type from environment
+
+-- < CONSTANTS >
+HOURS = 24 -- 1 hour = 1/24 day
+MINUTES = 60 -- 1 minute = 1/60 hour
+SECONDS = 60 -- 1 second = 1/60 minute
+MILLISECONDS = 1000 -- 1 millisecond = 1/1000 second
+
+DAYMINUTES = HOURS * MINUTES -- 1440
+DAYSECONDS = DAYMINUTES * SECONDS -- 86400
+DAYMILLISECONDS = DAYSECONDS * MILLISECONDS -- 86400000
+
+HOURSECONDS = MINUTES * SECONDS -- 3600
+HOURMILLISECONDS = HOURSECONDS * MILLISECONDS -- 3600000
+
+MINUTEMILLISECONDS = SECONDS * MILLISECONDS -- 60000
+
+DAYNUM_MAX = 365242500 -- Sat Jan 01 1000000 00:00:00
+DAYNUM_MIN = -365242500 -- Mon Jan 01 1000000 BCE 00:00:00
+
+DAYNUM_DEF = 0 -- Mon Jan 01 0001 00:00:00
+CENTURYFLIP = 0 -- year >= CENTURYFLIP == 1900, < CENTURYFLIP == 2000
+
+-- removes the decimal part of a number
+truncString = ( str ) ->
+    n = tonumber( str )
+    return n and trunc( n )
+
+-- is `str` in string list `tbl`, `ml` is the minimun len
+inlist = ( str, tbl, min_length, tn ) ->
+    length = len( str )
+
+    if length < ( min_length or 0 )
+        return nil
+
+    str = lower( str )
+
+    for key, value in pairs( tbl )
+        if str == lower( sub( value, 1, length ) )
+            if tn
+                tn[ 0 ] = key
+
+            return key
+
+--[[ DATE FUNCTIONS ]]
+sl_weekdays = {
+    [ 00 ]: "Sunday"
+    [ 01 ]: "Monday"
+    [ 02 ]: "Tuesday"
+    [ 03 ]: "Wednesday"
+    [ 04 ]: "Thursday"
+    [ 05 ]: "Friday"
+    [ 06 ]: "Saturday"
+    [ 07 ]: "Sun"
+    [ 08 ]: "Mon"
+    [ 09 ]: "Tue"
+    [ 10 ]: "Wed"
+    [ 11 ]: "Thu"
+    [ 12 ]: "Fri"
+    [ 13 ]: "Sat"
+}
+
+sl_meridian = {
+    [ -1 ]: "AM"
+    [ 01 ]: "PM"
+}
+
+sl_months = {
+    [ 00 ]: "January"
+    [ 01 ]: "February"
+    [ 02 ]: "March"
+    [ 03 ]: "April"
+    [ 04 ]: "May"
+    [ 05 ]: "June"
+    [ 06 ]: "July"
+    [ 07 ]: "August"
+    [ 08 ]: "September"
+    [ 09 ]: "October"
+    [ 10 ]: "November"
+    [ 11 ]: "December"
+    [ 12 ]: "Jan"
+    [ 13 ]: "Feb"
+    [ 14 ]: "Mar"
+    [ 15 ]: "Apr"
+    [ 16 ]: "May"
+    [ 17 ]: "Jun"
+    [ 18 ]: "Jul"
+    [ 19 ]: "Aug"
+    [ 20 ]: "Sep"
+    [ 21 ]: "Oct"
+    [ 22 ]: "Nov"
+    [ 23 ]: "Dec"
+}
+
+-- added the '.2'  to avoid collision, use `fix` to remove
+sl_timezone = {
+    [ 000 ]: "utc"
+    [ 0.2 ]: "gmt"
+    [ 300 ]: "est"
+    [ 240 ]: "edt"
+    [ 360 ]: "cst"
+    [ 300.2 ]: "cdt"
+    [ 420 ]: "mst"
+    [ 360.2 ]: "mdt"
+    [ 480 ]: "pst"
+    [ 420.2 ]: "pdt"
+}
+
+-- is year year leap year?
+-- year must be int!
+isleapyear = ( year ) ->
+    return fmod( year, 4 ) == 0 and ( fmod( year, 100 ) ~= 0 or fmod( year, 400 ) == 0 )
+
+-- day since year 0
+-- year must be int!
+dayfromyear = ( year ) ->
+    return 365 * year + floor( year / 4 ) - floor( year / 100 ) + floor( year / 400 )
+
+-- day number from date, month is zero base
+makedaynum = ( year, month, day ) ->
+    month_offset = fmod( fmod( month, 12 ) + 10, 12 )
+    return dayfromyear( year + floor( month / 12 ) - floor( month_offset / 10 ) ) + floor( ( month_offset * 306 + 5 ) / 10 ) + day - 307
+
+-- date from day number, month is zero base
+breakdaynum = ( g ) ->
+    g += 306
+
+    year = floor( ( 10000 * g + 14780 ) / 3652425 )
+
+    day = g - dayfromyear( year )
+    if day < 0
+        year -= 1
+        day = g - dayfromyear( year )
+
+    mi = floor( ( 100 * day + 52 ) / 3060 )
+    return floor( ( mi + 2 ) / 12 ) + year, fmod( mi + 2, 12 ), day - floor( ( mi * 306 + 5 ) / 10 ) + 1
+
+--[[ for floats or int32 Lua Number data type
+local function breakdaynum2(g)
+  local g, n = g + 306;
+  local n400 = floor(g/DI400Y);n = fmod(g,DI400Y);
+  local n100 = floor(n/DI100Y);n = fmod(n,DI100Y);
+  local n004 = floor(n/DI4Y);   n = fmod(n,DI4Y);
+  local n001 = floor(n/365);   n = fmod(n,365);
+  local year = (n400*400) + (n100*100) + (n004*4) + n001  - ((n001 == 4 or n100 == 4) and 1 or 0)
+  local day = g - dayfromyear(year)
+  local mi = floor((100*day + 52)/3060)
+  return (floor((mi + 2)/12) + year), fmod(mi + 2,12), (day - floor((mi*306 + 5)/10) + 1)
+]]
+
+-- day fraction from time
+makedayfrc = ( hour, min, sec, ms ) ->
+    return ( ( hour * 60 + min ) * 60 + sec ) * MILLISECONDS + ms
+
+-- time from day fraction
+breakdayfrc = ( day_fraction ) ->
+    return fmod( floor( day_fraction / HOURMILLISECONDS ), HOURS ), fmod( floor( day_fraction / MINUTEMILLISECONDS ), MINUTES ), fmod( floor( day_fraction / MILLISECONDS ), SECONDS ), fmod( day_fraction, MILLISECONDS )
+
+-- weekday sunday = 0, monday = 1 ...
+weekday = ( day_number ) ->
+    return fmod( day_number + 1, 7 )
+
+-- yearday 0 based ...
+yearday = ( day_number ) ->
+    return day_number - dayfromyear( breakdaynum( day_number ) - 1 )
+
+-- parse value as a month
+getmontharg = ( value ) ->
+    month = tonumber( value )
+    return ( month and trunc( month - 1 ) ) or inlist( tostring( value ) or "", sl_months, 2 )
+
+-- get __day_number of isoweek one of year
+isow1 = ( year ) ->
+    f = makedaynum( year, 0, 4 ) -- get the date for the 4-Jan of year
+    day = weekday( f )
+    day = day == 0 and 7 or day -- get the ISO day number, 1 == Monday, 7 == Sunday
+    return f + ( 1 - day )
+
+isowy = ( day_number ) ->
+    local w1
+
+    year = breakdaynum( day_number )
+    if day_number >= makedaynum( year, 11, 29 )
+        w1 = isow1( year + 1 )
+        if day_number < w1
+            w1 = isow1( year )
+        else
+            year += 1
+    else
+        w1 = isow1( year )
+        if day_number < w1
+            w1 = isow1( year - 1 )
+            year -= 1
+
+    return floor( ( day_number - w1 ) / 7 ) + 1, year
+
+isoy = ( day_number ) ->
+    year = breakdaynum( day_number )
+    return year + ( ( ( day_number >= makedaynum( year, 11, 29 ) ) and ( day_number >= isow1( year + 1 ) ) ) and 1 or ( day_number < isow1( year ) and -1 or 0 ) )
+
+makedaynum_isoywd = ( year, w, day ) ->
+    return isow1( year ) + 7 * w + day - 8
+
+-- simplified: isow1(year) + ((w-1)*7) + (day-1)
+internal_methods = {}
+fmtstr = "%x %X"
+
+-- shout invalid arg
+date_error_arg = ->
+    return error( "invalid argument(sec)", 3 )
+
+-- create new date object
+date_new = ( day_number, day_fraction ) ->
+    return setmetatable( { __day_number: day_number, __day_fraction: day_fraction }, internal_methods )
+
+-- magic year table
+local date_epoch, year_table
+getequivyear = ( value ) ->
+    assert( not year_table )
+    year_table = {}
+
+    local dateWeek, dateYear
+
+    obj = date_epoch\Copy!
+    for _ = 0, 3000
+        obj\SetYear( obj\GetYear! + 1, 1, 1 )
+        dateYear = obj\GetYear!
+        dateWeek = obj\GetWeekDay! * ( isleapyear( dateYear ) and -1 or 1 )
+
+        unless year_table[ dateWeek ]
+            year_table[ dateWeek ] = dateYear
+
+        if year_table[ -7 ] and year_table[ -6 ] and year_table[ -5 ] and year_table[ -4 ] and year_table[ -3 ] and year_table[ -2 ] and year_table[ -1 ] and year_table[ 1 ] and year_table[ 2 ] and year_table[ 3 ] and year_table[ 4 ] and year_table[ 5 ] and year_table[ 6 ] and year_table[ 7 ]
+            getequivyear = ( year ) ->
+                return year_table[ ( weekday( makedaynum( year, 0, 1 ) ) + 1 ) * ( isleapyear( year ) and -1 or 1 ) ]
+
+            return getequivyear( value )
+
+local DATE_EPOCH
+
+-- TimeValue from date and time
+totv = ( year, month, day, hour, min, sec ) ->
+    return ( makedaynum( year, month, day ) - DATE_EPOCH ) * DAYSECONDS + ( ( hour * 60 + min ) * 60 + sec )
+
+-- TimeValue from TimeTable
+tmtotv = ( time_table ) ->
+    return time_table and totv( time_table.year, time_table.month - 1, time_table.day, time_table.hour, time_table.min, time_table.sec )
+
+-- Returns the bias in seconds of utc time __day_number and __day_fraction
+getbiasutc2 = =>
+    year, month, day = breakdaynum( @__day_number )
+    hour, min, sec = breakdayfrc( @__day_fraction )
+    tvu = totv( year, month, day, hour, min, sec ) -- get the utc TimeValue of date and time
+    tml = date( "*t", tvu ) -- get the local TimeTable of tvu
+
+    -- failed try the magic
+    if ( not tml ) or ( tml.year > ( year + 1 ) or tml.year < ( year - 1 ) )
+        year = getequivyear( year )
+        tvu = totv( year, month, day, hour, min, sec )
+        tml = date( "*t", tvu )
+
+    tvl = tmtotv( tml )
+    if tvu and tvl
+        return tvu - tvl, tvu, tvl
+
+    return error( "failed to get bias from utc time" )
+
+-- Returns the bias in seconds of local time day_number and day_fraction
+getbiasloc2 = ( day_number, day_fraction ) ->
+    -- extract date and time
+    year, month, day = breakdaynum( day_number )
+    hour, min, sec = breakdayfrc( day_fraction )
+    month += 1
+
+    -- get equivalent TimeTable
+    tml = { :year, :month, :day, :hour, :min, :sec }
+
+    -- get equivalent TimeValue
+    tvl = tmtotv( tml )
+
+    local tvu
+    chkutc = ->
+        tml.isdst = nil
+
+        tvug = time( tml )
+        if tvug and ( tvl == tmtotv( date( "*t", tvug ) ) )
+            tvu = tvug
+            return nil
+
+        tml.isdst = true
+
+        tvud = time( tml )
+        if tvud and ( tvl == tmtotv( date( "*t", tvud ) ) )
+            tvu = tvud
+            return nil
+
+        tvu = tvud or tvug
+
+    chkutc!
+
+    unless tvu
+        tml.year = getequivyear( year )
+        tvl = tmtotv( tml )
+        chkutc!
+
+    return ( ( tvu and tvl ) and ( tvu - tvl ) ) or error( "failed to get bias from local time" ), tvu, tvl
+
+-- ^Lua regular expression is not as powerful as Perl$
+stringWalkerClass = environment.class( "StringWalker", {
+    new: ( str ) =>
+        @length = len( str )
+        @i, @e = 1, 1
+        @data = str
+        return nil
+
+    aimchr: =>
+        return "\n" .. @data .. "\n" .. rep( ".", @e - 1 ) .. "^"
+
+    finish: =>
+        return @i > @length
+
+    back: =>
+        @i = @e
+        return @
+
+    restart: =>
+        @i, @e = 1, 1
+        return @
+
+    match: ( str ) =>
+        return find( @data, str, @i )
+
+    __call: ( str, func ) =>
+        local is, ie
+        is, ie, @[ 1 ], @[ 2 ], @[ 3 ], @[ 4 ], @[ 5 ] = find( @data, str, @i )
+        if is
+            @e, @i = @i, 1 + ie
+            if func
+                func( unpack( @ ) )
+
+            return @
+
+        return nil
+
+} )
+
+--[[ THE DATE OBJECT METHODS ]]
+--
+internal_methods.Normalize = =>
+    day_fraction = @__day_fraction
+    day_number = trunc( @__day_number ) + floor( day_fraction / DAYMILLISECONDS )
+    @__day_number = day_number
+
+    day_fraction = fmod( day_fraction, DAYMILLISECONDS )
+    if day_fraction < 0
+        day_fraction += DAYMILLISECONDS
+
+    @__day_fraction = day_fraction
+
+    return ( day_number >= DAYNUM_MIN and day_number <= DAYNUM_MAX ) and @ or error("date beyond imposed limits:" .. @ )
+
+internal_methods.GetDate = =>
+    year, month, day = breakdaynum( @__day_number )
+    return year, month + 1, day
+
+internal_methods.GetTime = =>
+    return breakdayfrc( @__day_fraction )
+
+internal_methods.GetClockHour = =>
+    hour = @GetHours!
+    return hour > 12 and fmod( hour, 12 ) or ( hour == 0 and 12 or hour )
+
+internal_methods.GetYearDay = =>
+    return yearday( @__day_number ) + 1
+
+-- in lua weekday is sunday = 1, monday = 2 ...
+internal_methods.GetWeekDay = =>
+    return weekday( @__day_number ) + 1
+
+internal_methods.GetYear = =>
+    return breakdaynum( @__day_number ), nil
+
+local _
+
+-- in lua month is 1 base
+internal_methods.GetMonth = =>
+    local r
+    _, r, _ = breakdaynum( @__day_number )
+    return r + 1
+
+internal_methods.GetDay = =>
+    local r
+    _, _, r = breakdaynum( @__day_number )
+    return r
+
+internal_methods.GetHours = =>
+    return fmod( floor( @__day_fraction / HOURMILLISECONDS ), HOURS )
+
+internal_methods.GetMinutes = =>
+    return fmod( floor( @__day_fraction / MINUTEMILLISECONDS ), MINUTES )
+
+internal_methods.GetSeconds = =>
+    return fmod( floor( @__day_fraction / MILLISECONDS ), SECONDS )
+
+internal_methods.GetMilliseconds = =>
+    return fmod( floor( @__day_fraction / MILLISECONDS ), MILLISECONDS )
+
+internal_methods.GetFloatSeconds = =>
+    return fmod( floor( @__day_fraction / MILLISECONDS ), SECONDS ) + ( fmod( @__day_fraction, MILLISECONDS ) / MILLISECONDS )
+
+internal_methods.GetTicks = ( u ) =>
+    x = fmod( @__day_fraction, MILLISECONDS )
+    return u and ( ( x * u ) / MILLISECONDS ) or x
+
+internal_methods.GetWeekNumber = ( wdb ) =>
+    wd, yd = weekday( @__day_number ), yearday( @__day_number )
+    if wdb
+        wdb = tonumber( wdb )
+        if wdb
+            wd = fmod( wd - ( wdb - 1 ), 7 ) -- shift the week day base
+        else
+            return date_error_arg!
+
+    return ( yd < wd and 0 ) or ( floor( yd / 7 ) + ( ( fmod( yd, 7 ) >= wd ) and 1 or 0 ) )
+
+-- sunday = 7, monday = 1 ...
+internal_methods.GetISOWeekDay = =>
+    return fmod( weekday( @__day_number ) - 1, 7 ) + 1
+
+internal_methods.GetISOWeekNumber = =>
+    return isowy( @__day_number )
+
+internal_methods.GetISOYear = =>
+    return isoy( @__day_number )
+
+internal_methods.GetISODate = =>
+    w, year = isowy( @__day_number )
+    return year, w, @GetISOWeekDay!
+
+internal_methods.SetISOYear = ( year, w, day ) =>
+    cy, cw, cd = @GetISODate!
+    if year
+        cy = trunc( tonumber( year ) )
+
+    if w
+        cw = trunc( tonumber( w ) )
+
+    if day
+        cd = trunc( tonumber( day ) )
+
+    if cy and cw and cd
+        @__day_number = makedaynum_isoywd( cy, cw, cd )
+        return @Normalize!
+
+    return date_error_arg!
+
+internal_methods.SetISOWeekDay = ( day ) =>
+    return @SetISOYear( nil, nil, day )
+
+internal_methods.SetISOWeekNumber = ( w, day ) =>
+    return @SetISOYear( nil, w, day )
+
+internal_methods.SetYear = ( year, month, day ) =>
+    cy, cm, cd = breakdaynum( @__day_number )
+    if year
+        cy = trunc( tonumber( year ) )
+
+    if month
+        cm = getmontharg( month )
+
+    if day
+        cd = trunc( tonumber( day ) )
+
+    if cy and cm and cd
+        @__day_number = makedaynum( cy, cm, cd )
+        return @Normalize!
+
+    return date_error_arg!
+
+internal_methods.SetMonth = ( month, day ) =>
+    return @SetYear( nil, month, day )
+
+internal_methods.SetDay = ( day ) =>
+    return @SetYear( nil, nil, day )
+
+internal_methods.SetHours = ( hour, month, sec, ms ) =>
+    ch, cm, cs, ck = breakdayfrc( @__day_fraction )
+    ch, cm, cs, ck = tonumber( hour or ch ), tonumber( month or cm ), tonumber( sec or cs ), tonumber( ms and ( ms * MILLISECONDS ) or ck )
+    if ch and cm and cs and ck
+        @__day_fraction = makedayfrc( ch, cm, cs, ck )
+        return @Normalize!
+
+    return date_error_arg!
+
+internal_methods.SetMinutes = ( month, sec, ms ) =>
+    return @SetHours( nil, month, sec, ms )
+
+internal_methods.SetSeconds = ( sec, ms ) =>
+    return @SetHours( nil, nil, sec, ms )
+
+internal_methods.SetTicks = ( ms ) =>
+    return @SetHours( nil, nil, nil, ms )
+
+internal_methods.SpanTicks = =>
+    return @__day_number * DAYMILLISECONDS + @__day_fraction
+
+internal_methods.SpanSeconds = =>
+    return ( @__day_number * DAYMILLISECONDS + @__day_fraction ) / MILLISECONDS
+
+internal_methods.SpanMinutes = =>
+    return ( @__day_number * DAYMILLISECONDS + @__day_fraction ) / MINUTEMILLISECONDS
+
+internal_methods.SpanHours = =>
+    return ( @__day_number * DAYMILLISECONDS + @__day_fraction ) / HOURMILLISECONDS
+
+internal_methods.SpanDays = =>
+    return ( @__day_number * DAYMILLISECONDS + @__day_fraction ) / DAYMILLISECONDS
+
+internal_methods.AddYears = ( year, month, day ) =>
+    cy, cm, cd = breakdaynum( @__day_number )
+    if year
+        year = trunc( tonumber( year ) )
+    else
+        year = 0
+
+    if month
+        month = trunc( tonumber( month ) )
+    else
+        month = 0
+
+    if day
+        day = trunc( tonumber( day ) )
+    else
+        day = 0
+
+    if year and month and day
+        @__day_number = makedaynum( cy + year, cm + month, cd + day )
+        return @Normalize!
+
+    return date_error_arg!
+
+internal_methods.AddMonths = ( month, day ) =>
+    return @AddYears( nil, month, day )
+
+do
+
+    dobj_adddayfrc = ( n, pt, pd ) =>
+        n = tonumber( n )
+        if n
+            x = floor( n / pd )
+            @__day_number = @__day_number + x
+            @__day_fraction = @__day_fraction + ( n - x * pd ) * pt
+            return @Normalize!
+
+        return date_error_arg!
+
+    internal_methods.AddDays = ( n ) =>
+        return dobj_adddayfrc( @, n, DAYMILLISECONDS, 1 )
+
+    internal_methods.AddHours = ( n ) =>
+        return dobj_adddayfrc( @, n, HOURMILLISECONDS, HOURS )
+
+    internal_methods.AddMinutes = ( n ) =>
+        return dobj_adddayfrc( @, n, MINUTEMILLISECONDS, DAYMINUTES )
+
+    internal_methods.AddSeconds = ( n ) =>
+        return dobj_adddayfrc( @, n, MILLISECONDS, DAYSECONDS )
+
+    internal_methods.AddMilliseconds = ( n ) =>
+        return dobj_adddayfrc( @, n, 1000, DAYMILLISECONDS )
+
+    internal_methods.AddTicks = ( n ) =>
+        return dobj_adddayfrc( @, n, 1, DAYMILLISECONDS )
+
+do
+
+    tvspec = {
+        -- Abbreviated weekday name (Sun)
+        ['%a']: => sl_weekdays[ weekday( @__day_number ) + 7 ]
+
+        -- Full weekday name (Sunday)
+        ['%A']: => sl_weekdays[ weekday( @__day_number ) ]
+
+        -- Abbreviated month name (Dec)
+        ['%b']: => sl_months[ @GetMonth! - 1 + 12 ]
+
+        -- Full month name (December)
+        ['%B']: => sl_months[ @GetMonth! - 1 ]
+
+        -- Year/100 (19, 20, 30)
+        ['%C']: => format( "%.2d", trunc( @GetYear! / 100 ) )
+
+        -- The day of the month as a number (range 1 - 31)
+        ['%d']: => format( "%.2d", @GetDay! )
+
+        -- year for ISO 8601 week, from 00 (79)
+        ['%g']: => format( "%.2d", fmod( @GetISOYear!, 100 ) )
+
+        -- year for ISO 8601 week, from 0000 (1979)
+        ['%G']: => format( "%.4d", @GetISOYear! )
+
+        -- same as %b
+        ['%h']: => @fmt0( "%b" )
+
+        -- hour of the 24-hour day, from 00 (06)
+        ['%H']: => format( "%.2d", @GetHours! )
+
+        -- The  hour as a number using a 12-hour clock (01 - 12)
+        ['%I']: => format( "%.2d", @GetClockHour! )
+
+        -- The day of the year as a number (001 - 366)
+        ['%j']: => format( "%.3d", @GetYearDay! )
+
+        -- Month of the year, from 01 to 12
+        ['%m']: => format( "%.2d", @GetMonth! )
+
+        -- Minutes after the hour 55
+        ['%M']: => format( "%.2d", @GetMinutes! )
+
+        -- AM/PM indicator (AM)
+        ['%p']: => sl_meridian[ @GetHours! > 11 and 1 or -1 ] --AM/PM indicator (AM)
+
+        -- The second as a number (59, 20 , 01)
+        ['%S']: => format( "%.2d", @GetSeconds! )
+
+        -- ISO 8601 day of the week, to 7 for Sunday (7, 1)
+        ['%u']: => @GetISOWeekDay!
+
+        -- Sunday week of the year, from 00 (48)
+        ['%U']: => format( "%.2d", @GetWeekNumber! )
+
+        -- ISO 8601 week of the year, from 01 (48)
+        ['%V']: => format( "%.2d", @GetISOWeekNumber! )
+
+        -- The day of the week as a decimal, Sunday being 0
+        ['%w']: => @GetWeekDay! - 1
+
+        -- Monday week of the year, from 00 (48)
+        ['%W']: => format( "%.2d", @GetWeekNumber( 2 ) )
+
+        -- The year as a number without a century (range 00 to 99)
+        ['%y']: => format( "%.2d", fmod( @GetYear!, 100 ) )
+
+        -- Year with century (2000, 1914, 0325, 0001)
+        ['%Y']: => format( "%.4d", @GetYear! )
+
+        -- Time zone offset, the date object is assumed local time (+1000, -0230)
+        ['%z']: =>
+            b = -@GetBIAS!
+            x = abs( b )
+            return format( "%s%.4d", b < 0 and "-" or "+", trunc( x / 60 ) * 100 + floor( fmod( x, 60 ) ) )
+
+        -- Time zone name, the date object is assumed local time
+        ['%Z']: => @GetTimeZone!
+
+        -- Misc -- -- Year, if year is in BCE, prints the BCE Year representation, otherwise result is similar to "%Y" (1 BCE, 40 BCE)
+        ['%\b']: =>
+            x = @GetYear!
+            return format( "%.4d%s", x > 0 and x or ( 1 - x ), x > 0 and "" or " BCE" )
+
+        -- Seconds including fraction (59.998, 01.123)
+        ['%\f']: =>
+            x = @GetFloatSeconds!
+            return format( "%s%.9f", x >= 10 and "" or "0", x )
+
+        -- percent character %
+        ['%%']: => "%"
+
+        -- Group Spec -- -- 12-hour time, from 01:00:00 AM (06:55:15 AM); same as "%I:%M:%S %p"
+        ['%r']: => @fmt0( "%I:%M:%S %p" )
+
+        -- hour:minute, from 01:00 (06:55); same as "%I:%M"
+        ['%R']: => @fmt0( "%I:%M" )
+
+        -- 24-hour time, from 00:00:00 (06:55:15); same as "%H:%M:%S"
+        ['%T']: => @fmt0( "%H:%M:%S" )
+
+        -- month/day/year from 01/01/00 (12/02/79); same as "%m/%d/%y"
+        ['%D']: => @fmt0( "%m/%d/%y" )
+
+        -- year-month-day (1979-12-02); same as "%Y-%m-%d"
+        ['%F']: => @fmt0( "%Y-%m-%d" )
+
+        -- The preferred date and time representation;  same as "%x %X"
+        ['%c']: => @fmt0( "%x %X" )
+
+        -- The preferred date representation, same as "%a %b %d %\b"
+        ['%x']: => @fmt0( "%a %b %d %\b" )
+
+        -- The preferred time representation, same as "%H:%M:%\f"
+        ['%X']: => @fmt0( "%H:%M:%\f" )
+
+        -- GroupSpec -- -- Iso format, same as "%Y-%m-%dT%T"
+        ['${iso}']: => @fmt0( "%Y-%m-%dT%T" )
+
+        -- http format, same as "%a, %d %b %Y %T GMT"
+        ['${http}']: => @fmt0( "%a, %d %b %Y %T GMT" )
+
+        -- ctime format, same as "%a %b %d %T GMT %Y"
+        ['${ctime}']: => @fmt0( "%a %b %d %T GMT %Y" )
+
+        -- RFC850 format, same as "%A, %d-%b-%y %T GMT"
+        ['${rfc850}']: => @fmt0( "%A, %d-%b-%y %T GMT" )
+
+        -- RFC1123 format, same as "%a, %d %b %Y %T GMT"
+        ['${rfc1123}']: => @fmt0( "%a, %d %b %Y %T GMT" )
+
+        -- asctime format, same as "%a %b %d %T %Y"
+        ['${asctime}']: => @fmt0( "%a %b %d %T %Y" )
+    }
+
+    fmt0 = internal_methods.fmt0 = ( str ) =>
+        return gsub( str, "%%[%a%%\b\f]", ( x ) ->
+            f = tvspec[ x ]
+            return ( f and f( @ ) ) or x
+        ), nil
+
+    internal_methods.Format = internal_methods.__tostring = ( str ) =>
+        str or= @fmtstr or fmtstr
+
+        return fmt0( @, gmatch( str, "${%w+}" ) and gsub( str, "${%w+}", ( x ) ->
+                f = tvspec[ x ]
+                return ( f and f( @ ) ) or x
+            ) or str
+        ), nil
+
+internal_methods.ToTable = =>
+    year, month, day = breakdaynum( @__day_number )
+    hour, min, sec = breakdayfrc( @__day_fraction )
+    return { :year, :month, :day, :hour, :min, :sec }
+
+internal_methods.ToUnix = =>
+    year, month, day = breakdaynum( @__day_number )
+    hour, min, sec = breakdayfrc( @__day_fraction )
+    return totv( year, month, day, hour, min, sec )
+
+internal_methods.ToDOS = =>
+    year, month, day = breakdaynum( @__day_number )
+    hour, min, sec = breakdayfrc( @__day_fraction )
+    return bor( lshift( hour, 11 ), lshift( min, 5 ), fdiv( sec, 2 ) ), bor( lshift( year - 1980, 9 ), lshift( month, 5 ), day )
+
+internal_methods.__lt = ( b ) =>
+    if isnumber( b )
+        return @ToUnix! < b
+
+    if @__day_number == b.__day_number
+        return @__day_fraction < b.__day_fraction
+
+    return @__day_number < b.__day_number
+
+internal_methods.__le = ( b ) =>
+    if isnumber( b )
+        return @ToUnix! <= b
+
+    if @__day_number == b.__day_number
+        return @__day_fraction <= b.__day_fraction
+
+    return @__day_number <= b.__day_number
+
+internal_methods.__eq = ( b ) =>
+    if isnumber( b )
+        return @ToUnix! == b
+
+    return ( @__day_number == b.__day_number ) and ( @__day_fraction == b.__day_fraction )
+
+local dateClass
+
+internal_methods.__mul = ( a, b ) ->
+    if isnumber( b )
+        return date_new( a.__day_number * b, a.__day_fraction * b )\Normalize!
+
+    b = dateClass( b )
+    return date_new( a.__day_number * b.__day_number, a.__day_fraction * b.__day_fraction )\Normalize!
+
+internal_methods.__div = ( a, b ) ->
+    if isnumber( b )
+        return date_new( a.__day_number / b, a.__day_fraction / b )\Normalize!
+
+    b = dateClass( b )
+    return date_new( a.__day_number / b.__day_number, a.__day_fraction / b.__day_fraction )\Normalize!
+
+internal_methods.__sub = ( a, b ) ->
+    if isnumber( b )
+        return a\Copy!\AddSeconds( b )
+
+    b = dateClass( b )
+    return date_new( a.__day_number - b.__day_number, a.__day_fraction - b.__day_fraction )\Normalize!
+
+internal_methods.__add = ( a, b ) ->
+    if isnumber( b )
+        return a\Copy!\AddSeconds( b )
+
+    b = dateClass( b )
+    return date_new( a.__day_number + b.__day_number, a.__day_fraction + b.__day_fraction )\Normalize!
+
+internal_methods.__concat = ( a, b ) ->
+    return a\Format! .. tostring( b )
+
+internal_methods.Copy = =>
+    return date_new( @__day_number, @__day_fraction )
+
+--[[ THE LOCAL DATE OBJECT METHODS ]]
+--
+internal_methods.ToLocal = =>
+    day_number, day_fraction = @__day_number, @__day_fraction
+    bias = getbiasutc2( @ )
+    if bias
+        -- utc = local + bias; local = utc - bias
+        @__day_number = day_number
+        @__day_fraction = day_fraction - bias * MILLISECONDS
+        return @Normalize!
+
+    return nil
+
+internal_methods.ToUTC = =>
+    day_fraction = @__day_fraction
+    bias = getbiasloc2( @__day_number, day_fraction )
+    if bias
+        -- utc = local + bias;
+        -- @__day_number = day_number
+        @__day_fraction = day_fraction + bias * MILLISECONDS
+        return @Normalize!
+
+    return nil
+
+internal_methods.GetBIAS = =>
+    return getbiasloc2( @__day_number, @__day_fraction ) / SECONDS
+
+internal_methods.GetTimeZone = =>
+    local tvu
+    _, tvu, _ = getbiasloc2( @__day_number, @__day_fraction )
+    return tvu and date( "%Z", tvu ) or ""
+
+do
+
+    date_parse = ( str ) ->
+        local year, month, day, hour, min, sec, z, w, u, j, e, x, c, day_number, day_fraction
+        sw = stringWalkerClass( gsub( gsub( str, "(%b())", "" ), "^(%s*)", "" ) ) -- remove comment, trim leading space
+
+        error_dup = ( q ) ->
+            error( "duplicate value: " .. ( q or "" ) .. sw\aimchr! )
+            return nil
+
+        error_syn = ( q ) ->
+            error( "syntax error: " .. ( q or "" ) .. sw\aimchr! )
+            return nil
+
+        error_inv = ( q ) ->
+            error( "invalid date: " .. ( q or "" ) .. sw\aimchr! )
+            return nil
+
+        sety = ( q ) ->
+            year = year and error_dup! or tonumber( q )
+            return nil
+
+        setm = ( q ) ->
+            month = ( month or w or j ) and error_dup( month or w or j ) or tonumber( q )
+            return nil
+
+        setd = ( q ) ->
+            day = day and error_dup! or tonumber( q )
+            return nil
+
+        seth = ( q ) ->
+            hour = hour and error_dup! or tonumber( q )
+            return nil
+
+        setr = ( q ) ->
+            min = min and error_dup! or tonumber( q )
+            return nil
+
+        sets = ( q ) ->
+            sec = sec and error_dup! or tonumber( q )
+            return nil
+
+        adds = ( q ) ->
+            sec += tonumber( "." .. sub( q, 2, -1 ) )
+            return nil
+
+        setj = ( q ) ->
+            j = ( month or w or j ) and error_dup! or tonumber( q )
+            return nil
+
+        setz = ( q ) ->
+            z = ( z ~= 0 and z ) and error_dup! or q
+            return nil
+
+        setzn = ( zs, zn ) ->
+            zn = tonumber( zn )
+            setz( ( ( zn < 24 ) and ( zn * 60 ) or ( fmod( zn, 100 ) + floor( zn / 100 ) * 60 ) ) * ( zs == '+' and -1 or 1 ) )
+            return nil
+
+        setzc = ( zs, zh, zm ) ->
+            setz( ( ( tonumber( zh ) * 60 ) + tonumber( zm ) ) * ( zs == '+' and -1 or 1 ) )
+            return nil
+
+        if not ( sw("^(%d%d%d%d)", sety ) and ( sw( "^(%-?)(%d%d)%1(%d%d)", ( _, a, b ) ->
+            setm( tonumber( a ) )
+            setd( tonumber( b ) )
+            return nil
+
+        ) or sw( "^(%-?)[Ww](%d%d)%1(%d?)", ( _, a, b ) ->
+            w, u = tonumber( a ), tonumber( b or 1 )
+            return nil
+
+        ) or sw("^%-?(%d%d%d)", setj) or sw( "^%-?(%d%d)", ( a ) ->
+            setm( a )
+            setd( 1 )
+            return nil
+
+        )) and ( ( sw( "^%s*[Tt]?(%d%d):?", seth ) and sw( "^(%d%d):?", setr ) and sw( "^(%d%d)", sets ) and sw( "^([,%.]%d+)", adds ) and sw( "%s*([+-])(%d%d):?(%d%d)%s*$", setzc ) ) or sw\finish! or ( sw( "^%s*$" ) or sw( "^%s*[Zz]%s*$" ) or sw( "^%s-([%+%-])(%d%d):?(%d%d)%s*$", setzc ) or sw( "^%s*([%+%-])(%d%d)%s*$", setzn ) ) ) )
+            sw\restart!
+
+            year, month, day, hour, min, sec, z, w, u, j = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
+
+            repeat
+                if sw( "^[tT:]?%s*(%d%d?):", seth )
+                    _ = sw( "^%s*(%d%d?)", setr ) and sw( "^%s*:%s*(%d%d?)", sets ) and sw( "^([,%.]%d+)", adds )
+
+                elseif sw( "^(%d+)[/\\%s,-]?%s*" )
+                    x, c = tonumber( sw[ 1 ] ), len( sw[ 1 ] )
+                    if ( x >= 70 ) or ( month and day and not year ) or ( c > 3 )
+                        sety( x + ( ( x >= 100 or c > 3 ) and 0 or x < CENTURYFLIP and 2000 or 1900 ) )
+                    else
+                        if month
+                            setd( x )
+                        else
+                            month = x
+
+                elseif sw( "^(%a+)[/\\%s,-]?%s*" )
+                    x = sw[ 1 ]
+                    if inlist( x, sl_months, 2, sw )
+                        if month and not day and not year
+                            day, month = month, false
+
+                        setm( fmod( sw[ 0 ], 12 ) + 1 )
+
+                    elseif inlist( x, sl_timezone, 2, sw )
+                        c = truncString( sw[ 0 ] )
+                        if c ~= 0
+                            setz( c )
+
+                    elseif not inlist( x, sl_weekdays, 2, sw )
+                        sw\back!
+
+                        if sw( "^([bB])%s*(%.?)%s*[Cc]%s*(%2)%s*[Ee]%s*(%2)%s*") or sw("^([bB])%s*(%.?)%s*[Cc]%s*(%2)%s*" )
+                            e = e and error_dup() or -1
+
+                        elseif sw( "^([aA])%s*(%.?)%s*[Dd]%s*(%2)%s*" ) or sw( "^([cC])%s*(%.?)%s*[Ee]%s*(%2)%s*" )
+                            e = e and error_dup! or 1
+
+                        elseif sw( "^([PApa])%s*(%.?)%s*[Mm]?%s*(%2)%s*" )
+                            x = lower( sw[ 1 ] )
+                            if not hour or hour > 12 or hour < 0
+                                return error_inv!
+
+                            if x == 'a' and hour == 12
+                                hour = 0
+
+                            if x == 'p' and hour ~= 12
+                                hour = hour + 12
+
+                        else
+                            error_syn!
+
+                elseif not ( sw( "^([+-])(%d%d?):(%d%d)", setzc ) or sw( "^([+-])(%d+)", setzn ) or sw( "^[Zz]%s*$" ) )
+                    error_syn( "?" )
+
+                sw( "^%s*" )
+            until sw\finish!
+
+        -- if date is given, it must be complete year, month & day
+        if ( not year and not hour ) or ( ( month and not day ) or ( day and not month ) ) or ( ( month and w ) or ( month and j ) or ( j and w ) )
+            return error_inv( "!" )
+
+        -- fix month
+        if month
+            month = month - 1
+
+        -- fix year if we are on BCE
+        if e and e < 0 and year > 0
+            year = 1 - year
+
+        --  create date object
+        return ( year and ( ( w and makedaynum_isoywd( year, w, u ) ) or ( j and makedaynum( year, 0, j ) ) or makedaynum( year, month, day ) ) ) or DAYNUM_DEF, makedayfrc( hour or 0, min or 0, sec or 0, 0 ) + ( ( z or 0 ) * MINUTEMILLISECONDS )
+
+    internal_methods.new = ( arg1, month, day, hour, min, sec, ms ) =>
+        if arg1
+            if month
+                year, month, day = truncString( arg1 ), getmontharg( month ), truncString( day )
+                hour, min, sec, ms = tonumber( hour or 0 ), tonumber( min or 0 ), tonumber( sec or 0 ), tonumber( ms or 0 )
+                if year and month and day and hour and min and sec and ms
+                    @__day_number = makedaynum( year, month, day )
+                    @__day_fraction = makedayfrc( hour, min, sec, ms * MILLISECONDS )
+                    @Normalize!
+                    return nil
+
+                date_error_arg!
+                return nil
+
+            argType = type( arg1 )
+            if argType == "number"
+                @__day_number = date_epoch.__day_number
+                @__day_fraction = date_epoch.__day_fraction
+                @AddSeconds( arg1 )
+                return nil
+
+            if argType == "string"
+                @__day_number, @__day_fraction = date_parse( arg1 )
+                return nil
+
+            if argType == "boolean"
+                time_table = date( arg1 and "!*t" or "*t" )
+                @__day_number = makedaynum( time_table.year, time_table.month - 1, time_table.day ) or DAYNUM_DEF
+                @__day_fraction = makedayfrc( time_table.hour or 0, time_table.min or 0, time_table.sec or 0, 0 )
+                return nil
+
+            if argType == "Date"
+                @__day_number = year.__day_number
+                @__day_fraction = year.__day_fraction
+                return nil
+
+            if argType == "table"
+                year, month, day = truncString( arg1.year ), getmontharg( arg1.month ), truncString( arg1.day )
+                hour, min, sec, ms = tonumber( arg1.hour ), tonumber( arg1.min ), tonumber( arg1.sec ), tonumber( arg1.ticks )
+
+                -- atleast there is time or complete date
+                if ( year or month or day ) and not ( year and month and day )
+                    error( "incomplete table", 3 )
+                    return nil
+
+                @__day_number = year and makedaynum( year, month - 1, day ) or DAYNUM_DEF
+                @__day_fraction = makedayfrc( hour or 0, min or 0, sec or 0, ms and ( ms * MILLISECONDS ) or 0 )
+                return nil
+
+            error( "bad argument #1 to Date (string/number/boolean/table expected, got " .. argType .. ")", 3 )
+            return nil
+
+        time_table = date( "*t" )
+        @__day_number = makedaynum( time_table.year, time_table.month - 1, time_table.day ) or DAYNUM_DEF
+        @__day_fraction = makedayfrc( time_table.hour or 0, time_table.min or 0, time_table.sec or 0, 0 )
+        return nil
+
+static_methods = {}
+
+static_methods.Time = ( hour, min, sec, ms ) ->
+    hour, min, sec, ms = tonumber( hour or 0 ), tonumber( min or 0 ), tonumber( sec or 0 ), tonumber( ms or 0 )
+    if hour and min and sec and ms
+        return date_new( DAYNUM_DEF, makedayfrc( hour, min, sec, ms * MILLISECONDS ) )
+
+    return date_error_arg!
+
+static_methods.IsLeapYear = ( value ) ->
+    year = truncString( value )
+    unless year
+        year = dateClass( value )
+        year = year and year\GetYear!
+
+    return isleapyear( year + 0 )
+
+static_methods.Epoch = ->
+    return date_epoch\Copy!
+
+static_methods.ISO = ( year, w, day ) ->
+    return date_new( makedaynum_isoywd( year + 0, w and ( w + 0 ) or 1, day and ( day + 0 ) or 1 ), 0 )
+
+do
+
+    fromUnix = static_methods.FromUnix = ( seconds ) ->
+        object = date_new( date_epoch.__day_number, date_epoch.__day_fraction )
+        object\AddSeconds( seconds )
+        return object
+
+    static_methods.FromDOS = ( t, d ) ->
+        time_table = { year: 10, month: 1, day: 1, hour: 0, min: 0, sec: 0 }
+
+        if t
+            time_table.hour = rshift( band( t, 0xF800 ), 11 )
+            time_table.min = rshift( band( t, 0x07E0 ), 5 )
+            time_table.sec = band( t, 0x001F ) * 2
+
+        if d
+            time_table.year += rshift( band( d, 0xFE00 ), 9 )
+            time_table.month = rshift( band( d, 0x01E0 ), 5 )
+            time_table.day = band( d, 0x001F )
+
+        object = date_new( date_epoch.__day_number, date_epoch.__day_fraction )
+        object\AddSeconds( time_table.sec )
+        object\AddMinutes( time_table.min )
+        object\AddHours( time_table.hour )
+
+        object\AddDays( time_table.day - 1 )
+        object\AddMonths( time_table.month )
+        object\AddYears( time_table.year )
+
+        return object
+
+static_methods.diff = ( a, b ) ->
+    if isnumber( b )
+        return a\ToUnix! - b
+
+    return a - b
+
+do
+
+    import Read, Write from environment.struct.io.I
+
+    internal_methods.ToBinary = =>
+        return Write( nil, @__day_number, 4 ) .. Write( nil, @__day_fraction, 4 )
+
+    static_methods.FromBinary = ( str ) ->
+        length = len( str )
+        if length < 8
+            error( "binary data was corrupted", 2 )
+            return nil
+
+        return date_new( Read( nil, sub( str, 1, 4 ), 4 ), Read( nil, sub( str, 5, length ), 4 ) )
+
+dateClass = environment.class( "Date", internal_methods, static_methods )
+
+time_table = date( "!*t", 0 )
+if time_table
+    date_epoch = dateClass( time_table )
+    -- the distance from our epoch to os epoch in __day_number
+    DATE_EPOCH = date_epoch and date_epoch\SpanDays!
+else
+    date_epoch = setmetatable( {}, { __index: -> error( "failed to get the epoch date" ) } )
+
+environment.util.Date = dateClass

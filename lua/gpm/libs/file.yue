@@ -491,6 +491,10 @@ do
         base.ReadColor = ByteStream.ReadColor
         base.WriteColor = ByteStream.WriteColor
 
+        -- Date
+        base.ReadDate = ByteStream.ReadDate
+        base.WriteDate = ByteStream.WriteDate
+
     append = lib.Append = ( filePath, content, gamePath, skipNormalize ) ->
         fileHandle = fileClass( filePath, "ab", gamePath, skipNormalize )
         if fileHandle

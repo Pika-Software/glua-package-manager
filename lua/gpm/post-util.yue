@@ -3,7 +3,6 @@ import environment, Logger from _G.gpm
 import getmetatable, setmetatable, istable from _G
 import math, string, table, util, ArgAssert, isfunction, error from environment
 import byte, sub, len from string
-newClass = environment.class
 import fdiv from math
 
 do
@@ -210,8 +209,8 @@ do
     import time, unix2dos, dos2unix from environment.os
     import char, reverse, format from string
     import deflate, Color from environment
+    import CRC, Date from util
     import clamp from math
-    import CRC from util
 
     local readInt, writeInt
     do
@@ -269,7 +268,7 @@ do
         @position = position
         return position
 
-    util.ByteStream = newClass(
+    util.ByteStream = environment.class(
         "ByteStream",
         {
             __tostring: =>
@@ -599,6 +598,13 @@ do
             WriteColor: ( color ) =>
                 return @Write( char( color.r, color.g, color.b, color.a ) )
 
+            -- Date
+            ReadDate: =>
+                return Date.FromBinary( @Read( 12 ) )
+
+            WriteDate: ( date ) =>
+                return @Write( date\ToBinary! )
+
         },
         {
             CompressionMethods: compressionMethods
@@ -801,7 +807,7 @@ do
         return a > b
 
     local versionClass
-    versionClass = newClass(
+    versionClass = environment.class(
         "Version",
         {
             __tostring: =>
