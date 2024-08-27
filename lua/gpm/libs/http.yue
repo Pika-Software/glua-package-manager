@@ -1,6 +1,6 @@
 _G = _G
 import gpm, SysTime from _G
-import environment, Logger from gpm
+import environment, Logger, sql from gpm
 import await, async, ArgAssert, Promise, http, isstring, isnumber, istable, WebClientError from environment
 
 unless isstring( http.UserAgent )
@@ -138,6 +138,26 @@ do
 
             promise\Reject( WebClientError msg )
             return nil
+
+        -- ETag extension
+        if parameters.etag
+            data = sql.http_cache.get( url )
+            if data
+                unless istable( parameters.headers )
+                    parameters.headers = {}
+
+                parameters.headers[ "If-None-Match" ] = data.etag
+            
+            handle = parameters.success
+            parameters.success = ( status, body, headers ) ->
+                if status == 304
+                    status = 200
+                    body = data.content
+                elseif status == 200 and headers["etag"]
+                    sql.http_cache.set( url, headers["etag"], body )
+                
+                handle( status, body, headers )
+                return
 
         if queue
             queue[] = ->

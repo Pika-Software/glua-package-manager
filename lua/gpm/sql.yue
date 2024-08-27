@@ -1,6 +1,6 @@
 
-import gpm from _G
-import istable, isstring, isfunction, tostring, throw, Logger, xpcall from gpm
+import gpm, os from _G
+import istable, isstring, isfunction, tostring, throw, Logger, xpcall, ArgAssert from gpm
 import string from gpm
 import SQLError from gpm
 
@@ -49,24 +49,25 @@ sql.rollback = ->
 do
     lib = sql.http_cache = {}
     
-    lib.exists = ( url, etag ) ->
-        unless isstring( url ) and isstring( etag )
-            throw SQLError "URL and ETag must be strings, not #{url} and #{etag}"
+    lib.get = ( url ) ->
+        ArgAssert( url, 1, "string" )
 
-        return sql.query( "select 1 from 'gpm.http_cache' where url=? and etag=? limit 1" ) != nil
+        result = sql.query( "select etag, content from 'gpm.http_cache' where url=? limit 1", url )
+        return result and result[1]
 
     lib.set = ( url, etag, content ) ->
-        unless isstring( url ) and isstring( etag ) and isstring( content )
-            throw SQLError "URL, ETag and content must be strings, not #{url}, #{etag} and #{content}"
+        ArgAssert( url, 1, "string" )
+        ArgAssert( etag, 2, "string" )
+        ArgAssert( content, content, "string" )
+        if #content > ( 50 * 1024 ) -- 50KB
+            -- do not cache content that are larger than 50KB
+            return
+        
+        if string.find( content, "\x00", 1, true )
+            -- we are unable to store null bytes in sqlite
+            return
 
-        sql.query( "insert into 'gpm.http_cache' (url, etag, timestamp, content) values (?, ?, ?, ?)", url, etag, os.time(), content )
-    
-    lib.get = ( url, etag ) ->
-        unless isstring( url ) and isstring( etag )
-            throw SQLError "URL and ETag must be strings, not #{url} and #{etag}"
-
-        result = sql.query( "select content from 'gpm.http_cache' where url=? and etag=? limit 1" )
-        return result and result[1] and result[1].content
+        sql.query( "insert or replace into 'gpm.http_cache' (url, etag, timestamp, content) values (?, ?, ?, ?)", url, etag, os.time(), content )
 
 --[[
 
@@ -77,13 +78,17 @@ do
 sql.migrations = [
     {
         name: "initial"
+        execute: -> -- deprecated
+    },
+    {
+        name: "http_cache add primary key"
         execute: ->
+            sql.query "drop table if exists 'gpm.http_cache'"
             sql.query [[create table 'gpm.http_cache' (
-                url text, 
+                url text primary key, 
                 etag text,
                 timestamp int, 
-                content blob, 
-                unique(url, etag) on conflict replace
+                content blob
             )]]
     }
 ]
