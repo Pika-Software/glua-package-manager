@@ -59,7 +59,7 @@ do
 
     local api_token
     if SERVER
-        api_token = _G.CreateConVar( "gpm_github_token", "", _G.bit.bor( _G.FCVAR_ARCHIVE, _G.FCVAR_PROTECTED ), "https://github.com/settings/tokens" )
+        api_token = _G.CreateConVar( "gpm_github_token", "", { _G.FCVAR_ARCHIVE, _G.FCVAR_PROTECTED, 16 --[[FCVAR_HIDDEN]] }, "https://github.com/settings/tokens" )
 
     request = ( href ) ->
         local headers
