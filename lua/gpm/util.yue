@@ -1,7 +1,7 @@
 _G = _G
 import environment from _G.gpm
 import pairs, error, rawget, getfenv, getmetatable, setmetatable, istable, tostring from _G
-import string, table, debug, util from environment
+import string, table, debug, util, os from environment
 import byte, sub, gsub, format, len, find from string
 import concat, remove from table
 import rshift, band from _G.bit
@@ -1314,20 +1314,24 @@ do
 if _G.SERVER and util.IsBinaryModuleInstalled( "workshop" )
     _G.require( "workshop" )
 
-os.dos2unix = ( t, d ) ->
-    data = { year: 1980, month: 1, day: 1, hour: 0, min: 0, sec: 0 }
+do
 
-    if t
-        data.hour = rshift( band( t, 0xF800 ), 11 )
-        data.min = rshift( band( t, 0x07E0 ), 5 )
-        data.sec = band( t, 0x001F ) * 2
+    import time from os
 
-    if d
-        data.year += rshift( band( d, 0xFE00 ), 9 )
-        data.month = rshift( band( d, 0x01E0 ), 5 )
-        data.day = band( d, 0x001F )
+    os.dos2unix = ( t, d ) ->
+        data = { year: 1980, month: 1, day: 1, hour: 0, min: 0, sec: 0 }
 
-    return time( data )
+        if t
+            data.hour = rshift( band( t, 0xF800 ), 11 )
+            data.min = rshift( band( t, 0x07E0 ), 5 )
+            data.sec = band( t, 0x001F ) * 2
+
+        if d
+            data.year += rshift( band( d, 0xFE00 ), 9 )
+            data.month = rshift( band( d, 0x01E0 ), 5 )
+            data.day = band( d, 0x001F )
+
+        return time( data )
 
 do
 
@@ -1338,7 +1342,6 @@ do
     os.unix2dos = ( u ) ->
         data = date( "*t", u )
         return bor( lshift( data.hour, 11 ), lshift( data.min, 5 ), fdiv( data.sec, 2 ) ), bor( lshift( data.year - 1980, 9 ), lshift( data.month, 5 ), data.day )
-
 
 -- Garry's Mod hooks
 do
