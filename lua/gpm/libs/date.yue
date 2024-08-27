@@ -418,14 +418,11 @@ internal_methods.GetSeconds = =>
     return fmod( floor( @__day_fraction / MILLISECONDS ), SECONDS )
 
 internal_methods.GetMilliseconds = =>
-    return fmod( floor( @__day_fraction / MILLISECONDS ), MILLISECONDS )
+    x = fmod( @__day_fraction, MILLISECONDS )
+    return u and ( ( x * u ) / MILLISECONDS ) or x
 
 internal_methods.GetFloatSeconds = =>
     return fmod( floor( @__day_fraction / MILLISECONDS ), SECONDS ) + ( fmod( @__day_fraction, MILLISECONDS ) / MILLISECONDS )
-
-internal_methods.GetTicks = ( u ) =>
-    x = fmod( @__day_fraction, MILLISECONDS )
-    return u and ( ( x * u ) / MILLISECONDS ) or x
 
 internal_methods.GetWeekNumber = ( wdb ) =>
     wd, yd = weekday( @__day_number ), yearday( @__day_number )
@@ -513,10 +510,10 @@ internal_methods.SetMinutes = ( month, sec, ms ) =>
 internal_methods.SetSeconds = ( sec, ms ) =>
     return @SetHours( nil, nil, sec, ms )
 
-internal_methods.SetTicks = ( ms ) =>
+internal_methods.SetMilliseconds = ( ms ) =>
     return @SetHours( nil, nil, nil, ms )
 
-internal_methods.SpanTicks = =>
+internal_methods.SpanMilliseconds = =>
     return @__day_number * DAYMILLISECONDS + @__day_fraction
 
 internal_methods.SpanSeconds = =>
@@ -582,9 +579,6 @@ do
         return dobj_adddayfrc( @, n, MILLISECONDS, DAYSECONDS )
 
     internal_methods.AddMilliseconds = ( n ) =>
-        return dobj_adddayfrc( @, n, 1000, DAYMILLISECONDS )
-
-    internal_methods.AddTicks = ( n ) =>
         return dobj_adddayfrc( @, n, 1, DAYMILLISECONDS )
 
 do
@@ -841,10 +835,10 @@ internal_methods.ToUTC = =>
 internal_methods.GetBIAS = =>
     return getbiasloc2( @__day_number, @__day_fraction ) / SECONDS
 
-internal_methods.GetTimeZone = =>
+internal_methods.GetTimeZone = ( retName ) =>
     local tvu
     _, tvu, _ = getbiasloc2( @__day_number, @__day_fraction )
-    return tvu and date( "%Z", tvu ) or ""
+    return tvu and date( retName and "%Z" or "%z", tvu ) or ""
 
 do
 
@@ -1037,7 +1031,7 @@ do
 
             if argType == "table"
                 year, month, day = truncString( arg1.year ), getmontharg( arg1.month ), truncString( arg1.day )
-                hour, min, sec, ms = tonumber( arg1.hour ), tonumber( arg1.min ), tonumber( arg1.sec ), tonumber( arg1.ticks )
+                hour, min, sec, ms = tonumber( arg1.hour ), tonumber( arg1.min ), tonumber( arg1.sec ), tonumber( arg1.ms )
 
                 -- atleast there is time or complete date
                 if ( year or month or day ) and not ( year and month and day )
