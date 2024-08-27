@@ -1,6 +1,6 @@
 
 import gpm, os from _G
-import istable, isstring, isfunction, tostring, throw, Logger, xpcall, ArgAssert from gpm
+import istable, isstring, isfunction, tostring, throw, Logger, xpcall, ArgAssert, pairs from gpm
 import string from gpm
 import SQLError from gpm
 
@@ -15,7 +15,11 @@ unless istable( sql )
 
 --]]
 
-sql.escape = (str) -> gsql.SQLStr(str)
+sql.escape = (str) ->
+    if str == nil
+        return "null"
+
+    return gsql.SQLStr(str)
 
 sql.query = ( query, ... ) ->
     args, i = { ... }, 0
@@ -28,6 +32,13 @@ sql.query = ( query, ... ) ->
     result = gsql.Query( query )
     if result == false
         throw SQLError gsql.LastError(), nil, nil, 4
+
+    -- convert NULL values into nil
+    if istable( result )
+        for t in *result
+            for k, v in pairs( t )
+                if v == "NULL"
+                    t[ k ] = nil
 
     return result
 
@@ -74,7 +85,6 @@ do --- key-value store for gpm
 
     lib.set = ( key, value ) ->
         ArgAssert( key, 1, "string" )
-        ArgAssert( value, 2, "string" )
 
         sql.query( "insert or replace into 'gpm.store' values (?, ?)", key, value )
         return
