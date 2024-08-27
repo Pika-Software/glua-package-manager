@@ -101,4 +101,5 @@ export SourceError = classExtend( errorClass, "SourceError" )
 export AddonError = classExtend( errorClass, "AddonError" )
 export RangeError = classExtend( errorClass, "RangeError" )
 export TypeError = classExtend( errorClass, "TypeError" )
+export SQLError = classExtend( errorClass, "SQLError" )
 export Error = errorClass

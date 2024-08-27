@@ -28,6 +28,7 @@ if SERVER
     AddCSLuaFile( "gpm/loader.lua" )
     AddCSLuaFile( "gpm/init.lua" )
     AddCSLuaFile( "gpm/util.lua" )
+    AddCSLuaFile( "gpm/sql.lua" )
 
 gpm.StartTime = SysTime!
 
@@ -129,6 +130,9 @@ environment.path = include( "libs/path.lua" )
 for key, value in _G.pairs( include( "libs/error.lua" ) )
     environment[ key ] = value
 
+include( "sql.lua" )
+gpm.sql.migrate( "added key-value store" )
+
 environment.utf8 = setmetatable( include( "libs/utf8/init.lua" ), sandboxMetatable( _G.utf8 ) )
 environment.ipaml = include( "libs/3rd-party/ip.lua" )
 environment.struct = include( "libs/struct.lua" )
@@ -184,8 +188,8 @@ for fileName in *Find( "gpm/sources/*.lua", "LUA" )
 if SERVER
     include( "test.lua" )
 
--- if SERVER
-    -- gpm.loader.Startup!\Catch( environment.Error.display )
+if SERVER
+    gpm.loader.Startup!\Catch( environment.Error.display )
 
 Logger\Info( "Start-up time: %.4f sec.", SysTime! - gpm.StartTime )
 
