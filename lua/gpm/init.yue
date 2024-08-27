@@ -164,6 +164,9 @@ do
     http.EncodeURI = url.encodeURI
     http.DecodeURI = url.decodeURI
 
+-- Github API
+include( "libs/github.lua" )
+
 -- Utils & Libs
 include( "post-util.lua" )
 include( "libs/file.lua" )

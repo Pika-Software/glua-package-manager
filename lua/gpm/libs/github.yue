@@ -1,0 +1,7 @@
+-- Github API library
+import gpm from _G
+
+
+local api_token
+if SERVER
+    api_token = CreateConVar( "gpm_github_token", "", { FCVAR_ARCHIVE, FCVAR_PROTECTED, 16 --[[FCVAR_HIDDEN]] }, "https://github.com/settings/tokens" )
