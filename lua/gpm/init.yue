@@ -28,6 +28,7 @@ if SERVER
     AddCSLuaFile( "gpm/loader.lua" )
     AddCSLuaFile( "gpm/init.lua" )
     AddCSLuaFile( "gpm/util.lua" )
+    AddCSLuaFile( "gpm/sql.lua" )
 
 gpm.StartTime = SysTime!
 
@@ -128,6 +129,9 @@ environment.path = include( "libs/path.lua" )
 -- gm_error
 for key, value in _G.pairs( include( "libs/error.lua" ) )
     environment[ key ] = value
+
+include( "sql.lua" )
+gpm.sql.migrate "initial"
 
 environment.utf8 = setmetatable( include( "libs/utf8/init.lua" ), sandboxMetatable( _G.utf8 ) )
 environment.ipaml = include( "libs/3rd-party/ip.lua" )
