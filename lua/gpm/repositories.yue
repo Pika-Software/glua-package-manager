@@ -1,14 +1,8 @@
 _G = _G
 import gpm from _G
-import Query from _G.sql
 import environment from gpm
 import istable, util, CLIENT, SERVER, MENU_DLL, ArgAssert from environment
 import JSONToTable, Version from util
-
-if SERVER or MENU_DLL
-    Query( "CREATE TABLE IF NOT EXISTS `gpm.table_version` ( Name TEXT PRIMARY KEY NOT NULL, Version INT )" )
-    Query( "CREATE TABLE IF NOT EXISTS `gpm.repository` ( ID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, URL TEXT UNIQUE NOT NULL )" )
-    Query( "CREATE TABLE IF NOT EXISTS `gpm.packages` ( ID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, Name TEXT NOT NULL, URL TEXT UNIQUE NOT NULL, Version TEXT NOT NULL, Installed BOOLEAN DEFAULT 0 NOT NULL, RepositoryID INTEGER DEFAULT 0 NOT NULL, FOREIGN KEY(RepositoryID) REFERENCES `gpm.repository` (ID) )" )
 
 repositories = gpm.Repositories
 unless istable( repositories )
@@ -17,27 +11,27 @@ unless istable( repositories )
 list = repositories.List
 unless istable( list )
     if SERVER or MENU_DLL
-        list = Query( "SELECT * FROM `gpm.repository`" ) or {}
+        -- list = Query( "SELECT * FROM `gpm.repository`" ) or {}
 
-        count = #list
-        if count == 0
-            Query( "INSERT INTO `gpm.repository` ( URL ) VALUES ( 'https://raw.githubusercontent.com/Pika-Software/gpm-repositories/main/main.json' )" )
-            list = Query( "SELECT * FROM `gpm.repository`" ) or {}
-            count = #list
+        -- count = #list
+        -- if count == 0
+        --     Query( "INSERT INTO `gpm.repository` ( URL ) VALUES ( 'https://raw.githubusercontent.com/Pika-Software/gpm-repositories/main/main.json' )" )
+        --     list = Query( "SELECT * FROM `gpm.repository`" ) or {}
+        --     count = #list
 
-        for index = 1, count
-            repository = list[ index ]
-            packages = Query( "SELECT * FROM `gpm.packages` WHERE RepositoryID = " .. repository.ID ) or {}
+        -- for index = 1, count
+        --     repository = list[ index ]
+        --     packages = Query( "SELECT * FROM `gpm.packages` WHERE RepositoryID = " .. repository.ID ) or {}
 
-            for package in *packages
-                package.Version = Version( package.Version )
-                package.Installed = package.Installed == 1
-                package.RepositoryID = repository
-                package.RepositoryID = nil
+        --     for package in *packages
+        --         package.Version = Version( package.Version )
+        --         package.Installed = package.Installed == 1
+        --         package.RepositoryID = repository
+        --         package.RepositoryID = nil
 
-            repository.Packages = packages
+        --     repository.Packages = packages
 
-        repositories.List = list
+        -- repositories.List = list
 
     if SERVER
         environment.file.Set( "/lua/gpm/vfs/repositories.lua", "return '" .. util.TableToJSON( repositories, false ) .. "'", "GLua Package Manager::Repositories" )

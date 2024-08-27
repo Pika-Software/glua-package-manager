@@ -131,7 +131,7 @@ for key, value in _G.pairs( include( "libs/error.lua" ) )
     environment[ key ] = value
 
 include( "sql.lua" )
-gpm.sql.migrate( "added key-value store" )
+gpm.sql.migrate( "initial repositories and packages" )
 
 environment.utf8 = setmetatable( include( "libs/utf8/init.lua" ), sandboxMetatable( _G.utf8 ) )
 environment.ipaml = include( "libs/3rd-party/ip.lua" )

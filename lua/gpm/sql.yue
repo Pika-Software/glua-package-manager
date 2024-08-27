@@ -1,7 +1,7 @@
 
 import gpm, os from _G
 import istable, isstring, isfunction, tostring, throw, Logger, xpcall, ArgAssert, pairs from gpm
-import string from gpm
+import string, table from gpm
 import SQLError from gpm
 
 gsql = _G.sql
@@ -95,6 +95,35 @@ do --- key-value store for gpm
         result = sql.query( "select value from 'gpm.store' where key=?", key )
         return result and result[1].value
 
+do --- repositories
+    lib = sql.repositories = {}
+
+    lib.getPackage = ( repository, name ) ->
+        if istable( repository )
+            repository = repository.id
+
+        ArgAssert( repository, 1, "number" )
+        ArgAssert( name, 2, "string" )
+
+        result = sql.query( [[
+            select p.*, group_concat(v.version) as versions 
+                from 'gpm.packages' p 
+                join 'gpm.package_versions' v on p.repositoryId=? and p.name=? and p.id=v.packageId
+        ]], repository, name )
+
+        if result := result and result[1]
+            result.versions = string.ByteSplit( result.versions, 0x2C --[[',']] )
+            table.SortDesc( result.versions ) -- let be newest first
+            return result
+
+    lib.getRepositories = ->
+        result = sql.query( "select * from 'gpm.repository'" )
+        return
+
+    lib.addRepository = ( url ) ->
+
+    lib.removeRepository = ( url ) ->
+
 --[[
 
     Migrations
@@ -105,7 +134,7 @@ sql.migrations = [
     {
         name: "initial"
         execute: -> -- deprecated
-    },
+    }
     {
         name: "http_cache add primary key"
         execute: ->
@@ -116,17 +145,55 @@ sql.migrations = [
                 timestamp int, 
                 content blob
             )]] )
+
+            return
     }
     {
-        name: "added key-value store",
+        name: "added key-value store"
         execute: ->
             sql.query( "create table 'gpm.store' ( key text unique, value text )" )
+
+            return
+    }
+    {
+        name: "initial repositories and packages"
+        execute: ->
+            sql.query( "drop table if exists 'gpm.table_version'" )
+            sql.query( "drop table if exists 'gpm.repository'" )
+            sql.query( "drop table if exists 'gpm.packages'" )
+
+            if SERVER
+                sql.query( "create table 'gpm.repositories' ( id integer primary key autoincrement, url text unique not null )" )
+                sql.query( [[
+                    create table 'gpm.packages' (
+                        id integer primary key autoincrement,
+                        name text not null,
+                        url text not null,
+                        type int not null,
+                        repositoryId integer,
+
+                        foreign key(repositoryId) references 'gpm.repositories' (id)
+                        unique(name, repositoryId) on conflict replace
+                    )
+                ]] )
+                sql.query( [[
+                    create table 'gpm.package_versions' ( 
+                        version text not null,
+                        metadata text,
+                        packageId integer not null,
+
+                        foreign key(packageId) references 'gpm.packages' (id)
+                        unique(version, packageId) on conflict replace
+                    )
+                ]] )
+
+            return
     }
 ]
 
 -- migration history table
 unless gsql.TableExists( "gpm.migration_history" )
-    sql.query "create table 'gpm.migration_history' (name text, timestamp int)"
+    sql.query "create table 'gpm.migration_history' (name text, timestamp integer)"
 
 sql.migrationExists = (name) ->
     for m in *sql.migrations
@@ -138,7 +205,7 @@ sql.runMigration = (migration) ->
     unless isfunction( migration.execute )
         throw SQLError "Migration '#{migration.name}' does not have an execute function"
 
-    Logger\Debug( "Running migration '#{migration.name}'..." )
+    Logger\Info( "Running migration '#{migration.name}'..." )
 
     sql.begin() -- begin transaction so we can rollback if something goes wrong
     ok = xpcall( migration.execute, SQLError.display )
