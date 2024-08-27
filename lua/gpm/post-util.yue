@@ -1,8 +1,7 @@
 _G = _G
 import environment, Logger from _G.gpm
 import getmetatable, setmetatable, istable from _G
-import bit, math, string, table, util, ArgAssert, isfunction, error from environment
-import band, bor, lshift, rshift from bit
+import math, string, table, util, ArgAssert, isfunction, error from environment
 import byte, sub, len from string
 newClass = environment.class
 import fdiv from math
@@ -176,6 +175,7 @@ table.Flip = ( tbl ) ->
 do
 
     import struct from environment
+    import io from struct
 
     -- lua 5.3 string features
     do
@@ -194,7 +194,6 @@ do
 
         string.packsize = struct.SizeOf
 
-    import io from struct
     import Read from io.i
     import Little from io.endianness
 
@@ -207,39 +206,12 @@ do
         Little!
         return Read( nil, sub( binary, 6, 14 ), 8 )
 
--- Byte Stream
-do
-
-    import struct, deflate, os, Color from environment
+    -- Byte Stream
+    import time, unix2dos, dos2unix from environment.os
     import char, reverse, format from string
+    import deflate, Color from environment
     import clamp from math
     import CRC from util
-    import io from struct
-    import time from os
-
-    dos2unix = os.dos2unix = ( t, d ) ->
-        data = { year: 1980, month: 1, day: 1, hour: 0, min: 0, sec: 0 }
-
-        if t
-            data.hour = rshift( band( t, 0xF800 ), 11 )
-            data.min = rshift( band( t, 0x07E0 ), 5 )
-            data.sec = band( t, 0x001F ) * 2
-
-        if d
-            data.year += rshift( band( d, 0xFE00 ), 9 )
-            data.month = rshift( band( d, 0x01E0 ), 5 )
-            data.day = band( d, 0x001F )
-
-        return time( data )
-
-    local unix2dos
-    do
-
-        import date from os
-
-        unix2dos = os.unix2dos = ( u ) ->
-            data = date( "*t", u )
-            return bor( lshift( data.hour, 11 ), lshift( data.min, 5 ), fdiv( data.sec, 2 ) ), bor( lshift( data.year - 1980, 9 ), lshift( data.month, 5 ), data.day )
 
     local readInt, writeInt
     do
@@ -654,6 +626,7 @@ do
             return url.scheme .. "/" .. concat( Flip( ByteSplit( lower(url.hostname), 0x2E --[[ . ]] ) ), "/" ) .. lower(url.pathname)
 
     import isnumber, tonumber, isstring, tostring from _G
+    import band, bor, lshift, rshift from environment.bit
     import match, find, gsub, ByteCount from string
     import isuint, max from math
     import sort from table
