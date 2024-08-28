@@ -1,6 +1,6 @@
 
 import gpm, os from _G
-import istable, isstring, isfunction, tostring, throw, Logger, xpcall, ArgAssert, pairs from gpm
+import istable, isstring, isnumber, isfunction, tostring, throw, Logger, xpcall, ArgAssert, pairs from gpm
 import string, table from gpm
 import SQLError from gpm
 
@@ -42,6 +42,10 @@ sql.query = ( query, ... ) ->
 
     return result
 
+sql.queryOne = ( query, ... ) ->
+    result = sql.query( query, ... )
+    return result and result[1]
+
 sql.begin = -> 
     return sql.query( "begin" )
 
@@ -50,6 +54,16 @@ sql.commit = ->
 
 sql.rollback = -> 
     return sql.query( "rollback" )
+
+sql.transaction = ( func ) ->
+    sql.begin()
+    ok, result = pcall( func )
+    unless ok
+        sql.rollback()
+        throw result
+
+    sql.commit()
+    return result
 
 --[[
 
@@ -98,10 +112,42 @@ do --- key-value store for gpm
 do --- repositories
     lib = sql.repositories = {}
 
-    lib.getPackage = ( repository, name ) ->
-        if istable( repository )
-            repository = repository.id
+    lib.getRepositories = ->
+        result = sql.query( "select * from 'gpm.repositories'" )
+        return
 
+    lib.addRepository = ( url ) ->
+        ArgAssert( url, 1, "string" )
+        return sql.queryOne( "insert or ignore into 'gpm.repositories' (url) values (?); select * from 'gpm.repositories' where url=?", url, url )
+
+    lib.removeRepository = ( url ) ->
+        ArgAssert( url, 1, "string" )
+
+        sql.transaction ->
+            repository = sql.queryOne( "select id from 'gpm.repositories' where url=?", url )
+            packages = sql.query( "select id from 'gpm.packages' where repositoryId=?", repository.id )
+            
+            -- delete all versions, packages and repository
+            for p in *packages
+                sql.query( "delete from 'gpm.package_versions' where packageId=?; delete from 'gpm.packages' where id=?", p.id, p.id )
+            
+            sql.query( "delete from 'gpm.repositories' where id=?", repository.id )
+            
+            return
+
+    getRepositoryId = ( repository ) ->
+        if isnumber( repository )
+            return repository
+    
+        if istable( repository )
+            return repository.id
+
+        if isstring( repository )
+            result = sql.queryOne( "select id from 'gpm.repositories' where url=?", repository )
+            return result and result.id or nil
+
+    lib.getPackage = ( repository, name ) ->
+        repository = getRepositoryId( repository )
         ArgAssert( repository, 1, "number" )
         ArgAssert( name, 2, "string" )
 
@@ -115,14 +161,25 @@ do --- repositories
             result.versions = string.ByteSplit( result.versions, 0x2C --[[',']] )
             table.SortDesc( result.versions ) -- let be newest first
             return result
+    
+    lib.updateRepository = ( repository, packages ) ->
+        ArgAssert( packages, 2, "table" )
 
-    lib.getRepositories = ->
-        result = sql.query( "select * from 'gpm.repository'" )
-        return
+        repositoryId = getRepositoryId( repository )
+        unless repositoryId
+            throw SQLError "invalid repository '#{repository}' was given as #1 argument"
 
-    lib.addRepository = ( url ) ->
+        currentPackages = sql.query( "select id, name from 'gpm.packages' where repositoryId=?", repositoryId )
+        oldPackages = { pkg.name, pkg.id for pkg in *currentPackages }
 
-    lib.removeRepository = ( url ) ->
+        sql.transaction ->
+            for name, pkg in pairs( packages )
+                sql.query( "insert or replace into 'gpm.packages' (name, url, type, repositoryId) values (?, ?, ?, ?)", pkg.name, pkg.url, pkg.type, repositoryId )
+                packageId = sql.queryOne( "select id from 'gpm.package_versions' where name=? and repositoryId=?", pkg.name, repositoryId ).id
+
+                sql.query( "delete from 'gpm.package_versions' where packageId=?", packageId )
+                for v in *pkg.versions
+                    sql.query( "insert into 'gpm.package_versions' (version, metadata, packageId) values (?, ?, ?)", v.version, v.metadata, packageId )
 
 --[[
 
@@ -191,7 +248,21 @@ sql.migrations = [
     }
 ]
 
--- migration history table
+-- optimize sqlite database
+unless sql.optimized
+    pragma_values = sql.query( "pragma foreign_keys; pragma journal_mode; pragma synchronous" )
+    if pragma_values[1].foreign_keys == "0"
+        sql.query( "pragma foreign_keys = 1" )
+    
+    if pragma_values[2].journal_mode == "delete"
+        sql.query( "pragma journal_mode = wal" )
+    
+    if pragma_values[3].synchronous == "0"
+        sql.query( "pragma synchronous = normal" )
+
+    sql.optimized = true
+
+
 unless gsql.TableExists( "gpm.migration_history" )
     sql.query "create table 'gpm.migration_history' (name text, timestamp integer)"
 
