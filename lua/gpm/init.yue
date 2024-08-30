@@ -164,14 +164,14 @@ do
     http.EncodeURI = url.encodeURI
     http.DecodeURI = url.decodeURI
 
--- Github API
-include( "libs/github.lua" )
-
 -- Utils & Libs
 include( "gpm/libs/yaml.lua" )
 include( "post-util.lua" )
 include( "libs/file.lua" )
 include( "libs/http.lua" )
+
+-- Github API
+gpm.github = include( "libs/github.lua" )
 
 -- Package Manager
 include( "repositories.lua" )
