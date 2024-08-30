@@ -140,27 +140,22 @@ do --- repositories
             return repository
     
         if istable( repository )
-            return repository.id
+            return repository.id or repository.url
 
         if isstring( repository )
             result = sql.queryOne( "select id from 'gpm.repositories' where url=?", repository )
             return result and result.id or nil
 
     lib.getPackage = ( repository, name ) ->
-        repository = getRepositoryId( repository )
-        ArgAssert( repository, 1, "number" )
         ArgAssert( name, 2, "string" )
 
-        result = sql.query( [[
-            select p.*, group_concat(v.version) as versions 
-                from 'gpm.packages' p 
-                join 'gpm.package_versions' v on p.repositoryId=? and p.name=? and p.id=v.packageId
-        ]], repository, name )
+        repositoryId = getRepositoryId( repository )
+        unless repositoryId
+            throw SQLError "invalid repository '#{repository}' was given as #1 argument"
 
-        if result := result and result[1]
-            result.versions = string.ByteSplit( result.versions, 0x2C --[[',']] )
-            table.SortDesc( result.versions ) -- let be newest first
-            return result
+        if pkg := sql.queryOne( "select * from 'gpm.packages' where name=? and repositoryId=?", name, repositoryId )
+            pkg.versions = sql.query( "select version, metadata from 'gpm.package_versions' where packageId=?", pkg.id )
+            return pkg
     
     lib.updateRepository = ( repository, packages ) ->
         ArgAssert( packages, 2, "table" )
@@ -169,17 +164,23 @@ do --- repositories
         unless repositoryId
             throw SQLError "invalid repository '#{repository}' was given as #1 argument"
 
-        currentPackages = sql.query( "select id, name from 'gpm.packages' where repositoryId=?", repositoryId )
-        oldPackages = { pkg.name, pkg.id for pkg in *currentPackages }
+        oldPackages = sql.query( "select id, name from 'gpm.packages' where repositoryId=?", repositoryId )
+        oldPackages = { pkg.name, pkg.id for pkg in *oldPackages }
 
         sql.transaction ->
             for name, pkg in pairs( packages )
                 sql.query( "insert or replace into 'gpm.packages' (name, url, type, repositoryId) values (?, ?, ?, ?)", pkg.name, pkg.url, pkg.type, repositoryId )
-                packageId = sql.queryOne( "select id from 'gpm.package_versions' where name=? and repositoryId=?", pkg.name, repositoryId ).id
+                packageId = sql.queryOne( "select id from 'gpm.packages' where name=? and repositoryId=?", pkg.name, repositoryId ).id
 
                 sql.query( "delete from 'gpm.package_versions' where packageId=?", packageId )
                 for v in *pkg.versions
                     sql.query( "insert into 'gpm.package_versions' (version, metadata, packageId) values (?, ?, ?)", v.version, v.metadata, packageId )
+
+                oldPackages[ name ] = nil
+            
+            -- remove old packages
+            for name, id in pairs( oldPackages )
+                sql.query( "delete from 'gpm.package_versions' where packageId=?; delete from 'gpm.packages' where id=?", id, id )
 
 --[[
 
