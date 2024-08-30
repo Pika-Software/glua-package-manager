@@ -1,6 +1,6 @@
 
 import gpm, os from _G
-import istable, isstring, isnumber, isfunction, tostring, throw, Logger, xpcall, ArgAssert, pairs from gpm
+import istable, isstring, isnumber, isfunction, tostring, throw, Logger, xpcall, argument, pairs from gpm
 import string, table from gpm
 import SQLError from gpm
 
@@ -75,15 +75,15 @@ do --- http_cache table, used for etag caching in http library
     lib = sql.http_cache = {}
     
     lib.get = ( url ) ->
-        ArgAssert( url, 1, "string" )
+        argument( url, 1, "string" )
 
         result = sql.query( "select etag, content from 'gpm.http_cache' where url=? limit 1", url )
         return result and result[1]
 
     lib.set = ( url, etag, content ) ->
-        ArgAssert( url, 1, "string" )
-        ArgAssert( etag, 2, "string" )
-        ArgAssert( content, content, "string" )
+        argument( url, 1, "string" )
+        argument( etag, 2, "string" )
+        argument( content, content, "string" )
         if #content > ( 50 * 1024 ) -- 50KB
             -- do not cache content that are larger than 50KB
             return
@@ -98,13 +98,13 @@ do --- key-value store for gpm
     lib = sql.store = {}
 
     lib.set = ( key, value ) ->
-        ArgAssert( key, 1, "string" )
+        argument( key, 1, "string" )
 
         sql.query( "insert or replace into 'gpm.store' values (?, ?)", key, value )
         return
     
     lib.get = ( key ) ->
-        ArgAssert( key, 1, "string" )
+        argument( key, 1, "string" )
 
         result = sql.query( "select value from 'gpm.store' where key=?", key )
         return result and result[1].value
@@ -117,11 +117,11 @@ do --- repositories
         return
 
     lib.addRepository = ( url ) ->
-        ArgAssert( url, 1, "string" )
+        argument( url, 1, "string" )
         return sql.queryOne( "insert or ignore into 'gpm.repositories' (url) values (?); select * from 'gpm.repositories' where url=?", url, url )
 
     lib.removeRepository = ( url ) ->
-        ArgAssert( url, 1, "string" )
+        argument( url, 1, "string" )
 
         sql.transaction ->
             repository = sql.queryOne( "select id from 'gpm.repositories' where url=?", url )
@@ -147,7 +147,7 @@ do --- repositories
             return result and result.id or nil
 
     lib.getPackage = ( repository, name ) ->
-        ArgAssert( name, 2, "string" )
+        argument( name, 2, "string" )
 
         repositoryId = getRepositoryId( repository )
         unless repositoryId
@@ -158,7 +158,7 @@ do --- repositories
             return pkg
     
     lib.updateRepository = ( repository, packages ) ->
-        ArgAssert( packages, 2, "table" )
+        argument( packages, 2, "table" )
 
         repositoryId = getRepositoryId( repository )
         unless repositoryId

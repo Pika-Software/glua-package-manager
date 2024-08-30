@@ -1,5 +1,5 @@
 import environment from _G.gpm
-import ArgAssert from environment
+import argument from environment
 import Create, Remove from environment.timer
 import GetValue, SetValue from environment.table
 import serialize, deserialize from environment.yaml
@@ -7,7 +7,7 @@ import IsFile, AsyncWrite, Read, Write from environment.file
 
 environment.Config = environment.class( "Config", {
     new: ( name, defaults ) =>
-        ArgAssert( name, 1, "string" )
+        argument( name, 1, "string" )
         @name = name
 
         filePath = "/data/config/" .. name .. ".txt"
@@ -17,7 +17,7 @@ environment.Config = environment.class( "Config", {
         if IsFile( filePath )
             @data = deserialize( Read( filePath ) )
         elseif defaults
-            ArgAssert( defaults, 2, "table" )
+            argument( defaults, 2, "table" )
             Write( filePath, serialize( defaults ) )
             @data = defaults
         else
@@ -32,7 +32,7 @@ environment.Config = environment.class( "Config", {
         return GetValue( @data, key )
 
     Set: ( key, value ) =>
-        ArgAssert( key, 1, "string" )
+        argument( key, 1, "string" )
         SetValue( @data, key, value )
         Create @timer, 1, 1, ->
             @Write!

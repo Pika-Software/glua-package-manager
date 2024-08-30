@@ -27,7 +27,7 @@
 _G = _G
 import error, type from _G
 import environment from _G.gpm
-import string, math, table, tonumber, assert, ArgAssert, isstring, isnumber from environment
+import string, math, table, tonumber, assert, argument, isstring, isnumber from environment
 import char, byte, len, sub, format, match, find, rep from string
 import trunc, floor, min, max, pow2, mod2 from math
 import concat, unpack from table
@@ -1757,7 +1757,7 @@ do
             error "bad argument #2 to 'Read' (file or string expected, got " .. type( fileDescriptor ) .. ")", 3
 
         if data ~= nil
-            ArgAssert( data, 3, "table" )
+            argument( data, 3, "table" )
 
         return obj.ast\Read( fileDescriptor, data or {} )
 
@@ -1770,7 +1770,7 @@ do
         unless IsCursor( fileDescriptor )
             error "bad argument #2 to 'Write' (file or string expected, got " .. type( fileDescriptor ) .. ")", 3
 
-        ArgAssert( data, 3, "table" )
+        argument( data, 3, "table" )
 
         obj.ast\Write( fileDescriptor, data )
         return unwrapFileDescriptor( fileDescriptor )
@@ -1782,7 +1782,7 @@ do
             error "bad argument #2 to 'Records' (file or string expected, got " .. type( fileDescriptor ) .. ")", 3
 
         if unpacked ~= nil
-            ArgAssert( unpacked, 3, "boolean" )
+            argument( unpacked, 3, "boolean" )
 
         return ->
             if fileDescriptor\Read( 0 )
@@ -1835,34 +1835,34 @@ do
         import Compile, WarpFileDescriptor from api
 
         read = _module_0.Read = ( fmt, ... ) ->
-            ArgAssert( fmt, 1, "string" )
+            argument( fmt, 1, "string" )
             return Compile( nil, fmt )\Read( ... )
 
         write = _module_0.Write = ( fmt, ... ) ->
-            ArgAssert( fmt, 1, "string" )
+            argument( fmt, 1, "string" )
             return Compile( nil, fmt )\Write( ... )
 
         sizeOf = _module_0.SizeOf = ( fmt ) ->
-            ArgAssert( fmt, 1, "string" )
+            argument( fmt, 1, "string" )
             return Compile( nil, fmt ).ast.size
 
         _module_0.ReadVals = ( ... ) ->
             return unpack( read( ... ) )
 
         _module_0.Compile = ( name, fmt ) ->
-            ArgAssert( name, 1, "string" )
+            argument( name, 1, "string" )
 
             if fmt
-                ArgAssert( fmt, 2, "string" )
+                argument( fmt, 2, "string" )
                 return Compile( name, fmt )
 
             return Compile( nil, name )
 
         records = _module_0.Records = ( fmt, fileDescriptor, unpacked ) ->
-            ArgAssert( fmt, 1, "string" )
+            argument( fmt, 1, "string" )
 
             if unpacked ~= nil
-                ArgAssert( unpacked, 3, "boolean" )
+                argument( unpacked, 3, "boolean" )
 
             return Compile( nil, fmt )\Records( WarpFileDescriptor( fileDescriptor ), unpacked )
 

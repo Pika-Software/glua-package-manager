@@ -1,7 +1,7 @@
 _G = _G
 import environment, Logger from _G.gpm
 import file, istable, CLIENT, SERVER, MENU_DLL from _G
-import async, await, debug, util, path, string, Promise, CodeCompileError, FileSystemError, error, ArgAssert from environment
+import async, await, debug, util, path, string, Promise, CodeCompileError, FileSystemError, error, argument from environment
 import ByteStream, IsBinaryModuleInstalled from util
 import byte, sub, len, match, ByteSplit from string
 import resolve, getDirectory, getFile from path
@@ -898,7 +898,7 @@ do
         }
 
     lib.AsyncCompile = ( filePath, env, config, gamePath, skipNormalize ) ->
-        ArgAssert( filePath, 1, "string" )
+        argument( filePath, 1, "string" )
 
         unless skipNormalize
             filePath, gamePath = normalizeGamePath( filePath, gamePath )
@@ -912,7 +912,7 @@ do
         return asyncCompile( filePath, gamePath, env, config )
 
     lib.Compile = ( filePath, env, config, gamePath, skipNormalize ) ->
-        ArgAssert( filePath, 1, "string" )
+        argument( filePath, 1, "string" )
 
         unless skipNormalize
             filePath, gamePath = normalizeGamePath( filePath, gamePath )
@@ -962,7 +962,7 @@ do
         }
 
     environment.loadfile = ( filePath, mode, env, config, gamePath, skipNormalize ) ->
-        ArgAssert( filePath, 1, "string" )
+        argument( filePath, 1, "string" )
 
         unless skipNormalize
             filePath, gamePath = normalizeGamePath( filePath, gamePath )
@@ -992,12 +992,12 @@ do
                 result = {}
                 for index = 1, #filePath
                     fileName = filePath[ index ]
-                    ArgAssert( fileName, index, "string" )
+                    argument( fileName, index, "string" )
                     result[ fileName ] = Read( fileName, nil, nil, false )
 
                 return result
 
-            ArgAssert( filePath, 1, "string" )
+            argument( filePath, 1, "string" )
 
             return {
                 [ filePath ]: Read( filePath, nil, nil, false )
@@ -1010,8 +1010,8 @@ do
 
             gma = GMA!
             for fileName, fileContent in pairs( filePath )
-                ArgAssert( fileName, 1, "string" )
-                ArgAssert( fileContent, 2, "string" )
+                argument( fileName, 1, "string" )
+                argument( fileContent, 2, "string" )
 
                 if len( fileContent ) == 0
                     error FileSystemError "File '" .. fileName .. "' cannot be empty.", 2
@@ -1035,8 +1035,8 @@ do
 
             return gma\Mount( false )
 
-        ArgAssert( filePath, 1, "string" )
-        ArgAssert( content, 2, "string" )
+        argument( filePath, 1, "string" )
+        argument( content, 2, "string" )
 
         if len( content ) == 0
             error FileSystemError "File '" .. filePath .. "' cannot be empty.", 2
@@ -1113,7 +1113,7 @@ do
         return await mountZIPData( await( asyncRead( filePath, gamePath, true ) ), "file:///" .. filePath )
 
     lib.MountZIP = ( filePath, gamePath, skipNormalize ) ->
-        ArgAssert( filePath, 1, "string" )
+        argument( filePath, 1, "string" )
 
         unless skipNormalize
             filePath, gamePath = normalizeGamePath( filePath, gamePath )

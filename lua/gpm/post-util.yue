@@ -1,7 +1,7 @@
 _G = _G
 import environment, Logger from _G.gpm
 import getmetatable, setmetatable, istable from _G
-import math, string, table, util, ArgAssert, isfunction, error from environment
+import math, string, table, util, argument, isfunction, error from environment
 import byte, sub, len from string
 import fdiv from math
 
@@ -84,7 +84,7 @@ do
         return CompileString( code, identifier, handleError )
 
     load = ( chunk, chunkName, mode = "bt", env = getfenv( 2 ), config, handleError = true ) ->
-        ArgAssert( chunkName, 2, "string" )
+        argument( chunkName, 2, "string" )
 
         if mode == ""
             mode = "bt"
@@ -109,7 +109,7 @@ do
 
                 if modes[ 0x79 --[[ y ]] ]
                     if config
-                        ArgAssert( config, 5, "table" )
+                        argument( config, 5, "table" )
                         chunk = yue.ToLua( chunk, config )
                     else
                         chunk = yue.ToLua( chunk )
@@ -157,7 +157,7 @@ do
     import Delay, SafeAwait from environment.Promise
 
     environment.sleep = ( time = 0 ) ->
-        ArgAssert( time, 1, "number" )
+        argument( time, 1, "number" )
         SafeAwait( Delay( time ) )
         return nil
 
@@ -260,7 +260,7 @@ do
         @Flush!
 
         if position
-            ArgAssert( position, 2, "number" )
+            argument( position, 2, "number" )
             position = clamp( position, 0, @size )
         else
             position = 0
@@ -307,7 +307,7 @@ do
 
             Skip: ( bytes ) =>
                 if bytes
-                    ArgAssert( bytes, 2, "number" )
+                    argument( bytes, 2, "number" )
                 else
                     bytes = 1
 
@@ -320,7 +320,7 @@ do
                 if bytes == "*a" or bytes == nil
                     bytes = size
 
-                ArgAssert( bytes, 2, "number" )
+                argument( bytes, 2, "number" )
 
                 if bytes > 0
                     if position >= size
@@ -357,7 +357,7 @@ do
                 return @Read( bytes ), @Skip( 1 )
 
             WriteString: ( str ) =>
-                ArgAssert( str, 1, "string" )
+                argument( str, 1, "string" )
                 return @Write( str .. "\0" )
 
             -- Line
@@ -379,7 +379,7 @@ do
                 return @Read( bytes ), @Skip( 1 )
 
             WriteLine: ( str ) =>
-                ArgAssert( str, 1, "string" )
+                argument( str, 1, "string" )
                 return @Write( str .. "\n" )
 
             -- Byte
@@ -408,13 +408,13 @@ do
 
             -- UInt
             ReadUInt: ( bytes, endianness ) =>
-                ArgAssert( bytes, 2, "number", 4 )
+                argument( bytes, 2, "number", 4 )
                 setEndianness( endianness or "little" )
                 return readUInt( nil, @Read( bytes ), bytes )
 
             WriteUInt: ( number, bytes, endianness ) =>
-                ArgAssert( number, 1, "number", 4 )
-                ArgAssert( bytes, 2, "number", 4 )
+                argument( number, 1, "number", 4 )
+                argument( bytes, 2, "number", 4 )
                 setEndianness( endianness or "little" )
                 return @Write( writeUInt( nil, number, bytes ) )
 
@@ -441,13 +441,13 @@ do
 
             -- Int
             ReadInt: ( bytes, endianness ) =>
-                ArgAssert( bytes, 2, "number", 4 )
+                argument( bytes, 2, "number", 4 )
                 setEndianness( endianness or "little" )
                 return readInt( nil, @Read( bytes ), bytes )
 
             WriteInt: ( number, bytes, endianness ) =>
-                ArgAssert( number, 1, "number", 4 )
-                ArgAssert( bytes, 2, "number", 4 )
+                argument( number, 1, "number", 4 )
+                argument( bytes, 2, "number", 4 )
                 setEndianness( endianness or "little" )
                 return @Write( writeInt( nil, number, bytes ) )
 
@@ -478,7 +478,7 @@ do
                 return readFloat( nil, @Read( 4 ), 4 )
 
             WriteFloat: ( number, endianness ) =>
-                ArgAssert( number, 2, "number" )
+                argument( number, 2, "number" )
                 setEndianness( endianness or "little" )
                 return @Write( writeFloat( nil, number, 4 ) )
 
@@ -488,7 +488,7 @@ do
                 return readDouble( nil, @Read( 8 ), 8 )
 
             WriteDouble: ( number, endianness ) =>
-                ArgAssert( number, 2, "number" )
+                argument( number, 2, "number" )
                 setEndianness( endianness or "little" )
                 return @Write( writeDouble( nil, number, 8 ) )
 
@@ -498,7 +498,7 @@ do
                 return readQuad( nil, @Read( 16 ), 16 )
 
             WriteQuad: ( number, endianness ) =>
-                ArgAssert( number, 2, "number" )
+                argument( number, 2, "number" )
                 setEndianness( endianness or "little" )
                 return @Write( writeQuad( nil, number, 16 ) )
 
@@ -545,10 +545,10 @@ do
                 return data
 
             WriteZipFile: ( fileName, content, compressionMethod = 0, unixTime = time! ) =>
-                ArgAssert( fileName, 1, "string" )
-                ArgAssert( content, 2, "string" )
-                ArgAssert( compressionMethod, 3, "number" )
-                ArgAssert( unixTime, 4, "number" )
+                argument( fileName, 1, "string" )
+                argument( content, 2, "string" )
+                argument( compressionMethod, 3, "number" )
+                argument( unixTime, 4, "number" )
 
                 -- signature
                 @Write( "PK\x03\x04" )
@@ -1077,7 +1077,7 @@ do
 
     environment.Config = environment.class( "Config", {
         new: ( name, defaults, @config_type = "yaml" ) =>
-            ArgAssert( name, 1, "string" )
+            argument( name, 1, "string" )
             @name = name
 
             filePath = "/data/config/" .. name .. ".txt"
@@ -1088,7 +1088,7 @@ do
                 @data = @Deserialize( Read( filePath ) )
 
             elseif defaults
-                ArgAssert( defaults, 2, "table" )
+                argument( defaults, 2, "table" )
                 @data = defaults
                 Write( filePath, @Serialize! )
 
@@ -1104,7 +1104,7 @@ do
             return GetValue( @data, key )
 
         Set: ( key, value ) =>
-            ArgAssert( key, 1, "string" )
+            argument( key, 1, "string" )
             SetValue( @data, key, value )
             Create @timer, 1, 1, ->
                 @Write!

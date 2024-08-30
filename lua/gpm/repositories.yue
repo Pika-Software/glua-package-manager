@@ -1,7 +1,7 @@
 _G = _G
 import gpm from _G
 import environment from gpm
-import istable, util, CLIENT, SERVER, MENU_DLL, ArgAssert from environment
+import istable, util, CLIENT, SERVER, MENU_DLL, argument from environment
 import JSONToTable, Version from util
 
 repositories = gpm.Repositories
@@ -313,7 +313,7 @@ do
     import tostring from _G
 
     repositories.FindPackage = async ( name, version, offlineMode, withPattern ) ->
-        ArgAssert( name, 1, "string" )
+        argument( name, 1, "string" )
 
         packageName = name
         if withPattern
@@ -329,7 +329,7 @@ do
 
             local versionObj
             if version
-                ArgAssert( version, 2, "string" )
+                argument( version, 2, "string" )
 
                 for folderName in *versions
                     versionObj = Version( folderName )

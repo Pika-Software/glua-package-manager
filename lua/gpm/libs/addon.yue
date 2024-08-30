@@ -1,6 +1,6 @@
 _G = _G
 import environment from _G.gpm
-import string, file, table, await, async, AddonError, ArgAssert, isstring, error, tostring, tonumber from environment
+import string, file, table, await, async, AddonError, argument, isstring, error, tostring, tonumber from environment
 
 file.CreateDir( "/data/gpm/mount", true )
 file.Delete( "/data/gpm/mount/*" )
@@ -201,42 +201,42 @@ _module_0.GMA = environment.class( "GMA", {
         return @title
 
     SetTitle: ( str ) =>
-        ArgAssert( str, 1, "string" )
+        argument( str, 1, "string" )
         @title = str
 
     GetAuthor: =>
         return @author
 
     SetAuthor: ( str ) =>
-        ArgAssert( str, 1, "string" )
+        argument( str, 1, "string" )
         @author = str
 
     GetDescription: =>
         return @description
 
     SetDescription: ( str ) =>
-        ArgAssert( str, 1, "string" )
+        argument( str, 1, "string" )
         @description = str
 
     GetAddonVersion: =>
         return @version
 
     SetAddonVersion: ( int32 ) =>
-        ArgAssert( int32, 1, "number" )
+        argument( int32, 1, "number" )
         @version = int32
 
     GetTimestamp: =>
         return @timestamp
 
     SetTimestamp: ( uint64 ) =>
-        ArgAssert( uint64, 1, "number" )
+        argument( uint64, 1, "number" )
         @timestamp = uint64
 
     GetSteamID: =>
         return @steam_id
 
     SetSteamID: ( str ) =>
-        ArgAssert( str, 1, "string" )
+        argument( str, 1, "string" )
         @steam_id = str
 
     Parse: ( handler, doCRC ) =>
@@ -374,8 +374,8 @@ _module_0.GMA = environment.class( "GMA", {
         return @files[ index ]
 
     SetFile: ( filePath, content, doCRC ) =>
-        ArgAssert( filePath, 1, "string" )
-        ArgAssert( content, 2, "string" )
+        argument( filePath, 1, "string" )
+        argument( content, 2, "string" )
 
         if byte( filePath, 1 ) == 0x2F --[[ / ]]
             filePath = sub( filePath, 2 )
@@ -409,11 +409,11 @@ _module_0.GMA = environment.class( "GMA", {
         return Empty( @files )
 
     AddRequiredContent: ( value ) =>
-        ArgAssert( value, 1, "string" )
+        argument( value, 1, "string" )
         @required_content[ value ] = true
 
     RemoveRequiredContent: ( value ) =>
-        ArgAssert( value, 1, "string" )
+        argument( value, 1, "string" )
         @required_content[ value ] = nil
 
     ClearRequiredContent: =>
@@ -509,7 +509,7 @@ _module_0.GMA = environment.class( "GMA", {
         return handler\ReadAll!
 
     Write: ( filePath, doCRC ) =>
-        ArgAssert( filePath, 1, "string" )
+        argument( filePath, 1, "string" )
 
         handler = Open( filePath, "wb" )
         unless handler
@@ -520,7 +520,7 @@ _module_0.GMA = environment.class( "GMA", {
         return @
 
     AsyncWrite: async ( filePath, doCRC ) =>
-        ArgAssert( filePath, 1, "string" )
+        argument( filePath, 1, "string" )
         await AsyncWrite( filePath, @GetBinary( doCRC ) )
         return @
 

@@ -347,7 +347,7 @@ string.Replace = ( str, searchable, replaceable, withPattern ) ->
 string.IsBytecode = ( str ) ->
     return byte( str, 1 ) == 0x1B --[[ byte code marker ]]
 
-local argAssert, findMetaTable, registerMetaTable
+local argument, findMetaTable, registerMetaTable
 do
 
     import FindMetaTable, RegisterMetaTable, TypeID, rawset, type from _G
@@ -404,7 +404,7 @@ do
     metatables = {}
 
     findMetaTable = util.FindMetaTable = ( name ) ->
-        argAssert( name, 1, "string" )
+        argument( name, 1, "string" )
 
         metatable = metatables[ name ]
         unless metatable
@@ -425,8 +425,8 @@ do
         return metatable
 
     registerMetaTable = util.RegisterMetaTable = ( name, new ) ->
-        argAssert( name, 1, "string" )
-        argAssert( new, 2, "table" )
+        argument( name, 1, "string" )
+        argument( new, 2, "table" )
 
         old = findMetaTable( name )
         unless old
@@ -517,26 +517,34 @@ do
 
         return false
 
-    argAssert = environment.ArgAssert = ( value, num, expected, errorlevel = 3 ) ->
-        name = type_fn( value )
+    argument = environment.argument = ( value, num, ... ) ->
+        type_name = type_fn( value )
+        args = { ... }
+        length = #args
 
-        if name == expected
-            return value
-
-        elseif isfunction( expected )
-            ok, expected = expected( value, num, name )
-            if ok
+        local expected
+        for index = 1, length
+            searchable = args[ index ]
+            if type_name == searchable or searchable == "any"
                 return value
 
-        elseif istable( expected )
-            length = #expected
-            for index = 1, length
-                if name == expected[ index ]
+            elseif isfunction( searchable )
+                local success
+                success, expected = searchable( value, type_name, num )
+                if success
                     return value
 
-            expected = concat( expected, "/", 1, length )
+        unless expected
+            if length == 0
+                expected = "none"
 
-        error( "bad argument #" .. num .. " to \'" .. ( getinfo( 2, "n" ).name or "unknown" ) .. "\' ('" .. expected .. "' expected, got '" .. name .. "')", errorlevel )
+            elseif length == 1
+                expected = args[ 1 ]
+
+            else
+                expected = concat( args, "/" )
+
+        error( "bad argument #" .. num .. " to \'" .. ( getinfo( 2, "n" ).name or "unknown" ) .. "\' ('" .. expected .. "' expected, got '" .. type_name .. "')", 3 )
         return nil
 
 local newClass
@@ -581,8 +589,8 @@ do
         return format( "@class '%s': %p", cls.__name, cls )
 
     classExtends = environment.extends = ( cls, parent ) ->
-        argAssert( cls, 1, "class" )
-        argAssert( parent, 2, "class" )
+        argument( cls, 1, "class" )
+        argument( parent, 2, "class" )
 
         base = rawget( cls, "__base" )
         unless base
@@ -618,10 +626,10 @@ do
         return cls
 
     newClass = environment.class = ( name, base, static, parent ) ->
-        argAssert( name, 1, "string" )
+        argument( name, 1, "string" )
 
         if base
-            argAssert( base, 2, "table" )
+            argument( base, 2, "table" )
             rawset( base, "__index", rawget( base, "__index" ) or base )
             rawset( base, "__tostring", rawget( base, "__tostring" ) or tostring_object )
         else
@@ -629,7 +637,7 @@ do
             base.__index = base
 
         if static
-            argAssert( static, 3, "table" )
+            argument( static, 3, "table" )
 
             rawset( static, "__init", rawget( base, "new" ) )
             rawset( static, "__name", name )
@@ -684,11 +692,11 @@ do
 
     environment.Type = newClass( "Type", {
         new: ( name, scheme, types ) =>
-            argAssert( name, 1, "string" )
-            argAssert( scheme, 2, "string" )
+            argument( name, 1, "string" )
+            argument( scheme, 2, "string" )
 
             if types ~= nil
-                argAssert( types, 3, "table" )
+                argument( types, 3, "table" )
 
                 for type_name, cls in pairs( types )
                     unless isstring( type_name )
@@ -1592,9 +1600,9 @@ do
         import IsEmpty from table
 
         lib.Add = ( eventName, identifier, func, priority ) ->
-            argAssert( eventName, 1, "string" )
-            argAssert( identifier, 2, "string" )
-            argAssert( func, 3, "function" )
+            argument( eventName, 1, "string" )
+            argument( identifier, 2, "string" )
+            argument( func, 3, "function" )
 
             if fenv := getfenv( 2 )
                 if pkg := fenv.__package
@@ -1605,8 +1613,8 @@ do
             return Add( eventName, identifier, func, priority )
 
         lib.Remove = ( eventName, identifier ) ->
-            argAssert( eventName, 1, "string" )
-            argAssert( identifier, 2, "string" )
+            argument( eventName, 1, "string" )
+            argument( identifier, 2, "string" )
 
             if fenv := getfenv( 2 )
                 if pkg := fenv.__package
@@ -1642,8 +1650,8 @@ do
         import unpack from table
 
         lib.Adjust = ( identifier, delay, repetitions, func ) ->
-            argAssert( identifier, 1, "string" )
-            argAssert( delay, 2, "number" )
+            argument( identifier, 1, "string" )
+            argument( delay, 2, "number" )
 
             if fenv := getfenv( 2 )
                 if pkg := fenv.__package
@@ -1661,10 +1669,10 @@ do
             return Adjust( identifier, delay, repetitions, func )
 
         lib.Create = ( identifier, delay, repetitions, func ) ->
-            argAssert( identifier, 1, "string" )
-            argAssert( delay, 2, "number" )
-            argAssert( repetitions, 3, "number" )
-            argAssert( func, 4, "function" )
+            argument( identifier, 1, "string" )
+            argument( delay, 2, "number" )
+            argument( repetitions, 3, "number" )
+            argument( func, 4, "function" )
 
             if fenv := getfenv( 2 )
                 if pkg := fenv.__package
@@ -1682,7 +1690,7 @@ do
             return Create( identifier, delay, repetitions, func )
 
         lib.Exists = ( identifier ) ->
-            argAssert( identifier, 1, "string" )
+            argument( identifier, 1, "string" )
 
             if fenv := getfenv( 2 )
                 if pkg := fenv.__package
@@ -1691,7 +1699,7 @@ do
             return Exists( identifier )
 
         lib.Pause = ( identifier ) ->
-            argAssert( identifier, 1, "string" )
+            argument( identifier, 1, "string" )
 
             if fenv := getfenv( 2 )
                 if pkg := fenv.__package
@@ -1700,7 +1708,7 @@ do
             return Pause( identifier )
 
         lib.Remove = ( identifier ) ->
-            argAssert( identifier, 1, "string" )
+            argument( identifier, 1, "string" )
 
             if fenv := getfenv( 2 )
                 if pkg := fenv.__package
@@ -1711,7 +1719,7 @@ do
             return Remove( identifier )
 
         lib.RepsLeft = ( identifier ) ->
-            argAssert( identifier, 1, "string" )
+            argument( identifier, 1, "string" )
 
             if fenv := getfenv( 2 )
                 if pkg := fenv.__package
@@ -1720,7 +1728,7 @@ do
             return RepsLeft( identifier )
 
         lib.Start = ( identifier ) ->
-            argAssert( identifier, 1, "string" )
+            argument( identifier, 1, "string" )
 
             if fenv := getfenv( 2 )
                 if pkg := fenv.__package
@@ -1729,7 +1737,7 @@ do
             return Start( identifier )
 
         lib.Stop = ( identifier ) ->
-            argAssert( identifier, 1, "string" )
+            argument( identifier, 1, "string" )
 
             if fenv := getfenv( 2 )
                 if pkg := fenv.__package
@@ -1738,7 +1746,7 @@ do
             return Stop( identifier )
 
         lib.TimeLeft = ( identifier ) ->
-            argAssert( identifier, 1, "string" )
+            argument( identifier, 1, "string" )
 
             if fenv := getfenv( 2 )
                 if pkg := fenv.__package
@@ -1747,7 +1755,7 @@ do
             return TimeLeft( identifier )
 
         lib.Toggle = ( identifier ) ->
-            argAssert( identifier, 1, "string" )
+            argument( identifier, 1, "string" )
 
             if fenv := getfenv( 2 )
                 if pkg := fenv.__package
@@ -1756,7 +1764,7 @@ do
             return Toggle( identifier )
 
         lib.UnPause = ( identifier ) ->
-            argAssert( identifier, 1, "string" )
+            argument( identifier, 1, "string" )
 
             if fenv := getfenv( 2 )
                 if pkg := fenv.__package
@@ -1772,7 +1780,7 @@ do
             return {}
 
         lib.NextTick = util.NextTick = ( func, ... ) ->
-            argAssert( func, 1, "function" )
+            argument( func, 1, "function" )
             args = { ... }
 
             Simple 0, ->

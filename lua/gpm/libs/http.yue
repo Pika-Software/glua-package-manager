@@ -1,7 +1,7 @@
 _G = _G
 import gpm, SysTime from _G
 import environment, Logger, sql from gpm
-import await, async, ArgAssert, Promise, http, isstring, isnumber, istable, WebClientError from environment
+import await, async, argument, Promise, http, isstring, isnumber, istable, WebClientError from environment
 
 unless isstring( http.UserAgent )
     http.UserAgent = "GLua Package Manager/" .. gpm.VERSION .. " - Garry's Mod/" .. VERSIONSTR
@@ -100,7 +100,7 @@ do
         queue = nil
 
     HTTP = ( parameters ) ->
-        ArgAssert( parameters, 1, "table" )
+        argument( parameters, 1, "table" )
         promise = Promise!
 
         unless isstring( parameters.method )

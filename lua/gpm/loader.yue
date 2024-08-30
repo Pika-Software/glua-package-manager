@@ -1,7 +1,7 @@
 _G = _G
 import gpm from _G
 import environment from gpm
-import debug, string, path, table, file, util, pairs, isurl, isstring, ArgAssert, URL, ModuleError, error, pcall, PackageError, Promise from environment
+import debug, string, path, table, file, util, pairs, isurl, isstring, argument, URL, ModuleError, error, pcall, PackageError, Promise from environment
 import NormalizeGamePath, AbsoluteGamePath, Find from file
 import stripExtension, getDirectory from path
 import concat, IsEmpty from table
@@ -997,20 +997,20 @@ do
             return base, env, parent
 
     gpm.Import = ( specifier ) ->
-        ArgAssert( specifier, 1, "string" )
+        argument( specifier, 1, "string" )
         return asyncImport( specifier, ESM.resolve, nil, getImportMeta! )
 
     -- just for a .lua users
     environment.import = ( specifier ) ->
-        ArgAssert( specifier, 1, "string" )
+        argument( specifier, 1, "string" )
         return await asyncImport( specifier, ESM.resolve, nil, getImportMeta! )
 
     environment.require = ( modname ) ->
-        ArgAssert( modname, 1, "string" )
+        argument( modname, 1, "string" )
         return await asyncImport( modname, Require.resolve, nil, getImportMeta! )
 
     environment.include = environment.dofile = ( fileName ) ->
-        ArgAssert( fileName, 1, "string" )
+        argument( fileName, 1, "string" )
         return await asyncImport( fileName, Include.resolve, nil, getImportMeta! )
 
 -- packages autorun
