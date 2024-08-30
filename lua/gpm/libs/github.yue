@@ -1,9 +1,61 @@
 -- Github API library
 import gpm from _G
-import http, async, await from gpm
+import HTTP, SysTime, async, await, Promise, WebClientError, string from gpm
 
 local api_token
 if SERVER
     api_token = CreateConVar( "gpm_github_token", "", { FCVAR_ARCHIVE, FCVAR_PROTECTED, 16 --[[FCVAR_HIDDEN]] }, "https://github.com/settings/tokens" )
 
--- export request = (  )
+mutationNextTime = 0
+rateLimitReset = 0
+
+export request = async ( method, path, headers, body, cache ) ->
+    method = string.upper( method )
+
+    unless string.IsURL( path )
+        path = "https://api.github.com" .. path
+
+    headers or= {}
+    unless headers["Authorization"] and api_token\GetString() != ""
+        headers["Authorization"] = "Bearer " .. api_token\GetString()
+    
+    unless headers["Accept"]
+        headers["Accept"] = "application/vnd.github+json"
+    
+    unless headers["X-GitHub-Api-Version"]
+        headers["X-GitHub-Api-Version"] = "2022-11-28"
+
+    currentTime = os.time()
+    if rateLimitReset > currentTime
+        diff = rateLimitReset - currentTime
+        if diff < 30 -- I think waiting 30 seconds is acceptable
+            await Promise.delay( diff )
+        else
+            error WebClientError "Github API rate limit exceeded"
+
+    -- Rate limit mutative requests
+    if method == "POST" or method == "PATCH" or method == "PUT" or method == "DELETE"
+        diff = mutationNextTime - SysTime()
+
+        if diff > 0
+            mutationNextTime = mutationNextTime + 1000
+            await Promise.delay( diff )
+        else
+            mutationNextTime = SysTime() + 1000
+    
+    result = await HTTP({
+        url: path
+        method: method
+        headers: headers
+        body: body
+        etag: cache != false
+    })
+
+    if (result.status == 429 or result.status == 403) and headers["x-ratelimit-remaining"] == "0"
+        reset = tonumber( headers["x-ratelimit-reset"] )
+        if reset
+            rateLimitReset = reset
+
+        error WebClientError "Github API rate limit exceeded"
+
+    return result
