@@ -3,6 +3,7 @@ import environment from _G.gpm
 import pairs, error, rawget, getfenv, getmetatable, setmetatable, istable, tostring from _G
 import string, table, debug, util, os from environment
 import byte, sub, gsub, format, len, find from string
+:isbool, :isnumber, :isstring, :isfunction = _G
 import concat, remove from table
 import rshift, band from _G.bit
 import getinfo from debug
@@ -34,7 +35,318 @@ do
 
         return length
 
-:isbool, :isnumber, :isstring, :isfunction = _G
+-- string
+string.slice = sub
+string.gmatch or= string.gfind
+
+string.StartsWith = ( str, startStr ) ->
+	return sub( str, 1, len( startStr ) ) == startStr
+
+string.EndsWith = ( str, endStr ) ->
+	return endStr == "" or sub( str, len( str ) - len( endStr ) ) == endStr
+
+string.concat = ( ... ) ->
+    args = { ... }
+
+    length = #args
+    if length == 0
+        return ""
+
+    return concat( args, "", 1, length )
+
+string.indexOf = ( str, searchable, position, withPattern ) ->
+    unless searchable
+        return 0
+
+    if searchable == ""
+        return 1
+
+    position = max( position or 1, 1 )
+
+    if position > len( str )
+        return -1
+
+    return find( str, searchable, position, withPattern ~= true ) or -1, nil
+
+do
+
+    split = string.Split = ( str, pattern, withPattern ) ->
+        unless pattern
+            return { str }
+
+        if pattern == ""
+            ret = {}
+            for i = 1, len( str )
+                ret[ i ] = sub( str, i, i )
+
+            return ret
+
+        withPattern = withPattern ~= true
+        ret, rlength = {}, 0
+        pointer = 1
+
+        while true
+            startPos, endPos = find( str, pattern, pointer, withPattern )
+            unless startPos
+                break
+
+            rlength += 1
+            ret[ rlength ] = sub( str, pointer, startPos - 1 )
+            pointer = endPos + 1
+
+        rlength += 1
+        ret[ rlength ] = sub( str, pointer )
+
+        return ret, rlength
+
+    string.Explode = ( pattern, str, withPattern ) ->
+        return split( str, pattern, withPattern )
+
+string.Count = ( str, pattern, withPattern ) ->
+    unless pattern
+        return 0
+
+    if pattern == ""
+        return len( str )
+
+    withPattern = withPattern ~= true
+    pointer = 1
+    count = 0
+
+    while true
+        startPos, endPos = find( str, pattern, pointer, withPattern )
+        unless startPos
+            break
+
+        count += 1
+        pointer = endPos + 1
+
+    return count
+
+string.ByteSplit = ( str, byte0 ) ->
+    unless byte0
+        return { str }
+
+    result, length = {}, 0
+    startPos, endPos = 1, 1
+    nextByte = byte( str, endPos )
+
+    while nextByte
+        if nextByte == byte0
+            length += 1
+            result[ length ] = sub( str, startPos, endPos - 1 )
+            startPos = endPos + 1
+
+        endPos += 1
+        nextByte = byte( str, endPos )
+
+    length += 1
+    result[ length ] = sub( str, startPos, endPos - 1 )
+
+    return result, length
+
+string.ByteCount = ( str, byte0 ) ->
+    unless byte0
+        return 0
+
+    count = 0
+    pointer = 1
+    nextByte = byte( str, pointer )
+
+    while nextByte
+        if nextByte == byte0
+            count += 1
+
+        pointer += 1
+        nextByte = byte( str, pointer )
+
+    return count
+
+do
+
+    isASCII = string.IsASCII = ( byte0 ) ->
+        return byte0 >= 0 and byte0 <= 255
+
+    string.TrimByte = ( str, byte0, dir = 0 ) ->
+        unless isASCII( byte0 )
+            error "invalid byte", 2
+
+        startPos, endPos = 1, len( str )
+
+        if dir ~= -1
+            while byte( str, startPos ) == byte0
+                startPos += 1
+
+                if startPos == endPos
+                    return ""
+
+        if dir ~= 1
+            while byte( str, endPos ) == byte0
+                endPos -= 1
+
+                if endPos == 0
+                    return ""
+
+        return sub( str, startPos, endPos )
+
+    string.TrimBytes = ( str, bytes, dir = 0 ) ->
+        startPos, endPos = 1, len( str )
+
+        for key, value in pairs( bytes )
+            if isnumber( value )
+                bytes[ value ] = true
+                bytes[ key ] = nil
+
+            elseif isbool( value )
+                unless isnumber( key ) and isASCII( key )
+                   error "invalid bytes", 2
+            else
+                error "invalid bytes", 2
+
+        if dir ~= -1
+            while bytes[ byte( str, startPos ) ]
+                startPos += 1
+
+                if startPos == endPos
+                    return ""
+
+        if dir ~= 1
+            while bytes[ byte( str, endPos ) ]
+                endPos -= 1
+
+                if endPos == 0
+                    return ""
+
+        return sub( str, startPos, endPos )
+
+do
+
+    chars = {
+        -- ()
+        [ 0x28 ]: "%("
+        [ 0x29 ]: "%)"
+
+        -- []
+        [ 0x5B ]: "%["
+        [ 0x5D ]: "%]"
+
+        -- .
+        [ 0x2E ]: "%."
+
+        -- %
+        [ 0x25 ]: "%%"
+
+        -- +-
+        [ 0x2B ]: "%+"
+        [ 0x2D ]: "%-"
+
+        -- *
+        [ 0x2A ]: "%*"
+
+        -- ?
+        [ 0x3F ]: "%?"
+
+        -- ^
+        [ 0x5E ]: "%^"
+
+        -- $
+        [ 0x24 ]: "%$"
+    }
+
+    patternSafe = string.PatternSafe = ( str ) ->
+        result, size = {}, 0
+        startPos = 1
+
+        length = len( str )
+
+        for index = 1, length
+            byte0 = byte( str, index )
+            if byte0 == 0x00
+                size += 1
+                result[ size ] = sub( str, startPos, index - 1 ) .. "%z"
+                startPos = index + 1
+            else
+                sybol = chars[ byte0 ]
+                if sybol
+                    size += 1
+                    if startPos ~= index
+                        result[ size ] = sub( str, startPos, index - 1 ) .. sybol
+                    else
+                        result[ size ] = sybol
+
+                    startPos = index + 1
+
+        size += 1
+        result[ size ] = sub( str, startPos, length )
+
+        if size == 0
+            return str
+
+        if size == 1
+            return result[ 1 ]
+
+        return concat( result, "", 1, size )
+
+    import match from string
+
+    trim = string.Trim = ( str, pattern, dir = 0 ) ->
+        if pattern
+            length = len( pattern )
+            if length == 0
+                pattern = "%s"
+            elseif length == 1
+                pattern = chars[ byte( pattern, 1 ) ] or pattern
+            elseif length ~= 2 or byte( pattern, 1 ) ~= 0x25
+                error "invalid character", 2
+        else
+            pattern = "%s"
+
+        -- left
+        if dir == 1
+            return match( str, "^(.-)" .. pattern .. "*$" ) or str
+
+        -- right
+        if dir == -1
+            return match( str, "^" .. pattern .. "*(.+)$" ) or str
+
+        return match( str, "^" .. pattern .. "*(.-)" .. pattern .. "*$" ) or str
+
+    string.TrimLeft = ( str, pattern ) ->
+        return trim( str, pattern, 1 )
+
+    string.TrimRight = ( str, pattern ) ->
+        return trim( str, pattern, -1 )
+
+    string.IsURL = ( str ) ->
+        return match( str, "^%l[%l+-.]+%:[^%z\x01-\x20\x7F-\xFF\"<>^`{-}]*$" ) ~= nil
+
+string.Extract = ( str, pattern, default ) ->
+    startPos, endPos, matched = find( str, pattern, 1, false )
+    if startPos
+        return sub( str, 1, startPos - 1 ) .. sub( str, endPos + 1 ), matched or default
+
+    return str, default
+
+string.Left = ( str, num ) ->
+    return sub( str, 1, num )
+
+string.Right = ( str, num ) ->
+    return sub( str, -num )
+
+string.Replace = ( str, searchable, replaceable, withPattern ) ->
+    if withPattern
+        return gsub( str, searchable, replaceable )
+
+    startPos, endPos = find( str, searchable, 1, true )
+    while startPos
+        str = sub( str, 1, startPos - 1 ) .. replaceable .. sub( str, endPos + 1 )
+        startPos, endPos = find( str, searchable, endPos + 1, true )
+
+    return str
+
+string.IsBytecode = ( str ) ->
+    return byte( str, 1 ) == 0x1B --[[ byte code marker ]]
+
 local argAssert, findMetaTable, registerMetaTable
 do
 
@@ -508,201 +820,6 @@ do
             return gsub( gsub( sub( info.source, 2 ), "^(.-)(lua/.*)$", lff ), "^(.-)([%w_]+/gamemode/.*)$", lff )
 
         return ""
-
--- string
-string.slice = sub
-string.gmatch or= string.gfind
-
-string.StartsWith = ( str, startStr ) ->
-	return sub( str, 1, len( startStr ) ) == startStr
-
-string.EndsWith = ( str, endStr ) ->
-	return endStr == "" or sub( str, len( str ) - len( endStr ) ) == endStr
-
-string.concat = ( ... ) ->
-    args = { ... }
-
-    length = #args
-    if length == 0
-        return ""
-
-    return concat( args, "", 1, length )
-
-string.indexOf = ( str, searchable, position, withPattern ) ->
-    unless searchable
-        return 0
-
-    if searchable == ""
-        return 1
-
-    position = max( position or 1, 1 )
-
-    if position > len( str )
-        return -1
-
-    return find( str, searchable, position, withPattern ~= true ) or -1, nil
-
-do
-
-    split = string.Split = ( str, pattern, withPattern ) ->
-        unless pattern
-            return { str }
-
-        if pattern == ""
-            ret = {}
-            for i = 1, len( str )
-                ret[ i ] = sub( str, i, i )
-
-            return ret
-
-        withPattern = withPattern ~= true
-        ret, rlength = {}, 0
-        pointer = 1
-
-        while true
-            startPos, endPos = find( str, pattern, pointer, withPattern )
-            unless startPos
-                break
-
-            rlength += 1
-            ret[ rlength ] = sub( str, pointer, startPos - 1 )
-            pointer = endPos + 1
-
-        rlength += 1
-        ret[ rlength ] = sub( str, pointer )
-
-        return ret, rlength
-
-    string.Explode = ( pattern, str, withPattern ) ->
-        return split( str, pattern, withPattern )
-
-string.Count = ( str, pattern, withPattern ) ->
-    unless pattern
-        return 0
-
-    if pattern == ""
-        return len( str )
-
-    withPattern = withPattern ~= true
-    pointer = 1
-    count = 0
-
-    while true
-        startPos, endPos = find( str, pattern, pointer, withPattern )
-        unless startPos
-            break
-
-        count += 1
-        pointer = endPos + 1
-
-    return count
-
-string.ByteSplit = ( str, byte0 ) ->
-    unless byte0
-        return { str }
-
-    result, length = {}, 0
-    startPos, endPos = 1, 1
-    nextByte = byte( str, endPos )
-
-    while nextByte
-        if nextByte == byte0
-            length += 1
-            result[ length ] = sub( str, startPos, endPos - 1 )
-            startPos = endPos + 1
-
-        endPos += 1
-        nextByte = byte( str, endPos )
-
-    length += 1
-    result[ length ] = sub( str, startPos, endPos - 1 )
-
-    return result, length
-
-string.ByteCount = ( str, byte0 ) ->
-    unless byte0
-        return 0
-
-    count = 0
-    pointer = 1
-    nextByte = byte( str, pointer )
-
-    while nextByte
-        if nextByte == byte0
-            count += 1
-
-        pointer += 1
-        nextByte = byte( str, pointer )
-
-    return count
-
-string.TrimByte = ( str, byte0, dir = 0 ) ->
-    startPos, endPos = 1, len( str )
-
-    switch dir
-        when -1
-            while byte( str, endPos ) == byte0
-                endPos -= 1
-
-                if endPos == 0
-                    return ""
-        when 1
-            while byte( str, startPos ) == byte0
-                startPos += 1
-
-                if startPos == endPos
-                    return ""
-        else
-            while byte( str, startPos ) == byte0
-                startPos += 1
-
-                if startPos == endPos
-                    return ""
-
-            while byte( str, endPos ) == byte0
-                endPos -= 1
-
-                if endPos == 0
-                    return ""
-
-    return sub( str, startPos, endPos )
-
-string.Extract = ( str, pattern, default ) ->
-    startPos, endPos, matched = find( str, pattern, 1, false )
-    if startPos
-        return sub( str, 1, startPos - 1 ) .. sub( str, endPos + 1 ), matched or default
-
-    return str, default
-
-string.Left = ( str, num ) ->
-    return sub( str, 1, num )
-
-string.Right = ( str, num ) ->
-    return sub( str, -num )
-
-string.Replace = ( str, searchable, replaceable, withPattern ) ->
-    if withPattern
-        return gsub( str, searchable, replaceable )
-
-    startPos, endPos = find( str, searchable, 1, true )
-    while startPos
-        str = sub( str, 1, startPos - 1 ) .. replaceable .. sub( str, endPos + 1 )
-        startPos, endPos = find( str, searchable, endPos + 1, true )
-
-    return str
-
-do
-
-    import match from string
-
-    string.IsURL = ( str ) ->
-        return match( str, "^%l[%l+-.]+%:[^%z\x01-\x20\x7F-\xFF\"<>^`{-}]*$" ) ~= nil
-
-string.IsASCII = ( byte0 ) ->
-    return byte0 >= 0 and byte0 <= 255
-
-string.IsBytecode = ( str ) ->
-    return byte( str, 1 ) == 0x1B --[[ byte code marker ]]
 
 -- table
 unless table.unpack

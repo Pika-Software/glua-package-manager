@@ -5,6 +5,13 @@ import concat, insert, remove, IsEmpty, IsSequential from environment.table
 import inf, nan from environment.math
 import Date from environment.util
 
+--[[
+
+    Based on https://github.com/peposso/lua-tinyyaml
+    lua-tinyyaml
+
+]]
+
 UNESCAPES = {
     ["0"]: "\x00"
     ["z"]: "\x00"
