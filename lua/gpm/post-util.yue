@@ -1076,7 +1076,7 @@ do
     import IsFile, AsyncWrite, Read, Write from environment.file
 
     environment.Config = environment.class( "Config", {
-        new: ( name, defaults ) =>
+        new: ( name, defaults, @config_type = "yaml" ) =>
             ArgAssert( name, 1, "string" )
             @name = name
 
@@ -1085,11 +1085,13 @@ do
             @filepath = filePath
 
             if IsFile( filePath )
-                @data = deserialize( Read( filePath ) )
+                @data = @Deserialize( Read( filePath ) )
+
             elseif defaults
                 ArgAssert( defaults, 2, "table" )
-                Write( filePath, serialize( defaults ) )
                 @data = defaults
+                Write( filePath, @Serialize! )
+
             else
                 @data = {}
 
@@ -1110,12 +1112,24 @@ do
             return nil
 
         Write: =>
-            AsyncWrite( @filepath, serialize( @data ) )
+            AsyncWrite( @filepath, @Serialize! )
             Remove( @timer )
             return nil
 
         Read: =>
-            @data = deserialize( Read( @filepath ) )
+            @data = @Deserialize( Read( @filepath ) )
             return nil
+
+        Serialize: =>
+            if @config_type == "yaml"
+                return serialize( @data )
+
+            return TableToJSON( @data, true )
+
+        Deserialize: ( str ) =>
+            if @config_type == "yaml"
+                return deserialize( str )
+
+            return JSONToTable( str, true, true )
 
     } )

@@ -178,16 +178,16 @@ do
                 startPos += 1
 
                 if startPos == endPos
-                    return ""
+                    return "", 0
 
         if dir ~= 1
             while byte( str, endPos ) == byte0
                 endPos -= 1
 
                 if endPos == 0
-                    return ""
+                    return "", 0
 
-        return sub( str, startPos, endPos )
+        return sub( str, startPos, endPos ), endPos - startPos + 1
 
     string.TrimBytes = ( str, bytes, dir = 0 ) ->
         startPos, endPos = 1, len( str )
@@ -208,16 +208,16 @@ do
                 startPos += 1
 
                 if startPos == endPos
-                    return ""
+                    return "", 0
 
         if dir ~= 1
             while bytes[ byte( str, endPos ) ]
                 endPos -= 1
 
                 if endPos == 0
-                    return ""
+                    return "", 0
 
-        return sub( str, startPos, endPos )
+        return sub( str, startPos, endPos ), endPos - startPos + 1
 
 do
 
@@ -536,7 +536,7 @@ do
 
             expected = concat( expected, "/", 1, length )
 
-        error( "bad argument #" .. num .. " to \'" .. ( getinfo( 2, "n" ).name or "unknown" ) .. "\' (" .. expected .. " expected, got " .. name .. ")", errorlevel )
+        error( "bad argument #" .. num .. " to \'" .. ( getinfo( 2, "n" ).name or "unknown" ) .. "\' ('" .. expected .. "' expected, got '" .. name .. "')", errorlevel )
         return nil
 
 local newClass
