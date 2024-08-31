@@ -532,9 +532,8 @@ do
                 return value
 
             elseif isfunction( searchable )
-                local success
-                success, expected = searchable( value, typeName, num )
-                if success
+                expected = searchable( value, typeName, num )
+                unless isstring( expected )
                     return value
 
         unless expected
