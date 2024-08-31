@@ -749,6 +749,7 @@ do
 
                 fields[ fieldName ] = { type_name, isArray }
 
+            @metatable = { __metatable_name: name, __metatable_id: 5, :__tostring }
             @required = required
             @fields = fields
             return nil
@@ -781,11 +782,8 @@ do
                 elseif type( value ) ~= type_name
                     error "expected field '" .. key .. ":" .. type_name .. "', got '" .. key .. ":" .. type( value ) .. "'", 2
 
-            return setmetatable( tbl, {
-                __metatable_name: @name
-                __metatable_id: 5
-                :__tostring
-            } )
+            return setmetatable( tbl, @metatable )
+
     } )
 
 do
