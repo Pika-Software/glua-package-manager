@@ -1,6 +1,6 @@
 _G = _G
 import environment from _G.gpm
-import pairs, error, rawget, getfenv, getmetatable, setmetatable, istable, tostring from _G
+import pairs, error, rawget, getfenv, getmetatable, setmetatable, istable, tostring, math from _G
 import string, table, debug, util, os from environment
 import byte, sub, gsub, format, len, find from string
 :isbool, :isnumber, :isstring, :isfunction = _G
@@ -61,7 +61,7 @@ string.indexOf = ( str, searchable, position, withPattern ) ->
     if searchable == ""
         return 1
 
-    position = max( position or 1, 1 )
+    position = math.max( position or 1, 1 )
 
     if position > len( str )
         return -1
