@@ -518,19 +518,19 @@ do
         return false
 
     argument = environment.argument = ( value, num, ... ) ->
-        type_name = type_fn( value )
+        typeName = type_fn( value )
         args = { ... }
         length = #args
 
         local expected
         for index = 1, length
             searchable = args[ index ]
-            if type_name == searchable or searchable == "any"
+            if typeName == searchable or searchable == "any"
                 return value
 
             elseif isfunction( searchable )
                 local success
-                success, expected = searchable( value, type_name, num )
+                success, expected = searchable( value, typeName, num )
                 if success
                     return value
 
@@ -544,7 +544,7 @@ do
             else
                 expected = concat( args, "/" )
 
-        error( "bad argument #" .. num .. " to \'" .. ( getinfo( 2, "n" ).name or "unknown" ) .. "\' ('" .. expected .. "' expected, got '" .. type_name .. "')", 3 )
+        error( "bad argument #" .. num .. " to \'" .. ( getinfo( 2, "n" ).name or "unknown" ) .. "\' ('" .. expected .. "' expected, got '" .. typeName .. "')", 3 )
         return nil
 
 local newClass
@@ -691,24 +691,24 @@ do
         return format( "@type '%s': %p", getmetatable( @ ).__metatable_name, @ )
 
     environment.Type = newClass( "Type", {
-        new: ( name, scheme, types ) =>
+        new: ( name, scheme, classes ) =>
             argument( name, 1, "string" )
             argument( scheme, 2, "string" )
 
-            if types ~= nil
-                argument( types, 3, "table" )
+            if classes ~= nil
+                argument( classes, 3, "table" )
 
-                for type_name, cls in pairs( types )
-                    unless isstring( type_name )
+                for className, cls in pairs( classes )
+                    unless isstring( className )
                         error "external type name must be a string"
 
                     unless istable( cls )
                         error "external type must be a class"
 
-                    if rawget( cls, "__name" ) ~= type_name
-                        error "external type name mismatch '" .. ( rawget( cls, "__name" ) or "nil" ) .. " ~= " .. type_name .. "'"
+                    if rawget( cls, "__name" ) ~= className
+                        error "external type name mismatch '" .. ( rawget( cls, "__name" ) or "nil" ) .. " ~= " .. className .. "'"
 
-                @external_types = types
+                @external = classes
 
             @name = name
 
@@ -728,26 +728,26 @@ do
                 if count > 2
                     error "invalid type definition, expected 'name: type'"
 
-                type_name, type_length = TrimBytes( parts[ 2 ], SPACE_BYTES, 1 )
+                typeName, typeLength = TrimBytes( parts[ 2 ], SPACE_BYTES, 1 )
                 fieldName = TrimBytes( parts[ 1 ], SPACE_BYTES, -1 )
 
-                if byte( type_name, type_length ) == 0x3F --[[ ? ]]
-                    type_length -= 1
-                    type_name = sub( type_name, 1, type_length )
+                if byte( typeName, typeLength ) == 0x3F --[[ ? ]]
+                    typeLength -= 1
+                    typeName = sub( typeName, 1, typeLength )
                 else
                     length += 1
                     required[ length ] = fieldName
 
                 isArray = false
-                if byte( type_name, type_length - 1 ) == 0x5B --[[ [ ]] and byte( type_name, type_length ) == 0x5D --[[ ] ]]
+                if byte( typeName, typeLength - 1 ) == 0x5B --[[ [ ]] and byte( typeName, typeLength ) == 0x5D --[[ ] ]]
                     isArray = true
-                    type_length -= 2
-                    type_name = sub( type_name, 1, -3 )
+                    typeLength -= 2
+                    typeName = sub( typeName, 1, -3 )
 
-                unless ( default_types[ type_name ] or ( types and types[ type_name ] ) )
-                    error "unknown type '" .. type_name .. "'"
+                unless ( default_types[ typeName ] or ( classes and classes[ typeName ] ) )
+                    error "unknown type '" .. typeName .. "'"
 
-                fields[ fieldName ] = { type_name, isArray }
+                fields[ fieldName ] = { typeName, isArray }
 
             @metatable = { __metatable_name: name, __metatable_id: 5, :__tostring }
             @required = required
@@ -770,17 +770,17 @@ do
                 unless data
                     error "unknown field '" .. key .. ":" .. type( value ) .. "'", 2
 
-                type_name = data[ 1 ]
+                typeName = data[ 1 ]
                 if data[ 2 ]
                     unless istable( value )
-                        error "expected field '" .. key .. ":" .. type_name .. "[]', got '" .. key .. ":" .. type( value ) .. "'", 2
+                        error "expected field '" .. key .. ":" .. typeName .. "[]', got '" .. key .. ":" .. type( value ) .. "'", 2
 
                     for index = 1, #value
-                        if type( value[ index ] ) ~= type_name
-                            error "expected field '" .. key .. ":" .. type_name .. "[" .. index .. "]', got '" .. key .. ":" .. type( value[ index ] ) .. "[" .. index .. "]'", 2
+                        if type( value[ index ] ) ~= typeName
+                            error "expected field '" .. key .. ":" .. typeName .. "[" .. index .. "]', got '" .. key .. ":" .. type( value[ index ] ) .. "[" .. index .. "]'", 2
 
-                elseif type( value ) ~= type_name
-                    error "expected field '" .. key .. ":" .. type_name .. "', got '" .. key .. ":" .. type( value ) .. "'", 2
+                elseif type( value ) ~= typeName
+                    error "expected field '" .. key .. ":" .. typeName .. "', got '" .. key .. ":" .. type( value ) .. "'", 2
 
             return setmetatable( tbl, @metatable )
 
