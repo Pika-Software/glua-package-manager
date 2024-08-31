@@ -1,5 +1,5 @@
 
-import gpm, os from _G
+import gpm, os, hook from _G
 import istable, isstring, isnumber, isfunction, tostring, throw, Logger, xpcall, argument, pairs from gpm
 import string, table from gpm
 import SQLError from gpm
@@ -251,7 +251,7 @@ sql.migrations = [
 
 -- optimize sqlite database
 unless sql.optimized
-    pragma_values = sql.query( "pragma foreign_keys; pragma journal_mode; pragma synchronous" )
+    pragma_values = sql.query( "pragma foreign_keys; pragma journal_mode; pragma synchronous; pragma wal_autocheckpoint" )
     if pragma_values[1].foreign_keys == "0"
         sql.query( "pragma foreign_keys = 1" )
     
@@ -260,8 +260,17 @@ unless sql.optimized
     
     if pragma_values[3].synchronous == "0"
         sql.query( "pragma synchronous = normal" )
+    
+    if pragma_values[4].wal_autocheckpoint == "1000"
+        sql.query( "pragma wal_autocheckpoint = 100" )
 
     sql.optimized = true
+
+-- truncate WAL journal on shutdown
+hook.Add( "ShutDown", "GLua Package Manager", ->
+    if gsql.Query( "pragma wal_checkpoint(TRUNCATE)" ) == false
+        Logger\Error( "Failed to truncate WAL journal: %s", gsql.LastError() )
+)
 
 
 unless gsql.TableExists( "gpm.migration_history" )
