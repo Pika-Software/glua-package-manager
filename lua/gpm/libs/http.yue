@@ -1,7 +1,7 @@
 _G = _G
 import gpm, SysTime from _G
 import environment, Logger, sql from gpm
-import await, async, argument, Promise, http, isstring, isnumber, istable, WebClientError from environment
+import await, async, argument, Promise, http, isstring, isnumber, istable, tonumber, WebClientError, string from environment
 
 unless isstring( http.UserAgent )
     http.UserAgent = "GLua Package Manager/" .. gpm.VERSION .. " - Garry's Mod/" .. VERSIONSTR
@@ -35,7 +35,7 @@ do
 local HTTP
 do
 
-    defaultTimeout, cacheLifetime = 10, 30 * 60
+    defaultTimeout, globalCacheLifetime = 10, 30 * 60
 
     do
 
@@ -44,7 +44,7 @@ do
         flags = _G.bit.bor( _G.FCVAR_ARCHIVE, _G.FCVAR_REPLICATED )
 
         defaultTimeout = CreateConVar( "http_timeout", "10", flags, "Default http timeout for gpm http library.", 3, 300 )\GetInt!
-        cacheLifetime = CreateConVar( "gpm_http_cache_lifetime", "30", flags, "Cache lifetime for gpm http library." )\GetInt! * 60
+        globalCacheLifetime = CreateConVar( "gpm_http_cache_lifetime", "30", flags, "Cache lifetime for gpm http library in minutes." )\GetInt! * 60
 
     do
 
@@ -55,7 +55,7 @@ do
         "GLua Package Manager::HTTP" )
 
         AddChangeCallback( "gpm_http_cache_lifetime", ( _, __, new ) ->
-            cacheLifetime = tonumber( new ) * 60
+            globalCacheLifetime = tonumber( new ) * 60
         "GLua Package Manager::HTTP" )
 
     requestCache = {
@@ -68,6 +68,9 @@ do
         ["OPTIONS"]: {}
     }
 
+    isValidCache = ( cache ) ->
+        return ( SysTime! - cache.start ) < (cache.age or globalCacheLifetime or 0)
+
     do
 
         methods = { "GET", "POST", "HEAD", "PUT", "DELETE", "PATCH", "OPTIONS" }
@@ -76,21 +79,18 @@ do
         timer.Create "GLua Package Manager::HTTP", 60, 0, ->
             sysTime = SysTime!
 
-            for index = 1, 7
-                requests = requestCache[ methods[ index ] ]
-                for href, data in pairs( requests )
-                    if ( sysTime - data[ 2 ] ) > data[ 3 ]
+            for method in *methods
+                requests = requestCache[ method ]
+                for href, cache in pairs( requests )
+                    unless isValidCache( cache )
                         requests[ href ] = nil
 
     request = ( parameters ) =>
         if client( parameters ) or not returnsState
             Logger\Debug( "%s HTTP request to '%s', using '%s', with timeout %d seconds.", parameters.method, parameters.url, clientName, parameters.timeout )
         else
-            if parameters.cache
-                requestCache[ parameters.method ][ parameters.url ] = nil
-
-            @Reject( WebClientError "failed to make http request" )
-            return nil
+            parameters.failed( "failed to initiate http request" )
+            return
 
     queue = {}
     timer.Simple 0, ->
@@ -115,32 +115,52 @@ do
 
             parameters.headers[ userAgentKey ] = http.UserAgent
 
-        :cache, :method, :url = parameters
-        if cache
-            unless requestCache[ method ]
-                requestCache[ method ] = {}
-
-            data = requestCache[ method ][ url ]
-            if data
-                return data[ 1 ] -- yeah, here we can just remove previous promise
-
-            requestCache[ method ][ url ] = { promise, SysTime!, parameters.cacheLifetime or cacheLifetime }
-
-        parameters.cacheLifetime = nil
-
         parameters.success = ( status, body, headers ) ->
             promise\Resolve( { :status, :body, :headers } )
             return nil
 
         parameters.failed = ( msg ) ->
-            if cache
-                requestCache[ method ][ url ] = nil
-
             promise\Reject( WebClientError msg )
             return nil
+        
+        -- Cache extension
+        if parameters.cache
+            url = parameters.url
+            method = string.upper( parameters.method )
+
+            unless requestCache[ method ]
+                requestCache[ method ] = {}
+            
+            cache = requestCache[ method ][ url ]
+            if cache and isValidCache( cache )
+                return cache.promise
+            
+            cache = requestCache[ method ][ url ] = { :promise, start: SysTime!, age: parameters.cacheLifetime }
+
+            handleSuccess = parameters.success
+            parameters.success = ( status, body, headers ) ->
+                if cacheControl := headers["cache-control"]
+                    options = {}
+                    for key, value in string.gmatch( cacheControl, "([%w_-]+)=?([%w_-]*)" )
+                        options[key] = tonumber(value) or true
+
+                    if options["no-cache"] or options["no-store"]
+                        requestCache[ method ][ url ] = nil
+                    elseif options["s-maxage"] or options["max-age"]
+                        cache.age = options["s-maxage"] or options["max-age"]
+
+                handleSuccess( status, body, headers )
+                return
+
+            handleFailed = parameters.failed
+            parameters.failed = ( msg ) ->
+                requestCache[ method ][ url ] = nil
+                handleFailed( msg )
+                return
 
         -- ETag extension
         if parameters.etag
+            url = parameters.url
             data = sql.http_cache.get( url )
             if data
                 unless istable( parameters.headers )

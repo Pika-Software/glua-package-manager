@@ -51,6 +51,7 @@ export request = async ( method, path, headers, body, cache ) ->
         headers: headers
         body: body
         etag: cache != false
+        cache: cache != false
     })
 
     if (result.status == 429 or result.status == 403) and headers["x-ratelimit-remaining"] == "0"
