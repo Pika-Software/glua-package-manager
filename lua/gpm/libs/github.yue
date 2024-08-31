@@ -1,13 +1,14 @@
 -- Github API library
 import gpm from _G
-import HTTP, SysTime, async, await, Promise, WebClientError, string from gpm
+import string, util, coroutine from gpm
+import HTTP, SysTime, async, await, Promise, WebClientError from gpm
 
 local api_token
 if SERVER
     api_token = CreateConVar( "gpm_github_token", "", { FCVAR_ARCHIVE, FCVAR_PROTECTED, 16 --[[FCVAR_HIDDEN]] }, "https://github.com/settings/tokens" )
 
-mutationNextTime = 0
-rateLimitReset = 0
+local mutationNextTime = 0
+local rateLimitReset = 0
 
 export request = async ( method, path, headers, body, cache ) ->
     method = string.upper( method )
@@ -15,7 +16,7 @@ export request = async ( method, path, headers, body, cache ) ->
     unless string.IsURL( path )
         path = "https://api.github.com" .. path
 
-    headers or= {}
+    headers = headers or {}
     unless headers["Authorization"] and api_token\GetString() != ""
         headers["Authorization"] = "Bearer " .. api_token\GetString()
     
@@ -31,7 +32,7 @@ export request = async ( method, path, headers, body, cache ) ->
         if diff < 30 -- I think waiting 30 seconds is acceptable
             await Promise.delay( diff )
         else
-            error WebClientError "Github API rate limit exceeded"
+            error WebClientError "Github API rate limit exceeded (#{path})"
 
     -- Rate limit mutative requests
     if method == "POST" or method == "PATCH" or method == "PUT" or method == "DELETE"
@@ -42,7 +43,8 @@ export request = async ( method, path, headers, body, cache ) ->
             await Promise.delay( diff )
         else
             mutationNextTime = SysTime() + 1000
-    
+
+    -- i believe there is no reason to implement queue, since requests are queued by the engine
     result = await HTTP({
         url: path
         method: method
@@ -56,6 +58,31 @@ export request = async ( method, path, headers, body, cache ) ->
         if reset
             rateLimitReset = reset
 
-        error WebClientError "Github API rate limit exceeded"
+        error WebClientError "Github API rate limit exceeded (#{result.status}) (#{path})"
 
-    return result
+    unless result.status >= 200 and result.status < 300
+        error WebClientError "Failed to fetch data from Github API (#{result.status}) (#{path})"
+
+    data = util.JSONToTable( result.body )
+    unless data
+        error WebClientError "Failed to parse JSON response from Github API (#{result.status}) (#{path})"
+
+    return data
+
+
+export template = ( path, data ) ->
+    return string.gsub( path, "{(%w-)}", (k) -> data[k] ), nil
+
+export templateRequest = ( method, path, data ) ->
+    return request( method, template( path, data ) )
+
+
+export getRepository = ( owner, repo ) ->
+    return templateRequest( "GET", "/repos/{owner}/{repo}", { :owner, :repo } )
+
+export getRepositoryTags = ( owner, report ) ->
+    -- TODO: implement pagination?
+    return templateRequest( "GET", "/repos/{owner}/{repo}/tags?per_page=100", { :owner, :repo } )
+
+export getTree = ( owner, repo, tree_sha, recursive = false ) ->
+    return templateRequest( "GET", "/repos/{owner}/{repo}/git/trees/{tree_sha}?recursive={recursive}", { :owner, :repo, :tree_sha, :recursive } )
