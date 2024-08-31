@@ -1,7 +1,7 @@
 -- Github API library
 import gpm from _G
 import string, util, coroutine from gpm
-import HTTP, SysTime, async, await, Promise, WebClientError from gpm
+import HTTP, SysTime, async, await, Promise, WebClientError, tostring from gpm
 
 local api_token
 if SERVER
@@ -71,7 +71,7 @@ export request = async ( method, path, headers, body, cache ) ->
 
 
 export template = ( path, data ) ->
-    return string.gsub( path, "{(%w-)}", (k) -> data[k] ), nil
+    return string.gsub( path, "{([%w_-]-)}", (k) -> tostring(data[k]) ), nil
 
 export templateRequest = ( method, path, data ) ->
     return request( method, template( path, data ) )
@@ -86,3 +86,11 @@ export getRepositoryTags = ( owner, report ) ->
 
 export getTree = ( owner, repo, tree_sha, recursive = false ) ->
     return templateRequest( "GET", "/repos/{owner}/{repo}/git/trees/{tree_sha}?recursive={recursive}", { :owner, :repo, :tree_sha, :recursive } )
+
+export getBlob = ( owner, repo, file_sha ) ->
+    result = await templateRequest( "GET", "/repos/{owner}/{repo}/git/blobs/{file_sha}", { :owner, :repo, :file_sha } )
+    if result.encoding == "base64"
+        result.content = util.Base64Decode( result.content )
+        result.encoding = "raw"
+    
+    return result
