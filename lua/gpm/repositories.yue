@@ -1,7 +1,7 @@
 _G = _G
 import istable, gpm, tostring from _G
 import environment, Logger from gpm
-import table, util, CLIENT, SERVER, MENU_DLL, argument from environment
+import table, util, CLIENT, SERVER, MENU_DLL, argument, pairs from environment
 import JSONToTable, Version from util
 
 isSQLWorker = SERVER or MENU_DLL
@@ -78,7 +78,7 @@ repositories.RemoveRepository = ( href ) ->
 import await, async, SafeAwait, AllSettled from environment.Promise
 import IsURL, match, find from environment.string
 import sort from environment.table
-import URL, pairs from environment
+import URL from environment
 
 local request
 do

@@ -28,7 +28,6 @@ if SERVER
     AddCSLuaFile( "gpm/loader.lua" )
     AddCSLuaFile( "gpm/init.lua" )
     AddCSLuaFile( "gpm/util.lua" )
-    AddCSLuaFile( "gpm/sql.lua" )
 
 gpm.StartTime = SysTime!
 
@@ -122,34 +121,31 @@ do
 
 import include from _G
 include( "gpm/util.lua" )
-Logger = include( "libs/logger.lua" )
+Logger = include( "gpm/libs/logger.lua" )
 
-environment.path = include( "libs/path.lua" )
+environment.path = include( "gpm/libs/path.lua" )
 
 -- gm_error
-for key, value in _G.pairs( include( "libs/error.lua" ) )
+for key, value in _G.pairs( include( "gpm/libs/error.lua" ) )
     environment[ key ] = value
 
-include( "sql.lua" )
-gpm.sql.migrate( "initial repositories and packages" )
-
-environment.utf8 = setmetatable( include( "libs/utf8/init.lua" ), sandboxMetatable( _G.utf8 ) )
-environment.ipaml = include( "libs/3rd-party/ip.lua" )
-environment.struct = include( "libs/struct.lua" )
+environment.utf8 = setmetatable( include( "gpm/libs/utf8/init.lua" ), sandboxMetatable( _G.utf8 ) )
+environment.ipaml = include( "gpm/libs/3rd-party/ip.lua" )
+environment.struct = include( "gpm/libs/struct.lua" )
 include( "gpm/libs/date.lua" )
 
 -- LibDeflate
-deflate = include( "libs/3rd-party/deflate.lua" )
+deflate = include( "gpm/libs/3rd-party/deflate.lua" )
 Logger\Loaded( "LibDeflate v%s", deflate._VERSION )
 environment.deflate = deflate
 
 -- gm_promise ( modified for gpm )
-include( "libs/promise.lua" )
+include( "gpm/libs/promise.lua" )
 
 -- gm_url
 do
 
-    url = include( "libs/url.lua" )
+    url = include( "gpm/libs/url.lua" )
 
     environment.IsURLSearchParams = url.IsURLSearchParams
     environment.URLSearchParams = url.URLSearchParams
@@ -164,33 +160,35 @@ do
     http.EncodeURI = url.encodeURI
     http.DecodeURI = url.decodeURI
 
--- Utils & Libs
 include( "gpm/libs/yaml.lua" )
-include( "post-util.lua" )
-include( "libs/file.lua" )
-include( "libs/http.lua" )
+include( "gpm/post-util.lua" )
+
+gpm.sql.migrate( "initial repositories and packages" )
+
+include( "gpm/libs/file.lua" )
+include( "gpm/libs/http.lua" )
 
 -- Github API
-gpm.github = include( "libs/github.lua" )
+environment.github = include( "gpm/libs/github.lua" )
 
 -- Package Manager
-include( "repositories.lua" )
-include( "loader.lua" )
+include( "gpm/repositories.lua" )
+include( "gpm/loader.lua" )
 
 if SERVER
-    include( "cli.lua" )
+    include( "gpm/cli.lua" )
 
 -- Plugins
 for fileName in *Find( "gpm/plugins/*.lua", "LUA" )
-    include( "plugins/" .. fileName )
+    include( "gpm/plugins/" .. fileName )
 
 -- Code Sources
 for fileName in *Find( "gpm/sources/*.lua", "LUA" )
-    include( "sources/" .. fileName )
+    include( "gpm/sources/" .. fileName )
 
 -- our little sandbox ( TODO: remove on release )
 if SERVER
-    include( "test.lua" )
+    include( "gpm/test.lua" )
 
 if SERVER
     gpm.loader.Startup!\Catch( environment.Error.display )

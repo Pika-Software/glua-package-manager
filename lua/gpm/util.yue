@@ -78,8 +78,8 @@ do
 
         if pattern == ""
             ret = {}
-            for i = 1, len( str )
-                ret[ i ] = sub( str, i, i )
+            for index = 1, len( str )
+                ret[ index ] = sub( str, index, index )
 
             return ret
 
@@ -335,16 +335,28 @@ string.Left = ( str, num ) ->
 string.Right = ( str, num ) ->
     return sub( str, -num )
 
-string.Replace = ( str, searchable, replaceable, withPattern ) ->
-    if withPattern
-        return gsub( str, searchable, replaceable )
+do
 
-    startPos, endPos = find( str, searchable, 1, true )
-    while startPos
-        str = sub( str, 1, startPos - 1 ) .. replaceable .. sub( str, endPos + 1 )
-        startPos, endPos = find( str, searchable, endPos + 1, true )
+    replace = string.Replace = ( str, searchable, replaceable, withPattern ) ->
+        if withPattern
+            return gsub( str, searchable, replaceable )
 
-    return str
+        startPos, endPos = find( str, searchable, 1, true )
+        while startPos
+            str = sub( str, 1, startPos - 1 ) .. replaceable .. sub( str, endPos + 1 )
+            startPos, endPos = find( str, searchable, endPos + 1, true )
+
+        return str
+
+    string.SQLSafe = ( str, noQuotes ) ->
+        str = replace( tostring( str ), "'", "''", false )
+        if null_chr := find( str, "\0" )
+            str = sub( str, 1, null_chr - 1 )
+
+        if noQuotes
+            return str
+
+        return "'" .. str .. "'"
 
 string.IsBytecode = ( str ) ->
     return byte( str, 1 ) == 0x1B --[[ byte code marker ]]
