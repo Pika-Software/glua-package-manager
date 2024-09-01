@@ -1,45 +1,79 @@
 _G = _G
-import gpm from _G
-import environment from gpm
-import istable, util, CLIENT, SERVER, MENU_DLL, argument from environment
+import istable, gpm, tostring from _G
+import environment, Logger from gpm
+import table, util, CLIENT, SERVER, MENU_DLL, argument from environment
 import JSONToTable, Version from util
 
-repositories = gpm.Repositories
+isSQLWorker = SERVER or MENU_DLL
+sql = isSQLWorker and gpm.sql.repositories or nil
+sort_fn = ( a, b ) -> a.version > b.version
+
+repositories = gpm.repositories
 unless istable( repositories )
-    repositories = gpm.Repositories = {}
+    repositories = gpm.repositories = {}
+
+TYPE_JSON = repositories.TYPE_JSON = 0
+TYPE_GITHUB = repositories.TYPE_GITHUB = 5
 
 list = repositories.List
 unless istable( list )
-    if SERVER or MENU_DLL
-        -- list = Query( "SELECT * FROM `gpm.repository`" ) or {}
+    if isSQLWorker
+        list = sql.getRepositories!
 
-        -- count = #list
-        -- if count == 0
-        --     Query( "INSERT INTO `gpm.repository` ( URL ) VALUES ( 'https://raw.githubusercontent.com/Pika-Software/gpm-repositories/main/main.json' )" )
-        --     list = Query( "SELECT * FROM `gpm.repository`" ) or {}
-        --     count = #list
+        if #list == 0
+            sql.addRepository( "https://raw.githubusercontent.com/Pika-Software/gpm-repositories/main/main.json" )
+            list = sql.getRepositories!
 
-        -- for index = 1, count
-        --     repository = list[ index ]
-        --     packages = Query( "SELECT * FROM `gpm.packages` WHERE RepositoryID = " .. repository.ID ) or {}
+        import getPackages from sql
 
-        --     for package in *packages
-        --         package.Version = Version( package.Version )
-        --         package.Installed = package.Installed == 1
-        --         package.RepositoryID = repository
-        --         package.RepositoryID = nil
+        for repository in *list
+            repository.packages = getPackages( repository )
 
-        --     repository.Packages = packages
-
-        -- repositories.List = list
-
-    if SERVER
-        environment.file.Set( "/lua/gpm/vfs/repositories.lua", "return '" .. util.TableToJSON( repositories, false ) .. "'", "GLua Package Manager::Repositories" )
-        _G.AddCSLuaFile( "lua/gpm/vfs/repositories.lua" )
-
-    if CLIENT
-        list = JSONToTable( include( "gpm/vfs/repositories.lua" ) )
         repositories.List = list
+
+        if SERVER
+            environment.file.Set( "/lua/gpm/vfs/repositories.lua", "return '" .. util.TableToJSON( list, false ) .. "'", "GLua Package Manager::Repositories" )
+            _G.AddCSLuaFile( "lua/gpm/vfs/repositories.lua" )
+
+    elseif CLIENT
+        list = repositories.List = JSONToTable( _G.include( "gpm/vfs/repositories.lua" ), true, false )
+
+getLastID = ( tbl ) ->
+    id = 0
+    for _, value in pairs( tbl )
+        id = value.id
+
+    return id + 1
+
+repositories.AddRepository = ( href ) ->
+    argument( href, 1, "string" )
+
+    if table.HasValue( list, href, true )
+        return nil
+
+    if isSQLWorker
+        sql.addRepository( href )
+
+    index = #list + 1
+
+    list[ index ] = {
+        id: getLastID( list )
+        packages: {}
+        url: href
+    }
+
+    return index
+
+repositories.RemoveRepository = ( href ) ->
+    argument( href, 1, "string" )
+
+    unless table.HasValue( list, href, true )
+        return nil
+
+    if isSQLWorker
+        sql.removeRepository( href )
+
+    return table.RemoveByValue( list, href, true )
 
 import await, async, SafeAwait, AllSettled from environment.Promise
 import IsURL, match, find from environment.string
@@ -51,7 +85,7 @@ do
 
     import CachedFetch from environment.http
 
-    local api_token = GetConVar( "gpm_github_token" )
+    api_token = GetConVar( "gpm_github_token" )
 
     request = ( href ) ->
         local headers
@@ -84,18 +118,17 @@ apis["github.com"] = ( url, name, parent ) ->
     unless tags
         return nil
 
-    versions, length = {}, 0
-    for tag in *tags
-        length += 1
-        versions[ length ] = {
-            Name: name,
-            Installed: false,
-            Repository: parent,
-            Version: Version( tag.name ),
-            URL: "github://" .. user .. "/" .. repository .. "/" .. tag.name
+    for index = 1, #tags, 1
+        tags[ index ] = {
+            version: Version( tags[ index ].name )
         }
 
-    return versions
+    return {
+        name: name
+        url: user .. "/" .. repository
+        type: TYPE_GITHUB
+        versions: tags
+    }
 
 local fetchPackages
 do
@@ -103,161 +136,164 @@ do
     import getExtension from environment.path
     import isstring from environment
 
-    fetchPackages = repositories.FetchPackages = async ( url, name, parent ) ->
-        if IsURL( url )
-            if isstring( url )
-                url = URL( url )
-
-            fn = apis[ url.hostname ]
-            if fn
-                return fn( url, name, parent )
-
-            if getExtension( url.pathname ) ~= "json"
+    fetchPackages = repositories.FetchPackages = async ( url, name ) ->
+        unless IsURL( url )
+            if IsURL( name )
+                url = name
+            else
+                Logger\Error( "Invalid package '#{name}' URL: #{url}" )
                 return nil
 
-            ok, response = SafeAwait( request( url.href ) )
-            if not ok or response.status ~= 200
-                return nil
+        if isstring( url )
+            url = URL( url )
 
-            tbl = JSONToTable( response.body )
-            unless tbl
-                return nil
+        fn = apis[ url.hostname ]
+        if fn
+            return fn( url, name )
 
-            versions, length = {}, 0
-            for version, href in pairs( tbl )
-                length += 1
-                versions[ length ] = {
-                    Name: name,
-                    Installed: false,
-                    Repository: parent,
-                    Version: Version( version ),
-                    URL: href
-                }
+        if getExtension( url.pathname ) ~= "json"
+            return nil
 
-            return versions
+        ok, response = SafeAwait( request( url.href ) )
+        if not ok or response.status ~= 200
+            return nil
 
+        tbl = JSONToTable( response.body )
+        unless tbl
+            return nil
+
+        versions, length = {}, 0
+        for version, href in pairs( tbl )
+            length += 1
+            versions[ length ] = {
+                version: Version( version )
+                metadata: href
+            }
+
+        return {
+            name: name
+            url: ""
+            type: TYPE_JSON
+            versions: versions
+        }
+
+local syncSQL
+if isSQLWorker
+
+    import updateRepository from sql
+
+    syncSQL = repositories.SyncSQL = ( repository ) ->
+        updateRepository( repository, repository.packages )
         return nil
-
-sort_fn = ( a, b ) ->
-    return a.Version > b.Version
-
-searchPackages = repositories.SearchPackages = ( repository, name, version, withPattern ) ->
-    latest = version == "latest"
-    packages, count = {}, 0
-
-    for package in *repository.Packages
-        if name
-            if withPattern
-                unless find( package.Name, name, 1, false )
-                    continue
-
-            elseif package.Name ~= name
-                continue
-
-        if version and not ( latest or package.Version % version )
-            continue
-
-        count += 1
-        packages[ count ] = package
-
-    sort( packages, sort_fn )
-
-    if latest and count > 1
-        for index = 2, count
-            packages[ index ] = nil
-
-    return packages
 
 performPackage = repositories.PerformPackage = ( repository, package ) ->
     unless package
         return nil
 
-    name, version = package.Name, package.Version
-    packages = repository.Packages
-    exists = false
+    package.repositoryId = repository.id
 
-    for other in *packages
-        if other.Name == name and other.Version == version
-            other.URL = package.URL
-            exists = true
-            break
+    :name, :versions = package
+    :packages = repository
+    length = #packages
 
-    if exists
-        return nil
+    for index = 1, length, 1
+        pkg = packages[ index ]
+        if pkg.name == name
+            pkg.url = package.url
+            pkg.type = package.type
 
-    packages[] = package
+            packageVersions = pkg.versions
+            count = #versions
+
+            for index = 1, count, 1
+                new, exists = versions[ index ], false
+                for exist in *packageVersions
+                    if new.version == exist.version
+                        exists = true
+                        break
+
+                unless exists
+                    count += 1
+                    packageVersions[ count ] = new
+
+            sort( packageVersions, sort_fn )
+
+            if isSQLWorker
+                syncSQL( repository )
+
+            return nil
+
+    package.id = getLastID( packages )
+    sort( package.versions, sort_fn )
+    packages[ length + 1 ] = package
+
+    if isSQLWorker
+        syncSQL( repository )
+
     return nil
-
-syncSQL = repositories.SyncSQL = ( repository ) ->
-    if CLIENT
-        return nil
-
-    -- TODO: WIP waiting retro's cool sql library
-
-    -- Query( "BEGIN;" )
-    -- repositoryID = repository.ID
-    -- Query( "INSERT OR REPLACE INTO `gpm.repository` ( ID, URL ) VALUES ( " .. repositoryID .. ", '" .. repository.URL .. "' )" )
-
-    -- for package in *repository.Packages
-    --     packageID = package.ID
-    --     if packageID
-    --         Query( "REPLACE INTO `gpm.packages` ( ID, Name, URL, Version, Installed, RepositoryID ) VALUES ( " .. packageID .. ", '" .. package.Name .. "', '" .. package.URL .. "', '" .. tostring( package.Version ) .. "', " .. ( package.Installed and 1 or 0 ) .. ", " .. repositoryID .. " )" )
-    --     else
-    --         Query( "INSERT INTO `gpm.packages` ( Name, URL, Version, Installed, RepositoryID ) VALUES ( '" .. package.Name .. "', '" .. package.URL .. "', '" .. tostring( package.Version ) .. "', " .. ( package.Installed and 1 or 0 ) .. ", " .. repositoryID .. " )" )
-
-    -- Query( "COMMIT;" )
-    -- return nil
 
 updateRepository = repositories.UpdateRepository = async ( repository, map, pattern, withPattern ) ->
     tasks, length = {}, 0
     if pattern
-        for name, href in pairs( map )
-            if withPattern
+        if withPattern
+            for name, href in pairs( map )
                 if find( name, pattern, 1, false )
                     length += 1
-                    tasks[ length ] = fetchPackages( href, name, repository )
-
-            elseif name == pattern
-                length += 1
-                tasks[ length ] = fetchPackages( href, name, repository )
-
+                    tasks[ length ] = fetchPackages( href, name )
+        else
+            href = map[ pattern ]
+            if href
+                length = 1
+                tasks[ 1 ] = fetchPackages( href, pattern )
     else
         for name, href in pairs( map )
             length += 1
-            tasks[ length ] = fetchPackages( href, name, repository )
+            tasks[ length ] = fetchPackages( href, name )
 
     if length == 0
         return nil
 
     if length == 1
-        packages = await( tasks[ 1 ] )
-        if packages
-            for package in *packages
-                performPackage( repository, package )
-
-            syncSQL( repository )
-
+        performPackage( repository, await( tasks[ 1 ] ) )
         return nil
 
     for result in *await( AllSettled( tasks ) )
-        packages = result.value
-        if packages
-            for package in *packages
-                performPackage( repository, package )
-
-            syncSQL( repository )
+        performPackage( repository, result.value )
 
     return nil
 
+searchPackages = repositories.SearchPackages = ( repository, name, version, withPattern ) ->
+    latest = version == "latest"
+    packages, count = {}, 0
+
+    for package in *repository.packages
+        if name
+            if withPattern
+                unless find( package.name, name, 1, false )
+                    continue
+
+            elseif package.name ~= name
+                continue
+
+        for tbl in *package.versions
+            if version and not ( latest or tbl.version % version )
+                continue
+
+            count += 1
+            packages[ count ] = package
+
+    return packages
+
 fetchRepository = repositories.FetchRepository = async ( repository, name, version, withPattern, offlineMode ) ->
-    packages = repository.Packages
+    :packages = repository
 
     unless name or version
         if offline
             return packages
 
-        success, response = SafeAwait( request( repository.URL ) )
+        success, response = SafeAwait( request( repository.url ) )
         if not success or response.status ~= 200
+            Logger\Warn( "Failed to fetch repository '%s': %s", repository.url, response )
             return packages
 
         map = JSONToTable( response.body, true, true )
@@ -270,8 +306,9 @@ fetchRepository = repositories.FetchRepository = async ( repository, name, versi
     if offline
         return searchPackages( repository, name, version, withPattern )
 
-    success, response = SafeAwait( request( repository.URL ) )
+    success, response = SafeAwait( request( repository.url ) )
     if not success or response.status ~= 200
+        Logger\Warn( "Failed to fetch repository '%s': %s", repository.url, response )
         return searchPackages( repository, name, version, withPattern )
 
     map = JSONToTable( response.body, true, true )
@@ -281,36 +318,48 @@ fetchRepository = repositories.FetchRepository = async ( repository, name, versi
     await updateRepository( repository, map, name, withPattern )
     return searchPackages( repository, name, version, withPattern )
 
-lookupRepositories = repositories.LookupRepositories = async ( name, version, offlineMode, withPattern = false ) ->
-    tasks, length = {}, 0
-    for repository in *list
-        length += 1
-        tasks[ length ] = fetchRepository( repository, name, version, withPattern, offlineMode )
-
-    if length == 0
-        return tasks
-
-    if length == 1
-        return await( tasks[ 1 ] )
-
-    packages, length = {}, 0
-    for promise in *await( AllSettled( tasks ) )
-        :value = promise
-        if value
-            for package in *value
-                length += 1
-                packages[ length ] = package
-
-    sort( packages, sort_fn )
-    return packages
-
 do
 
-    str_sort = ( a, b ) ->
-        return a < b
-
     import Find from _G.file
-    import tostring from _G
+
+    formatters = repositories.Formatters
+    unless istable( formatters )
+        formatters = repositories.Formatters = {}
+
+    formatters[ TYPE_GITHUB ] = ( package, searchable ) ->
+        local version
+        if searchable
+            for tbl in *package.versions
+                if tbl.version % searchable
+                    version = tbl.version
+                    break
+        else
+            version = package.versions[ 1 ].version
+
+        return {
+            name: package.name
+            url: "github://" .. package.url .. "/" .. tostring( version )
+            version: version
+        }
+
+    formatters[ TYPE_JSON ] = ( package, searchable ) ->
+        local url, version
+        if searchable
+            for tbl in *package.versions
+                if tbl.version % searchable
+                    url, version = tbl.metadata, tbl.version
+                    break
+        else
+            tbl = package.versions[ 1 ]
+            url, version = tbl.metadata, tbl.version
+
+        return {
+            name: package.name
+            url: url
+            version: version
+        }
+
+    str_sort = ( a, b ) -> a < b
 
     repositories.FindPackage = async ( name, version, offlineMode, withPattern ) ->
         argument( name, 1, "string" )
@@ -341,12 +390,20 @@ do
 
             if versionObj
                 return {
-                    Name: packageName,
-                    URL: "file:///lua/gpm/vfs/packages/" .. packageName .. "/" .. tostring( versionObj ) .. "/",
-                    Version: versionObj,
-                    Installed: true
+                    name: packageName
+                    url: "file:///lua/gpm/vfs/packages/" .. packageName .. "/" .. tostring( versionObj ) .. "/"
+                    version: versionObj
                 }
 
-        package = await( lookupRepositories( name, version, offlineMode, withPattern ) )[ 1 ]
-        if package
-            return package
+        for repository in *list
+            packages = await fetchRepository( repository, name, version, withPattern, offlineMode )
+            if #packages ~= 0
+                package = packages[ 1 ]
+
+                formatter = formatters[ package.type ] or formatters[ TYPE_JSON ]
+                if formatter
+                    return formatter( package, version )
+
+                return package
+
+        return nil

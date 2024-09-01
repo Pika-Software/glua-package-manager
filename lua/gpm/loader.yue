@@ -1017,8 +1017,8 @@ do
 do
 
     import display from environment.Error
+    import Logger, repositories from gpm
     import allSettled from Promise
-    import Logger, Repositories from gpm
 
     loader.InstallDependency = async ( pkg, name, target, force ) ->
         unless isstring( name )
@@ -1033,11 +1033,11 @@ do
             task = loader.Dependencies[ ref ]
             if task
                 return task
-            
+
             loader.Dependencies[ ref ] = task = loader.InstallDependency( pkg, name, target, true )
             unless pkg.__dependencies[ name ]
                 pkg.__dependencies[ name ] = task
-            
+
             return task
 
         if istable( target )
@@ -1050,7 +1050,7 @@ do
         workdir = nil
         unless string.IsURL( target )
             -- probably version
-            res = await Repositories.FindPackage( name, target )
+            res = await repositories.FindPackage( name, target )
             unless res
                 error PackageError "could not find package '#{name}' with version '#{target}' for '#{pkg}'"
 
@@ -1079,7 +1079,7 @@ do
         tasks = {}
         for name, target in pairs( pkg.dependencies )
             tasks[] = loader.InstallDependency( pkg, name, target )
-        
+
         return Promise.all( tasks )
 
     loader.InitializePackage = async ( pkg ) ->

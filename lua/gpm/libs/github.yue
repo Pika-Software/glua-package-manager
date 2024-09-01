@@ -19,10 +19,10 @@ export request = async ( method, path, headers, body, cache ) ->
     headers = headers or {}
     unless headers["Authorization"] and api_token\GetString() != ""
         headers["Authorization"] = "Bearer " .. api_token\GetString()
-    
+
     unless headers["Accept"]
         headers["Accept"] = "application/vnd.github+json"
-    
+
     unless headers["X-GitHub-Api-Version"]
         headers["X-GitHub-Api-Version"] = "2022-11-28"
 
@@ -93,5 +93,5 @@ export getBlob = ( owner, repo, file_sha ) ->
     if result.encoding == "base64"
         result.content = util.Base64Decode( result.content )
         result.encoding = "raw"
-    
+
     return result
