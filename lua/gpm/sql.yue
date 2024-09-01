@@ -46,13 +46,13 @@ sql.queryOne = ( query, ... ) ->
     result = sql.query( query, ... )
     return result and result[1]
 
-sql.begin = -> 
+sql.begin = ->
     return sql.query( "begin" )
 
-sql.commit = -> 
+sql.commit = ->
     return sql.query( "commit" )
 
-sql.rollback = -> 
+sql.rollback = ->
     return sql.query( "rollback" )
 
 sql.transaction = ( func ) ->
@@ -73,7 +73,7 @@ sql.transaction = ( func ) ->
 
 do --- http_cache table, used for etag caching in http library
     lib = sql.http_cache = {}
-    
+
     lib.get = ( url ) ->
         argument( url, 1, "string" )
 
@@ -87,7 +87,7 @@ do --- http_cache table, used for etag caching in http library
         if #content > ( 50 * 1024 ) -- 50KB
             -- do not cache content that are larger than 50KB
             return
-        
+
         if string.find( content, "\x00", 1, true )
             -- we are unable to store null bytes in sqlite
             return
@@ -102,19 +102,20 @@ do --- key-value store for gpm
 
         sql.query( "insert or replace into 'gpm.store' values (?, ?)", key, value )
         return
-    
+
     lib.get = ( key ) ->
         argument( key, 1, "string" )
 
         result = sql.query( "select value from 'gpm.store' where key=?", key )
         return result and result[1].value
 
-do --- repositories
+--- repositories
+if SERVER
+
     lib = sql.repositories = {}
 
     lib.getRepositories = ->
-        result = sql.query( "select * from 'gpm.repositories'" )
-        return
+        return sql.query( "select * from 'gpm.repositories'" ) or {}
 
     lib.addRepository = ( url ) ->
         argument( url, 1, "string" )
@@ -123,22 +124,21 @@ do --- repositories
     lib.removeRepository = ( url ) ->
         argument( url, 1, "string" )
 
-        sql.transaction ->
+        return sql.transaction ->
             repository = sql.queryOne( "select id from 'gpm.repositories' where url=?", url )
             packages = sql.query( "select id from 'gpm.packages' where repositoryId=?", repository.id )
-            
+
             -- delete all versions, packages and repository
             for p in *packages
                 sql.query( "delete from 'gpm.package_versions' where packageId=?; delete from 'gpm.packages' where id=?", p.id, p.id )
-            
+
             sql.query( "delete from 'gpm.repositories' where id=?", repository.id )
-            
-            return
+            return nil
 
     getRepositoryId = ( repository ) ->
         if isnumber( repository )
             return repository
-    
+
         if istable( repository )
             return repository.id or repository.url
 
@@ -156,7 +156,24 @@ do --- repositories
         if pkg := sql.queryOne( "select * from 'gpm.packages' where name=? and repositoryId=?", name, repositoryId )
             pkg.versions = sql.query( "select version, metadata from 'gpm.package_versions' where packageId=?", pkg.id )
             return pkg
-    
+
+        return nil
+
+    lib.getPackages = ( repository ) ->
+        repositoryId = getRepositoryId( repository )
+        unless repositoryId
+            throw SQLError "invalid repository '#{repository}' was given as #1 argument"
+
+        packages = sql.query( "select * from 'gpm.packages' where repositoryId=?", repositoryId )
+        unless packages
+            return {}
+
+        for index = 1, #packages, 1
+            pkg = packages[ index ]
+            pkg.versions = sql.query( "select version, metadata from 'gpm.package_versions' where packageId=?", pkg.id )
+
+        return packages
+
     lib.updateRepository = ( repository, packages ) ->
         argument( packages, 2, "table" )
 
@@ -165,7 +182,8 @@ do --- repositories
             throw SQLError "invalid repository '#{repository}' was given as #1 argument"
 
         oldPackages = sql.query( "select id, name from 'gpm.packages' where repositoryId=?", repositoryId )
-        oldPackages = { pkg.name, pkg.id for pkg in *oldPackages }
+        if oldPackages
+            oldPackages = { pkg.name, pkg.id for pkg in *oldPackages }
 
         sql.transaction ->
             for name, pkg in pairs( packages )
@@ -176,11 +194,13 @@ do --- repositories
                 for v in *pkg.versions
                     sql.query( "insert into 'gpm.package_versions' (version, metadata, packageId) values (?, ?, ?)", v.version, v.metadata, packageId )
 
-                oldPackages[ name ] = nil
-            
+                if oldPackages
+                    oldPackages[ name ] = nil
+
             -- remove old packages
-            for name, id in pairs( oldPackages )
-                sql.query( "delete from 'gpm.package_versions' where packageId=?; delete from 'gpm.packages' where id=?", id, id )
+            if oldPackages
+                for name, id in pairs( oldPackages )
+                    sql.query( "delete from 'gpm.package_versions' where packageId=?; delete from 'gpm.packages' where id=?", id, id )
 
 --[[
 
@@ -198,9 +218,9 @@ sql.migrations = [
         execute: ->
             sql.query( "drop table if exists 'gpm.http_cache'" )
             sql.query( [[create table 'gpm.http_cache' (
-                url text primary key, 
+                url text primary key,
                 etag text,
-                timestamp int, 
+                timestamp int,
                 content blob
             )]] )
 
@@ -235,7 +255,7 @@ sql.migrations = [
                     )
                 ]] )
                 sql.query( [[
-                    create table 'gpm.package_versions' ( 
+                    create table 'gpm.package_versions' (
                         version text not null,
                         metadata text,
                         packageId integer not null,
@@ -254,13 +274,13 @@ unless sql.optimized
     pragma_values = sql.query( "pragma foreign_keys; pragma journal_mode; pragma synchronous; pragma wal_autocheckpoint" )
     if pragma_values[1].foreign_keys == "0"
         sql.query( "pragma foreign_keys = 1" )
-    
+
     if pragma_values[2].journal_mode == "delete"
         sql.query( "pragma journal_mode = wal" )
-    
+
     if pragma_values[3].synchronous == "0"
         sql.query( "pragma synchronous = normal" )
-    
+
     if pragma_values[4].wal_autocheckpoint == "1000"
         sql.query( "pragma wal_autocheckpoint = 100" )
 
@@ -296,11 +316,11 @@ sql.runMigration = (migration) ->
         sql.commit()
     else
         sql.rollback()
-    
+
     return ok
 
 
-sql.migrate = (name) ->
+sql.migrate = ( name ) ->
     unless isstring( name )
         throw SQLError "Migration name must be a string, not #{name}"
 
@@ -311,10 +331,10 @@ sql.migrate = (name) ->
     -- find if given migration name exists
     unless sql.migrationExists( name )
         throw SQLError "Migration '" .. name .. "' not found"
-    
+
     -- first execute migrations
     for m in *sql.migrations
-        unless history[ m.name ] 
+        unless history[ m.name ]
             if sql.runMigration( m ) == false
                 break
 
