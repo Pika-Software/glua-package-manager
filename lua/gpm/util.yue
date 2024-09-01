@@ -3,14 +3,16 @@ import environment from _G.gpm
 import pairs, error, rawget, getfenv, getmetatable, setmetatable, istable, tostring from _G
 import string, table, debug, util, os from environment
 import byte, sub, gsub, format, len, find from string
-:isbool, :isnumber, :isstring, :isfunction = _G
 import concat, remove from table
 import rshift, band from _G.bit
+import min, max from _G.math
 import getinfo from debug
+
+:isbool, :isnumber, :isstring, :isfunction = _G
 
 do
 
-    import running from coroutine
+    import running from _G.coroutine
 
     environment.throw = environment.error = ( message, level ) ->
         if running!
@@ -54,22 +56,19 @@ string.concat = ( ... ) ->
 
     return concat( args, "", 1, length )
 
-do
-    import max from math
+string.indexOf = ( str, searchable, position, withPattern ) ->
+    unless searchable
+        return 0
 
-    string.indexOf = ( str, searchable, position, withPattern ) ->
-        unless searchable
-            return 0
+    if searchable == ""
+        return 1
 
-        if searchable == ""
-            return 1
+    position = max( position or 1, 1 )
 
-        position = max( position or 1, 1 )
+    if position > len( str )
+        return -1
 
-        if position > len( str )
-            return -1
-
-        return find( str, searchable, position, withPattern ~= true ) or -1, nil
+    return find( str, searchable, position, withPattern ~= true ) or -1, nil
 
 do
 
@@ -894,7 +893,7 @@ do
     debug.fempty = object
 
     -- thread
-    object = coroutine.create( object )
+    object = _G.coroutine.create( object )
     do
 
         metatable = getmetatabled( object )
@@ -909,7 +908,6 @@ do
 
 -- my cool math '^'
 math = setmetatable( _G.include( "gpm/libs/math.lua" ), table.SandboxMetatable( _G.math ) )
-import min, max from math
 environment.math = math
 
 debug.fcall = ( func, ... ) ->
@@ -1038,14 +1036,15 @@ table.RemoveByValue = ( tbl, any, isSequential ) ->
     if isSequential
         for index = 1, #tbl
             if tbl[ index ] == any
-                return remove( tbl, index )
+                remove( tbl, index )
+                return index
 
     else
 
         for key, value in pairs( tbl )
             if value == any
                 tbl[ key ] = nil
-                return value
+                return key
 
     return nil
 
