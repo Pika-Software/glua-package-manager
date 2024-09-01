@@ -1,24 +1,32 @@
 -- Github API library
-import gpm from _G
-import string, util, coroutine from gpm
-import HTTP, SysTime, async, await, Promise, WebClientError, tostring from gpm
+_G = _G
+import tonumber, tostring, SysTime, error from _G
+import environment from _G.gpm
+
+import HTTP, async, await, WebClientError from environment
+import Base64Decode, JSONToTable from environment.util
+import upper, gsub, IsURL from environment.string
+import Delay from environment.Promise
+import time from environment.os
 
 local api_token
 if SERVER
     api_token = CreateConVar( "gpm_github_token", "", { FCVAR_ARCHIVE, FCVAR_PROTECTED, 16 --[[FCVAR_HIDDEN]] }, "https://github.com/settings/tokens" )
 
-local mutationNextTime = 0
-local rateLimitReset = 0
+-- https://docs.github.com/en/rest/overview/resources-in-the-rest-api#rate-limiting
+mutationNextTime = 0
+rateLimitReset = 0
 
 export request = async ( method, path, headers, body, cache ) ->
-    method = string.upper( method )
-
-    unless string.IsURL( path )
+    method = upper( method )
+    unless IsURL( path )
         path = "https://api.github.com" .. path
 
-    headers = headers or {}
-    unless headers["Authorization"] and api_token\GetString() != ""
-        headers["Authorization"] = "Bearer " .. api_token\GetString()
+    headers or= {}
+    unless headers["Authorization"]
+        token = api_token\GetString!
+        if token ~= ""
+            headers["Authorization"] = "Bearer " .. token
 
     unless headers["Accept"]
         headers["Accept"] = "application/vnd.github+json"
@@ -26,35 +34,27 @@ export request = async ( method, path, headers, body, cache ) ->
     unless headers["X-GitHub-Api-Version"]
         headers["X-GitHub-Api-Version"] = "2022-11-28"
 
-    currentTime = os.time()
+    currentTime = time!
     if rateLimitReset > currentTime
         diff = rateLimitReset - currentTime
         if diff < 30 -- I think waiting 30 seconds is acceptable
-            await Promise.delay( diff )
+            await Delay( diff )
         else
             error WebClientError "Github API rate limit exceeded (#{path})"
 
     -- Rate limit mutative requests
     if method == "POST" or method == "PATCH" or method == "PUT" or method == "DELETE"
-        diff = mutationNextTime - SysTime()
-
+        diff = mutationNextTime - SysTime!
         if diff > 0
-            mutationNextTime = mutationNextTime + 1000
-            await Promise.delay( diff )
+            mutationNextTime += 1000
+            await Delay( diff )
         else
-            mutationNextTime = SysTime() + 1000
+            mutationNextTime = SysTime! + 1000
 
     -- i believe there is no reason to implement queue, since requests are queued by the engine
-    result = await HTTP({
-        url: path
-        method: method
-        headers: headers
-        body: body
-        etag: cache != false
-        cache: cache != false
-    })
+    result = await HTTP( { url: path, :method, :headers, :body, etag: cache ~= false, cache: cache ~= false } )
 
-    if (result.status == 429 or result.status == 403) and headers["x-ratelimit-remaining"] == "0"
+    if ( result.status == 429 or result.status == 403 ) and headers["x-ratelimit-remaining"] == "0"
         reset = tonumber( headers["x-ratelimit-reset"] )
         if reset
             rateLimitReset = reset
@@ -64,19 +64,17 @@ export request = async ( method, path, headers, body, cache ) ->
     unless result.status >= 200 and result.status < 300
         error WebClientError "Failed to fetch data from Github API (#{result.status}) (#{path})"
 
-    data = util.JSONToTable( result.body )
+    data = JSONToTable( result.body, true, true )
     unless data
         error WebClientError "Failed to parse JSON response from Github API (#{result.status}) (#{path})"
 
     return data
 
-
 export template = ( path, data ) ->
-    return string.gsub( path, "{([%w_-]-)}", (k) -> tostring(data[k]) ), nil
+    return gsub( path, "{([%w_-]-)}", ( str ) -> tostring( data[ str ] ) ), nil
 
 export templateRequest = ( method, path, data ) ->
     return request( method, template( path, data ) )
-
 
 export getRepository = ( owner, repo ) ->
     return templateRequest( "GET", "/repos/{owner}/{repo}", { :owner, :repo } )
@@ -91,7 +89,7 @@ export getTree = ( owner, repo, tree_sha, recursive = false ) ->
 export getBlob = ( owner, repo, file_sha ) ->
     result = await templateRequest( "GET", "/repos/{owner}/{repo}/git/blobs/{file_sha}", { :owner, :repo, :file_sha } )
     if result.encoding == "base64"
-        result.content = util.Base64Decode( result.content )
+        result.content = Base64Decode( result.content )
         result.encoding = "raw"
 
     return result

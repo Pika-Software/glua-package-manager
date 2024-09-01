@@ -1341,6 +1341,7 @@ if _G.sql
                 url_str = url
 
                 transaction( transactionFunc )
+                url_str = nil
                 return nil
 
         getRepositoryId = ( repository ) ->
@@ -1426,6 +1427,8 @@ if _G.sql
 
                 pkgs, old_pkgs = packages, oldPackages
                 transaction( transactionFunc )
+                pkgs, old_pkgs = nil, nil
+                repositoryId = nil
                 return nil
 
     --[[
