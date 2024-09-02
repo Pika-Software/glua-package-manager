@@ -22,11 +22,11 @@
     SOFTWARE.
 --]]
 _G = _G
-import pcall, xpcall from _G
+import pcall, xpcall from _G -- renaming xpcall in code will result in breaking transformError
 import environment from _G.gpm
-import PromiseError, iscallable from environment
+import PromiseError, iscallable, table from environment
 import create, resume, yield, running from coroutine
-import captureStack from environment.Error
+import captureStack, appendStack, pushCallStack, popCallStack from environment.Error
 import format, match from _G.string
 import Simple from timer
 
@@ -198,32 +198,77 @@ do
                 err.fileName = nil
                 err.lineNumber = nil
 
-        if iserror( err )
-            stack = err.stack
-            stackSize = #stack
+        if iserror( err ) and not err._transformed
+            err._transformed = true
 
-            if stackSize >= 2 and stack[ stackSize - 1 ].name == "xpcall"
-                stack[ stackSize - 1 ] = nil -- remove xpcall stack
-                stack[ stackSize ] = nil -- remove promise wrapper stack
+            -- detect promise stack entries
+            pos, size = 1, #err.stack
+            while pos <= size
+                entry = err.stack[ pos ]
+                if entry.name == "xpcall"
+                    entry = err.stack[ pos + 2 ]
+                    if entry and entry._asyncEntry
+                        table.remove( err.stack, pos ) -- remove xpcall
+                        table.remove( err.stack, pos ) -- remove async coroutine entry
+                        table.remove( err.stack, pos ) -- remove async function entry
+                        size -= 3
 
-            stackSize = #stack
-            if stackSize == 0 -- if stack is empty, remove debug information
-                err.fileName = nil
-                err.lineNumber = nil
+                        funcEntry = err.stack[ pos - 1 ]
+                        if funcEntry and not funcEntry.name
+                            funcEntry.name = entry.name
 
-            lastStack = CALL_STACK[ STACK_SIZE ] -- peek current stack
-            if lastStack
-                if stackSize > 0 and not stack[ stackSize ].name
-                    stack[ stackSize ].name = lastStack[ 1 ].name -- set previous stack name since it's the name of the function
+                pos += 1
 
-                -- Append previous stack to the current stack
-                for entry in *lastStack[2,]
-                    stackSize += 1
-                    stack[ stackSize ] = entry
 
-            if first := stack[ 1 ]
-                err.fileName or= first.short_src
-                err.lineNumber or= first.currentline
+        -- if iserror( err )
+        --     callStack = { err.stack, CALL_STACK[ STACK_SIZE ] } -- peek current stack
+        --     while callStack -- each call stack has previous embeded in it, process them all
+        --         stack = callStack[ 1 ]
+        --         stackSize = #stack
+
+        --         if stackSize >= 2 and stack[ stackSize - 1 ].name == "xpcall"
+        --             stack[ stackSize - 1 ] = nil -- remove xpcall stack
+        --             stack[ stackSize ] = nil -- remove promise wrapper stack
+                
+        --         stackSize = #stack
+        --         if stackSize == 0 -- if stack is empty, remove debug information
+        --             err.fileName = nil
+        --             err.lineNumber = nil
+                
+        --         -- todo сделай сдеть как-то обработку всего это
+
+        --     stack = err.stack
+        --     stackSize = #stack
+
+        --     if stackSize >= 2 and stack[ stackSize - 1 ].name == "xpcall"
+        --         stack[ stackSize - 1 ] = nil -- remove xpcall stack
+        --         stack[ stackSize ] = nil -- remove promise wrapper stack
+
+        --     stackSize = #stack
+        --     if stackSize == 0 -- if stack is empty, remove debug information
+        --         err.fileName = nil
+        --         err.lineNumber = nil
+
+        --     callStack = CALL_STACK[ STACK_SIZE ] -- peek current stack
+        --     while callStack -- each call stack has previous embeded in it, process them all
+        --         if stackSize > 0 and not stack[ stackSize ].name
+        --             stack[ stackSize ].name = callStack[ 1 ].name -- set previous stack name since it's the name of the function
+                
+
+
+        --     -- lastStack = CALL_STACK[ STACK_SIZE ] -- peek current stack
+        --     -- if lastStack
+        --     --     if stackSize > 0 and not stack[ stackSize ].name
+        --     --         stack[ stackSize ].name = lastStack[ 1 ].name -- set previous stack name since it's the name of the function
+
+        --     --     -- Append previous stack to the current stack
+        --     --     for entry in *lastStack[2,]
+        --     --         stackSize += 1
+        --     --         stack[ stackSize ] = entry
+
+        --     if first := stack[ 1 ]
+        --         err.fileName or= first.short_src
+        --         err.lineNumber or= first.currentline
 
         return err
 
@@ -237,8 +282,7 @@ safeAwait = ( promise ) ->
 
     finish = ( success, value ) ->
         if waiting
-            STACK_SIZE += 1
-            CALL_STACK[ STACK_SIZE ] = stack -- push previous stack
+            pushCallStack( stack ) -- Error.pushCallStack( stack )
             resume( co, success, value )
         else
             _success, _value = success, value
@@ -248,9 +292,7 @@ safeAwait = ( promise ) ->
             return _success, _value
 
         waiting = true
-        stack = CALL_STACK[ STACK_SIZE ] -- pop current stack
-        CALL_STACK[ STACK_SIZE ] = nil
-        STACK_SIZE -= 1
+        stack = popCallStack() -- Error.popCallStack()
         return yield!
 
     if isPromise( promise )
@@ -370,8 +412,11 @@ promiseClass = environment.class(
 
             return ( ... ) ->
                 promise = promiseClass!
-                STACK_SIZE += 1
-                CALL_STACK[ STACK_SIZE ] = captureStack! -- push stack
+
+                -- save previous stack so later it will be appended to the error stack
+                stack = captureStack()
+                stack[ 1 ]._asyncEntry = true
+                appendStack( stack ) -- Error.appendStack(...)
 
                 resume( create( ( ... ) ->
                     success, result = xpcall( fn, transformError, ... )
@@ -380,7 +425,8 @@ promiseClass = environment.class(
                     else
                         try2reject( promise, result )
 
-                    CALL_STACK[ STACK_SIZE ] = nil -- pop stack
+                    -- Remove previosly added stack since this coroutine thread is done
+                    popCallStack() -- Error.popCallStack()
                     return nil
                 ), ... )
 

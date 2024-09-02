@@ -40,13 +40,53 @@ export iserror = ( obj, name = "Error" ) ->
 
     return false
 
+_callStack = { n: 0 }
+
+captureStack = ( stackPos ) ->
+    return getstack( (stackPos or 1) + 1 )
+
+pushCallStack = ( stack ) ->
+    size = _callStack.n + 1
+    _callStack[ size ] = stack
+    _callStack.n = size
+
+popCallStack = ->
+    pos = _callStack.n
+    if pos == 0
+        return nil
+
+    stack = _callStack[ pos ]
+    _callStack[ pos ] = nil
+    _callStack.n = pos - 1
+    return stack
+
+-- Should be used with captureStack
+appendStack = ( stack ) ->
+    previous = _callStack[ _callStack.n ]
+    pushCallStack({ stack, previous })
+
+mergeStack = ( stack ) ->
+    pos = #stack
+    currentCallStack = _callStack[ _callStack.n ]
+    while currentCallStack
+        -- just copy over info fields
+        for info in *currentCallStack[ 1 ]
+            pos += 1
+            stack[ pos ] = info
+        
+        -- get next call stack
+        currentCallStack = currentCallStack[ 2 ]
+    
+    return stack
+
 errorClass = environment.class(
     "Error",
     {
         name: "Error"
 
         new: ( @message, @fileName, @lineNumber, stackPos ) =>
-            @stack = stack = getstack( stackPos or 3 )
+            @stack = stack = captureStack( stackPos or 3 )
+            mergeStack( stack )
 
             if first := stack[1]
                 @fileName or= first.short_src
@@ -70,7 +110,7 @@ errorClass = environment.class(
             for index = 1, #stack
                 length += 1
                 info = stack[ index ]
-                lines[ length ] = format( "%s %d. %s - %s:%d", rep( " ", index ), index, info.name or "unknown", info.short_src, info.currentline )
+                lines[ length ] = format( "%s %d. %s - %s:%d", rep( " ", index ), index, info.name or "unknown", info.short_src, info.currentline or -1 )
 
             length += 1
             lines[ length ] = "\n"
@@ -82,8 +122,12 @@ errorClass = environment.class(
         __inherited: ( child ) =>
             child.__base.name = child.__name or @name
 
-        captureStack: ( stackPos ) ->
-            return getstack( stackPos or 1 )
+        _callStack: _callStack
+        captureStack: captureStack
+        pushCallStack: pushCallStack
+        popCallStack: popCallStack
+        appendStack: appendStack
+        mergeStack: mergeStack
 
         is: iserror
     }
