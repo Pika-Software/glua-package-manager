@@ -4,6 +4,7 @@ import environment, Logger from gpm
 import getmetatable, setmetatable, istable, pcall from _G
 import math, string, table, os, util, argument, isfunction, isstring, error from environment
 import byte, sub, gsub, len, find from string
+import concat from table
 import fdiv from math
 import time from os
 
@@ -344,7 +345,7 @@ do
             ReadString: =>
                 :position, :size = @
                 if position >= size
-                    return
+                    return nil, "eof"
 
                 bytes, data = 0, @data
                 for index = position, size
@@ -354,9 +355,12 @@ do
                     bytes += 1
 
                 if bytes == 0
-                    return
+                    @Skip( 1 )
+                    return nil
 
-                return @Read( bytes ), @Skip( 1 )
+                str = @Read( bytes )
+                @Skip( 1 )
+                return str
 
             WriteString: ( str ) =>
                 argument( str, 1, "string" )
@@ -366,7 +370,7 @@ do
             ReadLine: =>
                 :position, :size = @
                 if position >= size
-                    return
+                    return nil, "eof"
 
                 bytes, data = 0, @data
                 for index = position, size
@@ -376,9 +380,12 @@ do
                     bytes += 1
 
                 if bytes == 0
-                    return "", @Skip( 1 )
+                    @Skip( 1 )
+                    return nil
 
-                return @Read( bytes ), @Skip( 1 )
+                line = @Read( bytes )
+                @Skip( 1 )
+                return line
 
             WriteLine: ( str ) =>
                 argument( str, 1, "string" )
@@ -387,7 +394,7 @@ do
             -- Byte
             ReadByte: =>
                 if @EndOfFile!
-                    return
+                    return nil, "eof"
 
                 return byte( @data, @Skip( 1 ) )
 
@@ -403,7 +410,7 @@ do
                     when 1
                         return true
 
-                return nil
+                return nil, "eof"
 
             WriteBool: ( bool ) =>
                 return @WriteByte( bool and 1 or 0 )
@@ -415,6 +422,9 @@ do
                 return readUInt( nil, @Read( bytes ), bytes )
 
             WriteUInt: ( number, bytes, endianness ) =>
+                if isstring( number )
+                    number = tonumber( number, 10 )
+
                 argument( number, 1, "number", 4 )
                 argument( bytes, 2, "number", 4 )
                 setEndianness( endianness or "little" )
@@ -622,7 +632,7 @@ do
     do
 
         import URL, isurl from environment
-        import concat, Flip from table
+        import Flip from table
 
         string.PathFromURL = ( url ) ->
             unless isurl( url )

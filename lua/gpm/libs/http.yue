@@ -122,7 +122,7 @@ do
         parameters.failed = ( msg ) ->
             promise\Reject( WebClientError msg )
             return nil
-        
+
         -- Cache extension
         if parameters.cache
             url = parameters.url
@@ -130,11 +130,11 @@ do
 
             unless requestCache[ method ]
                 requestCache[ method ] = {}
-            
+
             cache = requestCache[ method ][ url ]
             if cache and isValidCache( cache )
                 return cache.promise
-            
+
             cache = requestCache[ method ][ url ] = { :promise, start: SysTime!, age: parameters.cacheLifetime }
 
             handleSuccess = parameters.success
@@ -167,7 +167,7 @@ do
                     parameters.headers = {}
 
                 parameters.headers[ "If-None-Match" ] = data.etag
-            
+
             handle = parameters.success
             parameters.success = ( status, body, headers ) ->
                 if status == 304
@@ -175,7 +175,7 @@ do
                     body = data.content
                 elseif status == 200 and headers["etag"]
                     sql.http_cache.set( url, headers["etag"], body )
-                
+
                 handle( status, body, headers )
                 return
 

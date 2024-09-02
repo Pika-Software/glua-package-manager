@@ -1,7 +1,7 @@
 import Promise, Error, debug from gpm
 import async, await from Promise
 import format from string
-SysTime = SysTime
+import SysTime from _G
 
 iter = 10000
 warmup = math.min( iter / 100, 100 )

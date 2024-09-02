@@ -1,6 +1,6 @@
 _G = _G
 import environment from _G.gpm
-import string, file, table, await, async, AddonError, argument, isstring, error, tostring, tonumber from environment
+import string, file, table, await, async, AddonError, argument, error from environment
 
 file.CreateDir( "/data/gpm/mount", true )
 file.Delete( "/data/gpm/mount/*" )
@@ -164,6 +164,7 @@ do
 
         return false
 
+import tostring, tonumber, isstring, isnumber from environment
 import AsyncRead, AsyncWrite, MountGMA, Open from file
 import ByteStream, CRC, MD5 from environment.util
 import byte, sub, lower, format, len from string
@@ -260,20 +261,25 @@ _module_0.GMA = environment.class( "GMA", {
         if version > @FormatVersion
             error AddonError "gma version is unsupported"
 
-        @steam_id = tostring( handler\ReadUInt64! ) or ""
+        if steam_id := handler\ReadUInt64!
+            if isstring( steam_id )
+                @steam_id = steam_id
+            else
+                @steam_id = tostring( steam_id )
+        else
+            @steam_id = ""
+
         @timestamp = handler\ReadUInt64!
 
-        if version > 1
+        if version > 1 and handler\ReadByte! ~= 0
             :required_content = @
+            handler\Skip( -1 )
 
             while not handler\EndOfFile!
-                value = handler\ReadString!
-                unless value
+                if value := handler\ReadString!
+                    required_content[ value ] = true
+                else
                     break
-
-                required_content[ value ] = true
-
-            handler\Skip( 1 )
 
         @title = handler\ReadString!
         @description = handler\ReadString!
@@ -474,7 +480,7 @@ _module_0.GMA = environment.class( "GMA", {
         handler\Write( @Identity )
         handler\WriteByte( @FormatVersion )
 
-        handler\WriteUInt64( tonumber( @steam_id ) or 0 )
+        handler\WriteUInt64( @steam_id or 0 )
         handler\WriteUInt64( @GetTimestamp! )
 
         for value in pairs( @required_content )
