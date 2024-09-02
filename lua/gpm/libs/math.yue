@@ -11,6 +11,9 @@ export log2e = log(e, 2)
 export sqrt1_2 = sqrt(0.5)
 export sqrt2 = sqrt(2)
 
+export maxinteger = 0x7FFFFFFF
+export mininteger = -0x80000000
+
 export pow2 = setmetatable( {
     [0]: 1.0
     [1]: 2.0

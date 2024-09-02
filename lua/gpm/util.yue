@@ -952,6 +952,16 @@ do
 math = setmetatable( _G.include( "gpm/libs/math.lua" ), table.SandboxMetatable( _G.math ) )
 environment.math = math
 
+do
+
+    import fmod from math
+
+    math.type = ( number ) ->
+        if isnumber( number )
+            return fmod( number, 1 ) == 0 and "integer" or "float"
+
+        return nil
+
 debug.fcall = ( func, ... ) ->
     return func( ... )
 
