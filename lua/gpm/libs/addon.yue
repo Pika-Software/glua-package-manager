@@ -167,6 +167,7 @@ do
 import AsyncRead, AsyncWrite, MountGMA, Open from file
 import ByteStream, CRC, MD5 from environment.util
 import byte, sub, lower, format, len from string
+import isuint from environment.math
 import equal from environment.path
 import time from environment.os
 import Empty from table
@@ -178,14 +179,13 @@ _module_0.GMA = environment.class( "GMA", {
     FormatVersion: 3
 
     __tostring: =>
-        return format( "GMA %p [%s]", @, @title )
+        return format( "Garry's Mod Addon: %p [%s]", @, @title )
 
     new: ( binary, doCRC ) =>
         @title = "unknown"
         @author = "unknown"
         @description = "unknown"
         @version = 1
-        @timestamp = 0
         @required_content = {}
         @steam_id = ""
         @real_crc = 0
@@ -226,10 +226,21 @@ _module_0.GMA = environment.class( "GMA", {
         @version = int32
 
     GetTimestamp: =>
-        return @timestamp
+        :timestamp = @
+        unless isnumber( timestamp )
+            timestamp = @timestamp = time!
+
+        return timestamp
 
     SetTimestamp: ( uint64 ) =>
         argument( uint64, 1, "number" )
+
+        unless isuint( uint64 )
+            error "invalid timestamp must be an unsigned integer", 2
+
+        if uint64 > 0xFFFFFFFFFFFFFFFF
+            error "invalid timestamp must be less than 2^64", 2
+
         @timestamp = uint64
 
     GetSteamID: =>
@@ -299,7 +310,7 @@ _module_0.GMA = environment.class( "GMA", {
             @stored_crc = handler\ReadULong! or 0
 
             handler\Seek( 0 )
-            @real_crc = tonumber( CRC( handler\Read( contentSize ) ) )
+            @real_crc = tonumber( CRC( handler\Read( contentSize ) ), 10 )
 
     VerifyCRC: =>
         return @stored_crc == @real_crc
@@ -314,7 +325,7 @@ _module_0.GMA = environment.class( "GMA", {
             unless real_crc
                 content = data.content
                 if content
-                    real_crc = tonumber( CRC( content ) )
+                    real_crc = tonumber( CRC( content ), 10 )
                     data.real_crc = real_crc
 
             if stored_crc ~= real_crc
@@ -363,7 +374,7 @@ _module_0.GMA = environment.class( "GMA", {
             handler\Seek( pointer + data.position )
             content = data.content = handler\Read( data.size )
             if doCRC
-                data.real_crc = tonumber( CRC( content ) )
+                data.real_crc = tonumber( CRC( content ), 10 )
 
         return files
 
@@ -400,7 +411,7 @@ _module_0.GMA = environment.class( "GMA", {
         }
 
         if doCRC
-            data.stored_crc = data.real_crc = tonumber( CRC( content ) )
+            data.stored_crc = data.real_crc = tonumber( CRC( content ), 10 )
 
         length += 1
         files[ length ] = data
@@ -464,7 +475,7 @@ _module_0.GMA = environment.class( "GMA", {
         handler\WriteByte( @FormatVersion )
 
         handler\WriteUInt64( tonumber( @steam_id ) or 0 )
-        handler\WriteUInt64( @timestamp or time! )
+        handler\WriteUInt64( @GetTimestamp! )
 
         for value in pairs( @required_content )
             handler\WriteString( value )
@@ -486,7 +497,7 @@ _module_0.GMA = environment.class( "GMA", {
             handler\WriteUInt64( data.size )
 
             if doCRC
-                handler\WriteULong( tonumber( CRC( data.content ) ) )
+                handler\WriteULong( tonumber( CRC( data.content ), 10 ) )
             else
                 handler\WriteULong( 0 )
 
@@ -500,7 +511,7 @@ _module_0.GMA = environment.class( "GMA", {
                 error AddonError "file content must be a string (" .. data.path .. ")"
 
         if doCRC
-            crc = tonumber( CRC( handler\ReadAll! ) )
+            crc = tonumber( CRC( handler\ReadAll! ), 10 )
             @stored_crc = crc
             @real_crc = crc
         else

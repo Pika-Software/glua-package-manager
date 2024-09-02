@@ -29,7 +29,7 @@ import error, type from _G
 import environment from _G.gpm
 import string, math, table, tonumber, assert, argument, isstring, isnumber from environment
 import char, byte, len, sub, format, match, find, rep from string
-import trunc, floor, min, max, pow2, mod2 from math
+import trunc, floor, min, max, pow2, mod2, fmod from math
 import concat, unpack from table
 classExtend = environment.extend
 
@@ -148,7 +148,7 @@ do
 
         defaultTypeSize = ( number ) ->
             assert( number, "format requires a size" )
-            return tonumber( number )
+            return tonumber( number, 10 )
 
         defaultSize = ( str ) ->
             assert( str, "format requires a size" )
@@ -327,8 +327,8 @@ do
 
         read = ( fileDescriptor, _, align ) ->
             :position = fileDescriptor
-            if position % align ~= 0
-                fileDescriptor\Seek( "cur", align - ( position % align ) )
+            if fmod( position, align ) ~= 0
+                fileDescriptor\Seek( "cur", align - fmod( position, align ) )
 
         registerIO( "a", {
             Read: read
@@ -361,13 +361,13 @@ do
 
             if endianness.value == "big"
                 for index = bytes, 1, -1
-                    buffer[ index ] = char( number % 0x100 )
+                    buffer[ index ] = char( fmod( number, 0x100 ) )
                     number = trunc( number / 0x100 )
 
                 return concat( buffer, "", 1, bytes )
 
             for index = 1, bytes, 1
-                buffer[ index ] = char( number % 0x100 )
+                buffer[ index ] = char( fmod( number, 0x100 ) )
                 number = trunc( number / 0x100 )
 
             return concat( buffer, "", 1, bytes )
@@ -540,7 +540,7 @@ do
                 assert( size, "format requires a size" )
                 assert( fraction, "format requires a fractional-part size" )
 
-                if tonumber( size ) and tonumber( fraction )
+                if tonumber( size, 10 ) and tonumber( fraction, 10 )
                     -- Check only possible if both values were specified at compile time
                     assert( size * 8 >= fraction, "fixed point number has more fractional bits than total bits" )
 
@@ -563,7 +563,7 @@ do
                 assert( size, "format requires a size" )
                 assert( fraction, "format requires a fractional-part size" )
 
-                if tonumber( size ) and tonumber( fraction )
+                if tonumber( size, 10 ) and tonumber( fraction, 10 )
                     -- Check only possible if both values were specified at compile time
                     assert( size * 8 >= fraction, "fixed point number has more fractional bits than total bits" )
 
@@ -724,7 +724,7 @@ do
 
     registerIO( "z", {
         Size: ( size ) ->
-            return tonumber( size )
+            return tonumber( size, 10 )
 
         Read: ( fileDescriptor, str, size, csize = 1 ) ->
             null = rep( "\0", csize )
@@ -740,7 +740,7 @@ do
 
                 repeat
                     length = find( str, null, length + 1, true )
-                until length == nil or ( length - 1 ) % csize == 0
+                until length == nil or fmod( ( length - 1 ), csize ) == 0
 
                 return sub( str, 1, ( length or 0 ) - 1 )
 
@@ -759,7 +759,7 @@ do
         White: ( _, str, size, csize = 1 ) ->
             size = size or len( str ) + csize
 
-            assert( size % csize == 0, "string length is not a multiple of character size" )
+            assert( fmod( size, csize ) == 0, "string length is not a multiple of character size" )
 
             -- truncate to field size
             if len( str ) >= size
@@ -1247,7 +1247,7 @@ do
                 if match( text, "^#" )
                     @key = sub( text, 2, len( text ) )
                 else
-                    @value = assert( tonumber( text ), "numeric constant '" .. text .. "' is not a number" )
+                    @value = assert( tonumber( text, 10 ), "numeric constant '" .. text .. "' is not a number" )
 
             -- This does not support the regular read/write interface; the only thing you
             -- can do with it is get its contained number.
@@ -1417,7 +1417,7 @@ do
 
             return ->
                 value = mod2[ floor( data[ index ] / pow2[ bit0 ] ) ]
-                bit0 = ( bit0 - 1 ) % 8
+                bit0 = fmod( ( bit0 - 1 ), 8 )
 
                 -- we just wrapped around
                 if bit0 == 7
@@ -1437,7 +1437,7 @@ do
 
             return ( byte1 ) ->
                 buffer[ index ] += byte1 * pow2[ bit0 ]
-                bit0 = ( bit0 - 1 ) % 8
+                bit0 = fmod( ( bit0 - 1 ), 8 )
 
                 -- we just wrapped around
                 if bit0 == 7
@@ -1482,7 +1482,7 @@ do
                     if arg == ""
                         argv[ n ] = nil
 
-                    elseif number := tonumber( arg )
+                    elseif number := tonumber( arg, 10 )
                         argv[ n ] = number
 
                     elseif match( arg, "^#[%a_][%w_.]*$" )
@@ -1648,7 +1648,7 @@ do
         ast_bitpack = ast.bitpack = ( lex ) ->
             ast_require( lex, "[" )
 
-            bitpack = bitpackClass( tonumber( ast_require( lex, "number" ).text ) )
+            bitpack = bitpackClass( tonumber( ast_require( lex, "number" ).text, 10 ) )
             ast_require( lex, "|" )
 
             for value in ast_next_until( lex, "]" )

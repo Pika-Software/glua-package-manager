@@ -37,6 +37,36 @@ do
 
         return length
 
+do
+
+    equal = table.Equal = ( a, b ) ->
+        if a == b
+            return true
+
+        for key, value in pairs( a )
+            alt = rawget( b, key )
+            unless alt
+                return false
+
+            if not ( getmetatable( value ) or getmetatable( alt ) ) and istable( value ) and istable( alt )
+                return equal( value, alt )
+
+            if value ~= alt
+                return false
+
+        for key, value in pairs( b )
+            alt = rawget( a, key )
+            unless alt
+                return false
+
+            if not ( getmetatable( value ) or getmetatable( alt ) ) and istable( value ) and istable( alt )
+                return equal( value, alt )
+
+            if value ~= alt
+                return false
+
+        return true
+
 -- string
 string.slice = sub
 string.gmatch or= string.gfind
