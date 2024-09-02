@@ -178,7 +178,7 @@ _module_0.GMA = environment.class( "GMA", {
     FormatVersion: 3
 
     __tostring: =>
-        return format( "GMAF %p [%s]", @, @title )
+        return format( "GMA %p [%s]", @, @title )
 
     new: ( binary, doCRC ) =>
         @title = "unknown"
