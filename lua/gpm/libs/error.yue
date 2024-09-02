@@ -43,7 +43,7 @@ export iserror = ( obj, name = "Error" ) ->
 _callStack = { n: 0 }
 
 captureStack = ( stackPos ) ->
-    return getstack( (stackPos or 1) + 1 )
+    return getstack( stackPos or 1 )
 
 pushCallStack = ( stack ) ->
     size = _callStack.n + 1
