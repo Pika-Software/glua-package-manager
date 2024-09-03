@@ -1054,8 +1054,8 @@ do
             unless res
                 error PackageError "could not find package '#{name}' with version '#{target}' for '#{pkg}'"
 
-            target = res.URL
-            workdir = "lua/gpm/vfs/packages/" .. name .. "/" .. tostring(target.Version) .. "/"
+            target = res.url
+            workdir = "lua/gpm/vfs/packages/" .. name .. "/" .. tostring(res.version) .. "/"
 
         url = URL( target )
         source = loader.Source.get( url )
