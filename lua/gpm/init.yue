@@ -28,6 +28,7 @@ if SERVER
     AddCSLuaFile( "gpm/loader.lua" )
     AddCSLuaFile( "gpm/init.lua" )
     AddCSLuaFile( "gpm/util.lua" )
+    AddCSLuaFile( "gpm/sql.lua" )
 
 gpm.StartTime = SysTime!
 
@@ -162,6 +163,7 @@ do
 
 include( "gpm/libs/yaml.lua" )
 include( "gpm/post-util.lua" )
+include( "gpm/sql.lua" )
 
 gpm.sql.migrate( "initial repositories and packages" )
 
