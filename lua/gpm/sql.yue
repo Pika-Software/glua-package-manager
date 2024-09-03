@@ -1,5 +1,5 @@
 import gpm from _G
-import argument, istable, isnumber, isstring, isfunction, SQLError, throw, tostring from gpm
+import argument, istable, isnumber, isstring, isfunction, SQLError, throw, tostring, Logger from gpm
 import string, os from gpm
 
 --#
@@ -156,6 +156,28 @@ if SERVER
             return
 
 
+-- files
+do
+
+    files = sql.files = {}
+    
+    files.save = ( path, size, time, hash ) ->
+        argument( path, 1, "string" )
+        argument( size, 2, "number" )
+        argument( time, 3, "number" ) if time
+        argument( hash, 4, "string" ) if hash
+
+        sql.query( "insert into 'gpm.files' (path, size, time, hash) values (?, ?, ?, ?)", path, size, time, hash )
+        return nil
+    
+    files.get = ( path ) ->
+        argument( path, 1, "string" )
+        result = sql.queryOne( "select * from 'gpm.files' where path=?", path )
+        result.size = tonumber( result.size ) or -1
+        result.time = tonumber( result.time )
+        return result
+
+
 -- optimize sqlite database
 unless sql.__optimized
     pragma_values = sql.rawQuery( "pragma foreign_keys; pragma journal_mode; pragma synchronous; pragma wal_autocheckpoint" )
@@ -245,6 +267,19 @@ migrations = [
                 ]] )
 
             return nil
+    }
+    {
+        name: "initial file table"
+        execute: ->
+            sql.rawQuery( [[
+                create table 'gpm.files' (
+                    id integer primary key autoincrement,
+                    path text not null unique,
+                    size integer not null,
+                    time number,
+                    hash text
+                )
+            ]] )
     }
 ]
 

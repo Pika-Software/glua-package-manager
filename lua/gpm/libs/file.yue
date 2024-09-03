@@ -1,5 +1,5 @@
 _G = _G
-import environment, Logger from _G.gpm
+import environment, Logger, sql from _G.gpm
 import file, istable, CLIENT, SERVER, MENU_DLL from _G
 import async, await, debug, util, path, string, Promise, CodeCompileError, FileSystemError, error, argument from environment
 import ByteStream, IsBinaryModuleInstalled from util
@@ -41,7 +41,7 @@ assertWriteAllowed = ( filePath, gamePath ) ->
     if writeAllowedGamePaths[ gamePath ] or MENU_DLL
         return nil
 
-    error FileSystemError "File '" .. filePath .. "' is not allowed to be written to '" .. gamePath .. "'.", 3
+    error FileSystemError "File '#{filePath}' is not allowed to be written to '#{gamePath}'.", 3
     return nil
 
 local normalizeGamePath, absoluteGamePath
@@ -504,16 +504,32 @@ do
 
         return false
 
-    read = lib.Read = ( filePath, gamePath, length, skipNormalize ) ->
+    read = lib.Read = ( filePath, gamePath, length, skipNormalize, validateHash ) ->
         fileHandle = fileClass( filePath, "rb", gamePath, skipNormalize )
         if fileHandle
-            return Read( fileHandle, length ), Close( fileHandle )
+            content = Read( fileHandle, length )
+            Close( fileHandle )
 
-    write = lib.Write = ( filePath, content, gamePath, skipNormalize ) ->
+            if validateHash
+                fullPath = absoluteGamePath( filePath, gamePath, false )
+                hash = util.SHA256( content )
+                f = sql.files.get( fullPath )
+
+                unless f and (not f.hash or f.hash == hash) and f.size == #content
+                    return nil
+
+            return content
+
+    write = lib.Write = ( filePath, content, gamePath, skipNormalize, saveHash ) ->
         fileHandle = fileClass( filePath, "wb", gamePath, skipNormalize )
         if fileHandle
             Write( fileHandle, content )
             Close( fileHandle )
+
+            if saveHash
+                fullPath = absoluteGamePath( filePath, gamePath, false )
+                sql.files.save( fullPath, #content, nil, util.SHA256( content ) )
+
             return true
 
         return false
@@ -776,7 +792,7 @@ do
 
         import Read from functions
 
-        asyncRead = lib.AsyncRead = ( filePath, gamePath, skipNormalize ) ->
+        asyncRead = lib.AsyncRead = ( filePath, gamePath, skipNormalize, validateHash ) ->
             unless skipNormalize
                 filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
@@ -784,6 +800,15 @@ do
 
             state = Read filePath, gamePath, ( _, __, iState, iContent ) ->
                 if iState == 0
+                    if validateHash
+                        fullPath = absoluteGamePath( filePath, gamePath, false )
+                        hash = util.SHA256( iContent )
+                        f = sql.files.get( fullPath )
+
+                        unless f and (not f.hash or f.hash == hash) and f.size == #iContent
+                            promise\Reject( FileSystemError "File hash mismatch for '" .. fullPath .. "'" )
+                            return nil
+
                     promise\Resolve( iContent )
                     return nil
 
@@ -799,7 +824,7 @@ do
 
         import Write from functions
 
-        lib.AsyncWrite = ( filePath, content, gamePath, skipNormalize ) ->
+        lib.AsyncWrite = ( filePath, content, gamePath, skipNormalize, saveHash ) ->
             unless skipNormalize
                 filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
@@ -813,7 +838,11 @@ do
 
             state = Write( filePath, content, gamePath, ( iFilePath, iGamePath, iState ) ->
                 if iState == 0
-                    promise\Resolve( absoluteGamePath( iFilePath, iGamePath, false ) )
+                    fullPath = absoluteGamePath( iFilePath, iGamePath, false )
+                    if saveHash
+                        sql.files.save( fullPath, #content, nil, util.SHA256(content) )
+
+                    promise\Resolve( fullPath )
                     return nil
 
                 promise\Reject( FileSystemError FSASYNC[ iState ] )
