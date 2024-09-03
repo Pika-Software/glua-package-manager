@@ -9,8 +9,8 @@ _G = _G
 import environment from _G.gpm
 import pairs, error, tonumber, tostring, setmetatable from _G
 import format, lower, rep, len, sub, gsub, gmatch, find from environment.string
-import floor, abs, trunc, fmod, fdiv from environment.math
 import band, bor, lshift, rshift from environment.bit
+import floor, abs, trunc, fdiv from environment.math
 import time, date from environment.os
 import unpack from environment.table
 import type from environment
@@ -124,7 +124,7 @@ sl_timezone = {
 -- is year year leap year?
 -- year must be int!
 isleapyear = ( year ) ->
-    return fmod( year, 4 ) == 0 and ( fmod( year, 100 ) ~= 0 or fmod( year, 400 ) == 0 )
+    return ( year % 4 ) == 0 and ( ( year % 100 ) ~= 0 or ( year % 400 ) == 0 )
 
 -- day since year 0
 -- year must be int!
@@ -133,7 +133,7 @@ dayfromyear = ( year ) ->
 
 -- day number from date, month is zero base
 makedaynum = ( year, month, day ) ->
-    month_offset = fmod( fmod( month, 12 ) + 10, 12 )
+    month_offset = ( ( month % 12 ) + 10 ) % 12
     return dayfromyear( year + floor( month / 12 ) - floor( month_offset / 10 ) ) + floor( ( month_offset * 306 + 5 ) / 10 ) + day - 307
 
 -- date from day number, month is zero base
@@ -148,19 +148,19 @@ breakdaynum = ( g ) ->
         day = g - dayfromyear( year )
 
     mi = floor( ( 100 * day + 52 ) / 3060 )
-    return floor( ( mi + 2 ) / 12 ) + year, fmod( mi + 2, 12 ), day - floor( ( mi * 306 + 5 ) / 10 ) + 1
+    return floor( ( mi + 2 ) / 12 ) + year, ( ( mi + 2 ) % 12 ), day - floor( ( mi * 306 + 5 ) / 10 ) + 1
 
 --[[ for floats or int32 Lua Number data type
 local function breakdaynum2(g)
   local g, n = g + 306;
-  local n400 = floor(g/DI400Y);n = fmod(g,DI400Y);
-  local n100 = floor(n/DI100Y);n = fmod(n,DI100Y);
-  local n004 = floor(n/DI4Y);   n = fmod(n,DI4Y);
-  local n001 = floor(n/365);   n = fmod(n,365);
+  local n400 = floor(g/DI400Y);n = g % DI400Y;
+  local n100 = floor(n/DI100Y);n = n % DI100Y;
+  local n004 = floor(n/DI4Y);   n = n % DI4Y;
+  local n001 = floor(n/365);   n = n % 365;
   local year = (n400*400) + (n100*100) + (n004*4) + n001  - ((n001 == 4 or n100 == 4) and 1 or 0)
   local day = g - dayfromyear(year)
   local mi = floor((100*day + 52)/3060)
-  return (floor((mi + 2)/12) + year), fmod(mi + 2,12), (day - floor((mi*306 + 5)/10) + 1)
+  return (floor((mi + 2)/12) + year), ( mi + 2 ) % 12, (day - floor((mi*306 + 5)/10) + 1)
 ]]
 
 -- day fraction from time
@@ -169,11 +169,11 @@ makedayfrc = ( hour, min, sec, ms ) ->
 
 -- time from day fraction
 breakdayfrc = ( day_fraction ) ->
-    return fmod( floor( day_fraction / HOURMILLISECONDS ), HOURS ), fmod( floor( day_fraction / MINUTEMILLISECONDS ), MINUTES ), fmod( floor( day_fraction / MILLISECONDS ), SECONDS ), fmod( day_fraction, MILLISECONDS )
+    return floor( day_fraction / HOURMILLISECONDS ) % HOURS, floor( day_fraction / MINUTEMILLISECONDS ) % MINUTES, floor( day_fraction / MILLISECONDS ) % SECONDS, day_fraction % MILLISECONDS
 
 -- weekday sunday = 0, monday = 1 ...
 weekday = ( day_number ) ->
-    return fmod( day_number + 1, 7 )
+    return ( day_number + 1 ) % 7
 
 -- yearday 0 based ...
 yearday = ( day_number ) ->
@@ -366,7 +366,7 @@ internal_methods.Normalize = =>
     day_number = trunc( @__day_number ) + floor( day_fraction / DAYMILLISECONDS )
     @__day_number = day_number
 
-    day_fraction = fmod( day_fraction, DAYMILLISECONDS )
+    day_fraction = day_fraction % DAYMILLISECONDS
     if day_fraction < 0
         day_fraction += DAYMILLISECONDS
 
@@ -383,7 +383,7 @@ internal_methods.GetTime = =>
 
 internal_methods.GetClockHour = =>
     hour = @GetHours!
-    return hour > 12 and fmod( hour, 12 ) or ( hour == 0 and 12 or hour )
+    return hour > 12 and ( hour % 12 ) or ( hour == 0 and 12 or hour )
 
 internal_methods.GetYearDay = =>
     return yearday( @__day_number ) + 1
@@ -409,35 +409,35 @@ internal_methods.GetDay = =>
     return r
 
 internal_methods.GetHours = =>
-    return fmod( floor( @__day_fraction / HOURMILLISECONDS ), HOURS )
+    return floor( @__day_fraction / HOURMILLISECONDS ) % HOURS
 
 internal_methods.GetMinutes = =>
-    return fmod( floor( @__day_fraction / MINUTEMILLISECONDS ), MINUTES )
+    return floor( @__day_fraction / MINUTEMILLISECONDS ) % MINUTES
 
 internal_methods.GetSeconds = =>
-    return fmod( floor( @__day_fraction / MILLISECONDS ), SECONDS )
+    return floor( @__day_fraction / MILLISECONDS ) % SECONDS
 
 internal_methods.GetMilliseconds = =>
-    x = fmod( @__day_fraction, MILLISECONDS )
+    x = @__day_fraction % MILLISECONDS
     return u and ( ( x * u ) / MILLISECONDS ) or x
 
 internal_methods.GetFloatSeconds = =>
-    return fmod( floor( @__day_fraction / MILLISECONDS ), SECONDS ) + ( fmod( @__day_fraction, MILLISECONDS ) / MILLISECONDS )
+    return ( floor( @__day_fraction / MILLISECONDS ) % SECONDS ) + ( ( @__day_fraction % MILLISECONDS ) / MILLISECONDS )
 
 internal_methods.GetWeekNumber = ( wdb ) =>
     wd, yd = weekday( @__day_number ), yearday( @__day_number )
     if wdb
         wdb = tonumber( wdb )
         if wdb
-            wd = fmod( wd - ( wdb - 1 ), 7 ) -- shift the week day base
+            wd = ( wd - ( wdb - 1 ) ) % 7 -- shift the week day base
         else
             return date_error_arg!
 
-    return ( yd < wd and 0 ) or ( floor( yd / 7 ) + ( ( fmod( yd, 7 ) >= wd ) and 1 or 0 ) )
+    return ( yd < wd and 0 ) or ( floor( yd / 7 ) + ( ( ( yd % 7 ) >= wd ) and 1 or 0 ) )
 
 -- sunday = 7, monday = 1 ...
 internal_methods.GetISOWeekDay = =>
-    return fmod( weekday( @__day_number ) - 1, 7 ) + 1
+    return ( ( weekday( @__day_number ) - 1 ) % 7 ) + 1
 
 internal_methods.GetISOWeekNumber = =>
     return isowy( @__day_number )
@@ -603,7 +603,7 @@ do
         ['%d']: => format( "%.2d", @GetDay! )
 
         -- year for ISO 8601 week, from 00 (79)
-        ['%g']: => format( "%.2d", fmod( @GetISOYear!, 100 ) )
+        ['%g']: => format( "%.2d", @GetISOYear! % 100 )
 
         -- year for ISO 8601 week, from 0000 (1979)
         ['%G']: => format( "%.4d", @GetISOYear! )
@@ -648,7 +648,7 @@ do
         ['%W']: => format( "%.2d", @GetWeekNumber( 2 ) )
 
         -- The year as a number without a century (range 00 to 99)
-        ['%y']: => format( "%.2d", fmod( @GetYear!, 100 ) )
+        ['%y']: => format( "%.2d", @GetYear! % 100 )
 
         -- Year with century (2000, 1914, 0325, 0001)
         ['%Y']: => format( "%.4d", @GetYear! )
@@ -657,7 +657,7 @@ do
         ['%z']: =>
             b = -@GetBIAS!
             x = abs( b )
-            return format( "%s%.4d", b < 0 and "-" or "+", trunc( x / 60 ) * 100 + floor( fmod( x, 60 ) ) )
+            return format( "%s%.4d", b < 0 and "-" or "+", trunc( x / 60 ) * 100 + floor( x % 60 ) )
 
         -- Time zone name, the date object is assumed local time
         ['%Z']: => @GetTimeZone!
@@ -893,7 +893,7 @@ do
 
         setzn = ( zs, zn ) ->
             zn = tonumber( zn )
-            setz( ( ( zn < 24 ) and ( zn * 60 ) or ( fmod( zn, 100 ) + floor( zn / 100 ) * 60 ) ) * ( zs == '+' and -1 or 1 ) )
+            setz( ( ( zn < 24 ) and ( zn * 60 ) or ( ( zn % 100 ) + floor( zn / 100 ) * 60 ) ) * ( zs == '+' and -1 or 1 ) )
             return nil
 
         setzc = ( zs, zh, zm ) ->
@@ -939,7 +939,7 @@ do
                         if month and not day and not year
                             day, month = month, false
 
-                        setm( fmod( sw[ 0 ], 12 ) + 1 )
+                        setm( ( sw[ 0 ] % 12 ) + 1 )
 
                     elseif inlist( x, sl_timezone, 2, sw )
                         c = truncString( sw[ 0 ] )

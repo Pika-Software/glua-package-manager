@@ -29,7 +29,7 @@ import error, type from _G
 import environment from _G.gpm
 import string, math, table, tonumber, assert, argument, isstring, isnumber from environment
 import char, byte, len, sub, format, match, find, rep from string
-import trunc, floor, min, max, pow2, mod2, fmod from math
+import trunc, floor, min, max, pow2, mod2 from math
 import concat, unpack from table
 classExtend = environment.extend
 
@@ -326,9 +326,11 @@ do
     do
 
         read = ( fileDescriptor, _, align ) ->
-            :position = fileDescriptor
-            if fmod( position, align ) ~= 0
-                fileDescriptor\Seek( "cur", align - fmod( position, align ) )
+            mod = fileDescriptor.position % align
+            if mod ~= 0
+                fileDescriptor\Seek( "cur", align - mod )
+
+            return nil
 
         registerIO( "a", {
             Read: read
@@ -361,13 +363,13 @@ do
 
             if endianness.value == "big"
                 for index = bytes, 1, -1
-                    buffer[ index ] = char( fmod( number, 0x100 ) )
+                    buffer[ index ] = char( number % 0x100 )
                     number = trunc( number / 0x100 )
 
                 return concat( buffer, "", 1, bytes )
 
             for index = 1, bytes, 1
-                buffer[ index ] = char( fmod( number, 0x100 ) )
+                buffer[ index ] = char( number % 0x100 )
                 number = trunc( number / 0x100 )
 
             return concat( buffer, "", 1, bytes )
@@ -740,7 +742,7 @@ do
 
                 repeat
                     length = find( str, null, length + 1, true )
-                until length == nil or fmod( ( length - 1 ), csize ) == 0
+                until length == nil or ( ( length - 1 ) % csize ) == 0
 
                 return sub( str, 1, ( length or 0 ) - 1 )
 
@@ -759,7 +761,7 @@ do
         White: ( _, str, size, csize = 1 ) ->
             size = size or len( str ) + csize
 
-            assert( fmod( size, csize ) == 0, "string length is not a multiple of character size" )
+            assert( ( size % csize ) == 0, "string length is not a multiple of character size" )
 
             -- truncate to field size
             if len( str ) >= size
@@ -1417,7 +1419,7 @@ do
 
             return ->
                 value = mod2[ floor( data[ index ] / pow2[ bit0 ] ) ]
-                bit0 = fmod( ( bit0 - 1 ), 8 )
+                bit0 = ( bit0 - 1 ) % 8
 
                 -- we just wrapped around
                 if bit0 == 7
@@ -1437,7 +1439,7 @@ do
 
             return ( byte1 ) ->
                 buffer[ index ] += byte1 * pow2[ bit0 ]
-                bit0 = fmod( ( bit0 - 1 ), 8 )
+                bit0 = ( bit0 - 1 ) % 8
 
                 -- we just wrapped around
                 if bit0 == 7

@@ -1,6 +1,6 @@
 _G = _G
 import getmetatable, math from _G
-import abs, atan2, ceil, min, max, random, sqrt, pow, floor, log, pi, fmod from math
+import abs, atan2, ceil, min, max, random, sqrt, pow, floor, log, pi from math
 
 -- Constants
 export e = math.exp(1)
@@ -47,7 +47,7 @@ export mod2 = setmetatable( {
     [10]: 0
 }, {
     __index: (n) =>
-        v = fmod(n, 2)
+        v = n % 2
         rawset(@, n, v)
         return v
 } )
@@ -70,12 +70,12 @@ export frexp = math.frexp or (x) ->
     return x, e
 
 -- is checks
-export isuint = (n) -> n >= 0 and fmod(n, 1) == 0
-export isfloat = (n) -> fmod(n, 1) ~= 0
-export isint = (n) -> fmod(n, 1) == 0
+export isuint = (n) -> n >= 0 and (n % 1) == 0
+export isfloat = (n) -> (n % 1) ~= 0
+export isint = (n) -> (n % 1) == 0
 
 export isequalwith = (a, b, tolerance) -> abs(a - b) <= tolerance
-export isdivideable = (n, d) -> fmod(n, d) == 0
+export isdivideable = (n, d) -> (n % d) == 0
 
 export isbool = (n) -> n == 0 or n == 1
 export iseven = (n) -> mod2[ n ] == 0
@@ -159,7 +159,7 @@ export rtod = (n) -> n * 180 / pi
 
 -- Angle
 export angle = (x1, y1, x2, y2) -> rtod(atan2(y2 - y1, x2 - x1))
-export anorm = (a) -> fmod(a + 180, 360) - 180
+export anorm = (a) -> ((a + 180) % 360) - 180
 export adiff = (a1, a2) ->
     diff = anorm(a1 - a2)
     if diff < 180
