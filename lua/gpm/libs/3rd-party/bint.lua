@@ -1902,7 +1902,8 @@ function environment.util.Bint( bits, wordbits )
 
     BINT_MATHMININTEGER, BINT_MATHMAXINTEGER = bint_new( math.mininteger ), bint_new( math.maxinteger )
     BINT_MININTEGER = static.MinInteger()
-    memo[ memoindex ] = internal
 
-    return class( 'Int' .. bits, internal, static )
+    local cls = class( 'Int' .. bits, internal, static )
+    memo[ memoindex ] = cls
+    return cls
 end

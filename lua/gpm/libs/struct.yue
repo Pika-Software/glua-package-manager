@@ -25,9 +25,9 @@
 --]]
 
 _G = _G
-import error, type from _G
+import error from _G
 import environment from _G.gpm
-import string, math, table, tonumber, assert, argument, isstring, isnumber from environment
+import string, math, table, tonumber, assert, argument, isstring, isnumber, type from environment
 import char, byte, len, sub, format, match, find, rep from string
 import trunc, floor, min, max, pow2, mod2 from math
 import concat, unpack from table
@@ -37,78 +37,85 @@ registry = {}
 _module_0 = { :registry }
 
 -- https://github.com/ToxicFrog/vstruct/blob/master/cursor.lua
-_module_0.Cursor = environment.class( "Cursor", {
-    __tostring: =>
-        return format( "Cursor: %p [%d/%d]", @, @position, @size )
+do
 
-    new: ( @data = "" ) =>
-        assert( isstring( data ), "data must be a string" )
-        @size = len( data )
-        @position = 0
-        @buffer = {}
+    base = {
+        __tostring: =>
+            return format( "Cursor: %p [%d/%d]", @, @position, @size )
 
-    Flush: =>
-        :buffer = @
+        new: ( @data = "" ) =>
+            assert( isstring( data ), "data must be a string" )
+            @size = len( data )
+            @position = 0
+            @buffer = {}
 
-        length = #buffer
-        if length == 0
-            return
+        Flush: =>
+            :buffer = @
 
-        :data, :position, :size = @
+            length = #buffer
+            if length == 0
+                return
 
-        if position > size
-            data ..= rep( "\0", position - size )
-            size = len( data )
+            :data, :position, :size = @
 
-        content = concat( buffer, "", 1, length )
+            if position > size
+                data ..= rep( "\0", position - size )
+                size = len( data )
 
-        for index = 1, length
-            buffer[ index ] = nil
+            content = concat( buffer, "", 1, length )
 
-        length = len( content )
-        data = sub( data, 1, position ) .. content .. sub( data, position + length + 1, size )
-        @position = position + length
-        @data, @size = data, len( data )
+            for index = 1, length
+                buffer[ index ] = nil
 
-    Seek: ( whence = "cur", offset = 0 ) =>
-        @Flush!
+            length = len( content )
+            data = sub( data, 1, position ) .. content .. sub( data, position + length + 1, size )
+            @position = position + length
+            @data, @size = data, len( data )
 
-        :position, :size = @
+        Seek: ( whence = "cur", offset = 0 ) =>
+            @Flush!
 
-        switch whence
-            when "cur"
-                position += offset
+            :position, :size = @
 
-            when "end"
-                position = size + offset
+            switch whence
+                when "cur"
+                    position += offset
 
-            when "set"
-                position = offset
+                when "end"
+                    position = size + offset
 
-            else
-                error "bad argument #1 to 'Seek' (invalid option)", 2
-                return nil
+                when "set"
+                    position = offset
 
-        position = @position = min( max( position, 0 ), size )
-        return position
+                else
+                    error "bad argument #1 to 'Seek' (invalid option)", 2
+                    return nil
 
-    Write: ( str ) =>
-        @buffer[] = str
+            position = @position = min( max( position, 0 ), size )
+            return position
 
-    Read: ( length = 1 ) =>
-        @Flush!
+        Write: ( str ) =>
+            @buffer[] = str
 
-        :position, :size = @
+        Read: ( length = 1 ) =>
+            @Flush!
 
-        if position > size
-            return nil, "eof"
+            :position, :size = @
 
-        if length == "*a"
-            length = size
+            if position > size
+                return nil, "eof"
 
-        @position = min( position + length, size )
-        return sub( @data, position + 1, position + length )
-} )
+            if length == "*a"
+                length = size
+
+            @position = min( position + length, size )
+            return sub( @data, position + 1, position + length )
+    }
+
+    _module_0.Cursor = environment.class( "Cursor", base )
+
+    _module_0.IsCursor = ( any ) ->
+        return getmetatable( any ) == base
 
 -- https://github.com/ToxicFrog/vstruct/blob/master/init.lua
 explode = _module_0.explode = ( number, size = 0 ) ->
@@ -1732,14 +1739,14 @@ do
     local wrapFileDescriptor
     do
 
-        import isfile from environment
         import Cursor from _module_0
 
         wrapFileDescriptor = api.WarpFileDescriptor = ( fileDescriptor ) ->
             if isstring( fileDescriptor )
                 return Cursor( fileDescriptor )
 
-            if isfile( fileDescriptor )
+            name = type( fileDescriptor )
+            if name == "File" or name == "File: Legacy"
                 return Cursor( fileDescriptor\Read!, fileDescriptor\Close! )
 
             return fileDescriptor
