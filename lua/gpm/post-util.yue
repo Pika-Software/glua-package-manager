@@ -196,18 +196,6 @@ do
 
         string.packsize = struct.SizeOf
 
-    import Read from io.i
-    import Little from io.endianness
-
-    util.LZMA_PROPS_SIZE = 5
-
-    util.CompressedSize = ( binary ) ->
-        if binary == ""
-            return 0
-
-        Little!
-        return Read( nil, sub( binary, 6, 14 ), 8 )
-
     -- Byte Stream
     import char, reverse, format from string
     import deflate, Color from environment
@@ -240,8 +228,28 @@ do
         quad = io.q
         readQuad, writeQuad = quad.Read, quad.Write
 
-    import endianness from io
-    setEndianness = endianness.Set
+    local setEndianness
+    do
+
+        import Little, Set from io.endianness
+        import Read from io.i
+
+        util.LZMA_PROPS_SIZE = 5
+
+        util.CompressedSize = ( binary ) ->
+            if binary == ""
+                return 0
+
+            Little!
+            return Read( nil, sub( binary, 6, 14 ), 8 )
+
+        setEndianness = ( isBigEndian ) ->
+            if isBigEndian
+                Set( "big" )
+                return true
+
+            Set( "little" )
+            return false
 
     noCompression = ( content ) ->
         return content
@@ -420,105 +428,105 @@ do
                 return @WriteByte( bool and 1 or 0 )
 
             -- UInt
-            ReadUInt: ( bytes, endianness ) =>
+            ReadUInt: ( bytes, isBigEndian ) =>
                 argument( bytes, 2, "number", 4 )
-                setEndianness( endianness or "little" )
+                setEndianness( isBigEndian )
                 return readUInt( nil, @Read( bytes ), bytes )
 
-            WriteUInt: ( number, bytes, endianness ) =>
+            WriteUInt: ( number, bytes, isBigEndian ) =>
                 argument( number, 1, "number", 4 )
                 argument( bytes, 2, "number", 4 )
-                setEndianness( endianness or "little" )
+                setEndianness( isBigEndian )
                 return @Write( writeUInt( nil, number, bytes ) )
 
             -- UShort
-            ReadUShort: ( endianness ) =>
-                return @ReadUInt( 2, endianness )
+            ReadUShort: ( isBigEndian ) =>
+                return @ReadUInt( 2, isBigEndian )
 
-            WriteUShort: ( number, endianness ) =>
-                return @WriteUInt( number, 2, endianness )
+            WriteUShort: ( number, isBigEndian ) =>
+                return @WriteUInt( number, 2, isBigEndian )
 
             -- ULong
-            ReadULong: ( endianness ) =>
-                return @ReadUInt( 4, endianness )
+            ReadULong: ( isBigEndian ) =>
+                return @ReadUInt( 4, isBigEndian )
 
-            WriteULong: ( number, endianness ) =>
-                return @WriteUInt( number, 4, endianness )
+            WriteULong: ( number, isBigEndian ) =>
+                return @WriteUInt( number, 4, isBigEndian )
 
             -- UInt64
-            ReadUInt64: ( endianness ) =>
-                return @ReadUInt( 8, endianness )
+            ReadUInt64: ( isBigEndian ) =>
+                return @ReadUInt( 8, isBigEndian )
 
-            WriteUInt64: ( number, endianness ) =>
-                @WriteUInt( number, 8, endianness )
+            WriteUInt64: ( number, isBigEndian ) =>
+                @WriteUInt( number, 8, isBigEndian )
 
             -- Int
-            ReadInt: ( bytes, endianness ) =>
+            ReadInt: ( bytes, isBigEndian ) =>
                 argument( bytes, 2, "number", 4 )
-                setEndianness( endianness or "little" )
+                setEndianness( isBigEndian )
                 return readInt( nil, @Read( bytes ), bytes )
 
-            WriteInt: ( number, bytes, endianness ) =>
+            WriteInt: ( number, bytes, isBigEndian ) =>
                 argument( number, 1, "number", 4 )
                 argument( bytes, 2, "number", 4 )
-                setEndianness( endianness or "little" )
+                setEndianness( isBigEndian )
                 return @Write( writeInt( nil, number, bytes ) )
 
             -- Short
-            ReadShort: ( endianness ) =>
-                return @ReadInt( 2, endianness )
+            ReadShort: ( isBigEndian ) =>
+                return @ReadInt( 2, isBigEndian )
 
-            WriteShort: ( number, endianness ) =>
-                return @WriteInt( number, 2, endianness )
+            WriteShort: ( number, isBigEndian ) =>
+                return @WriteInt( number, 2, isBigEndian )
 
             -- Long
-            ReadLong: ( endianness ) =>
-                return @ReadInt( 4, endianness )
+            ReadLong: ( isBigEndian ) =>
+                return @ReadInt( 4, isBigEndian )
 
-            WriteLong: ( number, endianness ) =>
-                return @WriteInt( number, 4, endianness )
+            WriteLong: ( number, isBigEndian ) =>
+                return @WriteInt( number, 4, isBigEndian )
 
             -- Int64
-            ReadInt64: ( endianness ) =>
-                if endianness.value == "big"
+            ReadInt64: ( isBigEndian ) =>
+                if setEndianness( isBigEndian )
                     return FromBigEndian( @Read( 8 ) )
 
                 return FromLittleEndian( @Read( 8 ) )
 
-            WriteInt64: ( number, endianness ) =>
-                if endianness.value == "big"
+            WriteInt64: ( number, isBigEndian ) =>
+                if setEndianness( isBigEndian )
                     return @Write( ToBigEndian( number ) )
 
                 return @Write( ToLittleEndian( number ) )
 
             -- Float
-            ReadFloat: ( endianness ) =>
-                setEndianness( endianness or "little" )
+            ReadFloat: ( isBigEndian ) =>
+                setEndianness( isBigEndian )
                 return readFloat( nil, @Read( 4 ), 4 )
 
-            WriteFloat: ( number, endianness ) =>
+            WriteFloat: ( number, isBigEndian ) =>
                 argument( number, 2, "number" )
-                setEndianness( endianness or "little" )
+                setEndianness( isBigEndian )
                 return @Write( writeFloat( nil, number, 4 ) )
 
             -- Double
-            ReadDouble: ( endianness ) =>
-                setEndianness( endianness or "little" )
+            ReadDouble: ( isBigEndian ) =>
+                setEndianness( isBigEndian )
                 return readDouble( nil, @Read( 8 ), 8 )
 
-            WriteDouble: ( number, endianness ) =>
+            WriteDouble: ( number, isBigEndian ) =>
                 argument( number, 2, "number" )
-                setEndianness( endianness or "little" )
+                setEndianness( isBigEndian )
                 return @Write( writeDouble( nil, number, 8 ) )
 
             -- Quad
-            ReadQuad: ( endianness ) =>
-                setEndianness( endianness or "little" )
+            ReadQuad: ( isBigEndian ) =>
+                setEndianness( isBigEndian )
                 return readQuad( nil, @Read( 16 ), 16 )
 
-            WriteQuad: ( number, endianness ) =>
+            WriteQuad: ( number, isBigEndian ) =>
                 argument( number, 2, "number" )
-                setEndianness( endianness or "little" )
+                setEndianness( isBigEndian )
                 return @Write( writeQuad( nil, number, 16 ) )
 
             -- Time

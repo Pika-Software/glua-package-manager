@@ -1752,6 +1752,7 @@ do
             return fileDescriptor
 
     import IsCursor from _module_0
+    import istable from _G
 
     unwrapFileDescriptor = api.UnwrapFileDescriptor = ( fileDescriptor ) ->
         if IsCursor( fileDescriptor )
@@ -1779,7 +1780,8 @@ do
         unless IsCursor( fileDescriptor )
             error "bad argument #2 to 'Write' (file or string expected, got " .. type( fileDescriptor ) .. ")", 3
 
-        argument( data, 3, "table" )
+        unless istable( data )
+            error "bad argument #3 to 'Write' (table expected, got " .. type( data ) .. ")", 3
 
         obj.ast\Write( fileDescriptor, data )
         return unwrapFileDescriptor( fileDescriptor )

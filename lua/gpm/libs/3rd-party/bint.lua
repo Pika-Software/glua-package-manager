@@ -370,7 +370,7 @@ function environment.util.Bint( bits, wordbits )
     -- @param x A value convertible to a bint (string, number or another bint).
     -- @return A new bint, guaranteed to be a new reference in case needed.
     -- @raise An assert is thrown in case x is not convertible to a bint.
-    -- @see internal.tobint
+    -- @see static.ToBint
     -- @see static.Parse
     local bint_new = function( x )
         -- return a clone
@@ -440,7 +440,7 @@ function environment.util.Bint( bits, wordbits )
         return nil
     end
 
-    internal.tobint = tobint
+    static.ToBint = tobint
 
     --- Convert a value to a bint if possible otherwise to a lua number.
     -- Useful to prepare values that you are unsure if it's going to be an integer or float.
@@ -647,7 +647,7 @@ function environment.util.Bint( bits, wordbits )
     -- @return A buffer of bytes representing the input.
     -- @raise Asserts in case input is not convertible to an integer.
     function internal.ToLittleEndian( x, trim )
-        local s = struct_Write( BINT_LEPACKFMT, bint_assert_convert( x ) )
+        local s = struct_Write( BINT_LEPACKFMT, bint_assert_convert( x ), nil )
         if trim then
             s = string_gsub( s, '\x00+$', '' )
             if s == '' then
@@ -664,7 +664,7 @@ function environment.util.Bint( bits, wordbits )
     -- @return A buffer of bytes representing the input.
     -- @raise Asserts in case input is not convertible to an integer.
     function internal.ToBigEndian( x, trim )
-        local s = string_reverse( struct_Write( BINT_LEPACKFMT, bint_assert_convert( x ) ) )
+        local s = string_reverse( struct_Write( BINT_LEPACKFMT, bint_assert_convert( x ), nil ) )
         if trim then
             s = string_gsub( s, '^\x00+', '' )
             if s == '' then
@@ -896,7 +896,7 @@ function environment.util.Bint( bits, wordbits )
 
     --- Increment a number by one considering bints.
     -- @param x A bint or a lua number to increment.
-    function internal.inc( x )
+    function internal.increment( x )
         local ix = tobint( x, true )
         if ix then
             return ix:_inc()
@@ -923,7 +923,7 @@ function environment.util.Bint( bits, wordbits )
 
     --- Decrement a number by one considering bints.
     -- @param x A bint or a lua number to decrement.
-    function internal.dec( x )
+    function internal.decrement( x )
         local ix = tobint( x, true )
         if ix then
             return ix:_dec()
