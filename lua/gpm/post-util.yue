@@ -1150,20 +1150,13 @@ if _G.sql
     import Query from sql
     lib = environment.sql
 
-    -- truncate WAL journal on shutdown
-    _G.hook.Add "ShutDown", "GLua Package Manager::SQLite", ->
-        if Query( "pragma wal_checkpoint(TRUNCATE)" ) == false
-            Logger\Error( "Failed to truncate WAL journal: %s", sql.m_strError )
-
-        return nil
-
-    lib.LastError = ->
+    lib.lastError = lib.LastError = ->
         return sql.m_strError
 
-    escape = lib.Escape = ( str ) ->
+    escape = lib.escape = lib.Escape = ( str ) ->
         return str == nil and "null" or SQLSafe( str )
 
-    queryString = lib.QueryString = ( str ) ->
+    rawQuery = lib.rawQuery = lib.RawQuery = ( str ) ->
         Logger\Debug( "Executing SQL query: " .. str )
 
         result = Query( str )
@@ -1172,31 +1165,32 @@ if _G.sql
 
         return result
 
-    tableExists = lib.TableExists = ( name ) ->
-        return queryString( "select name from sqlite_master where name=" .. escape( name ) .. " and type='table'" ) and true or false
+    tableExists = lib.tableExists = lib.TableExists = ( name ) ->
+        return rawQuery( "select name from sqlite_master where name=" .. escape( name ) .. " and type='table'" ) and true or false
 
-    lib.IndexExists = ( name ) ->
-        return queryString( "select name from sqlite_master where name=" .. escape( name ) .. " and type='index'" ) and true or false
+    lib.IndexExists = lib.IndexExists = ( name ) ->
+        return rawQuery( "select name from sqlite_master where name=" .. escape( name ) .. " and type='index'" ) and true or false
 
-    lib.Begin = ->
-        queryString( "begin" )
+    begin = lib.begin = lib.Begin = ->
+        rawQuery( "begin" )
         return nil
 
-    lib.Commit = ->
-        queryString( "commit" )
+    commit = lib.commit = lib.Commit = ->
+        rawQuery( "commit" )
         return nil
 
-    lib.Rollback = ->
-        queryString( "rollback" )
+    rollback = lib.rollback = lib.Rollback = ->
+        rawQuery( "rollback" )
         return nil
 
-    query = lib.Query = ( str, ... ) ->
+    query = lib.query = lib.Query = ( str, ... ) ->
         args, index = { ... }, 0
-        str = gsub str, "?", ->
+        str = gsub( str, "?", ->
             index += 1
             return escape( args[ index ] )
+        )
 
-        result = queryString( str )
+        result = rawQuery( str )
 
         -- convert NULL values into nil
         if result
@@ -1207,30 +1201,30 @@ if _G.sql
 
         return result
 
-    queryRow = lib.QueryRow = ( str, row = 1, ... ) ->
+    queryRow = lib.queryRow = lib.QueryRow = ( str, row = 1, ... ) ->
         if result := query( str, ... )
             return result[ row ]
 
         return nil
 
-    queryOne = lib.QueryOne = ( str, ... ) ->
+    queryOne = lib.queryOne = lib.QueryOne = ( str, ... ) ->
         return queryRow( str, 1, ... )
 
-    lib.QueryValue = ( str, ... ) ->
+    lib.queryValue = lib.QueryValue = ( str, ... ) ->
         if result := queryOne( str, ... )
             return next( result )
 
         return nil
 
-    transaction = lib.Transaction = ( func ) ->
-        queryString( "begin" )
+    lib.transaction = lib.Transaction = ( func ) ->
+        begin()
 
         ok, result = pcall( func )
         if ok
-            queryString( "commit" )
+            commit()
             return result
 
-        queryString( "rollback" )
+        rollback()
         throw result
         return nil
 
