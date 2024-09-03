@@ -141,7 +141,7 @@ function environment.util.Bint( bits, wordbits )
         return x
     end
 
-    internal.one = bint_one
+    static.One = bint_one
 
     -- Convert a value to a lua integer without losing precision.
     local function tointeger( x )
@@ -166,8 +166,8 @@ function environment.util.Bint( bits, wordbits )
     -- @param x A value to initialize from convertible to a lua integer.
     -- @return A new bint or nil in case the input cannot be represented by an integer.
     -- @see internal.frominteger
-    local bint_fromuinteger = function(x)
-        x = tointeger(x)
+    local bint_fromuinteger = function( x )
+        x = tointeger( x )
         if x then
             if x == 1 then
                 return bint_one()
@@ -175,9 +175,9 @@ function environment.util.Bint( bits, wordbits )
                 return bint_zero()
             end
 
-            local n = setmetatable({}, internal)
+            local n = setmetatable( {}, internal )
             for i = 1, BINT_SIZE do
-                n[i] = band( x, BINT_WORDMAX )
+                n[ i ] = band( x, BINT_WORDMAX )
                 x = rshift( x, BINT_WORDBITS )
             end
 
@@ -467,8 +467,8 @@ function environment.util.Bint( bits, wordbits )
     -- in that case integer values wrap around.
     -- @param x A bint or a number to be converted into an unsigned integer.
     -- @return An integer or nil in case the input cannot be represented by an integer.
-    -- @see internal.tointeger
-    function internal.touinteger( x )
+    -- @see internal.ToInteger
+    function internal.ToUInteger( x )
         if getmetatable( x ) == internal then
             local n = 0
             for i = 1, BINT_SIZE do
@@ -487,7 +487,7 @@ function environment.util.Bint( bits, wordbits )
     -- in that case integer values wrap around.
     -- @param x A bint or value to be converted into an unsigned integer.
     -- @return An integer or nil in case the input cannot be represented by an integer.
-    -- @see internal.touinteger
+    -- @see internal.ToUInteger
     local bint_tointeger = function( x )
         if getmetatable( x ) == internal then
             local neg = x:IsNegative()
@@ -510,7 +510,7 @@ function environment.util.Bint( bits, wordbits )
         return tointeger( x )
     end
 
-    internal.tointeger = bint_tointeger
+    internal.ToInteger = bint_tointeger
 
     local function bint_assert_tointeger( x )
         x = bint_tointeger( x )
@@ -522,15 +522,15 @@ function environment.util.Bint( bits, wordbits )
     end
 
     --- Convert a bint to a lua float in case integer would wrap around or lua integer otherwise.
-    -- Different from @{internal.tointeger} the operation does not wrap around integers,
+    -- Different from @{internal.ToInteger} the operation does not wrap around integers,
     -- but digits precision are lost in the process of converting to a float.
     -- @param x A bint or value to be converted into a lua number.
     -- @return A lua number or nil in case the input cannot be represented by a number.
-    -- @see internal.tointeger
+    -- @see internal.ToInteger
     local bint_tonumber = function( x )
         if getmetatable( x ) == internal then
             if x <= BINT_MATHMAXINTEGER and x >= BINT_MATHMININTEGER then
-                return x:tointeger()
+                return x:ToInteger()
             end
 
             return tonumber( tostring( x ), 10 )
@@ -571,7 +571,7 @@ function environment.util.Bint( bits, wordbits )
         local isxneg = x:IsNegative()
         if ( ( base == 10 and not unsigned ) or ( base == 16 and unsigned and not isxneg ) ) and ( x <= BINT_MATHMAXINTEGER and x >= BINT_MATHMININTEGER ) then
             -- integer is small, use tostring or string.format (faster)
-            local n = x:tointeger()
+            local n = x:ToInteger()
             if base == 10 then
                 return tostring( n )
             elseif unsigned then
