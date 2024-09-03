@@ -240,7 +240,8 @@ do
         quad = io.q
         readQuad, writeQuad = quad.Read, quad.Write
 
-    setEndianness = io.endianness.Set
+    import endianness from io
+    setEndianness = endianness.Set
 
     noCompression = ( content ) ->
         return content
@@ -270,6 +271,9 @@ do
 
         @position = position
         return position
+
+    Int64 = environment.Int64 = util.Bint( 64 )
+    import FromBigEndian, FromLittleEndian, ToBigEndian, ToLittleEndian from Int64
 
     util.ByteStream = environment.class(
         "ByteStream",
@@ -479,10 +483,16 @@ do
 
             -- Int64
             ReadInt64: ( endianness ) =>
-                return @ReadInt( 8, endianness )
+                if endianness.value == "big"
+                    return FromBigEndian( @Read( 8 ) )
+
+                return FromLittleEndian( @Read( 8 ) )
 
             WriteInt64: ( number, endianness ) =>
-                return @WriteInt( number, 8, endianness )
+                if endianness.value == "big"
+                    return @Write( ToBigEndian( number ) )
+
+                return @Write( ToLittleEndian( number ) )
 
             -- Float
             ReadFloat: ( endianness ) =>
