@@ -452,11 +452,11 @@ _module_0.GMA = environment.class( "GMA", {
         handler\Close!
         return @
 
-    AsyncRead: async ( filePath, readAllFiles, doCRC ) =>
+    AsyncRead: async ( filePath, readAllFiles, doCRC, validateHash ) =>
         Empty( @required_content )
         Empty( @files )
 
-        handler = ByteStream( await AsyncRead( filePath, "rb" ) )
+        handler = ByteStream( await AsyncRead( filePath, "rb", nil, validateHash ) )
         @Parse( handler, doCRC )
 
         if readAllFiles
@@ -536,9 +536,9 @@ _module_0.GMA = environment.class( "GMA", {
         handler\Close!
         return @
 
-    AsyncWrite: async ( filePath, doCRC ) =>
+    AsyncWrite: async ( filePath, doCRC, saveHash ) =>
         argument( filePath, 1, "string" )
-        await AsyncWrite( filePath, @GetBinary( doCRC ) )
+        await AsyncWrite( filePath, @GetBinary( doCRC ), nil, nil, saveHash )
         return @
 
     Mount: ( doCRC ) =>
@@ -551,9 +551,9 @@ _module_0.GMA = environment.class( "GMA", {
 
         return result
 
-    AsyncMount: async ( doCRC ) =>
+    AsyncMount: async ( doCRC, saveHash ) =>
         filePath = "/data/gpm/mount/" .. MD5( @title .. time! .. sidePrefix ) .. ".gma"
-        await @AsyncWrite( filePath, doCRC )
+        await @AsyncWrite( filePath, doCRC, saveHash )
 
         ok, result = MountGMA( filePath )
         unless ok

@@ -135,7 +135,7 @@ class GithubSource extends loader.Source
 
             gma\SetFile( entryPath, entry.content )
 
-        await gma\AsyncMount()
+        await gma\AsyncMount( nil, true )
 
 
 GithubSource( "github" )
