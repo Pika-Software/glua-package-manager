@@ -1160,20 +1160,13 @@ if _G.sql
     import Query from sql
     lib = environment.sql
 
-    -- truncate WAL journal on shutdown
-    _G.hook.Add "ShutDown", "GLua Package Manager::SQLite", ->
-        if Query( "pragma wal_checkpoint(TRUNCATE)" ) == false
-            Logger\Error( "Failed to truncate WAL journal: %s", sql.m_strError )
-
-        return nil
-
-    lib.LastError = ->
+    lib.lastError = lib.LastError = ->
         return sql.m_strError
 
-    escape = lib.Escape = ( str ) ->
+    escape = lib.escape = lib.Escape = ( str ) ->
         return str == nil and "null" or SQLSafe( str )
 
-    queryString = lib.QueryString = ( str ) ->
+    rawQuery = lib.rawQuery = lib.RawQuery = ( str ) ->
         Logger\Debug( "Executing SQL query: " .. str )
 
         result = Query( str )
@@ -1182,48 +1175,32 @@ if _G.sql
 
         return result
 
-    -- optimize sqlite database
-    unless sql.__optimized
-        pragma_values = queryString( "pragma foreign_keys; pragma journal_mode; pragma synchronous; pragma wal_autocheckpoint" )
-        if pragma_values[ 1 ].foreign_keys == "0"
-            queryString( "pragma foreign_keys = 1" )
+    tableExists = lib.tableExists = lib.TableExists = ( name ) ->
+        return rawQuery( "select name from sqlite_master where name=" .. escape( name ) .. " and type='table'" ) and true or false
 
-        if pragma_values[ 2 ].journal_mode == "delete"
-            queryString( "pragma journal_mode = wal" )
+    lib.IndexExists = lib.IndexExists = ( name ) ->
+        return rawQuery( "select name from sqlite_master where name=" .. escape( name ) .. " and type='index'" ) and true or false
 
-        if pragma_values[ 3 ].synchronous == "0"
-            queryString( "pragma synchronous = normal" )
-
-        if pragma_values[ 4 ].wal_autocheckpoint == "1000"
-            queryString( "pragma wal_autocheckpoint = 100" )
-
-        sql.__optimized = true
-
-    tableExists = lib.TableExists = ( name ) ->
-        return queryString( "select name from sqlite_master where name=" .. escape( name ) .. " and type='table'" ) and true or false
-
-    lib.IndexExists = ( name ) ->
-        return queryString( "select name from sqlite_master where name=" .. escape( name ) .. " and type='index'" ) and true or false
-
-    lib.Begin = ->
-        queryString( "begin" )
+    begin = lib.begin = lib.Begin = ->
+        rawQuery( "begin" )
         return nil
 
-    lib.Commit = ->
-        queryString( "commit" )
+    commit = lib.commit = lib.Commit = ->
+        rawQuery( "commit" )
         return nil
 
-    lib.Rollback = ->
-        queryString( "rollback" )
+    rollback = lib.rollback = lib.Rollback = ->
+        rawQuery( "rollback" )
         return nil
 
-    query = lib.Query = ( str, ... ) ->
+    query = lib.query = lib.Query = ( str, ... ) ->
         args, index = { ... }, 0
-        str = gsub str, "?", ->
+        str = gsub( str, "?", ->
             index += 1
             return escape( args[ index ] )
+        )
 
-        result = queryString( str )
+        result = rawQuery( str )
 
         -- convert NULL values into nil
         if result
@@ -1234,332 +1211,30 @@ if _G.sql
 
         return result
 
-    queryRow = lib.QueryRow = ( str, row = 1, ... ) ->
+    queryRow = lib.queryRow = lib.QueryRow = ( str, row = 1, ... ) ->
         if result := query( str, ... )
             return result[ row ]
 
         return nil
 
-    queryOne = lib.QueryOne = ( str, ... ) ->
+    queryOne = lib.queryOne = lib.QueryOne = ( str, ... ) ->
         return queryRow( str, 1, ... )
 
-    lib.QueryValue = ( str, ... ) ->
+    lib.queryValue = lib.QueryValue = ( str, ... ) ->
         if result := queryOne( str, ... )
             return next( result )
 
         return nil
 
-    transaction = lib.Transaction = ( func ) ->
-        queryString( "begin" )
+    lib.transaction = lib.Transaction = ( func ) ->
+        begin()
 
         ok, result = pcall( func )
         if ok
-            queryString( "commit" )
+            commit()
             return result
 
-        queryString( "rollback" )
+        rollback()
         throw result
         return nil
 
-    gpm_sql = gpm.sql
-    unless istable( gpm_sql )
-        gpm_sql = gpm.sql = {}
-
-    --[[
-
-        Libraries
-
-    --]]
-
-    -- http_cache table, used for etag caching in http library
-    do
-
-        http_cache = gpm_sql.http_cache = {}
-
-        http_cache.get = ( url ) ->
-            argument( url, 1, "string" )
-
-            result = query( "select etag, content from 'gpm.http_cache' where url=? limit 1", url )
-            return result and result[ 1 ]
-
-        MAX_SIZE = http_cache.MAX_SIZE = 50 * 1024
-
-        http_cache.set = ( url, etag, content ) ->
-            argument( url, 1, "string" )
-            argument( etag, 2, "string" )
-            argument( content, 3, "string" )
-
-            if len( content ) > MAX_SIZE -- 50KB
-                -- do not cache content that are larger than 50KB
-                return nil
-
-            if find( content, "\x00", 1, true )
-                -- we are unable to store null bytes in sqlite
-                return nil
-
-            query( "insert or replace into 'gpm.http_cache' (url, etag, timestamp, content) values (?, ?, ?, ?)", url, etag, time!, content )
-            return nil
-
-    -- key-value store for gpm
-    do
-
-        store = gpm_sql.store = {}
-
-        store.set = ( key, value ) ->
-            argument( key, 1, "string" )
-            query( "insert or replace into 'gpm.store' values (?, ?)", key, value )
-            return nil
-
-        store.get = ( key ) ->
-            argument( key, 1, "string" )
-            result = query( "select value from 'gpm.store' where key=?", key )
-            return result and result[ 1 ].value
-
-    --- repositories
-    if SERVER
-
-        repositories = gpm_sql.repositories = {}
-
-        repositories.getRepositories = ->
-            return query( "select * from 'gpm.repositories'" ) or {}
-
-        repositories.addRepository = ( url ) ->
-            argument( url, 1, "string" )
-            return queryOne( "insert or ignore into 'gpm.repositories' (url) values (?); select * from 'gpm.repositories' where url=?", url, url )
-
-        do
-
-            url_str = ""
-
-            transactionFunc = ->
-                repository = queryOne( "select id from 'gpm.repositories' where url=?", url_str )
-                unless repository
-                    return nil
-
-                repositoryId = repository.id
-
-                -- delete all versions, packages and repository
-                for package in *query( "select id from 'gpm.packages' where repositoryId=?", repositoryId )
-                    packageId = package.id
-                    query( "delete from 'gpm.package_versions' where packageId=?; delete from 'gpm.packages' where id=?", packageId, packageId )
-
-                query( "delete from 'gpm.repositories' where id=?", repositoryId )
-                return nil
-
-            repositories.removeRepository = ( url ) ->
-                argument( url, 1, "string" )
-                url_str = url
-
-                transaction( transactionFunc )
-                url_str = nil
-                return nil
-
-        getRepositoryId = ( repository ) ->
-            if isnumber( repository )
-                return repository
-
-            if istable( repository )
-                return repository.id or repository.url
-
-            if isstring( repository )
-                result = queryOne( "select id from 'gpm.repositories' where url=?", repository )
-                return result and result.id or nil
-
-            return nil
-
-        repositories.getPackage = ( repository, name ) ->
-            argument( name, 2, "string" )
-
-            repositoryId = getRepositoryId( repository )
-            unless repositoryId
-                throw SQLError "invalid repository '#{repository}' was given as #1 argument"
-
-            if pkg := queryOne( "select * from 'gpm.packages' where name=? and repositoryId=?", name, repositoryId )
-                pkg.versions = query( "select version, metadata from 'gpm.package_versions' where packageId=?", pkg.id )
-                return pkg
-
-            return nil
-
-        repositories.getPackages = ( repository ) ->
-            repositoryId = getRepositoryId( repository )
-            unless repositoryId
-                throw SQLError "invalid repository '#{repository}' was given as #1 argument"
-
-            packages = query( "select * from 'gpm.packages' where repositoryId=?", repositoryId )
-            unless packages
-                return {}
-
-            for index = 1, #packages, 1
-                pkg = packages[ index ]
-                pkg.versions = query( "select version, metadata from 'gpm.package_versions' where packageId=?", pkg.id )
-
-            return packages
-
-        do
-
-            local pkgs, old_pkgs, repositoryId
-
-            transactionFunc = ->
-                hasOldPkgs = old_pkgs ~= nil
-
-                for name, pkg in pairs( pkgs )
-                    query( "insert or replace into 'gpm.packages' (name, url, type, repositoryId) values (?, ?, ?, ?)", pkg.name, pkg.url, pkg.type, repositoryId )
-
-                    package = queryOne( "select id from 'gpm.packages' where name=? and repositoryId=?", pkg.name, repositoryId )
-                    if package
-                        packageId = package.id
-
-                        query( "delete from 'gpm.package_versions' where packageId=?", packageId )
-
-                        for tbl in *pkg.versions
-                            query( "insert into 'gpm.package_versions' (version, metadata, packageId) values (?, ?, ?)", tbl.version, tbl.metadata, packageId )
-
-                    if hasOldPkgs
-                        old_pkgs[ name ] = nil
-
-                -- remove old packages
-                if hasOldPkgs
-                    for name, id in pairs( old_pkgs )
-                        query( "delete from 'gpm.package_versions' where packageId=?; delete from 'gpm.packages' where id=?", id, id )
-
-                return nil
-
-            repositories.updateRepository = ( repository, packages ) ->
-                argument( packages, 2, "table" )
-
-                repositoryId = getRepositoryId( repository )
-                unless repositoryId
-                    throw SQLError "invalid repository '#{repository}' was given as #1 argument"
-
-                oldPackages = query( "select id, name from 'gpm.packages' where repositoryId=?", repositoryId )
-                if oldPackages
-                    oldPackages = { pkg.name, pkg.id for pkg in *oldPackages }
-
-                pkgs, old_pkgs = packages, oldPackages
-                transaction( transactionFunc )
-                pkgs, old_pkgs = nil, nil
-                repositoryId = nil
-                return nil
-
-    --[[
-
-        Migrations
-
-    --]]
-
-    migrations = [
-        {
-            name: "initial"
-            execute: -> -- deprecated
-        }
-        {
-            name: "http_cache add primary key"
-            execute: ->
-                queryString( "drop table if exists 'gpm.http_cache'" )
-                queryString( [[create table 'gpm.http_cache' (
-                    url text primary key,
-                    etag text,
-                    timestamp int,
-                    content blob
-                )]] )
-
-                return nil
-        }
-        {
-            name: "added key-value store"
-            execute: ->
-                queryString( "create table 'gpm.store' ( key text unique, value text )" )
-                return nil
-        }
-        {
-            name: "initial repositories and packages"
-            execute: ->
-                queryString( "drop table if exists 'gpm.table_version'" )
-                queryString( "drop table if exists 'gpm.repository'" )
-                queryString( "drop table if exists 'gpm.packages'" )
-
-                if SERVER
-                    queryString( "create table 'gpm.repositories' ( id integer primary key autoincrement, url text unique not null )" )
-
-                    queryString( [[
-                        create table 'gpm.packages' (
-                            id integer primary key autoincrement,
-                            name text not null,
-                            url text not null,
-                            type int not null,
-                            repositoryId integer,
-
-                            foreign key(repositoryId) references 'gpm.repositories' (id)
-                            unique(name, repositoryId) on conflict replace
-                        )
-                    ]] )
-
-                    queryString( [[
-                        create table 'gpm.package_versions' (
-                            version text not null,
-                            metadata text,
-                            packageId integer not null,
-
-                            foreign key(packageId) references 'gpm.packages' (id)
-                            unique(version, packageId) on conflict replace
-                        )
-                    ]] )
-
-                return nil
-        }
-    ]
-
-    gpm_sql.migrations = migrations
-
-    unless tableExists( "gpm.migration_history" )
-        queryString( "create table 'gpm.migration_history' (name text, timestamp integer)" )
-
-    migrationExists = gpm_sql.migrationExists = ( name ) ->
-        for migration in *migrations
-            if migration.name == name
-                return true
-
-        return false
-
-    local runMigration
-    do
-
-        :display = SQLError
-
-        runMigration = gpm_sql.runMigration = ( migration ) ->
-            unless isfunction( migration.execute )
-                throw SQLError "Migration '#{migration.name}' does not have an execute function"
-
-            Logger\Info( "Running migration '#{migration.name}'..." )
-
-            queryString( "begin" ) -- begin transaction so we can rollback if something goes wrong
-
-            ok = xpcall( migration.execute, display )
-            if ok
-                query( "insert into 'gpm.migration_history' (name, timestamp) values (?, ?)", migration.name, time! )
-                queryString( "commit" )
-            else
-                queryString( "rollback" )
-
-            return ok
-
-    gpm_sql.migrate = ( name ) ->
-        unless isstring( name )
-            throw SQLError "Migration name must be a string, not #{name}"
-
-        history = queryString( "select name from 'gpm.migration_history'" ) or {}
-        for migration in *history
-            history[ migration.name ] = true
-
-        -- find if given migration name exists
-        unless migrationExists( name )
-            throw SQLError "Migration '" .. name .. "' not found"
-
-        -- first execute migrations
-        for migration in *migrations
-            unless history[ migration.name ]
-                if runMigration( migration ) == false
-                    break
-
-            if migration.name == name -- this is our last migration
-                break
