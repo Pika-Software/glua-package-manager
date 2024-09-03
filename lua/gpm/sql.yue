@@ -1,0 +1,292 @@
+import gpm from _G
+import argument, istable, isnumber, isstring, isfunction, SQLError, throw, tostring from gpm
+import string, os from gpm
+
+--#
+--# Unknown Developer, you can optimize everything later, please do not touch anything here.
+--#
+
+sql = rawget( gpm, "sql" )
+unless istable( sql )
+    sql = gpm.sql = setmetatable( {}, { __index: gpm.environment.sql } )
+
+--[[
+
+    Libraries
+
+--]]
+
+-- http_cache table, used for etag caching in http library
+do
+
+    http_cache = sql.http_cache = {}
+
+    http_cache.get = ( url ) ->
+        argument( url, 1, "string" )
+
+        return sql.queryOne( "select etag, content from 'gpm.http_cache' where url=? limit 1", url )
+
+    MAX_SIZE = http_cache.MAX_SIZE = 50 * 1024 -- 50KB
+
+    http_cache.set = ( url, etag, content ) ->
+        argument( url, 1, "string" )
+        argument( etag, 2, "string" )
+        argument( content, 3, "string" )
+
+        if string.len( content ) > MAX_SIZE
+            -- do not cache content that are larger than MAX_SIZE
+            return nil
+
+        if string.find( content, "\x00", 1, true )
+            -- we are unable to store null bytes in sqlite
+            return nil
+
+        sql.query( "insert or replace into 'gpm.http_cache' (url, etag, timestamp, content) values (?, ?, ?, ?)", url, etag, time!, content )
+        return nil
+
+
+-- key-value store for gpm
+do
+
+    store = sql.store = {}
+
+    store.set = ( key, value ) ->
+        argument( key, 1, "string" )
+        sql.query( "insert or replace into 'gpm.store' values (?, ?)", key, value )
+        return nil
+
+    store.get = ( key ) ->
+        argument( key, 1, "string" )
+        return sql.queryValue( "select value from 'gpm.store' where key=?", key )
+
+
+--- repositories
+if SERVER
+
+    repositories = sql.repositories = {}
+
+    repositories.getRepositories = ->
+        return sql.query( "select * from 'gpm.repositories'" ) or {}
+
+    repositories.addRepository = ( url ) ->
+        argument( url, 1, "string" )
+        -- sadly gmod's sqlite does not support returning clause :(
+        return queryOne( "insert or ignore into 'gpm.repositories' (url) values (?); select * from 'gpm.repositories' where url=?", url, url )
+
+    getRepositoryId = ( repository ) ->
+        if istable( repository )
+            return repository.id or repository.url
+
+        if isnumber( repository )
+            return repository
+
+        if isstring( repository )
+            return sql.queryValue( "select id from 'gpm.repositories' where url=?", repository )
+
+        return nil
+
+    repositories.removeRepository = ( repository ) ->
+        repositoryId = getRepositoryId( repository )
+        unless repositoryId
+            throw SQLError "invalid repository '#{repository}' was given as #1 argument"
+
+        sql.transaction ->
+            -- delete all versions, packages and repository
+            for package in *sql.query( "select id from 'gpm.packages' where repositoryId=?", repositoryId )
+                packageId = package.id
+                sql.query( "delete from 'gpm.package_versions' where packageId=?; delete from 'gpm.packages' where id=?", packageId, packageId )
+
+            sql.query( "delete from 'gpm.repositories' where id=?", repositoryId )
+            return
+
+    repositories.getPackage = ( repository, name ) ->
+        argument( name, 2, "string" )
+
+        repositoryId = getRepositoryId( repository )
+        unless repositoryId
+            throw SQLError "invalid repository '#{repository}' was given as #1 argument"
+
+        if pkg := queryOne( "select * from 'gpm.packages' where name=? and repositoryId=?", name, repositoryId )
+            pkg.versions = query( "select version, metadata from 'gpm.package_versions' where packageId=?", pkg.id )
+            return pkg
+
+        return nil
+
+    repositories.getPackages = ( repository ) ->
+        repositoryId = getRepositoryId( repository )
+        unless repositoryId
+            throw SQLError "invalid repository '#{repository}' was given as #1 argument"
+
+        packages = sql.query( "select * from 'gpm.packages' where repositoryId=?", repositoryId ) or {}
+
+        -- fetch versions for each package
+        for pkg in *packages
+            pkg.versions = sql.query( "select version, metadata from 'gpm.package_versions' where packageId=?", pkg.id )
+
+        return packages
+    
+    repositories.updateRepository = ( repository, packages ) ->
+        argument( packages, 2, "table" )
+
+        repositoryId = getRepositoryId( repository )
+        unless repositoryId
+            throw SQLError "invalid repository '#{repository}' was given as #1 argument"
+
+        oldPackages = sql.query( "select id, name from 'gpm.packages' where repositoryId=?", repositoryId ) or {}
+        for pkg in *oldPackages
+            oldPackages[ pkg.name ] = pkg.id
+
+        sql.transaction ->
+            for name, pkg in pairs( packages )
+                sql.query( "insert or replace into 'gpm.packages' (name, url, type, repositoryId) values (?, ?, ?, ?)", pkg.name, pkg.url, pkg.type, repositoryId )
+
+                packageId = sql.queryValue( "select id from 'gpm.packages' where name=? and repositoryId=?", pkg.name, repositoryId )
+
+                sql.query( "delete from 'gpm.package_versions' where packageId=?", packageId )
+
+                for tbl in *pkg.versions
+                    sql.query( "insert into 'gpm.package_versions' (version, metadata, packageId) values (?, ?, ?)", tbl.version, tbl.metadata, packageId )
+
+                oldPackages[ name ] = nil
+
+            -- remove old packages
+            for name, id in pairs( oldPackages )
+                sql.query( "delete from 'gpm.package_versions' where packageId=?; delete from 'gpm.packages' where id=?", id, id )
+            
+            return
+
+
+-- optimize sqlite database
+unless sql.__optimized
+    pragma_values = sql.rawQuery( "pragma foreign_keys; pragma journal_mode; pragma synchronous; pragma wal_autocheckpoint" )
+    if pragma_values[ 1 ].foreign_keys == "0"
+        sql.rawQuery( "pragma foreign_keys = 1" )
+
+    if pragma_values[ 2 ].journal_mode == "delete"
+        sql.rawQuery( "pragma journal_mode = wal" )
+
+    if pragma_values[ 3 ].synchronous == "0"
+        sql.rawQuery( "pragma synchronous = normal" )
+
+    if pragma_values[ 4 ].wal_autocheckpoint == "1000"
+        sql.rawQuery( "pragma wal_autocheckpoint = 100" )
+
+    sql.__optimized = true
+
+-- truncate WAL journal on shutdown
+_G.hook.Add "ShutDown", "GLua Package Manager::SQLite", ->
+    if _G.sql.Query( "pragma wal_checkpoint(TRUNCATE)" ) == false
+        Logger\Error( "Failed to truncate WAL journal: %s", _G.sql.LastError() )
+
+    return nil
+
+--[[
+
+    Migrations
+
+--]]
+
+migrations = [
+    {
+        name: "initial"
+        execute: -> -- deprecated
+    }
+    {
+        name: "http_cache add primary key"
+        execute: ->
+            sql.rawQuery( "drop table if exists 'gpm.http_cache'" )
+            sql.rawQuery( [[create table 'gpm.http_cache' (
+                url text primary key,
+                etag text,
+                timestamp int,
+                content blob
+            )]] )
+
+            return nil
+    }
+    {
+        name: "added key-value store"
+        execute: ->
+            sql.rawQuery( "create table 'gpm.store' ( key text unique, value text )" )
+            return nil
+    }
+    {
+        name: "initial repositories and packages"
+        execute: ->
+            sql.rawQuery( "drop table if exists 'gpm.table_version'" )
+            sql.rawQuery( "drop table if exists 'gpm.repository'" )
+            sql.rawQuery( "drop table if exists 'gpm.packages'" )
+
+            if SERVER
+                sql.rawQuery( "create table 'gpm.repositories' ( id integer primary key autoincrement, url text unique not null )" )
+
+                sql.rawQuery( [[
+                    create table 'gpm.packages' (
+                        id integer primary key autoincrement,
+                        name text not null,
+                        url text not null,
+                        type int not null,
+                        repositoryId integer,
+
+                        foreign key(repositoryId) references 'gpm.repositories' (id)
+                        unique(name, repositoryId) on conflict replace
+                    )
+                ]] )
+
+                sql.rawQuery( [[
+                    create table 'gpm.package_versions' (
+                        version text not null,
+                        metadata text,
+                        packageId integer not null,
+
+                        foreign key(packageId) references 'gpm.packages' (id)
+                        unique(version, packageId) on conflict replace
+                    )
+                ]] )
+
+            return nil
+    }
+]
+
+unless sql.tableExists( "gpm.migration_history" )
+    sql.rawQuery( "create table 'gpm.migration_history' (name text, timestamp integer)" )
+
+migrationExists = sql.migrationExists = ( name ) ->
+    for migration in *migrations
+        if migration.name == name
+            return true
+
+    return false
+
+runMigration = sql.runMigration = ( migration ) ->
+    unless isfunction( migration.execute )
+        throw SQLError "Migration '#{migration.name}' does not have an execute function"
+
+    Logger\Info( "Running migration '#{migration.name}'..." )
+
+    ok = xpcall( sql.transaction, SQLError.display, migration.execute )
+    if ok
+        sql.query( "insert into 'gpm.migration_history' (name, timestamp) values (?, ?)", migration.name, os.time! )
+
+    return ok
+
+sql.migrate = ( name ) ->
+    unless isstring( name )
+        throw SQLError "Migration name must be a string, not #{name}"
+
+    history = sql.rawQuery( "select name from 'gpm.migration_history'" ) or {}
+    for migration in *history
+        history[ migration.name ] = true
+
+    -- find if given migration name exists
+    unless migrationExists( name )
+        throw SQLError "Migration '" .. name .. "' not found"
+
+    -- first execute migrations
+    for migration in *migrations
+        unless history[ migration.name ]
+            if runMigration( migration ) == false
+                break
+
+        if migration.name == name -- this is our last migration
+            break

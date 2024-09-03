@@ -811,7 +811,7 @@ do
 
             promise = Promise!
 
-            state = Write( filePath, content, ( iFilePath, iGamePath, iState ) ->
+            state = Write( filePath, content, gamePath, ( iFilePath, iGamePath, iState ) ->
                 if iState == 0
                     promise\Resolve( absoluteGamePath( iFilePath, iGamePath, false ) )
                     return nil
@@ -819,7 +819,7 @@ do
                 promise\Reject( FileSystemError FSASYNC[ iState ] )
                 return nil
 
-            gamePath )
+            )
 
             if state ~= 0
                 promise\Reject( FileSystemError FSASYNC[ state ] )
