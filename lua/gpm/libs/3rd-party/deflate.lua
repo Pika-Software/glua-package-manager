@@ -379,7 +379,7 @@ end
 -- @param str [string] the input string to calcuate its Adler-32 checksum.
 -- @return [integer] The Adler-32 checksum, which is greater or equal to 0,
 -- and less than 2^32 (4294967296).
-function lib_Adler32( str )
+local function Adler32( str )
     -- This function is loop unrolled by better performance.
     --
     -- Here is the minimum code:
@@ -415,7 +415,7 @@ function lib_Adler32( str )
     return ( b * 65536 + a ) % 4294967296
 end
 
-deflate.Adler32 = lib_Adler32
+deflate.Adler32 = Adler32
 
 -- Compare adler32 checksum.
 -- adler32 should be compared with a mod to avoid sign problem
@@ -479,7 +479,7 @@ function deflate.CreateDictionary(str, strlen, adler32)
         error( string_format( "Usage: deflate.CreateDictionary(str, strlen, adler32): 'str' - string longer than 32768 bytes is not allowed. Got %d bytes.", strlen ), 2 )
     end
 
-    local actual_adler32 = lib_Adler32( str )
+    local actual_adler32 = Adler32( str )
     if not IsEqualAdler32(adler32, actual_adler32) then
         error( string_format( "Usage: deflate.CreateDictionary(str, strlen, adler32):" ..
                 " 'adler32' does not match the actual adler32 of 'str'." ..
@@ -1957,7 +1957,7 @@ local function CompressZlibInternal( str, dictionary, configs )
     FlushWriter( _FLUSH_MODE_BYTE_BOUNDARY )
 
     -- Most significant byte first
-    local adler32 = lib_Adler32( str )
+    local adler32 = Adler32( str )
     local byte3 = adler32 % 256
 
     adler32 = ( adler32 - byte3 ) / 256
@@ -2691,7 +2691,7 @@ local function DecompressZlibInternal( str, dictionary )
 
     local adler32_expected = adler_byte0 * 16777216 + adler_byte1 * 65536 + adler_byte2 * 256 + adler_byte3
 
-    local adler32_actual = lib_Adler32( result )
+    local adler32_actual = Adler32( result )
     if not IsEqualAdler32( adler32_expected, adler32_actual ) then
         return nil, -15 -- Adler32 checksum does not match
     end

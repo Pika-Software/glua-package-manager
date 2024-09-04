@@ -98,6 +98,8 @@ function environment.util.Bint( bits, wordbits )
     assert( wordbits >= 8, 'wordbits must be at least 8' )
     assert( ( bits % 8 ) == 0, 'bitsize must be multiple of 8' )
 
+    local bint_band, bint_bor
+
     local static = {}
     local internal = {}
     internal.__index = internal
@@ -786,7 +788,7 @@ function environment.util.Bint( bits, wordbits )
     -- @param x A bint or a lua number.
     function internal.IsEven( x )
         if getmetatable( x ) == internal then
-            return x[ 1 ]:__band( 1 ) == 0
+            return bint_band( x[ 1 ], 1 ) == 0
         end
 
         return math_abs( x ) % 2 == 0
@@ -796,7 +798,7 @@ function environment.util.Bint( bits, wordbits )
     -- @param x A bint or a lua number.
     function internal.IsOdd( x )
         if getmetatable( x ) == internal then
-            return x[ 1 ]:__band( 1 ) == 1
+            return bint_band( x[ 1 ], 1 ) == 1
         end
 
         return math_abs( x ) % 2 == 1
@@ -996,7 +998,8 @@ function environment.util.Bint( bits, wordbits )
         if y <= 0 then
             return bint_zero()
         elseif y < BINT_BITS then
-            return x:__band( bint_one():__shl( y ) ):_dec()
+
+            return bint_band( x, bint_one():__shl( y ) ):_dec()
         end
 
         return bint_new( x )
@@ -1009,7 +1012,7 @@ function environment.util.Bint( bits, wordbits )
         x, y = bint_assert_convert( x ), bint_assert_tointeger( y )
 
         if y > 0 then
-            return x:__shl( y ):__bor( x:__shr( BINT_BITS - y ) )
+            return bint_bor( x:__shl( y ), x:__shr( BINT_BITS - y ) )
         elseif y < 0 then
             if y ~= math_mininteger then
                 return x:bror( -y )
@@ -1029,7 +1032,7 @@ function environment.util.Bint( bits, wordbits )
         x, y = bint_assert_convert( x ), bint_assert_tointeger( y )
 
         if y > 0 then
-            return x:__shr( y ):__bor( x:__shl( BINT_BITS - y ) )
+            return bint_bor( x:__shr( y ), x:__shl( BINT_BITS - y ) )
         elseif y < 0 then
             if y ~= math_mininteger then
                 return x:brol( -y )
@@ -1714,64 +1717,95 @@ function environment.util.Bint( bits, wordbits )
         return x
     end
 
-    --- Bitwise AND bints (in-place).
-    -- @param y An integer to perform bitwise AND.
-    -- @raise Asserts in case inputs are not convertible to integers.
-    function internal:_band( y )
-        y = bint_assert_convert( y )
-        for i = 1, BINT_SIZE do
-            self[ i ] = band( self[ i ], y[ i ] )
+    -- BAND ( a & b )
+    do
+
+        --- Bitwise AND bints (in-place).
+        -- @param y An integer to perform bitwise AND.
+        -- @raise Asserts in case inputs are not convertible to integers.
+        local internal_band = function( self, y )
+            y = bint_assert_convert( y )
+
+            for i = 1, BINT_SIZE do
+                self[ i ] = band( self[ i ], y[ i ] )
+            end
+
+            return self
         end
 
-        return self
-    end
+        internal.band = internal_band
+        internal.__band = internal_band
 
-    --- Bitwise AND two integers considering bints.
-    -- @param x An integer to perform bitwise AND.
-    -- @param y An integer to perform bitwise AND.
-    -- @raise Asserts in case inputs are not convertible to integers.
-    function internal.__band( x, y )
-        return bint_new( x ):_band( y )
-    end
-
-    --- Bitwise OR bints (in-place).
-    -- @param y An integer to perform bitwise OR.
-    -- @raise Asserts in case inputs are not convertible to integers.
-    function internal:_bor( y )
-        y = bint_assert_convert( y )
-        for i = 1, BINT_SIZE do
-            self[ i ] = bor( self[ i ], y[ i ] )
+        --- Bitwise AND two integers considering bints.
+        -- @param x An integer to perform bitwise AND.
+        -- @param y An integer to perform bitwise AND.
+        -- @raise Asserts in case inputs are not convertible to integers.
+        bint_band = function( x, y )
+            return internal_band( bint_new( x ), y )
         end
 
-        return self
+        static.band = bint_band
+
     end
 
-    --- Bitwise OR two integers considering bints.
-    -- @param x An integer to perform bitwise OR.
-    -- @param y An integer to perform bitwise OR.
-    -- @raise Asserts in case inputs are not convertible to integers.
-    function internal.__bor( x, y )
-        return bint_new( x ):_bor( y )
-    end
+    -- BOR ( a | b )
+    do
 
-    --- Bitwise XOR bints (in-place).
-    -- @param y An integer to perform bitwise XOR.
-    -- @raise Asserts in case inputs are not convertible to integers.
-    function internal:_bxor( y )
-        y = bint_assert_convert( y )
-        for i = 1, BINT_SIZE do
-            self[ i ] = bxor( self[ i ], y[ i ] )
+        --- Bitwise OR bints (in-place).
+        -- @param y An integer to perform bitwise OR.
+        -- @raise Asserts in case inputs are not convertible to integers.
+        local internal_bor = function( self, y )
+            y = bint_assert_convert( y )
+
+            for i = 1, BINT_SIZE do
+                self[ i ] = bor( self[ i ], y[ i ] )
+            end
+
+            return self
         end
 
-        return self
+        internal.bor = internal_bor
+        internal.__bor = internal_bor
+
+        --- Bitwise OR two integers considering bints.
+        -- @param x An integer to perform bitwise OR.
+        -- @param y An integer to perform bitwise OR.
+        -- @raise Asserts in case inputs are not convertible to integers.
+        bint_bor = function( x, y )
+            return internal_bor( bint_new( x ), y )
+        end
+
+        static.bor = bint_bor
+
     end
 
-    --- Bitwise XOR two integers considering bints.
-    -- @param x An integer to perform bitwise XOR.
-    -- @param y An integer to perform bitwise XOR.
-    -- @raise Asserts in case inputs are not convertible to integers.
-    function internal.__bxor( x, y )
-        return bint_new( x ):_bxor( y )
+    -- BXOR ( a ~ b )
+    do
+
+        --- Bitwise XOR bints (in-place).
+        -- @param y An integer to perform bitwise XOR.
+        -- @raise Asserts in case inputs are not convertible to integers.
+        local internal_bxor = function( self, y )
+            y = bint_assert_convert( y )
+
+            for i = 1, BINT_SIZE do
+                self[ i ] = bxor( self[ i ], y[ i ] )
+            end
+
+            return self
+        end
+
+        internal.bxor = internal_bxor
+        internal.__bxor = internal_bxor
+
+        --- Bitwise XOR two integers considering bints.
+        -- @param x An integer to perform bitwise XOR.
+        -- @param y An integer to perform bitwise XOR.
+        -- @raise Asserts in case inputs are not convertible to integers.
+        static.bxor = function( x, y )
+            return internal_bxor( bint_new( x ), y )
+        end
+
     end
 
     --- Bitwise NOT a bint (in-place).
