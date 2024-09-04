@@ -61,6 +61,10 @@ export request = async ( method, path, headers, body, cache ) ->
 
         error WebClientError "Github API rate limit exceeded (#{result.status}) (#{path})"
 
+    return result
+
+export apiRequest = async ( method, path, headers, body, cache ) ->
+    result = await request( method, path, headers, body, cache )
     unless result.status >= 200 and result.status < 300
         error WebClientError "Failed to fetch data from Github API (#{result.status}) (#{path})"
 
@@ -74,7 +78,7 @@ export template = ( path, data ) ->
     return gsub( path, "{([%w_-]-)}", ( str ) -> tostring( data[ str ] ) ), nil
 
 export templateRequest = ( method, path, data ) ->
-    return request( method, template( path, data ) )
+    return apiRequest( method, template( path, data ) )
 
 export getRepository = ( owner, repo ) ->
     return templateRequest( "GET", "/repos/{owner}/{repo}", { :owner, :repo } )
@@ -86,10 +90,18 @@ export getRepositoryTags = ( owner, report ) ->
 export getTree = ( owner, repo, tree_sha, recursive = false ) ->
     return templateRequest( "GET", "/repos/{owner}/{repo}/git/trees/{tree_sha}?recursive={recursive}", { :owner, :repo, :tree_sha, :recursive } )
 
-export getBlob = ( owner, repo, file_sha ) ->
+export getBlob = async ( owner, repo, file_sha ) ->
     result = await templateRequest( "GET", "/repos/{owner}/{repo}/git/blobs/{file_sha}", { :owner, :repo, :file_sha } )
     if result.encoding == "base64"
         result.content = Base64Decode( result.content )
         result.encoding = "raw"
 
     return result
+
+export fetchZip = async ( owner, repo, ref ) ->
+    result = await request( "GET", "/repos/#{owner}/#{repo}/zipball/#{ref}" )
+    if result.status != 200
+        error WebClientError "Failed to fetch zipball (#{owner}/#{repo}/#{ref}) from Github API (#{result.status})"
+    
+    return result.body
+    

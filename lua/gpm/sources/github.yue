@@ -3,11 +3,32 @@ import path, string, table, http, util, loader, file, addon from gpm -- librarie
 import isstring, istable, isurl, tostring, async, await, pairs from gpm -- functions
 import URL, Package, SourceError, Logger, github from gpm -- classes
 
--- TODO: Create GithubAPI class to handle requests
+CACHE_DIR = "/data/gpm/cache/github/"
 
--- url syntax: github:user/repo[/branch]
--- github://[apiToken@]user/repo[/branch]
+-- url syntax: 
+-- github:user/repo[/branch]
+-- or
+-- github://user/repo[/branch]
 class GithubSource extends loader.Source
+    GetDefaultBranch = ( user, repository ) ->
+        -- if we have local default branch, just use it and do not fetch it from github
+        -- probably it wont be changed, and there is no need to recheck it every time
+        filePath = CACHE_DIR .. user .. "/" .. repository .. "/default_branch.txt"
+        branch = file.Read( filePath, nil, nil, nil, true )
+        if branch
+            return branch
+
+        Logger\Debug( "Fetching information for Github repository '%s/%s'...", user, repository )
+        branch = github.getRepository( user, repository )\await().default_branch
+        
+        unless branch
+            error SourceError "Failed to fetch default branch for '#{user}/#{repository}' from Github API."
+
+        -- save the default branch to the cache
+        file.Write( filePath, branch, nil, nil, true )
+        
+        return branch
+
     -- pattern: priority
     PACKAGE_PATH_PRIORITIES = {
         "^package%..+$": 10
@@ -18,106 +39,153 @@ class GithubSource extends loader.Source
     }
 
     FindPackageInfo = ( user, repository, tree_sha ) ->
-        -- you might say, why recursive? well, github api rate limits us to 60 requests per hour, so we need to minimize them
+        filePath = CACHE_DIR .. user .. "/" .. repository .. "/" .. tree_sha .. "/package.entry.json"
+        if entry := util.JSONToTable( file.Read( filePath, nil, nil, nil, true ) or "" )
+            return entry
+
+        Logger\Debug( "Fetching file tree from Github repository '%s/%s/%s'...", user, repository, tree_sha )
+
         res = await github.getTree( user, repository, tree_sha, true )
-        
+
         entries = []
         for entry in *res.tree
             if entry.type == "blob" and string.match( entry.path, "package%..+$" )
                 entries[] = entry
 
-        if #entries == 1
-            return entries[1]
-        
-        -- welp, we have multiple package.lua files, lets try to find the correct one
-        priority = math.huge -- 0 is the highest priority
-        package_entry = nil
-        for entry in *entries
-            for pattern, p in pairs PACKAGE_PATH_PRIORITIES
-                if string.match( entry.path, pattern )
-                    if pattern == entry.path
-                        p = p - 10 -- paths that match the exact pattern are more important
-                    
-                    if p < priority
-                        priority = p
-                        package_entry = entry
-                    
-                    -- TODO: check if we have duplicates (i.e packages/a/package.lua and packages/b/package.lua)
+        packageEntry = nil
 
-        return package_entry
+        if #entries == 1
+            packageEntry = entries[1]
+
+        else 
+            -- welp, we have multiple package.lua files, lets try to find the correct one
+            priority = math.huge -- 0 is the highest priority
+            for entry in *entries
+                for pattern, p in pairs PACKAGE_PATH_PRIORITIES
+                    if string.match( entry.path, pattern )
+                        if pattern == entry.path
+                            p = p - 10 -- paths that match the exact pattern are more important
+                        
+                        if p < priority
+                            priority = p
+                            packageEntry = entry
+                        
+                        -- TODO: check if we have duplicates (i.e packages/a/package.lua and packages/b/package.lua)
+
+        if packageEntry
+            file.Write( filePath, util.TableToJSON( packageEntry ), nil, nil, true )
+
+        return packageEntry
+    
+    FetchPackageFile = ( user, repository, branch, entry ) ->
+        filePath = CACHE_DIR .. user .. "/" .. repository .. "/" .. branch .. "/package.txt"
+        if package := file.Read( filePath, nil, nil, nil, true )
+            return package
+
+        Logger\Debug( "Fetching package file from Github repository '%s/%s/%s'... (sha = '%s')", user, repository, branch, entry.sha )
+        
+        res = await github.getBlob( user, repository, entry.sha )
+        file.Write( filePath, res.content, nil, nil, true )
+        return res.content
+
+    DownloadRepository = ( user, repository, branch ) ->
+        filePath = CACHE_DIR .. user .. "/" .. repository .. "/" .. branch .. "/files.zip.dat"
+        if data := file.Read( filePath, nil, nil, nil, true )
+            return util.ByteStream( data )
+        
+        Logger\Debug( "Downloading repository '%s/%s/%s'...", user, repository, branch )
+        data = await github.fetchZip( user, repository, branch )
+
+        file.Write( filePath, data, nil, nil, true )
+
+        return util.ByteStream( data )
 
     FetchInfo: async ( url ) =>
+        -- Parse user, repo and branch from the given url
         segments = string.ByteSplit( url.pathname, 0x2F --[[ / ]] )
         if hostname := url.hostname
             insert( segments, 1, hostname )
 
-        user = segments[ 1 ]
-        repository = segments[ 2 ]
+        user = string.lower( segments[ 1 ] )
+        repository = string.lower( segments[ 2 ] )
         unless user and user != "" and repository and repository != ""
             error SourceError "Invalid url '#{url}' (missing user or repository, got '#{user}' and '#{repository}')."
 
-        Logger\Debug( "Fetching information for Github repository '%s'...", table.concat(segments, "/") )
-        branch = segments[ 3 ] or github.getRepository( user, repository )\await().default_branch
-        unless branch
-            error SourceError "Failed to get default branch for '#{user}/#{repository}'."
+        branch = segments[ 3 ] or GetDefaultBranch( user, repository )
 
-        -- first letäs try to find file locally
-        workdir = @WorkingDirectory( url )
-        pkg = await Package.read( url )
-        if pkg
-            return {
-                package: pkg,
-                url: url,
-                -- no metadata indicates that the package is locally installed
-            }
-
-        package_entry = FindPackageInfo( user, repository, branch )
-        unless package_entry
+        packageEntry = FindPackageInfo( user, repository, branch )
+        unless packageEntry
             error SourceError "Failed to find package file in #{user}/#{repository} (#{branch})."
 
-        res = await github.getBlob( user, repository, package_entry.sha )
-        packageURL = URL( path.getFile( package_entry.path ), workdir )
-        file.Set( packageURL.pathname, res.content ) -- TODO: prevent overwriting existing files
+        -- Check if repository already was installed locally
+        if pkg := await Package.read( url )
+            return {
+                package: pkg
+                url: url
+                metadata: {
+                    :user
+                    :repository
+                    :branch
+                    :packageEntry
+                    cached: true
+                }
+            }
+
+        packageURL = URL( path.getFile( packageEntry.path ), @WorkingDirectory( url ) )
+        packageContent = FetchPackageFile( user, repository, branch, packageEntry )
+        unless packageContent
+            error SourceError "Failed to fetch package file from #{url}."
+        
+        -- preventing overwriting existing package file
+        unless file.IsFile( packageURL.pathname )
+            file.Set( packageURL.pathname, packageContent )
 
         pkg = await Package.read( packageURL )
         unless pkg
             error SourceError "Failed to read package file from #{packageURL}. (url = #{url})"
         
         return {
-            package: pkg,
-            url: url,
+            package: pkg
+            url: url
             metadata: {
-                user: user,
-                repository: repository,
-                branch: branch,
-                auth: auth,
-                package_entry: package_entry
+                :user
+                :repository
+                :branch
+                :packageEntry
             }
         }
+
+    mountedRepositories = {}
 
     Install: async ( info, workdir ) =>
         unless workdir
             workdir = @WorkingDirectory( info.url ).pathname
 
-        unless info.metadata
-            -- TODO: if workdir is set, 
-            return -- package is already installed
+        if mountedRepositories[ workdir ]
+            return
+
+        root = path.getDirectory( info.metadata.packageEntry.path )
+        rootLength = #root + 1 -- +1 to remove the trailing slash
+
+        handle = DownloadRepository( info.metadata.user, info.metadata.repository, info.metadata.branch )
+
+        -- just in case if Install was called multiple times
+        if mountedRepositories[ workdir ]
+            return
 
         Logger\Debug( "Installing package '%s@%s' from Github repository '%s/%s/%s'...", info.package.name, info.package.version, info.metadata.user, info.metadata.repository, info.metadata.branch )
-
-        -- TODO: cache files
-
-        res = await http.CachedFetch("https://api.github.com/repos/#{info.metadata.user}/#{info.metadata.repository}/zipball/#{info.metadata.branch}", info.metadata.auth)
-        if res.status != 200
-            error SourceError "Failed to fetch zipball from Github repository '#{info.metadata.user}/#{info.metadata.repository}/#{info.metadata.branch}' (#{res.status})."
-
-        root = path.getDirectory( info.metadata.package_entry.path )
-        rootLength = #root + 1 -- +1 to remove the trailing slash
+    
+        gmaPath = CACHE_DIR .. info.metadata.user .. "/" .. info.metadata.repository .. "/" .. info.metadata.branch .. "/files-" .. util.CRC( workdir ) .. ".gma"
+        if file.Read( gmaPath, nil, nil, nil, true )
+            unless file.MountGMA( gmaPath )
+                error SourceError "Failed to mount GMA file '#{gmaPath}'."
+            
+            return
 
         gma = addon.GMA()
         gma\SetTitle( info.url.href )
 
-        for entry, err in file.IterateZipFiles( util.ByteStream(res.body), false ) -- entry: { path, content }
+        for entry, err in file.IterateZipFiles( handle, false ) -- entry: { path, content }
             if err
                 Logger\Debug( "Skipping file from zipball '%s/%s/%s' with path '%s' and reason '%s'", info.metadata.user, info.metadata.repository, info.metadata.branch, entry.path, err )
                 continue
@@ -126,6 +194,9 @@ class GithubSource extends loader.Source
             entryPath = string.sub( entry.path, string.indexOf(entry.path, "/") + 1 )
 
             -- then remove the root directory
+            unless string.StartsWith( entryPath, root )
+                continue
+
             entryPath = string.sub( entryPath, rootLength ) -- TODO: check if string is even valid
             if entryPath == ""
                 continue
@@ -135,7 +206,11 @@ class GithubSource extends loader.Source
 
             gma\SetFile( entryPath, entry.content )
 
-        await gma\AsyncMount( nil, true )
+        await gma\AsyncWrite( gmaPath, true, true )
+        unless file.MountGMA( gmaPath )
+            error SourceError "Failed to mount GMA file '#{gmaPath}'."
+
+        mountedRepositories[ workdir ] = true
 
 
 GithubSource( "github" )
