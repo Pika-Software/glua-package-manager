@@ -41,7 +41,7 @@ do
             -- we are unable to store null bytes in sqlite
             return nil
 
-        sql.query( "insert or replace into 'gpm.http_cache' (url, etag, timestamp, content) values (?, ?, ?, ?)", url, etag, time!, content )
+        sql.query( "insert or replace into 'gpm.http_cache' (url, etag, timestamp, content) values (?, ?, ?, ?)", url, etag, os.time(), content )
         return nil
 
 
@@ -167,7 +167,7 @@ do
         argument( time, 3, "number" ) if time
         argument( hash, 4, "string" ) if hash
 
-        sql.query( "insert into 'gpm.files' (path, size, time, hash) values (?, ?, ?, ?)", path, size, time, hash )
+        sql.query( "insert or replace into 'gpm.files' (path, size, time, hash) values (?, ?, ?, ?)", path, size, time, hash )
         return nil
     
     files.get = ( path ) ->
