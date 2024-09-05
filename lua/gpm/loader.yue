@@ -1075,6 +1075,9 @@ do
 
         pkg.__dependencies[name] = info.package
 
+        -- resolve dependencies of the dependency
+        await loader.ResolveDependencies( info.package )        
+        return
 
     loader.ResolveDependencies = async ( pkg ) ->
         if not pkg.dependencies
@@ -1139,3 +1142,7 @@ do
         for result in *tasks
             if result.status == "rejected"
                 display( result.reason )
+
+        if SERVER
+            -- find players that joined before packages were loaded, and force them to rejoin
+            -- TODO:
