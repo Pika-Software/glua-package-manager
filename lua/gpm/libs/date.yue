@@ -38,7 +38,7 @@ CENTURYFLIP = 0 -- year >= CENTURYFLIP == 1900, < CENTURYFLIP == 2000
 
 -- removes the decimal part of a number
 truncString = ( str ) ->
-    n = tonumber( str )
+    n = tonumber( str, 10 )
     return n and trunc( n )
 
 -- is `str` in string list `tbl`, `ml` is the minimun len
@@ -181,7 +181,7 @@ yearday = ( day_number ) ->
 
 -- parse value as a month
 getmontharg = ( value ) ->
-    month = tonumber( value )
+    month = tonumber( value, 10 )
     return ( month and trunc( month - 1 ) ) or inlist( tostring( value ) or "", sl_months, 2 )
 
 -- get __day_number of isoweek one of year
@@ -427,7 +427,7 @@ internal_methods.GetFloatSeconds = =>
 internal_methods.GetWeekNumber = ( wdb ) =>
     wd, yd = weekday( @__day_number ), yearday( @__day_number )
     if wdb
-        wdb = tonumber( wdb )
+        wdb = tonumber( wdb, 10 )
         if wdb
             wd = ( wd - ( wdb - 1 ) ) % 7 -- shift the week day base
         else
@@ -452,13 +452,13 @@ internal_methods.GetISODate = =>
 internal_methods.SetISOYear = ( year, w, day ) =>
     cy, cw, cd = @GetISODate!
     if year
-        cy = trunc( tonumber( year ) )
+        cy = trunc( tonumber( year, 10 ) )
 
     if w
-        cw = trunc( tonumber( w ) )
+        cw = trunc( tonumber( w, 10 ) )
 
     if day
-        cd = trunc( tonumber( day ) )
+        cd = trunc( tonumber( day, 10 ) )
 
     if cy and cw and cd
         @__day_number = makedaynum_isoywd( cy, cw, cd )
@@ -475,13 +475,13 @@ internal_methods.SetISOWeekNumber = ( w, day ) =>
 internal_methods.SetYear = ( year, month, day ) =>
     cy, cm, cd = breakdaynum( @__day_number )
     if year
-        cy = trunc( tonumber( year ) )
+        cy = trunc( tonumber( year, 10 ) )
 
     if month
         cm = getmontharg( month )
 
     if day
-        cd = trunc( tonumber( day ) )
+        cd = trunc( tonumber( day, 10 ) )
 
     if cy and cm and cd
         @__day_number = makedaynum( cy, cm, cd )
@@ -497,7 +497,7 @@ internal_methods.SetDay = ( day ) =>
 
 internal_methods.SetHours = ( hour, month, sec, ms ) =>
     ch, cm, cs, ck = breakdayfrc( @__day_fraction )
-    ch, cm, cs, ck = tonumber( hour or ch ), tonumber( month or cm ), tonumber( sec or cs ), tonumber( ms and ( ms * MILLISECONDS ) or ck )
+    ch, cm, cs, ck = tonumber( hour or ch, 10 ), tonumber( month or cm, 10 ), tonumber( sec or cs, 10 ), tonumber( ms and ( ms * MILLISECONDS ) or ck, 10 )
     if ch and cm and cs and ck
         @__day_fraction = makedayfrc( ch, cm, cs, ck )
         return @Normalize!
@@ -531,17 +531,17 @@ internal_methods.SpanDays = =>
 internal_methods.AddYears = ( year, month, day ) =>
     cy, cm, cd = breakdaynum( @__day_number )
     if year
-        year = trunc( tonumber( year ) )
+        year = trunc( tonumber( year, 10 ) )
     else
         year = 0
 
     if month
-        month = trunc( tonumber( month ) )
+        month = trunc( tonumber( month, 10 ) )
     else
         month = 0
 
     if day
-        day = trunc( tonumber( day ) )
+        day = trunc( tonumber( day, 10 ) )
     else
         day = 0
 
@@ -557,7 +557,7 @@ internal_methods.AddMonths = ( month, day ) =>
 do
 
     dobj_adddayfrc = ( n, pt, pd ) =>
-        n = tonumber( n )
+        n = tonumber( n, 10 )
         if n
             x = floor( n / pd )
             @__day_number = @__day_number + x
@@ -856,35 +856,35 @@ do
             return nil
 
         sety = ( q ) ->
-            year = year and error_dup! or tonumber( q )
+            year = year and error_dup! or tonumber( q, 10 )
             return nil
 
         setm = ( q ) ->
-            month = ( month or w or j ) and error_dup( month or w or j ) or tonumber( q )
+            month = ( month or w or j ) and error_dup( month or w or j ) or tonumber( q, 10 )
             return nil
 
         setd = ( q ) ->
-            day = day and error_dup! or tonumber( q )
+            day = day and error_dup! or tonumber( q, 10 )
             return nil
 
         seth = ( q ) ->
-            hour = hour and error_dup! or tonumber( q )
+            hour = hour and error_dup! or tonumber( q, 10 )
             return nil
 
         setr = ( q ) ->
-            min = min and error_dup! or tonumber( q )
+            min = min and error_dup! or tonumber( q, 10 )
             return nil
 
         sets = ( q ) ->
-            sec = sec and error_dup! or tonumber( q )
+            sec = sec and error_dup! or tonumber( q, 10 )
             return nil
 
         adds = ( q ) ->
-            sec += tonumber( "." .. sub( q, 2, -1 ) )
+            sec += tonumber( "." .. sub( q, 2, -1 ), 10 )
             return nil
 
         setj = ( q ) ->
-            j = ( month or w or j ) and error_dup! or tonumber( q )
+            j = ( month or w or j ) and error_dup! or tonumber( q, 10 )
             return nil
 
         setz = ( q ) ->
@@ -892,21 +892,21 @@ do
             return nil
 
         setzn = ( zs, zn ) ->
-            zn = tonumber( zn )
+            zn = tonumber( zn, 10 )
             setz( ( ( zn < 24 ) and ( zn * 60 ) or ( ( zn % 100 ) + floor( zn / 100 ) * 60 ) ) * ( zs == '+' and -1 or 1 ) )
             return nil
 
         setzc = ( zs, zh, zm ) ->
-            setz( ( ( tonumber( zh ) * 60 ) + tonumber( zm ) ) * ( zs == '+' and -1 or 1 ) )
+            setz( ( ( tonumber( zh, 10 ) * 60 ) + tonumber( zm, 10 ) ) * ( zs == '+' and -1 or 1 ) )
             return nil
 
         if not ( sw("^(%d%d%d%d)", sety ) and ( sw( "^(%-?)(%d%d)%1(%d%d)", ( _, a, b ) ->
-            setm( tonumber( a ) )
-            setd( tonumber( b ) )
+            setm( tonumber( a, 10 ) )
+            setd( tonumber( b, 10 ) )
             return nil
 
         ) or sw( "^(%-?)[Ww](%d%d)%1(%d?)", ( _, a, b ) ->
-            w, u = tonumber( a ), tonumber( b or 1 )
+            w, u = tonumber( a, 10 ), tonumber( b or 1, 10 )
             return nil
 
         ) or sw("^%-?(%d%d%d)", setj) or sw( "^%-?(%d%d)", ( a ) ->
@@ -924,7 +924,7 @@ do
                     _ = sw( "^%s*(%d%d?)", setr ) and sw( "^%s*:%s*(%d%d?)", sets ) and sw( "^([,%.]%d+)", adds )
 
                 elseif sw( "^(%d+)[/\\%s,-]?%s*" )
-                    x, c = tonumber( sw[ 1 ] ), len( sw[ 1 ] )
+                    x, c = tonumber( sw[ 1 ], 10 ), len( sw[ 1 ] )
                     if ( x >= 70 ) or ( month and day and not year ) or ( c > 3 )
                         sety( x + ( ( x >= 100 or c > 3 ) and 0 or x < CENTURYFLIP and 2000 or 1900 ) )
                     else
@@ -994,7 +994,7 @@ do
         if arg1
             if month
                 year, month, day = truncString( arg1 ), getmontharg( month ), truncString( day )
-                hour, min, sec, ms = tonumber( hour or 0 ), tonumber( min or 0 ), tonumber( sec or 0 ), tonumber( ms or 0 )
+                hour, min, sec, ms = tonumber( hour or 0, 10 ), tonumber( min or 0, 10 ), tonumber( sec or 0, 10 ), tonumber( ms or 0, 10 )
                 if year and month and day and hour and min and sec and ms
                     @__day_number = makedaynum( year, month, day )
                     @__day_fraction = makedayfrc( hour, min, sec, ms * MILLISECONDS )
@@ -1028,7 +1028,7 @@ do
 
             if argType == "table"
                 year, month, day = truncString( arg1.year ), getmontharg( arg1.month ), truncString( arg1.day )
-                hour, min, sec, ms = tonumber( arg1.hour ), tonumber( arg1.min ), tonumber( arg1.sec ), tonumber( arg1.ms )
+                hour, min, sec, ms = tonumber( arg1.hour, 10 ), tonumber( arg1.min, 10 ), tonumber( arg1.sec, 10 ), tonumber( arg1.ms, 10 )
 
                 -- atleast there is time or complete date
                 if ( year or month or day ) and not ( year and month and day )
@@ -1050,7 +1050,7 @@ do
 static_methods = {}
 
 static_methods.Time = ( hour, min, sec, ms ) ->
-    hour, min, sec, ms = tonumber( hour or 0 ), tonumber( min or 0 ), tonumber( sec or 0 ), tonumber( ms or 0 )
+    hour, min, sec, ms = tonumber( hour or 0, 10 ), tonumber( min or 0, 10 ), tonumber( sec or 0, 10 ), tonumber( ms or 0, 10 )
     if hour and min and sec and ms
         return date_new( DAYNUM_DEF, makedayfrc( hour, min, sec, ms * MILLISECONDS ) )
 

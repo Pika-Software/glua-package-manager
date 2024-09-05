@@ -57,7 +57,7 @@ export request = async ( method, path, headers, body, cache ) ->
     result = await HTTP( { url: path, :method, :headers, :body, etag: cache ~= false, cache: cache ~= false } )
 
     if ( result.status == 429 or result.status == 403 ) and headers["x-ratelimit-remaining"] == "0"
-        reset = tonumber( headers["x-ratelimit-reset"] )
+        reset = tonumber( headers["x-ratelimit-reset"], 10 )
         if reset
             rateLimitReset = reset
 
@@ -104,6 +104,6 @@ export fetchZip = async ( owner, repo, ref ) ->
     result = await request( "GET", "/repos/#{owner}/#{repo}/zipball/#{ref}" )
     if result.status != 200
         error WebClientError "Failed to fetch zipball (#{owner}/#{repo}/#{ref}) from Github API (#{result.status})"
-    
+
     return result.body
-    
+

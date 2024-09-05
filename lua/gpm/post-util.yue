@@ -757,7 +757,7 @@ do
         unless value2
             return 1
 
-        number, number2 = tonumber( value ), tonumber( value2 )
+        number, number2 = tonumber( value, 10 ), tonumber( value2, 10 )
         if number and number2
             return compare( number, number2 )
 
@@ -1136,17 +1136,17 @@ do
                 return versionClass( @major, @minor, @patch + 1 )
 
             toNumber: =>
-                major = tonumber( @major )
+                major = tonumber( @major, 10 )
                 if major > 0x3ff
                     error "major version is too large (max 1023)", 2
                     return nil
 
-                minor = tonumber( @minor )
+                minor = tonumber( @minor, 10 )
                 if minor > 0x7ff
                     error "minor version is too large (max 2047)", 2
                     return nil
 
-                patch = tonumber( @patch )
+                patch = tonumber( @patch, 10 )
                 if patch > 0x7ff
                     error "patch version is too large (max 2047)", 2
                     return nil

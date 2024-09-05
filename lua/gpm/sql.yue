@@ -124,7 +124,7 @@ if SERVER
             pkg.versions = sql.query( "select version, metadata from 'gpm.package_versions' where packageId=?", pkg.id )
 
         return packages
-    
+
     repositories.updateRepository = ( repository, packages ) ->
         argument( packages, 2, "table" )
 
@@ -152,7 +152,7 @@ if SERVER
             -- remove old packages
             for name, id in pairs( oldPackages )
                 sql.query( "delete from 'gpm.package_versions' where packageId=?; delete from 'gpm.packages' where id=?", id, id )
-            
+
             return
 
 
@@ -160,7 +160,7 @@ if SERVER
 do
 
     files = sql.files = {}
-    
+
     files.save = ( path, size, time, hash ) ->
         argument( path, 1, "string" )
         argument( size, 2, "number" )
@@ -169,12 +169,12 @@ do
 
         sql.query( "insert or replace into 'gpm.files' (path, size, time, hash) values (?, ?, ?, ?)", path, size, time, hash )
         return nil
-    
+
     files.get = ( path ) ->
         argument( path, 1, "string" )
         if result := sql.queryOne( "select * from 'gpm.files' where path=?", path )
-            result.size = tonumber( result.size ) or -1
-            result.time = tonumber( result.time )
+            result.size = tonumber( result.size, 10 ) or -1
+            result.time = tonumber( result.time, 10 )
             return result
 
 

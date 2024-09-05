@@ -321,13 +321,13 @@ parsetimestamp = ( line ) ->
     zc = sub( line, p3 + 1, p3 + 1 )
     _, p4, zs, z = find( line, '^ ?([%+%-])(%d+)', p3 + 1 )
     if p4
-        z = tonumber( z )
+        z = tonumber( z, 10 )
 
         _, p5, zi = find( line, '^:(%d+)', p4 + 1 )
         if p5
-            z = z + tonumber( zi ) / 60
+            z = z + tonumber( zi, 10 ) / 60
 
-        z = zs == '-' and -tonumber( z ) or tonumber( z )
+        z = zs == '-' and -tonumber( z, 10 ) or tonumber( z, 10 )
 
     elseif zc == 'Z'
         p4 = p3 + 1
@@ -406,10 +406,10 @@ parsescalar = ( line, lines, indent ) ->
         return nan
 
     if find( line, '^[%+%-]?[0-9]+$', 1, false ) or find( line, '^[%+%-]?[0-9]+%.$', 1, false )
-        return tonumber( line )
+        return tonumber( line, 10 )
 
     if find( line, '^[%+%-]?[0-9]+%.[0-9]+$', 1, false )
-        return tonumber( line )
+        return tonumber( line, 10 )
 
     return str or line
 

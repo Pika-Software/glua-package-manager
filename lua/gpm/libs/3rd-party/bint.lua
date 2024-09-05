@@ -147,7 +147,7 @@ function environment.util.Bint( bits, wordbits )
 
     -- Convert a value to a lua integer without losing precision.
     local function tointeger( x )
-        x = tonumber( x )
+        x = tonumber( x, 10 )
 
         local ty = math_type( x )
         if ty == 'float' then
@@ -937,7 +937,7 @@ function environment.util.Bint( bits, wordbits )
             return bint_new( x )
         end
 
-        return bint_new( math_ceil( tonumber( x ) ) )
+        return bint_new( math_ceil( tonumber( x, 10 ) ) )
     end
 
     --- Wrap around bits of an integer (discarding left bits) considering bints.
