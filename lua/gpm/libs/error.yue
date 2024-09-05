@@ -63,7 +63,7 @@ popCallStack = ->
 -- Should be used with captureStack
 appendStack = ( stack ) ->
     previous = _callStack[ _callStack.n ]
-    pushCallStack({ stack, previous })
+    pushCallStack( { stack, previous } )
 
 mergeStack = ( stack ) ->
     pos = #stack
@@ -73,10 +73,10 @@ mergeStack = ( stack ) ->
         for info in *currentCallStack[ 1 ]
             pos += 1
             stack[ pos ] = info
-        
+
         -- get next call stack
         currentCallStack = currentCallStack[ 2 ]
-    
+
     return stack
 
 errorClass = environment.class(
@@ -88,7 +88,7 @@ errorClass = environment.class(
             @stack = stack = captureStack( stackPos or 3 )
             mergeStack( stack )
 
-            if first := stack[1]
+            if first := stack[ 1 ]
                 @fileName or= first.short_src
                 @lineNumber or= first.currentline
 

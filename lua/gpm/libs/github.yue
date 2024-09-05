@@ -1,8 +1,7 @@
 -- Github API library
 _G = _G
-import tonumber, tostring, SysTime, error from _G
 import environment from _G.gpm
-
+import tonumber, tostring, SysTime, error from _G
 import HTTP, async, await, WebClientError from environment
 import Base64Decode, JSONToTable from environment.util
 import upper, gsub, IsURL from environment.string
@@ -11,24 +10,23 @@ import time from environment.os
 
 local api_token
 if SERVER
-    api_token = CreateConVar( "gpm_github_token", "", { FCVAR_ARCHIVE, FCVAR_PROTECTED, 16 --[[FCVAR_HIDDEN]] }, "https://github.com/settings/tokens" )
+    convar = _G.CreateConVar( "gpm_github_token", "", { _G.FCVAR_ARCHIVE, _G.FCVAR_PROTECTED, 16 --[[FCVAR_HIDDEN]] }, "https://github.com/settings/tokens" )
+    environment.cvars.AddChangeCallback( convar\GetName!, ( ( _, __, new ) -> api_token = new ), "GLua Package Manager::Github API" )
+    api_token = convar\GetString!
 else
-    api_token = { GetString: -> ""}
+    api_token = ""
 
 -- https://docs.github.com/en/rest/overview/resources-in-the-rest-api#rate-limiting
 mutationNextTime = 0
 rateLimitReset = 0
 
 export request = async ( method, path, headers, body, cache ) ->
-    method = upper( method )
     unless IsURL( path )
         path = "https://api.github.com" .. path
 
     headers or= {}
-    unless headers["Authorization"]
-        token = api_token\GetString!
-        if token ~= ""
-            headers["Authorization"] = "Bearer " .. token
+    if not headers["Authorization"] and api_token ~= ""
+        headers["Authorization"] = "Bearer " .. api_token
 
     unless headers["Accept"]
         headers["Accept"] = "application/vnd.github+json"
@@ -43,6 +41,8 @@ export request = async ( method, path, headers, body, cache ) ->
             await Delay( diff )
         else
             error WebClientError "Github API rate limit exceeded (#{path})"
+
+    method = upper( method )
 
     -- Rate limit mutative requests
     if method == "POST" or method == "PATCH" or method == "PUT" or method == "DELETE"
@@ -102,8 +102,7 @@ export getBlob = async ( owner, repo, file_sha ) ->
 
 export fetchZip = async ( owner, repo, ref ) ->
     result = await request( "GET", "/repos/#{owner}/#{repo}/zipball/#{ref}" )
-    if result.status != 200
+    if result.status ~= 200
         error WebClientError "Failed to fetch zipball (#{owner}/#{repo}/#{ref}) from Github API (#{result.status})"
 
     return result.body
-
