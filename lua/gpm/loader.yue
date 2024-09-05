@@ -207,6 +207,7 @@ do
     import STATE_REJECTED from Promise
     import rawset, tobool from _G
     import AsyncCompile from file
+    import AddCSLuaFile from gpm
     import Merge from table
     import Logger from util
 
@@ -236,6 +237,9 @@ do
             if IsEmpty( info )
                 error PackageError "file '#{filePath}' does not contain valid package info (empty or cannot be parsed)"
                 return nil
+            
+            if gamePath == file.LuaPath
+                AddCSLuaFile( filePath )
 
             return Package( URL( AbsoluteGamePath( filePath, gamePath ), "file:///" ), info )
 
@@ -1017,7 +1021,7 @@ do
 do
 
     import display from environment.Error
-    import Logger, repositories from gpm
+    import Logger, repositories, AddCSLuaFile from gpm
     import allSettled from Promise
 
     loader.InstallDependency = async ( pkg, name, target, force ) ->
@@ -1071,6 +1075,9 @@ do
 
         pkg.__dependencies[name] = info.package
 
+        -- resolve dependencies of the dependency
+        await loader.ResolveDependencies( info.package )        
+        return
 
     loader.ResolveDependencies = async ( pkg ) ->
         if not pkg.dependencies
@@ -1080,16 +1087,34 @@ do
         for name, target in pairs( pkg.dependencies )
             tasks[] = loader.InstallDependency( pkg, name, target )
 
-        return Promise.all( tasks )
+        await Promise.all( tasks )
+
+        -- hacky way to determine if all packages were installed
+        for ref, task in pairs( loader.Dependencies )
+            if task.state == task.STATE_PENDING
+                return
+        
+        -- alright, it seems that all dependencies were installed
+        -- let's restart server if there is any humans on the servers
+        if #player.GetHumans() > 0
+            RunConsoleCommand( "changelevel", game.GetMap() )
 
     loader.InitializePackage = async ( pkg ) ->
-        await loader.ResolveDependencies( pkg )
+        if SERVER
+            -- we are resolving dependencies only on server
+            await loader.ResolveDependencies( pkg )
+
+            -- AddCSLuaFile in pkg.send
+            if istable( pkg.send )
+                for fileName in *pkg.send
+                    fileURL = URL( fileName, pkg.url )
+                    AddCSLuaFile( fileURL.pathname )
+
         unless pkg.autorun
             return
 
         Logger\Info( "Executing '%s@%s' package...", pkg.name, pkg.version )
 
-        -- TODO: addcsluafiles that are in pkg.send table
         await loader.AsyncImport( pkg.name, ESM.resolve, nil, pkg.url, pkg.env )
         return
 

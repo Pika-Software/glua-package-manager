@@ -95,6 +95,7 @@ do
         if ( len( str ) + titleLength ) > 950
             str = sub( str, 1, 950 - titleLength ) .. "..."
 
+        -- TODO: for ukdev - enqueue only spam messages (i.e. if there is too many messages per second)
         queue\enqueue( { color, level, @title_color, title, @text_color, str } )
         return nil
 
