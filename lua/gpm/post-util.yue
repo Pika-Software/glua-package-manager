@@ -281,7 +281,7 @@ do
         return position
 
     Int64 = environment.Int64 = util.Bint( 64 )
-    import ToBint, FromBigEndian, FromLittleEndian, ToBigEndian, ToLittleEndian, ToUnsigned, IsUnsigned from Int64
+    import IsBint, IsUnsigned, ToBint, FromBigEndian, FromLittleEndian, ToBigEndian, ToLittleEndian, ToUnsigned, ToLuaNumber from Int64
 
     util.ByteStream = environment.class(
         "ByteStream",
@@ -460,19 +460,52 @@ do
                     return nil, "eof"
 
                 if setEndianness( isBigEndian )
+                    if byte( binary, 1 ) == 0 and byte( binary, 2 ) == 0
+                        return readUInt( nil, sub( binary, 3 ), 6 )
+
                     return ToUnsigned( FromBigEndian( binary ) )
+
+                if byte( binary, 7 ) == 0 and byte( binary, 8 ) == 0
+                    return readUInt( nil, binary, 6 )
 
                 return ToUnsigned( FromLittleEndian( binary ) )
 
             WriteUInt64: ( number, isBigEndian ) =>
-                number = ToBint( number )
-                unless IsUnsigned( number )
-                    ToUnsigned( number )
+                local isBint
+                if isstring( number )
+                    number = ToBint( number )
+                    unless IsUnsigned( number )
+                        ToUnsigned( number )
+
+                    isBint = true
+                elseif IsBint( number )
+                    unless IsUnsigned( number )
+                        ToUnsigned( number )
+
+                    isBint = true
+                else
+                    isBint = false
+
+                if isBint or number > 0xFFFFFFFFFFFF
+                    if setEndianness( isBigEndian )
+                        return @Write( ToBigEndian( number ) )
+
+                    return @Write( ToLittleEndian( number ) )
 
                 if setEndianness( isBigEndian )
-                    return @Write( ToBigEndian( number ) )
+                    @Write( "\0\0" )
 
-                return @Write( ToLittleEndian( number ) )
+                    if isBint
+                        return @Write( writeUInt( nil, ToLuaNumber( number, true ), 6 ) )
+
+                    return @Write( writeUInt( nil, number, 6 ) )
+
+                if isBint
+                    @Write( writeUInt( nil, ToLuaNumber( number, true ), 6 ) )
+                else
+                    @Write( writeUInt( nil, number, 6 ) )
+
+                return @Write( "\0\0" )
 
             -- Int
             ReadInt: ( bytes, isBigEndian ) =>
@@ -507,15 +540,44 @@ do
                     return nil, "eof"
 
                 if setEndianness( isBigEndian )
+                    if byte( binary, 1 ) == 0 and byte( binary, 2 ) == 0
+                        return readInt( nil, sub( binary, 3 ), 6 )
+
                     return FromBigEndian( binary )
+
+                if byte( binary, 7 ) == 0 and byte( binary, 8 ) == 0
+                    return readInt( nil, binary, 6 )
 
                 return FromLittleEndian( binary )
 
             WriteInt64: ( number, isBigEndian ) =>
-                if setEndianness( isBigEndian )
-                    return @Write( ToBigEndian( number ) )
+                local isBint
+                if isstring( number )
+                    number = ToBint( number )
+                    isBint = true
+                else
+                    isBint = IsBint( number )
 
-                return @Write( ToLittleEndian( number ) )
+                if isBint or number > 0xFFFFFFFFFFFF
+                    if setEndianness( isBigEndian )
+                        return @Write( ToBigEndian( number ) )
+
+                    return @Write( ToLittleEndian( number ) )
+
+                if setEndianness( isBigEndian )
+                    @Write( "\0\0" )
+
+                    if isBint
+                        return @Write( writeInt( nil, ToLuaNumber( number, true ), 6 ) )
+
+                    return @Write( writeInt( nil, number, 6 ) )
+
+                if isBint
+                    @Write( writeInt( nil, ToLuaNumber( number, true ), 6 ) )
+                else
+                    @Write( writeInt( nil, number, 6 ) )
+
+                return @Write( "\0\0" )
 
             -- Float
             ReadFloat: ( isBigEndian ) =>

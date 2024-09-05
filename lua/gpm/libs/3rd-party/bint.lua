@@ -511,7 +511,7 @@ function environment.util.Bint( bits, wordbits )
     local bint_tonumber = function( x )
         if getmetatable( x ) == internal then
             if x <= BINT_MATHMAXINTEGER and x >= BINT_MATHMININTEGER then
-                return x:ToInteger()
+                return toLuaNumber( x, false )
             end
 
             return tonumber( tostring( x ), 10 )
@@ -552,7 +552,7 @@ function environment.util.Bint( bits, wordbits )
         local isxneg = x:IsNegative()
         if ( ( base == 10 and not unsigned ) or ( base == 16 and unsigned and not isxneg ) ) and ( x <= BINT_MATHMAXINTEGER and x >= BINT_MATHMININTEGER ) then
             -- integer is small, use tostring or string.format (faster)
-            local n = x:ToInteger()
+            local n = toLuaNumber( x, false )
             if base == 10 then
                 return tostring( n )
             elseif unsigned then
