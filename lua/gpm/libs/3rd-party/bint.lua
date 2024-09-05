@@ -463,37 +463,16 @@ function environment.util.Bint( bits, wordbits )
 
     static.Parse = bint_parse
 
-    --- Convert a bint to an unsigned integer.
-    -- Note that large unsigned integers may be represented as negatives in lua integers.
-    -- Note that lua cannot represent values larger than 64 bits,
-    -- in that case integer values wrap around.
-    -- @param x A bint or a number to be converted into an unsigned integer.
-    -- @return An integer or nil in case the input cannot be represented by an integer.
-    -- @see internal.ToInteger
-    function internal.ToUInteger( x )
-        if getmetatable( x ) == internal then
-            local n = 0
-            for i = 1, BINT_SIZE do
-                n = bor( n, lshift( x[ i ], BINT_WORDBITS * ( i - 1 ) ) )
-            end
-
-            return n
-        end
-
-        return tointeger( x )
-    end
-
     --- Convert a bint to a signed integer.
     -- It works by taking absolute values then applying the sign bit in case needed.
     -- Note that lua cannot represent values larger than 64 bits,
     -- in that case integer values wrap around.
     -- @param x A bint or value to be converted into an unsigned integer.
     -- @return An integer or nil in case the input cannot be represented by an integer.
-    -- @see internal.ToUInteger
-    local bint_tointeger = function( x )
+    local toLuaNumber = function( x, uintOnly )
         if getmetatable( x ) == internal then
-            local neg = x:IsNegative()
-            if neg then
+            local isNegative = uintOnly ~= true and x:IsNegative()
+            if isNegative then
                 x = -x
             end
 
@@ -502,7 +481,7 @@ function environment.util.Bint( bits, wordbits )
                 n = bor( n, lshift( x[ i ], BINT_WORDBITS * ( i - 1 ) ) )
             end
 
-            if neg then
+            if isNegative then
                 n = -n
             end
 
@@ -512,10 +491,10 @@ function environment.util.Bint( bits, wordbits )
         return tointeger( x )
     end
 
-    internal.ToInteger = bint_tointeger
+    internal.ToLuaNumber = toLuaNumber
 
     local function bint_assert_tointeger( x )
-        x = bint_tointeger( x )
+        x = toLuaNumber( x, false )
         if not x then
             error( 'value has no integer representation', 2 )
         end
