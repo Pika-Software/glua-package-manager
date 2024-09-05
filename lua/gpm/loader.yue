@@ -1087,7 +1087,17 @@ do
         for name, target in pairs( pkg.dependencies )
             tasks[] = loader.InstallDependency( pkg, name, target )
 
-        return Promise.all( tasks )
+        await Promise.all( tasks )
+
+        -- hacky way to determine if all packages were installed
+        for ref, task in pairs( loader.Dependencies )
+            if task.state == task.STATE_PENDING
+                return
+        
+        -- alright, it seems that all dependencies were installed
+        -- let's restart server if there is any humans on the servers
+        if #player.GetHumans() > 0
+            RunConsoleCommand( "changelevel", game.GetMap() )
 
     loader.InitializePackage = async ( pkg ) ->
         if SERVER
@@ -1142,7 +1152,3 @@ do
         for result in *tasks
             if result.status == "rejected"
                 display( result.reason )
-
-        if SERVER
-            -- find players that joined before packages were loaded, and force them to rejoin
-            -- TODO:
