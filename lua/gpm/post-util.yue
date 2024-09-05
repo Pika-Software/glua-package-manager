@@ -1,9 +1,10 @@
 _G = _G
-import isnumber, gpm, SERVER from _G
+import gpm, SERVER from _G
 import environment, Logger from gpm
-import getmetatable, setmetatable, istable, pcall from _G
-import math, string, table, os, util, argument, isfunction, isstring, error from environment
+import istable, pcall, require from _G
+import math, string, table, os, util, argument, isfunction, isstring, isnumber, error from environment
 import byte, sub, gsub, len, find from string
+import IsBinaryModuleInstalled from util
 import concat from table
 import fdiv from math
 import time from os
@@ -11,9 +12,9 @@ import time from os
 do
 
     import CodeCompileError from environment
-    local installed
 
-    if util.IsBinaryModuleInstalled( "moonloader" )
+    installed, filePath = IsBinaryModuleInstalled( "moonloader" )
+    if installed
         ok, msg = pcall( require, "moonloader" )
         if ok and istable( moonloader )
             Logger\Loaded( "gm_moonloader v%s", moonloader._VERSION )
@@ -21,8 +22,6 @@ do
         else
             Logger\Error( "gm_moonloader startup error: %s", msg or "unknown error" )
             installed = false
-    else
-        installed = false
 
     yueFail = ->
         error CodeCompileError "Attempt to compile Yuescript failed, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader."
@@ -41,7 +40,7 @@ do
                 ToLua: yueFail
             }
 
-            Logger\Warn( "Yuescript support is missing, yue package execution is unavailable!" )
+            Logger\Warn( "Yuescript support is missing, yuescript code compilation is unavailable." )
 
     else
 
@@ -58,15 +57,29 @@ do
             ToLua: yueFail
         }
 
-        Logger\Warn( "gm_moonloader is missing, support for moon and yue scripts is unavailable!" )
+        Logger\Warn( "Binary module '" .. filePath .. "' is missing, support for moon and yue scripts is unavailable." )
+
+-- https://github.com/WilliamVenner/gmsv_workshop
+if SERVER and not ( istable( steamworks ) and isfunction( steamworks.DownloadUGC ) )
+    installed, filePath = IsBinaryModuleInstalled( "workshop" )
+    if installed
+        unless pcall( require, "workshop" )
+            Logger\Error( "Binary module '" .. filePath .. "' was corrupted!" )
+    else
+        Logger\Warn( "Binary module '" .. filePath .. "' is missing, Steam workshop downloads is unavailable." )
 
 do
 
-
-    -- https://github.com/willox/gmbc
-    byteCodeSupported = false
-    if util.IsBinaryModuleInstalled( "gmbc" )
-        byteCodeSupported = pcall( require, "gmbc" )
+    local byteCodeSupported
+    if SERVER
+        -- https://github.com/willox/gmbc
+        byteCodeSupported, filePath = IsBinaryModuleInstalled( "gmbc" )
+        if byteCodeSupported
+            byteCodeSupported = pcall( require, "gmbc" )
+        else
+            Logger\Warn( "Binary module '" .. filePath .. "' is missing, bytecode compilation is unavailable." )
+    else
+        byteCodeSupported = false
 
     import CompileString, gmbc_load_bytecode, setfenv from _G
     import yue, moon from environment

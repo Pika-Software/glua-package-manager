@@ -1,11 +1,13 @@
 _G = _G
-import gpm from _G
+import CLIENT, SERVER, gpm, pcall from _G
 import environment from gpm
-import debug, string, path, table, file, util, pairs, isurl, isstring, argument, URL, ModuleError, error, pcall, PackageError, Promise from environment
+
+import debug, string, path, file, util, pairs, isurl, isstring, argument, URL, ModuleError, error, PackageError, Promise from environment
 import NormalizeGamePath, AbsoluteGamePath, Find from file
+import concat, IsEmpty, Merge from environment.table
 import stripExtension, getDirectory from path
-import concat, IsEmpty from table
 import await, async from Promise
+newClass = environment.class
 import getfpath from debug
 import Version from util
 
@@ -15,11 +17,14 @@ _G.hook.Add "ShutDown", "GLua Package Manager::VFS", ->
     file.Delete( "/data/gpm/vfs" )
     return nil
 
+local addcsluafile
+
 if SERVER
 
     import getCurrentFile, getCurrentDirectory, getFile from path
     import AsyncRead, Exists, LuaGamePaths from file
     import GMA from environment.addon
+    import IsBytecode from string
     import AddCSLuaFile from _G
 
     addFile = async ( filePath, gamePath, mountTable ) ->
@@ -71,7 +76,7 @@ if SERVER
 
         return nil
 
-    environment.AddCSLuaFile = ( filePath = "", gamePath, skipNormalize ) ->
+    addcsluafile = ( filePath = "", gamePath, skipNormalize ) ->
         if filePath == "" or getFile( filePath ) == "."
             fenv = getfenv( 2 )
             if m := fenv and fenv.__module
@@ -93,7 +98,9 @@ if SERVER
 
 else
 
-    environment.AddCSLuaFile = environment.debug.fempty
+    addcsluafile = environment.debug.fempty
+
+environment.AddCSLuaFile = addcsluafile
 
 :loader = gpm
 unless istable( loader )
@@ -102,24 +109,31 @@ unless istable( loader )
 -- Modules and Packages are tables with format: [url] = Module/Package
 packages = loader.Packages = {}
 modules = loader.Modules = {}
-loader.Dependencies = {} -- this one has [name@version or url] = Promise
+
+getSource = ( protocol ) ->
+    if isstring( protocol ) and IsURL( protocol )
+        protocol = URL( protocol ).scheme
+    elseif isurl( protocol )
+        protocol = protocol.scheme
+
+    return sources[ protocol ]
 
 -- Resolves specifier as it is package specifier
 -- See https://nodejs.org/api/esm.html#resolution-algorithm-specification PACKAGE_RESOLVE
-import sub, byte, find, match, gsub, format, StartsWith, IsURL from string
-import IsFile from file
+import find, match, gsub, format, StartsWith, IsURL from string
+import AsyncCompile, IsFile from file
 
-local Module, Package
+local moduleClass, packageClass, packageRead
 do
 
-    import getmetatable, setmetatable from _G
+    import setmetatable from _G
 
     do
 
         import AsyncWrite, Time from file
         import PathFromURL from string
 
-        startTime = environment.os.time! - ( gpm.StartTime or 0 )
+        -- startTime = environment.os.time! - ( gpm.StartTime or 0 )
 
         -- cache files have different paths for client and server
         getCachePath = ( url ) ->
@@ -128,87 +142,88 @@ do
 
             return "/data/gpm/vfs/" .. stripExtension( PathFromURL( url ) ) .. ".txt"
 
-        class Module
-            __tostring: =>
-                return format( "Module: %p [%s]", @, @name )
+        moduleClass = newClass(
+            "Module",
+            {
+                __tostring: =>
+                    return format( "Module: %p [%s]", @, @name )
 
-            new: ( @url, @env = _G ) =>
-                unless isurl( url )
-                    error ModuleError "url is " .. type( url ) .. ", expected URL"
+                new: ( @url, @env = _G ) =>
+                    argument( url, 1, "URL" )
 
-                @name = "unknown"
+                    :pathname = url
+                    unless pathname
+                        return nil
 
-                @file = url.pathname
-                @directory = getDirectory( url.pathname, false )
-                @env = setmetatable({ __module: @, __filename: @file, __dirname: @directory }, { __index: @env, __newindex: @env })
+                    @name = "unknown"
+                    @file = pathname
+                    @directory = getDirectory( pathname, false )
+                    @env = setmetatable( { __module: @, __filename: @file, __dirname: @directory }, { __index: @env, __newindex: @env } )
 
-                modules[ url.href ] = @
-                return nil
+                    modules[ url.href ] = @
+                    return nil
 
-            load: async =>
-                if @func
-                    return @func
+                load: async =>
+                    if @func
+                        return @func
 
-                config = {}
+                    config = {}
 
-                if @url.scheme == "file"
-                    filePath, gamePath = NormalizeGamePath( @url.pathname )
-                    if not IsFile( filePath, gamePath, true )
-                        error ModuleError "file '#{@url}' does not exist"
+                    if @url.scheme == "file"
+                        filePath, gamePath = NormalizeGamePath( @url.pathname )
+                        unless IsFile( filePath, gamePath, true )
+                            error ModuleError "file '#{@url}' does not exist"
 
-                    compileResult = await file.AsyncCompile( filePath, @env, config, gamePath, true )
-                    @func = func = compileResult.func
-                    @name = getfpath( func ) or "unknown"
-                    return func
+                        compileResult = await AsyncCompile( filePath, @env, config, gamePath, true )
+                        @func = func = compileResult.func
+                        @name = getfpath( func ) or "unknown"
+                        return func
 
-                error ModuleError "unsupported scheme '" .. @url.scheme .. "' ('" .. @url.href .. "')"
-                return nil
+                    error ModuleError "unsupported scheme '" .. @url.scheme .. "' ('" .. @url.href .. "')"
+                    return nil
 
-            run: ( ... ) =>
-                if not @func
-                    error ModuleError "module #{@url} was not loaded"
+                run: ( ... ) =>
+                    if not @func
+                        error ModuleError "module #{@url} was not loaded"
 
-                return async( @func )( ... )
+                    return async( @func )( ... )
+            },
+            {
+                getAll: ->
+                    return modules
 
-            @getAll: -> modules
+                get: ( url ) ->
+                    return modules[ url.href ]
 
-            @get: ( url ) -> modules[ url.href ]
+                -- @getCachePath: getCachePath
 
-            -- @getCachePath: getCachePath
+                -- @cache: async ( url, content ) ->
+                --     filePath = getCachePath( url )
+                --     if CLIENT
+                --         return filePath
 
-            -- @cache: async ( url, content ) ->
-            --     filePath = getCachePath( url )
-            --     if CLIENT
-            --         return filePath
+                --     if IsFile( filePath ) and Time( filePath ) >= startTime
+                --         return filePath
 
-            --     if IsFile( filePath ) and Time( filePath ) >= startTime
-            --         return filePath
+                --     return AsyncWrite( filePath, content )
 
-            --     return AsyncWrite( filePath, content )
+                run: async ( url, env ) ->
+                    argument( url, 1, "URL" )
 
-            @run: async ( url, env ) ->
-                unless isurl( url )
-                    error ModuleError "url is " .. type( url ) .. ", expected URL"
+                    m = modules[ url.href ]
+                    unless m
+                        m = moduleClass( url, env )
+                        await m\load!
 
-                m = modules[ url.href ]
-                unless m
-                    m = Module( url, env )
-                    await m\load!
+                    return m\run!
+            }
+        )
 
-                return m\run!
-
-        loader.Module = Module
-
-        environment.ismodule = ( any ) ->
-            metatable = getmetatable( any )
-            return metatable and metatable.__class == Module
+        loader.Module = moduleClass
 
     import getFileName, getExtension from path
     import STATE_REJECTED from Promise
     import rawset, tobool from _G
-    import AsyncCompile from file
-    import AddCSLuaFile from gpm
-    import Merge from table
     import Logger from util
 
     default = environment.Color( 50, 100, 200 )\DoCorrection!
@@ -225,7 +240,7 @@ do
     parse = async ( filePath, gamePath, config ) ->
         compileResult = await AsyncCompile( filePath, {}, config, gamePath, true )
         -- await Module.cache( "file://" .. compileResult.path, compileResult.content )
-        func = compileResult.func
+        :func = compileResult
 
         info = {}
         setfenv( func, info )
@@ -237,18 +252,71 @@ do
             if IsEmpty( info )
                 error PackageError "file '#{filePath}' does not contain valid package info (empty or cannot be parsed)"
                 return nil
-            
-            if gamePath == file.LuaPath
-                AddCSLuaFile( filePath )
 
-            return Package( URL( AbsoluteGamePath( filePath, gamePath ), "file:///" ), info )
+            if gamePath == file.LuaPath
+                addcsluafile( filePath )
+
+            return packageClass( URL( AbsoluteGamePath( filePath, gamePath ), "file:///" ), info )
 
         error PackageError "package info '" .. filePath .. "' execution error: " .. result
         return nil
 
     emptyTable = {}
 
-    environment.Package = class Package
+    packageRead = async ( url ) ->
+        if isstring( url )
+            url = URL( url )
+
+        unless isurl( url )
+            error PackageError "invalid url '" .. url.href .. "'"
+
+        if url.scheme ~= "file"
+            -- error PackageError "unsupported scheme '" .. url.scheme .. "' ('" .. url.href .. "')"
+            return nil
+
+        unless istable( url.path )
+            -- error PackageError "invalid path '" .. url.pathname .. "' ('" .. url.href .. "')"
+            return nil
+
+        cached = packages[ url.href ]
+        if cached
+            if cached.state ~= STATE_REJECTED
+                return cached
+
+            -- clear cache if parsing failed
+            packages[ url.href ] = nil
+
+        filePath, gamePath = NormalizeGamePath( url.pathname )
+        fileDir = getDirectory( filePath, true )
+
+        -- if not package.* file was given in url, try to find it smartly
+        if getFileName( filePath, false ) ~= "package"
+            files = Find( fileDir .. "/package.*", gamePath, true )
+            if #files == 1
+                filePath = fileDir .. files[ 1 ]
+
+            elseif #files > 1
+                -- Smartly decide which file to use
+                values = {} -- [ext] = filePath
+                for fileName in *files
+                    values[ getExtension( fileName, false ) ] = fileName
+
+                filePath = fileDir .. values.yue or values.moon or values.lua or values[ 1 ]
+
+        unless IsFile( filePath, gamePath, true )
+            -- error PackageError "file '" .. filePath .. "' does not exist for packageURL '" .. url.href .. "'"
+            return nil
+
+        config = {}
+        for key, value in url.searchParams\iterator!
+            config[ key ] = value
+
+        -- also cache result so next calls will return current package
+        promise = parse( filePath, gamePath, config )
+        packages[ url.href ] = promise
+        return promise
+
+    packageClass = newClass( "Package", {
         __tostring: =>
             return format( "Package: %p [%s@%s]", @, @name, @version )
 
@@ -357,344 +425,312 @@ do
 
             -- package environment
             @env = setmetatable( { __package: @, Logger: packageLogger }, environmentMetatable )
-
+    },
+    {
         -- directly reads package info from given filePath and creates Package
         -- do not use this method directly, use Package.read instead
-        @parse: parse
+        parse: parse
 
         -- Finds a package info in given url.
         -- If package.* file was not given in path, tries to find it.
         -- Also caches the package by URL.
-        @read: async ( url ) ->
-            if isstring( url )
-                url = URL( url )
+        read: packageRead
+    } )
 
-            unless isurl( url )
-                error PackageError "invalid url '" .. url.href .. "'"
-
-            if url.scheme ~= "file"
-                -- error PackageError "unsupported scheme '" .. url.scheme .. "' ('" .. url.href .. "')"
-                return nil
-
-            unless istable( url.path )
-                -- error PackageError "invalid path '" .. url.pathname .. "' ('" .. url.href .. "')"
-                return nil
-
-            cached = packages[ url.href ]
-            if cached
-                if cached.state ~= STATE_REJECTED
-                    return cached
-
-                -- clear cache if parsing failed
-                packages[ url.href ] = nil
-
-            filePath, gamePath = NormalizeGamePath( url.pathname )
-            fileDir = getDirectory( filePath, true )
-
-            -- if not package.* file was given in url, try to find it smartly
-            if getFileName( filePath, false ) ~= "package"
-                files = Find( fileDir .. "/package.*", gamePath, true )
-                if #files == 1
-                    filePath = fileDir .. files[ 1 ]
-
-                elseif #files > 1
-                    -- Smartly decide which file to use
-                    values = {} -- [ext] = filePath
-                    for fileName in *files
-                        values[ getExtension( fileName, false ) ] = fileName
-
-                    filePath = fileDir .. values.yue or values.moon or values.lua or values[ 1 ]
-
-            unless IsFile( filePath, gamePath, true )
-                -- error PackageError "file '" .. filePath .. "' does not exist for packageURL '" .. url.href .. "'"
-                return nil
-
-            config = {}
-            for key, value in url.searchParams\iterator!
-                config[ key ] = value
-
-            -- also cache result so next calls will return current package
-            promise = parse( filePath, gamePath, config )
-            packages[ url.href ] = promise
-            return promise
-
-    environment.ispackage = ( any ) ->
-        metatable = getmetatable( any )
-        return metatable and metatable.__class == Package
+    environment.Package = packageClass
 
 -- TODO: after this works as specs intended, optimize it and make better!
-local ESM
+local esmClass, esmResolve
 do
 
     import canParse from URL
     import IsDir from file
+    import sub from string
 
-    class ESM
-        DEFAULT_CONDITIONS = {
-            [SERVER and "server" or CLIENT and "client" or MENU_DLL and "menu" or "default"]: true,
-        }
+    DEFAULT_CONDITIONS = {
+        [ SERVER and "server" or CLIENT and "client" or _G.MENU_DLL and "menu" or "default" ]: true,
+    }
 
-        -- Just a shortcut so `ESM.resolve ...` can be used instead of creating a new instance.
-        @resolve: ( ... ) -> ESM!\resolve( ... )
+    local packageResolve
 
-        -- ESM_RESOLVE(specifier, parentURL)
-        resolve: async ( specifier, parentURL ) =>
-            @specifier = specifier
-            @parentURL = parentURL
+    -- PACKAGE_TARGET_RESOLVE(packageURL, target, patternMatch, isImports, conditions)
+    packageTargetResolve = ( packageURL, target, patternMatch, isImports ) =>
+        if isstring( target )
+            unless StartsWith( target, "./" )
+                if isImports == false or StartsWith( target, "/" ) or StartsWith( target, "../" ) or canParse( target )
+                    error PackageError "invalid target '#{target}' for '#{packageURL}'"
+                    return nil
 
-            local resolved
+                if isstring( patternMatch )
+                    return packageResolve( @, gsub( target, "*", patternMatch ), packageURL )
 
-            -- resolve
-            if isurl( specifier ) or canParse( specifier )
-                resolved = URL( specifier )
-            elseif StartsWith( specifier, "/" ) or StartsWith( specifier, "./" ) or StartsWith( specifier, "../" )
-                resolved = URL( specifier, parentURL )
-            elseif StartsWith( specifier, "#" )
-                resolved = packageImportsResolve( @, specifier, parentURL )
-            else
-                -- specifier is now a bare specifier
-                resolved = packageResolve( @, specifier, parentURL )
+                return packageResolve( @, target, packageURL )
 
-            return { :resolved, package: @pjson }
+            -- TODO: If target split on "/" or "\" contains any "", ".", "..", or "node_modules" segments after the first "." segment, case insensitive and including percent encoded variants, throw an Invalid Package Target error.
 
-        -- PACKAGE_RESOLVE(packageSpecifier, parentURL)
-        packageResolve = ( packageSpecifier, parentURL ) =>
-            local packageName
-            if packageSpecifier == ""
-                error PackageError "specifier is an empty string"
-
-            -- If packageSpecifier is a Node.js builtin module name, then
-            -- 1. Return the string "node:" concatenated with packageSpecifier.
-
-            if not StartsWith( packageSpecifier, "@" )
-                packageName = match( packageSpecifier, "(.-)/" ) or packageSpecifier -- Set packageName to the substring of packageSpecifier until the first "/" separator or the end of the string.
-            else
-                packageName = match( packageSpecifier, "(.-/.-)/" ) or packageSpecifier -- Set packageName to the substring of packageSpecifier until the second "/" separator or the end of the string.
-                if not packageName -- If packageSpecifier does not contain a "/" separator, then
-                    error PackageError "invalid specifier '#{packageSpecifier}'"
-
-            if StartsWith( packageSpecifier, "." ) or find( packageSpecifier, "%", 1, true ) or find( packageSpecifier, "\\", 1, true )
-                error PackageError "invalid specifier '#{packageSpecifier}'"
-
-            packageSubpath = "." .. sub( packageSpecifier, #packageName + 1 )
-
-            if selfURL := packageSelfResolve( @, packageName, packageSubpath, parentURL )
-                return selfURL
-
-            local packageURL
-            while not packageURL or packageURL.path[1] ~= "packages" -- While parentURL is not the file system root
-                firstTime = not packageURL
-
-                packageURL = URL( "packages/" .. packageName .. "/", parentURL ) -- Let packageURL be the URL resolution of "node_modules/" concatenated with packageSpecifier, relative to parentURL.
-                parentURL = URL( "..", parentURL ) -- Set parentURL to the parent folder URL of parentURL.
-
-                if packageURL.scheme == "file" and not IsDir( packageURL.pathname ) -- If the folder at packageURL does not exist, then
-                    if result := firstTime and packageDependenciesResolve( @, packageName, packageSubpath )
-                        return result
-
-                    continue
-
-                pjson = @pjson = await Package.read( packageURL )
-                if pjson and pjson.exports
-                    return packageExportsResolve( @, packageURL, packageSubpath, pjson.exports )
-
-                return URL( packageSubpath, packageURL )
-
-            error PackageError "package not found: '#{packageSpecifier}' from '#{@parentURL}'"
-            return
-
-        -- PACKAGE_SELF_RESOLVE(packageName, packageSubpath, parentURL)
-        packageSelfResolve = ( packageName, packageSubpath, parentURL ) =>
-            packageURL = lookupPackageScope( @, parentURL )
-            if not packageURL
-                return
-
-            pjson = @pjson = await Package.read( packageURL )
-            if not pjson or not pjson.exports
-                return
-
-            if pjson.name == packageName
-                return packageExportsResolve( @, packageURL, packageSubpath, pjson.exports )
-
-        packageDependenciesResolve = ( packageName, packageSubpath ) =>
-            -- @pjson must be set by packageSelfResolve
-            pjson = @pjson
-            if not pjson or not istable(pjson.dependencies)
-                return
-
-            target = pjson.dependencies[ packageName ]
-            if isstring( target )
-                return packageDependencyResolve( @, packageName, target, packageSubpath )
-
-        packageDependencyResolve = ( name, target, subpath ) =>
-            if not target
-                error PackageError "invalid dependency target '#{target}' for '#{name}'"
-
-            packageURL = nil
-            if string.IsURL( target ) -- source lookup
-                source = loader.Source.get( target )
-                unless source
-                    error PackageError "source for '#{target}' not found"
-
-                packageURL = source\WorkingDirectory( target ) -- our package must be in the root directory, I hope
-            else -- version lookup
-                -- Retrieving all version of the package
-                _, folders = Find( "gpm/vfs/packages/" .. name .. "/*", file.LuaPath, true ) -- lets hope that package installer will create correct versions of the package
-                version = Version.select( target, folders )
-                unless version
-                    versions_str = concat( folders, ", " )
-                    error PackageError "could not find installed #{name} with version selector #{target} (available versions: [#{versions_str}])"
-
-                packageURL = URL( "file:///lua/gpm/vfs/packages/" .. name .. "/" .. tostring(version) .. "/" )
-                unless IsDir( packageURL.pathname )
-                    error PackageError "#{packagePath} should exists but it does not :? (#{name} with target #{target})"
-
-            pjson = @pjson = await Package.read( packageURL )
-            if pjson and pjson.exports
-                return packageExportsResolve( @, packageURL, subpath, pjson.exports )
-
-            return URL( subpath, packageURL )
-
-        exportsStartsWithDot = ( exports, packageURL ) =>
-            if istable( exports )
-                local state
-                for k in pairs( exports )
-                    statsWithDot = StartsWith( k, "." )
-                    if state == nil
-                        state = statsWithDot
-                    elseif state ~= statsWithDot
-                        error PackageError "'#{packageURL}' exports are invalid"
-                return state
-            -- otherwise exports must be a string
-            return StartsWith( exports, "." )
-
-        -- PACKAGE_EXPORTS_RESOLVE(packageURL, subpath, exports, conditions)
-        packageExportsResolve = ( packageURL, subpath, exports ) =>
-            startsWithDot = exportsStartsWithDot( @, exports, packageURL )
-
-            if subpath == "."
-                local mainExport
-                if isstring( exports ) or not startsWithDot
-                    mainExport = exports
-                elseif istable( exports ) and startsWithDot
-                    mainExport = exports["."]
-
-                if mainExport
-                    if resolved := packageTargetResolve( @, packageURL, mainExport, nil, false )
-                        return resolved
-            elseif istable( exports ) and startsWithDot
-                if resolved := packageImportsExportsResolve( @, subpath, exports, packageURL, false )
-                    return resolved
-
-            error PackageError "no exports found for '#{subpath}' in '#{packageURL}'"
-            return
-
-        -- PACKAGE_IMPORTS_RESOLVE(specifier, parentURL, conditions)
-        packageImportsResolve = ( specifier, parentURL ) =>
-            if specifier == "#" or StartsWith( specifier, "#/" )
-                error PackageError "invalid import specifier '" .. specifier .. "'"
-
-            packageURL = lookupPackageScope( @, parentURL )
-            if packageURL
-                pjson = @pjson = await Package.read( packageURL )
-                if pjson and pjson.imports
-                    if resolved := packageImportsExportsResolve( @, specifier, pjson.imports, packageURL, true )
-                        return resolved
-
-            error PackageError "imports are not defined for '" .. specifier .. "' in #{packageURL or parentURL}"
-            return
-
-        -- PACKAGE_IMPORTS_EXPORTS_RESOLVE(matchKey, matchObj, packageURL, isImports)
-        packageImportsExportsResolve = ( matchKey, matchObj, packageURL, isImports ) =>
-            if matchObj[matchKey] and not find( matchKey, "*", 1, true )
-                target = matchObj[matchKey]
-                return packageTargetResolve( @, packageURL, target, nil, isImports )
-
-            -- TODO: Implement pattern matching
-            error PackageError "pattern matching is not implemented"
-            return
-
-        -- PACKAGE_TARGET_RESOLVE(packageURL, target, patternMatch, isImports, conditions)
-        packageTargetResolve = ( packageURL, target, patternMatch, isImports ) =>
-            if isstring( target )
-                unless StartsWith( target, "./" )
-                    if isImports == false or StartsWith( target, "/" ) or StartsWith( target, "../" ) or canParse( target )
-                        error PackageError "invalid target '#{target}' for '#{packageURL}'"
-                        return nil
-
-                    if isstring( patternMatch )
-                        return packageResolve( @, gsub( target, "*", patternMatch ), packageURL )
-
-                    return packageResolve( @, target, packageURL )
-
-                -- TODO: If target split on "/" or "\" contains any "", ".", "..", or "node_modules" segments after the first "." segment, case insensitive and including percent encoded variants, throw an Invalid Package Target error.
-
-                resolvedTarget = URL( target, packageURL )
-                if patternMatch == nil
-                    return resolvedTarget
-
-                -- TODO: If patternMatch split on "/" or "\" contains any "", ".", "..", or "node_modules" segments, case insensitive and including percent encoded variants, throw an Invalid Module Specifier error.
-                resolvedTarget.pathname = gsub( resolvedTarget.pathname, "*", patternMatch )
+            resolvedTarget = URL( target, packageURL )
+            if patternMatch == nil
                 return resolvedTarget
 
-            if istable( target )
-                if #target == 0 -- object
-                    local defaultValue
-                    for p, targetValue in pairs( target )
-                        if DEFAULT_CONDITIONS[ p ]
-                            if resolved := packageTargetResolve( @, packageURL, targetValue, patternMatch, isImports )
-                                return resolved
+            -- TODO: If patternMatch split on "/" or "\" contains any "", ".", "..", or "node_modules" segments, case insensitive and including percent encoded variants, throw an Invalid Module Specifier error.
+            resolvedTarget.pathname = gsub( resolvedTarget.pathname, "*", patternMatch )
+            return resolvedTarget
 
-                        elseif p == "default"
-                            defaultValue = targetValue
+        if istable( target )
+            if #target == 0 -- object
+                local defaultValue
+                for p, targetValue in pairs( target )
+                    if DEFAULT_CONDITIONS[ p ]
+                        if resolved := packageTargetResolve( @, packageURL, targetValue, patternMatch, isImports )
+                            return resolved
 
-                    -- resolving "default" at the end because tables in lua are unordered
-                    if defaultValue
-                        return packageTargetResolve( @, packageURL, defaultValue, patternMatch, isImports )
+                    elseif p == "default"
+                        defaultValue = targetValue
 
-                    return nil
-
-                -- array
-                local success, resolved
-                for targetValue in *target
-                    success, resolved = pcall( packageTargetResolve, @, packageURL, targetValue, patternMatch, isImports )
-                    if success and resolved
-                        return resolved
-
-                unless success
-                    error resolved
-                    return nil
+                -- resolving "default" at the end because tables in lua are unordered
+                if defaultValue
+                    return packageTargetResolve( @, packageURL, defaultValue, patternMatch, isImports )
 
                 return nil
 
-            if target == nil
+            -- array
+            local success, resolved
+            for targetValue in *target
+                success, resolved = pcall( packageTargetResolve, @, packageURL, targetValue, patternMatch, isImports )
+                if success and resolved
+                    return resolved
+
+            unless success
+                error resolved
                 return nil
 
-            error PackageError "invalid target '#{target}' for '#{packageURL}'"
             return nil
 
-        -- LOOKUP_PACKAGE_SCOPE(url)
-        lookupPackageScope = ( url ) =>
-            if url.scheme ~= "file"
-                error PackageError "unable to lookup package scope for '#{url}' (not a file:/// URL)"
+        if target == nil
+            return nil
 
-            local scopeURL = URL( "./package.lua", url )
-            while scopeURL.path[1] ~= "package.lua" -- not filesystem root
-                if scopeURL.path[ #scopeURL.path - 1 ] == "packages"
-                    return nil
+        error PackageError "invalid target '#{target}' for '#{packageURL}'"
+        return nil
 
-                if IsFile( scopeURL.pathname )
-                    return URL( "./", scopeURL )
+    exportsStartsWithDot = ( exports, packageURL ) =>
+        if istable( exports )
+            local state
+            for key in pairs( exports )
+                statsWithDot = StartsWith( key, "." )
+                if state == nil
+                    state = statsWithDot
+                elseif state ~= statsWithDot
+                    error PackageError "'#{packageURL}' exports are invalid"
 
-                scopeURL = URL( "../package.lua", scopeURL )
+            return state
 
-    loader.ESM = ESM
+        -- otherwise exports must be a string
+        return StartsWith( exports, "." )
 
-local Require
+    -- PACKAGE_IMPORTS_EXPORTS_RESOLVE(matchKey, matchObj, packageURL, isImports)
+    packageImportsExportsResolve = ( matchKey, matchObj, packageURL, isImports ) =>
+        if matchObj[ matchKey ] and not find( matchKey, "*", 1, true )
+            target = matchObj[ matchKey ]
+            return packageTargetResolve( @, packageURL, target, nil, isImports )
+
+        -- TODO: Implement pattern matching
+        error PackageError "pattern matching is not implemented"
+        return nil
+
+    -- PACKAGE_EXPORTS_RESOLVE(packageURL, subpath, exports, conditions)
+    packageExportsResolve = ( packageURL, subpath, exports ) =>
+        startsWithDot = exportsStartsWithDot( @, exports, packageURL )
+
+        if subpath == "."
+            local mainExport
+            if isstring( exports ) or not startsWithDot
+                mainExport = exports
+            elseif istable( exports ) and startsWithDot
+                mainExport = exports["."]
+
+            if mainExport
+                if resolved := packageTargetResolve( @, packageURL, mainExport, nil, false )
+                    return resolved
+
+        elseif istable( exports ) and startsWithDot
+            if resolved := packageImportsExportsResolve( @, subpath, exports, packageURL, false )
+                return resolved
+
+        error PackageError "no exports found for '#{subpath}' in '#{packageURL}'"
+        return nil
+
+    packageDependencyResolve = ( name, target, subpath ) =>
+        unless target
+            error PackageError "invalid dependency target '#{target}' for '#{name}'"
+
+        packageURL = nil
+        if IsURL( target ) -- source lookup
+            source = getSource( target )
+            unless source
+                error PackageError "source for '#{target}' not found"
+
+            packageURL = source\WorkingDirectory( target ) -- our package must be in the root directory, I hope
+        else -- version lookup
+            -- Retrieving all version of the package
+            _, folders = Find( "gpm/vfs/packages/" .. name .. "/*", file.LuaPath, true ) -- lets hope that package installer will create correct versions of the package
+            version = Version.select( target, folders )
+            unless version
+                versions_str = concat( folders, ", " )
+                error PackageError "could not find installed #{name} with version selector #{target} (available versions: [#{versions_str}])"
+
+            packageURL = URL( "file:///lua/gpm/vfs/packages/" .. name .. "/" .. tostring( version ) .. "/" )
+            unless IsDir( packageURL.pathname )
+                error PackageError "#{packagePath} should exists but it does not :? (#{name} with target #{target})"
+
+        pjson = @pjson = await packageRead( packageURL )
+        if pjson and pjson.exports
+            return packageExportsResolve( @, packageURL, subpath, pjson.exports )
+
+        return URL( subpath, packageURL )
+
+    packageDependenciesResolve = ( packageName, packageSubpath ) =>
+        -- @pjson must be set by packageSelfResolve
+        pjson = @pjson
+        if not pjson or not istable( pjson.dependencies )
+            return nil
+
+        target = pjson.dependencies[ packageName ]
+        if isstring( target )
+            return packageDependencyResolve( @, packageName, target, packageSubpath )
+
+        return nil
+
+    -- LOOKUP_PACKAGE_SCOPE(url)
+    lookupPackageScope = ( url ) =>
+        if url.scheme ~= "file"
+            error PackageError "unable to lookup package scope for '#{url}' (not a file:/// URL)"
+
+        local scopeURL = URL( "./package.lua", url )
+        while scopeURL.path[ 1 ] ~= "package.lua" -- not filesystem root
+            if scopeURL.path[ #scopeURL.path - 1 ] == "packages"
+                return nil
+
+            if IsFile( scopeURL.pathname )
+                return URL( "./", scopeURL )
+
+            scopeURL = URL( "../package.lua", scopeURL )
+
+        return nil
+
+    -- PACKAGE_SELF_RESOLVE(packageName, packageSubpath, parentURL)
+    packageSelfResolve = ( packageName, packageSubpath, parentURL ) =>
+        packageURL = lookupPackageScope( @, parentURL )
+        unless packageURL
+            return nil
+
+        pjson = @pjson = await packageRead( packageURL )
+        unless pjson and pjson.exports
+            return nil
+
+        if pjson.name == packageName
+            return packageExportsResolve( @, packageURL, packageSubpath, pjson.exports )
+
+        return nil
+
+    -- PACKAGE_RESOLVE(packageSpecifier, parentURL)
+    packageResolve = ( packageSpecifier, parentURL ) =>
+        local packageName
+        if packageSpecifier == ""
+            error PackageError "specifier is an empty string"
+
+        -- If packageSpecifier is a Node.js builtin module name, then
+        -- 1. Return the string "node:" concatenated with packageSpecifier.
+
+        if StartsWith( packageSpecifier, "@" )
+            packageName = match( packageSpecifier, "(.-/.-)/" ) or packageSpecifier -- Set packageName to the substring of packageSpecifier until the second "/" separator or the end of the string.
+            unless packageName -- If packageSpecifier does not contain a "/" separator, then
+                error PackageError "invalid specifier '#{packageSpecifier}'"
+        else
+            packageName = match( packageSpecifier, "(.-)/" ) or packageSpecifier -- Set packageName to the substring of packageSpecifier until the first "/" separator or the end of the string.
+
+        if StartsWith( packageSpecifier, "." ) or find( packageSpecifier, "%", 1, true ) or find( packageSpecifier, "\\", 1, true )
+            error PackageError "invalid specifier '#{packageSpecifier}'"
+
+        packageSubpath = "." .. sub( packageSpecifier, #packageName + 1 )
+
+        if selfURL := packageSelfResolve( @, packageName, packageSubpath, parentURL )
+            return selfURL
+
+        local packageURL
+        while not packageURL or packageURL.path[ 1 ] ~= "packages" -- While parentURL is not the file system root
+            firstTime = not packageURL
+
+            packageURL = URL( "packages/" .. packageName .. "/", parentURL ) -- Let packageURL be the URL resolution of "node_modules/" concatenated with packageSpecifier, relative to parentURL.
+            parentURL = URL( "..", parentURL ) -- Set parentURL to the parent folder URL of parentURL.
+
+            if packageURL.scheme == "file" and not IsDir( packageURL.pathname ) -- If the folder at packageURL does not exist, then
+                if result := firstTime and packageDependenciesResolve( @, packageName, packageSubpath )
+                    return result
+
+                continue
+
+            pjson = @pjson = await packageRead( packageURL )
+            if pjson and pjson.exports
+                return packageExportsResolve( @, packageURL, packageSubpath, pjson.exports )
+
+            return URL( packageSubpath, packageURL )
+
+        error PackageError "package not found: '#{packageSpecifier}' from '#{@parentURL}'"
+        return nil
+
+    -- PACKAGE_IMPORTS_RESOLVE(specifier, parentURL, conditions)
+    packageImportsResolve = ( specifier, parentURL ) =>
+        if specifier == "#" or StartsWith( specifier, "#/" )
+            error PackageError "invalid import specifier '" .. specifier .. "'"
+
+        packageURL = lookupPackageScope( @, parentURL )
+        if packageURL
+            pjson = @pjson = await packageRead( packageURL )
+            if pjson and pjson.imports
+                if resolved := packageImportsExportsResolve( @, specifier, pjson.imports, packageURL, true )
+                    return resolved
+
+        error PackageError "imports are not defined for '" .. specifier .. "' in #{packageURL or parentURL}"
+        return nil
+
+    esmResolve = ( ... ) ->
+        return esmClass!\resolve( ... )
+
+    esmClass = newClass(
+        "ESM",
+        {
+            -- ESM_RESOLVE(specifier, parentURL)
+            resolve: async ( specifier, parentURL ) =>
+                @specifier = specifier
+                @parentURL = parentURL
+
+                -- resolve
+                local resolved
+                if isurl( specifier ) or canParse( specifier )
+                    resolved = URL( specifier )
+                elseif StartsWith( specifier, "/" ) or StartsWith( specifier, "./" ) or StartsWith( specifier, "../" )
+                    resolved = URL( specifier, parentURL )
+                elseif StartsWith( specifier, "#" )
+                    resolved = packageImportsResolve( @, specifier, parentURL )
+                else
+                    -- specifier is now a bare specifier
+                    resolved = packageResolve( @, specifier, parentURL )
+
+                return { :resolved, package: @pjson }
+        },
+        {
+            -- Just a shortcut so `ESM.resolve ...` can be used instead of creating a new instance.
+            resolve: esmResolve
+        }
+    )
+
+    loader.ESM = esmClass
+
+local requireClass
 do
 
     import NotImplementedError from environment
-    import IsBinaryModuleInstalled from util
+    -- import IsBinaryModuleInstalled from util
 
     PACKAGE_PATHS = { "./?.lua", "./?/init.lua" }
 
@@ -709,67 +745,82 @@ do
 
         return nil
 
-    class Require
-        -- Just a shortcut so `Require.resolve ...` can be used instead of creating a new instance.
-        @resolve: ( ... ) -> Require!\resolve( ... )
+    requireClass = newClass(
+        "Require",
+        {
+            resolve: async ( modname, base ) =>
+                unless base
+                    error ModuleError "`require` cannot be used outside of modules"
 
-        resolve: async ( modname, base ) =>
-            unless base
-                error ModuleError "`require` cannot be used outside of modules"
+                if base.scheme ~= "file"
+                    error NotImplementedError "cannot use `require` from `#{base}`"
 
-            if base.scheme ~= "file"
-                error NotImplementedError "cannot use `require` from `#{base}`"
+                isOpaque = isRequireSyntax( modname )
+                filePath = gsub( modname, "%.", "/" )
 
-            isOpaque = isRequireSyntax( modname )
-            filePath = gsub( modname, "%.", "/" )
+                if resolved := isOpaque and resolveFile( @, filePath, base )
+                    return { :resolved }
 
-            if resolved := isOpaque and resolveFile( @, filePath, base )
-                return { :resolved }
+                if StartsWith( filePath, "gpm/" ) or StartsWith( filePath, "gmod/" )
+                    protocol, filePath = match( filePath, "^(.-)/(.*)" )
+                    filePath = URL( protocol .. ":///" .. filePath ).href
 
-            if StartsWith( filePath, "gpm/" ) or StartsWith( filePath, "gmod/" )
-                protocol, filePath = match( filePath, "^(.-)/(.*)" )
-                filePath = URL( protocol .. ":///" .. filePath ).href
+                if filePath == "gpm" or filePath == "gmod"
+                    filePath ..= ":///"
 
-            if filePath == "gpm" or filePath == "gmod"
-                filePath ..= ":///"
+                success, resolved = try await esmResolve( isOpaque and filePath or modname, base )
+                if success
+                    return resolved
 
-            success, resolved = try await ESM.resolve( isOpaque and filePath or modname, base )
-            if success
-                return resolved
+                -- if IsBinaryModuleInstalled( modname )
+                --     return { resolved: URL( "dll:" .. modname ) }
 
-            if IsBinaryModuleInstalled( modname )
-                return { resolved: URL( "dll:" .. modname ) }
+                -- TODO: make better errors
+                error resolved -- just return error from ESM
+                return nil
+        },
+        {
+            -- Just a shortcut so `Require.resolve ...` can be used instead of creating a new instance.
+            resolve: ( ... ) ->
+                return requireClass!\resolve( ... )
+        }
+    )
 
-            -- TODO: make better errors
-            error resolved -- just return error from ESM
-            return
 
-    loader.Require = Require
+    loader.Require = requireClass
 
-class Include
-    -- Just a shortcut so `Include.resolve ...` can be used instead of creating a new instance.
-    @resolve: ( ... ) -> Include!\resolve( ... )
+local includeClass
+includeClass = newClass(
+    "Include",
+    {
+        resolve: async ( fileName, base ) =>
+            if base and base.scheme == "file"
+                resolved = URL( fileName, base )
+                if resolved.path[ 1 ] == "lua" and IsFile( resolved.pathname )
+                    return { :resolved }
 
-    resolve: async ( fileName, base ) =>
-        if base and base.scheme == "file"
-            resolved = URL( fileName, base )
+            resolved = URL( fileName, "file:///lua/" )
             if resolved.path[ 1 ] == "lua" and IsFile( resolved.pathname )
                 return { :resolved }
 
-        resolved = URL( fileName, "file:///lua/" )
-        if resolved.path[ 1 ] == "lua" and IsFile( resolved.pathname )
-            return { :resolved }
+            return esmResolve( fileName, base )
+    },
+    {
+        -- Just a shortcut so `Include.resolve ...` can be used instead of creating a new instance.
+        resolve: ( ... ) ->
+           return includeClass!\resolve( ... )
+    }
+)
 
-        return ESM.resolve( fileName, base )
+loader.Include = includeClass
 
-loader.Include = Include
-
-local findSource
+local asyncImport, findSource
 do
 
     import SourceError from environment
-    import reject from Promise
     import Logger, ispromise from gpm
+    import reject from Promise
+    import join from path
 
     sources = loader.Sources
     unless istable( sources )
@@ -786,133 +837,40 @@ do
     registerSource = loader.RegisterSource = ( scheme, source ) ->
         sources[ scheme ] = source
 
-    class loader.BaseSourceHandler
-        __tostring: =>
-            return format( "%s: %p", @@__name or "unknown source handler", @ )
+    loader.Source = newClass(
+        "Source",
+        {
+            __tostring: =>
+                return format( "%s %p", @@__name, @ )
 
-        FetchInfo: ( url, base ) =>
-            return nil
+            new: ( ... ) =>
+                for protocol in *{ ... }
+                    @register( protocol )
 
-        Install: ( url, info ) =>
-            return nil
+                unless @FetchInfo
+                    Logger\Warn( "Source #{@} does not implement :FetchInfo method. May cause errors." )
 
-        Run: ( url, info, env, parent ) =>
-            return nil
+                unless @Install
+                    Logger\Warn( "Source #{@} does not implement :Install method. May cause errors." )
 
-    class loader.BaseSource
-        __tostring: =>
-            return format( "%s: %p", @@__name or "unknown source", @ )
+            register: ( protocol ) =>
+                if isurl( protocol )
+                    protocol = protocol.scheme
 
-        new: ( ... ) =>
-            @handlers = {}
+                old = sources[ protocol ]
+                if old
+                    Logger\Warn( "Protocol '#{protocol}' has been reregistered by '#{@}'. (was #{old})" )
 
-            for scheme in *{ ... }
-                registerSource( scheme, @ )
+                sources[ protocol ] = @
+                Logger\Debug( "  - #{@} was registered for #{protocol}:"  )
 
-        RegisterHandler: ( handler ) =>
-            @handlers[] = handler
-
-        CallHandler: ( name, url, ... ) =>
-            for handler in *@handlers
-                if not handler.ShouldHandle or handler\ShouldHandle( url, ... )
-                    return handler[ name ]( handler, url, ... )
-
-            return reject SourceError "No handler found for URL '#{url}' (" .. name .. ")"
-
-        FetchInfo: ( url, base ) =>
-            return @CallHandler( "FetchInfo", url, base )
-
-        Install: ( url, info ) =>
-            return @CallHandler( "Install", url, info )
-
-        Run: ( url, info, env, parent ) =>
-            return @CallHandler( "Run", url, info, env, parent )
-
-    class loader.Source
-        __tostring: =>
-            return format( "%s %p", @@__name, @ )
-
-        new: ( ... ) =>
-            for protocol in *{ ... }
-                @register( protocol )
-
-            if not @FetchInfo
-                Logger\Warn( "Source #{@} does not implement :FetchInfo method. May cause errors." )
-
-            if not @Install
-                Logger\Warn( "Source #{@} does not implement :Install method. May cause errors." )
-
-        register: ( protocol ) =>
-            if isurl( protocol )
-                protocol = protocol.scheme
-
-            old = sources[ protocol ]
-            if old
-                Logger\Warn( "Protocol '#{protocol}' has been reregistered by '#{@}'. (was #{old})" )
-
-            sources[ protocol ] = @
-            Logger\Debug( "  - #{@} was registered for #{protocol}:"  )
-
-        @get: ( protocol ) ->
-            if isstring( protocol ) and string.IsURL( protocol )
-                protocol = URL( protocol ).scheme
-            elseif isurl( protocol )
-                protocol = protocol.scheme
-
-            return sources[ protocol ]
-
-        WorkingDirectory: ( url ) =>
-            return URL( path.join("file:///lua/gpm/vfs/modules/", string.PathFromURL(url) ) .. "/" )
-
-        --[[
-
-            -- Sources API
-
-            WebSource: "http", "https"
-            http://dom.com/path/to/
-
-            isPackage = path.GetFile( pathname ) == ""
-            url.path[#url.path] == "" -- is directory
-
-            -- GetWorkingDirectory( url: URL ) => URL file:/// *SHARED
-            -- FetchInfo( url: URL ) => { package: Package, url: URL, metadata: {...} } *SERVER
-            -- Install( info: DataFromFetchInfo, workdir: string? ) *SERVER
-
-            pkg = Package( ... )
-            files = {...}
-
-            data/gpm/vfs/packages/package1/0.1.0/package.lua
-
-            data/gpm/vfs/packages/package1/0.1.0/package.lua -- server
-            lua/gpm/vfs/packages/package1/0.1.0/package.lua -- client
-
-            client:
-            server:
-            menu:
-
-            gpm/vfs/modules/github/ukgamer/gpm/path/to/file.lua
-            gpm/vfs/modules/com/github/ukgamer/gpm/ .. package.lua
-
-            gpm/vfs/modules/com/github/ukgamer/gpm/ => {
-                folder/file.lua
-                package.lua
-                init.lua
-            }
-
-            -- packages/units/package.lua
-            dependencies = {
-                ["ukgamer"] = "github:ukgamer/gpm/main/lua/package/package1", -- packages/units/packages/ukgamer
-                package1: "^1.0.0" 1.2.3 1.2.0 1.4.0
-            }
-
-            packages/pkg1/packages/units@1.0.1
-            -- packages/pkg2/packages/units@2.0.3
-            -- packages/pkg3/packages/units@2.0.3 2.0.4
-            packages/pkg4/packages/units@1.0.1
-            packages/units@2.0.3
-
-            gpm.Import "ukgamer" -> gpm/vfs/github/ukgamer/gpm/path/to/file.lua
-        ]]
+            WorkingDirectory: ( url ) =>
+                return URL( join("file:///lua/gpm/vfs/modules/", string.PathFromURL( url ) ) .. "/" )
+        },
+        {
+            get: getSource
+        }
+    )
 
     parseFileURL = loader.ParseFileURL = ( any ) ->
         if isurl( any )
@@ -937,25 +895,31 @@ do
         url = getFileURL( url )
         return findSource( url.scheme )\FetchInfo( url, base, env, parent )
 
-    asyncImport = loader.AsyncImport = async ( specifier, resolver, info, base = URL( "file:///lua/" ), env, parent ) ->
-        :resolved, :package = await resolver( specifier, base )
+    do
 
-        -- if package was found, then it must overwrite current env
-        if package
-            env = package.env or env
+        import run from moduleClass
 
-            -- if package has dependencies, wait until they are resolved
-            if package.__dependencies
-                for name, dep in pairs(package.__dependencies)
-                    if ispromise( dep )
-                        await dep
+        defaultBase = URL( "file:///lua/" )
 
-        return Module.run( resolved, env )
+        asyncImport = loader.AsyncImport = async ( specifier, resolver, info, base, env, parent ) ->
+            :resolved, :package = await resolver( specifier, base or defaultBase )
 
-        -- source = findSource( resolved.scheme )
-        -- info or= await source\FetchInfo( resolved, base )
-        -- info = await source\Install( resolved, info )
-        -- return source\Run( resolved, info, env, parent )
+            -- if package was found, then it must overwrite current env
+            if package
+                env = package.env or env
+
+                -- if package has dependencies, wait until they are resolved
+                if dependencies := package.__dependencies
+                    for name, dep in pairs( dependencies )
+                        if ispromise( dep )
+                            await dep
+
+            return run( resolved, env )
+
+            -- source = findSource( resolved.scheme )
+            -- info or= await source\FetchInfo( resolved, base )
+            -- info = await source\Install( resolved, info )
+            -- return source\Run( resolved, info, env, parent )
 
     local getImportMeta
     do
@@ -1002,43 +966,56 @@ do
 
     gpm.Import = ( specifier ) ->
         argument( specifier, 1, "string" )
-        return asyncImport( specifier, ESM.resolve, nil, getImportMeta! )
+        return asyncImport( specifier, esmResolve, nil, getImportMeta! )
 
     -- just for a .lua users
     environment.import = ( specifier ) ->
         argument( specifier, 1, "string" )
-        return await asyncImport( specifier, ESM.resolve, nil, getImportMeta! )
+        return await asyncImport( specifier, esmResolve, nil, getImportMeta! )
 
-    environment.require = ( modname ) ->
-        argument( modname, 1, "string" )
-        return await asyncImport( modname, Require.resolve, nil, getImportMeta! )
+    do
 
-    environment.include = environment.dofile = ( fileName ) ->
-        argument( fileName, 1, "string" )
-        return await asyncImport( fileName, Include.resolve, nil, getImportMeta! )
+        :resolve = requireClass
+
+        environment.require = ( modname ) ->
+            argument( modname, 1, "string" )
+            return await asyncImport( modname, resolve, nil, getImportMeta! )
+
+    do
+
+        :resolve = includeClass
+
+        environment.include = environment.dofile = ( fileName ) ->
+            argument( fileName, 1, "string" )
+            return await asyncImport( fileName, resolve, nil, getImportMeta! )
 
 -- packages autorun
 do
 
     import display from environment.Error
-    import Logger, repositories, AddCSLuaFile from gpm
-    import allSettled from Promise
+    import Logger, repositories from gpm
+    import all, allSettled from Promise
 
-    loader.InstallDependency = async ( pkg, name, target, force ) ->
+    -- this one has [name@version or url] = Promise
+    dependencies = loader.Dependencies = {}
+
+    local installDependency, resolveDependencies
+
+    installDependency = async ( pkg, name, target, force ) ->
         unless isstring( name )
             error PackageError "invalid dependency name '#{name}' for '#{pkg}'"
 
         -- caching installation so duplicate dependencies wont be installed two times
-        if force != true
+        if force ~= true
             ref = tostring( target )
-            unless string.IsURL( ref )
+            unless IsURL( ref )
                 ref = name .. "@" .. target
 
-            task = loader.Dependencies[ ref ]
+            task = dependencies[ ref ]
             if task
                 return task
 
-            loader.Dependencies[ ref ] = task = loader.InstallDependency( pkg, name, target, true )
+            dependencies[ ref ] = task = installDependency( pkg, name, target, true )
             unless pkg.__dependencies[ name ]
                 pkg.__dependencies[ name ] = task
 
@@ -1046,23 +1023,23 @@ do
 
         if istable( target )
             -- handle multiple
-            return
+            return nil
 
-        if not isstring( target )
+        unless isstring( target )
             error PackageError "invalid dependency target '#{target}' for '#{name}' in '#{pkg}'"
 
-        workdir = nil
-        unless string.IsURL( target )
+        local workdir
+        unless IsURL( target )
             -- probably version
             res = await repositories.FindPackage( name, target )
             unless res
                 error PackageError "could not find package '#{name}' with version '#{target}' for '#{pkg}'"
 
             target = res.url
-            workdir = "lua/gpm/vfs/packages/" .. name .. "/" .. tostring(res.version) .. "/"
+            workdir = "lua/gpm/vfs/packages/" .. name .. "/" .. tostring( res.version ) .. "/"
 
         url = URL( target )
-        source = loader.Source.get( url )
+        source = getSource( url )
 
         unless source
             error PackageError "source for '#{url}' not found (dependency of '#{pkg}')"
@@ -1073,60 +1050,66 @@ do
             await source\Install( info, workdir )
             Logger\Info( "Installed dependency '%s' [%s] for '%s'", name, target, pkg.name )
 
-        pkg.__dependencies[name] = info.package
+        pkg.__dependencies[ name ] = info.package
 
         -- resolve dependencies of the dependency
-        await loader.ResolveDependencies( info.package )        
-        return
+        await resolveDependencies( info.package )
+        return nil
 
-    loader.ResolveDependencies = async ( pkg ) ->
-        if not pkg.dependencies
-            return
+    loader.InstallDependency = installDependency
 
-        tasks = {}
+    resolveDependencies = async ( pkg ) ->
+        unless pkg.dependencies
+            return nil
+
+        tasks, taskCount = {}, 0
         for name, target in pairs( pkg.dependencies )
-            tasks[] = loader.InstallDependency( pkg, name, target )
+            taskCount += 1
+            tasks[ taskCount ] = installDependency( pkg, name, target )
 
-        await Promise.all( tasks )
+        await all( tasks )
 
         -- hacky way to determine if all packages were installed
-        for ref, task in pairs( loader.Dependencies )
+        for _, task in pairs( dependencies )
             if task.state == task.STATE_PENDING
-                return
-        
+                return nil
+
         -- alright, it seems that all dependencies were installed
         -- let's restart server if there is any humans on the servers
-        if #player.GetHumans() > 0
+        if #_G.player.GetHumans! > 0
             RunConsoleCommand( "changelevel", game.GetMap() )
 
-    loader.InitializePackage = async ( pkg ) ->
+        return nil
+
+    loader.ResolveDependencies = resolveDependencies
+
+    initializePackage = async ( pkg ) ->
         if SERVER
             -- we are resolving dependencies only on server
-            await loader.ResolveDependencies( pkg )
+            await resolveDependencies( pkg )
 
             -- AddCSLuaFile in pkg.send
-            if istable( pkg.send )
-                for fileName in *pkg.send
-                    fileURL = URL( fileName, pkg.url )
-                    AddCSLuaFile( fileURL.pathname )
+            for fileName in *pkg.send
+                addcsluafile( URL( fileName, pkg.url ).pathname )
 
         unless pkg.autorun
-            return
+            return nil
 
         Logger\Info( "Executing '%s@%s' package...", pkg.name, pkg.version )
+        await asyncImport( pkg.name, esmResolve, nil, pkg.url, pkg.env )
+        return nil
 
-        await loader.AsyncImport( pkg.name, ESM.resolve, nil, pkg.url, pkg.env )
-        return
+    loader.InitializePackage = initializePackage
 
     loader.Startup = async ->
-        _, folders = Find( "packages/*", file.LuaPath, true )
         Logger\Info( "Parsing `packages/` directory..." )
+        _, folders = Find( "packages/*", file.LuaPath, true )
         base = URL( "file:///lua/packages/" )
 
         readTasks, taskCount = {}, 0
         for folderName in *folders
             taskCount += 1
-            readTasks[ taskCount ] = Package.read( URL( folderName .. "/", base ) ) -- TODO: addcsluafile
+            readTasks[ taskCount ] = packageRead( URL( folderName .. "/", base ) ) -- TODO: addcsluafile
 
         -- no :>
         pkgs, pkgCount = {}, 0
@@ -1144,11 +1127,17 @@ do
             return nil
 
         Logger\Info( "Found %d packages! Initializing them...", pkgCount )
-        tasks = {}
+
+        tasks, taskCount = {}, 0
         for pkg in *pkgs
-            tasks[] = loader.InitializePackage( pkg )
+            taskCount += 1
+            tasks[ taskCount ] = initializePackage( pkg )
 
         tasks = await allSettled( tasks )
-        for result in *tasks
+
+        for index = 1, taskCount
+            result = tasks[ index ]
             if result.status == "rejected"
                 display( result.reason )
+
+        return nil

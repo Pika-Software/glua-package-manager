@@ -5,7 +5,7 @@ import URL, Package, SourceError, Logger, github from gpm -- classes
 
 CACHE_DIR = "/data/gpm/cache/github/"
 
--- url syntax: 
+-- url syntax:
 -- github:user/repo[/branch]
 -- or
 -- github://user/repo[/branch]
@@ -20,13 +20,13 @@ class GithubSource extends loader.Source
 
         Logger\Debug( "Fetching information for Github repository '%s/%s'...", user, repository )
         branch = github.getRepository( user, repository )\await().default_branch
-        
+
         unless branch
             error SourceError "Failed to fetch default branch for '#{user}/#{repository}' from Github API."
 
         -- save the default branch to the cache
         file.Write( filePath, branch, nil, nil, true )
-        
+
         return branch
 
     -- pattern: priority
@@ -57,7 +57,7 @@ class GithubSource extends loader.Source
         if #entries == 1
             packageEntry = entries[1]
 
-        else 
+        else
             -- welp, we have multiple package.lua files, lets try to find the correct one
             priority = math.huge -- 0 is the highest priority
             for entry in *entries
@@ -65,25 +65,25 @@ class GithubSource extends loader.Source
                     if string.match( entry.path, pattern )
                         if pattern == entry.path
                             p = p - 10 -- paths that match the exact pattern are more important
-                        
+
                         if p < priority
                             priority = p
                             packageEntry = entry
-                        
+
                         -- TODO: check if we have duplicates (i.e packages/a/package.lua and packages/b/package.lua)
 
         if packageEntry
             file.Write( filePath, util.TableToJSON( packageEntry ), nil, nil, true )
 
         return packageEntry
-    
+
     FetchPackageFile = ( user, repository, branch, entry ) ->
         filePath = CACHE_DIR .. user .. "/" .. repository .. "/" .. branch .. "/package.txt"
         if package := file.Read( filePath, nil, nil, nil, true )
             return package
 
         Logger\Debug( "Fetching package file from Github repository '%s/%s/%s'... (sha = '%s')", user, repository, branch, entry.sha )
-        
+
         res = await github.getBlob( user, repository, entry.sha )
         file.Write( filePath, res.content, nil, nil, true )
         return res.content
@@ -92,7 +92,7 @@ class GithubSource extends loader.Source
         filePath = CACHE_DIR .. user .. "/" .. repository .. "/" .. branch .. "/files.zip.dat"
         if data := file.Read( filePath, nil, nil, nil, true )
             return util.ByteStream( data )
-        
+
         Logger\Debug( "Downloading repository '%s/%s/%s'...", user, repository, branch )
         data = await github.fetchZip( user, repository, branch )
 
@@ -135,7 +135,7 @@ class GithubSource extends loader.Source
         packageContent = FetchPackageFile( user, repository, branch, packageEntry )
         unless packageContent
             error SourceError "Failed to fetch package file from #{url}."
-        
+
         -- preventing overwriting existing package file
         unless file.IsFile( packageURL.pathname )
             file.Set( packageURL.pathname, packageContent )
@@ -143,7 +143,7 @@ class GithubSource extends loader.Source
         pkg = await Package.read( packageURL )
         unless pkg
             error SourceError "Failed to read package file from #{packageURL}. (url = #{url})"
-        
+
         return {
             package: pkg
             url: url
@@ -174,12 +174,12 @@ class GithubSource extends loader.Source
             return
 
         Logger\Debug( "Installing package '%s@%s' from Github repository '%s/%s/%s'...", info.package.name, info.package.version, info.metadata.user, info.metadata.repository, info.metadata.branch )
-    
+
         gmaPath = CACHE_DIR .. info.metadata.user .. "/" .. info.metadata.repository .. "/" .. info.metadata.branch .. "/files-" .. util.CRC( workdir ) .. ".gma"
         if file.Read( gmaPath, nil, nil, nil, true )
             unless file.MountGMA( gmaPath )
                 error SourceError "Failed to mount GMA file '#{gmaPath}'."
-            
+
             return
 
         gma = addon.GMA()
@@ -189,7 +189,7 @@ class GithubSource extends loader.Source
             if err
                 Logger\Debug( "Skipping file from zipball '%s/%s/%s' with path '%s' and reason '%s'", info.metadata.user, info.metadata.repository, info.metadata.branch, entry.path, err )
                 continue
-            
+
             -- first remove first directory from the path (appended by github)
             entryPath = string.sub( entry.path, string.indexOf(entry.path, "/") + 1 )
 

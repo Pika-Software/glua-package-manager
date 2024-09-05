@@ -131,7 +131,6 @@ environment.utf8 = setmetatable( include( "gpm/libs/utf8.lua" ), sandboxMetatabl
 environment.ipaml = include( "gpm/libs/3rd-party/ip.lua" )
 environment.struct = include( "gpm/libs/struct.lua" )
 include( "gpm/libs/3rd-party/bint.lua" )
-
 include( "gpm/libs/date.lua" )
 
 -- LibDeflate

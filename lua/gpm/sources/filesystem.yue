@@ -1,18 +1,14 @@
-import path, string, table, http, util, loader, file, addon from gpm -- libraries
-import isstring, istable, isurl, tostring, async, await, pairs from gpm -- functions
-import URL, Package, SourceError, Logger from gpm -- classes
+import gpm from _G
+import environment from gpm
+import await, SourceError from environment
+import read from environment.Package
 
-class FileSource extends loader.Source
-    FetchInfo: async ( url ) =>
-        pkg = await Package.read( url )
-        unless pkg
-            error SourceError "Failed to read or find package file for " .. url.href
+environment.class( "FileSource", {
+    FetchInfo: environment.async ( url ) =>
+        package = await read( url )
+        if package
+            return { :url, :package }
 
-        return {
-            url: url,
-            package: pkg,
-        }
-
-    -- Install: async ( info ) =>
-
-FileSource( "file" )
+        error SourceError "Failed to read or find package file for " .. url.href
+        return nil
+}, nil, gpm.loader.Source )( "file" )

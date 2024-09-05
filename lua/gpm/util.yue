@@ -1608,9 +1608,41 @@ do
 
     }, nil, nil, true )
 
--- https://github.com/WilliamVenner/gmsv_workshop
-if _G.SERVER and util.IsBinaryModuleInstalled( "workshop" )
-    _G.require( "workshop" )
+do
+
+    import system, jit, require from _G
+    import Exists from _G.file
+
+    isEdge = jit.versionnum ~= 20004
+    is32 = jit.arch == "x86"
+
+    head = "lua/bin/gm" .. ( ( CLIENT and not MENU_DLL ) and "cl" or "sv" ) .. "_"
+    tail = "_" .. ( { "osx64", "osx", "linux64", "linux", "win64", "win32" } )[ ( system.IsWindows() and 4 or 0 ) + ( system.IsLinux() and 2 or 0 ) + ( is32 and 1 or 0 ) + 1 ] .. ".dll"
+
+    isBinaryModuleInstalled = util.IsBinaryModuleInstalled = ( name ) ->
+        argument( name, 1, "string" )
+        if name == ""
+            return false, ""
+
+        filePath = head .. name .. tail
+        if Exists( filePath, "MOD" )
+            return true, filePath
+
+        if isEdge and is32 and tail == "_linux.dll"
+            filePath = head .. name .. "_linux32.dll"
+            if Exists( filePath, "MOD" )
+                return true, filePath
+
+        return false, filePath
+
+    environment.load_binary = ( name ) ->
+        installed, filePath = isBinaryModuleInstalled( name )
+        if installed
+            require( name )
+            return _G[ name ]
+
+        error "Binary module '" .. filePath .. "' was not found.", 2
+        return nil
 
 do
 
