@@ -12,6 +12,8 @@ import time from environment.os
 local api_token
 if SERVER
     api_token = CreateConVar( "gpm_github_token", "", { FCVAR_ARCHIVE, FCVAR_PROTECTED, 16 --[[FCVAR_HIDDEN]] }, "https://github.com/settings/tokens" )
+else
+    api_token = { GetString: -> ""}
 
 -- https://docs.github.com/en/rest/overview/resources-in-the-rest-api#rate-limiting
 mutationNextTime = 0
