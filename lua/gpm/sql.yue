@@ -172,10 +172,10 @@ do
     
     files.get = ( path ) ->
         argument( path, 1, "string" )
-        result = sql.queryOne( "select * from 'gpm.files' where path=?", path )
-        result.size = tonumber( result.size ) or -1
-        result.time = tonumber( result.time )
-        return result
+        if result := sql.queryOne( "select * from 'gpm.files' where path=?", path )
+            result.size = tonumber( result.size ) or -1
+            result.time = tonumber( result.time )
+            return result
 
 
 -- optimize sqlite database
