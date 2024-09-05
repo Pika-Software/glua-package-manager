@@ -827,19 +827,6 @@ function environment.util.Bint( bits, wordbits )
         return self
     end
 
-    -- Bitwise left shift words of a bint (in-place). Used only internally.
-    function internal:_shlwords( n )
-        for i = BINT_SIZE, n + 1, -1 do
-            self[ i ] = self[ i - n ]
-        end
-
-        for i = 1, n do
-            self[ i ] = 0
-        end
-
-        return self
-    end
-
     --- Increment a bint by one (in-place).
     local increment = function( self )
         for i = 1, BINT_SIZE do
@@ -1650,7 +1637,15 @@ function environment.util.Bint( bits, wordbits )
 
         local nvals = math_fdiv( y, BINT_WORDBITS )
         if nvals ~= 0 then
-            x:_shlwords( nvals )
+            -- Bitwise left shift words of a bint (in-place). Used only internally.
+            for i = BINT_SIZE, nvals + 1, -1 do
+                x[ i ] = x[ i - nvals ]
+            end
+
+            for i = 1, nvals do
+                x[ i ] = 0
+            end
+
             y = y - ( nvals * BINT_WORDBITS )
         end
 
