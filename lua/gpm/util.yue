@@ -1018,7 +1018,14 @@ table.Add = ( destination, source, isSequential ) ->
 
     return destination
 
-table.Invert = ( tbl ) ->
+table.Invert = ( tbl, makeCopy ) ->
+    if makeCopy
+        result = {}
+        for key, value in pairs( tbl )
+            result[ value ] = key
+
+        return result
+
     for key, value in pairs( tbl )
         tbl[ value ] = key
         tbl[ key ] = nil

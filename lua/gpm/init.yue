@@ -14,9 +14,6 @@ if SERVER
     for fileName in *Find( "gpm/libs/*.lua", "lsv" )
         AddCSLuaFile( "gpm/libs/" .. fileName )
 
-    for fileName in *Find( "gpm/libs/utf8/*.lua", "lsv" )
-        AddCSLuaFile( "gpm/libs/utf8/" .. fileName )
-
     for fileName in *Find( "gpm/libs/3rd-party/*.lua", "lsv" )
         AddCSLuaFile( "gpm/libs/3rd-party/" .. fileName )
 
@@ -130,7 +127,7 @@ environment.path = include( "gpm/libs/path.lua" )
 for key, value in _G.pairs( include( "gpm/libs/error.lua" ) )
     environment[ key ] = value
 
-environment.utf8 = setmetatable( include( "gpm/libs/utf8/init.lua" ), sandboxMetatable( _G.utf8 ) )
+environment.utf8 = setmetatable( include( "gpm/libs/utf8.lua" ), sandboxMetatable( _G.utf8 ) )
 environment.ipaml = include( "gpm/libs/3rd-party/ip.lua" )
 environment.struct = include( "gpm/libs/struct.lua" )
 include( "gpm/libs/3rd-party/bint.lua" )
