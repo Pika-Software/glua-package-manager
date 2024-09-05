@@ -1,115 +1,143 @@
 _G = _G
-import gpm from _G
+import gpm, timer from _G
 import environment from gpm
 
 import format, gsub, sub, len from environment.string
-import timer, util, Color from environment
+import util, Color, tostring from environment
 
-dateScheme, limit = "%d-%m-%Y %H:%M:%S ", 128
+isLoading = true
+timer.Simple 0, ->
+    isLoading = false
+
+dateScheme, limit = "%d-%m-%Y %H:%M:%S ", 200
 do
 
     import CreateConVar from environment
     import FCVAR_ARCHIVE from _G
 
     dateScheme = CreateConVar( "gpm_logger_date", "0", FCVAR_ARCHIVE, "Allows the logger to display date.", 0, 1 )\GetBool! and "%d-%m-%Y %H:%M:%S " or "%H:%M:%S "
-    limit = CreateConVar( "gpm_logger_limit", "128", FCVAR_ARCHIVE, "Maximum number of messages displayed per second.", 0, 2 ^ 16 )\GetInt!
+    limit = CreateConVar( "gpm_logger_limit", limit, FCVAR_ARCHIVE, "Maximum number of messages displayed per second.", 0, 2 ^ 16 )\GetInt!
 
-queue = util.Queue( limit )
-
+local isInDebug
 do
 
     import AddChangeCallback from environment.cvars
 
     AddChangeCallback( "gpm_logger_date", ( _, __, new ) ->
         dateScheme = ( new == "1" and "%d-%m-%Y %H:%M:%S " or "%H:%M:%S ")
-
     "GLua Package Manager::Logger")
 
     AddChangeCallback( "gpm_logger_limit", ( _, __, new ) ->
-        limit = tonumber( new )
+        limit = tonumber( new, 10  )
         if limit
-            queue.size = limit
             timer.Adjust( "GLua Package Manager::Logger", 1 / limit, 0 )
 
+        return nil
     "GLua Package Manager::Logger" )
 
-secondary_text = Color( 150, 150, 150 )
-primary_text = Color( 200, 200, 200 )
+    developer = _G.GetConVar( "developer" )
+
+    if _G.game.IsDedicated!
+        isDebug = developer\GetInt! > 0
+
+        AddChangeCallback( "developer", ( _, __, new ) ->
+            isDebug = ( tonumber( new, 10 ) or 0 ) > 0
+        "GLua Package Manager::Logger" )
+
+        isInDebug = ->
+            return isDebug
+    else
+        import GetInt from _G.getmetatable( developer )
+
+        isInDebug = ->
+            return GetInt( developer ) > 0
+
+secondaryTextColor = Color( 150, 150, 150 )
+primaryTextColor = Color( 200, 200, 200 )
 white = Color( 255, 255, 255 )
 info = Color( 70, 135, 255 )
 warn = Color( 255, 130, 90 )
 error = Color( 250, 55, 40 )
 debug = Color( 0, 200, 150 )
 
-local state, state_color
+local state, stateColor
 if MENU_DLL
     state = "Main Menu"
-    state_color = Color( 75, 175, 80 )
+    stateColor = Color( 75, 175, 80 )
 elseif CLIENT
     state = "Client"
-    state_color = Color( 225, 170, 10 )
+    stateColor = Color( 225, 170, 10 )
 elseif SERVER
     state = "Server"
-    state_color = Color( 5, 170, 250 )
+    stateColor = Color( 5, 170, 250 )
 else
     state = "Unknown"
-    state_color = white
+    stateColor = white
 
 state = "[" .. state .. "] "
+queue = util.Queue!
 
+local display
 do
 
     import date from environment.os
     import MsgC from environment
 
-    timer.Create "GLua Package Manager::Logger", 1 / limit, 0, ->
-        data = queue\dequeue!
-        if data
-            MsgC( secondary_text, date( dateScheme ), state_color, state, data[ 1 ], data[ 2 ], secondary_text, " --> ", data[ 3 ], data[ 4 ], secondary_text, " : ", data[ 5 ], data[ 6 ] .. "\n" )
-
+    display = ( levelColor, level, titleColor, title, msgColor, msg ) ->
+        MsgC( secondaryTextColor, date( dateScheme ), stateColor, state, levelColor, level, secondaryTextColor, " --> ", titleColor, title, secondaryTextColor, " : ", msgColor, msg .. "\n" )
         return nil
 
-local log
-do
+dequeue = ->
+    data = queue\Dequeue!
+    if data
+        display( data[ 1 ], data[ 2 ], data[ 3 ], data[ 4 ], data[ 5 ], data[ 6 ] )
 
-    import tostring from environment
+    return nil
 
-    log = ( color, level, str, ... ) =>
-        if @interpolation
-            args = {...}
-            for index = 1, #args
-                args[ tostring( index ) ] = tostring( args[ index ] )
+timer.Create( "GLua Package Manager::Logger", 1 / limit, 0, dequeue )
 
-            str = gsub( str, "{([0-9]+)}", args )
-        else
-            str = format( str, ... )
+_G.hook.Add "ShutDown", "GLua Package Manager::Logger", ->
+    timer.Remove "GLua Package Manager::Logger"
 
-        title = @title
+    while not queue\IsEmpty!
+        dequeue!
 
-        titleLength = len( title )
-        if titleLength > 64
-            title = sub( title, 1, 64 )
-            titleLength = 64
-            @title = title
+    return nil
 
-        if ( len( str ) + titleLength ) > 950
-            str = sub( str, 1, 950 - titleLength ) .. "..."
+log = ( color, level, str, ... ) =>
+    if @interpolation
+        args = {...}
+        for index = 1, #args
+            args[ tostring( index ) ] = tostring( args[ index ] )
 
-        -- TODO: for ukdev - enqueue only spam messages (i.e. if there is too many messages per second)
-        queue\enqueue( { color, level, @title_color, title, @text_color, str } )
-        return nil
+        str = gsub( str, "{([0-9]+)}", args )
+    else
+        str = format( str, ... )
 
-developer = GetConVar( "developer" )
+    title = @title
 
-debugFilter = ->
-    return developer\GetInt! > 0
+    titleLength = len( title )
+    if titleLength > 64
+        title = sub( title, 1, 64 )
+        titleLength = 64
+        @title = title
+
+    if ( len( str ) + titleLength ) > 950
+        str = sub( str, 1, 950 - titleLength ) .. "..."
+
+    if isLoading
+        display( color, level, @title_color, title, @text_color, str )
+    else
+        queue\Enqueue( { color, level, @title_color, title, @text_color, str } )
+
+    return nil
 
 loggerClass = environment.class( "Logger", {
     __tostring: =>
         return format( "Logger: %p [%s]", @, @title )
 
-    new: ( @title = "unknown", @title_color = white, @interpolation = true, @debug_filter = debugFilter ) =>
-        @text_color = primary_text
+    new: ( @title = "unknown", @title_color = white, @interpolation = true, @IsInDebug = isInDebug ) =>
+        @text_color = primaryTextColor
 
     Log: log
 
@@ -130,7 +158,7 @@ loggerClass = environment.class( "Logger", {
         return nil
 
     Debug: ( ... ) =>
-        if @debug_filter( ... )
+        if @IsInDebug!
             log( @, debug, "DEBUG ", ... )
 
         return nil

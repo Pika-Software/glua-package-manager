@@ -1463,16 +1463,16 @@ do
             @size = ( isnumber( size ) and size > 0 ) and size or -1
             @pointer = 0
 
-        isEmpty: =>
+        IsEmpty: =>
             return @pointer == 0
 
-        isFull: =>
+        IsFull: =>
             return @pointer == @size
 
-        peek: =>
+        Peek: =>
             return @[ @pointer ]
 
-        push: ( value ) =>
+        Push: ( value ) =>
             pointer = @pointer
             if pointer ~= @size
                 pointer += 1
@@ -1481,7 +1481,7 @@ do
 
             return pointer
 
-        pop: =>
+        Pop: =>
             pointer = @pointer
             if pointer == 0
                 return nil
@@ -1491,7 +1491,7 @@ do
             @[ pointer ] = nil
             return value
 
-        empty: =>
+        Empty: =>
             for index = 1, @pointer
                 @[ index ] = nil
 
@@ -1511,7 +1511,7 @@ do
     --]]
 
     enqueue = ( value ) =>
-        if @isFull!
+        if @IsFull!
             return nil
 
         rear = @rear + 1
@@ -1519,7 +1519,7 @@ do
         @[ rear ] = value
 
     dequeue = =>
-        if @isEmpty!
+        if @IsEmpty!
             return nil
 
         front = @front
@@ -1530,7 +1530,7 @@ do
         @front = front
 
         if ( front * 2 ) >= @rear
-            @optimize!
+            @Optimize!
 
         return value
 
@@ -1543,29 +1543,29 @@ do
             @front = 1
             @rear = 0
 
-        length: =>
+        Length: =>
             return ( @rear - @front ) + 1
 
-        isEmpty: =>
+        IsEmpty: =>
             :rear = @
             return rear == 0 or @front > rear
 
-        isFull: =>
-            return @length! == @size
+        IsFull: =>
+            return @Length! == @size
 
-        push: enqueue
-        pop: dequeue
+        Push: enqueue
+        Pop: dequeue
 
-        :enqueue
-        :dequeue
+        Enqueue: enqueue
+        Dequeue: dequeue
 
-        get: ( index ) =>
+        Get: ( index ) =>
             return @[ @front + index ]
 
-        set: ( index, value ) =>
+        Set: ( index, value ) =>
             @[ @front + index ] = value
 
-        optimize: =>
+        Optimize: =>
             pointer, buffer = 1, {}
 
             for index = @front, @rear
@@ -1579,15 +1579,15 @@ do
             @front = 1
             @rear = pointer - 1
 
-        peek: =>
+        Peek: =>
             return @[ @front ]
 
-        empty: =>
+        Empty: =>
             for index = @front, @rear
                 @[ index ] = nil
 
-        iterator: =>
-            @optimize!
+        Iterator: =>
+            @Optimize!
 
             :front, :rear = @
             front -= 1
