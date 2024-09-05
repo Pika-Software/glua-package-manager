@@ -98,7 +98,7 @@ function environment.util.Bint( bits, wordbits )
     assert( wordbits >= 8, 'wordbits must be at least 8' )
     assert( ( bits % 8 ) == 0, 'bitsize must be multiple of 8' )
 
-    local bint_band, bint_bor
+    local bint_band, bint_bor, bint_lshift, bint_rshift, negation, add
 
     local static = {}
     local internal = {}
@@ -215,7 +215,7 @@ function environment.util.Bint( bits, wordbits )
             end
 
             if neg then
-                n:_unm()
+                negation( n )
             end
 
             return n
@@ -302,12 +302,12 @@ function environment.util.Bint( bits, wordbits )
             end
 
             if d ~= 0 then
-                n:_add( d )
+                add( n, d )
             end
         end
 
         if sign == '-' then
-            n:_unm()
+            negation( n )
         end
 
         return n
@@ -838,7 +838,7 @@ function environment.util.Bint( bits, wordbits )
     end
 
     --- Bitwise right shift a bint in one bit (in-place).
-    function internal:_shrone()
+    local bint_shrone = function( self )
         local wordbitsm1 = BINT_WORDBITS - 1
         for i = 1, BINT_SIZE - 1 do
             self[ i ] = band( bor( rshift( self[ i ], 1 ), lshift( self[ i + 1 ], wordbitsm1 ) ), BINT_WORDMAX )
@@ -861,27 +861,8 @@ function environment.util.Bint( bits, wordbits )
         return self
     end
 
-    -- Bitwise right shift words of a bint (in-place). Used only internally.
-    function internal:_shrwords( n )
-        if n < BINT_SIZE then
-            for i = 1, BINT_SIZE - n do
-                self[ i ] = self[ i + n ]
-            end
-
-            for i = BINT_SIZE - n + 1, BINT_SIZE do
-                self[ i ] = 0
-            end
-        else
-            for i = 1, BINT_SIZE do
-                self[ i ] = 0
-            end
-        end
-
-        return self
-    end
-
     --- Increment a bint by one (in-place).
-    function internal:_inc()
+    local increment = function( self )
         for i = 1, BINT_SIZE do
             local tmp = self[ i ]
 
@@ -896,19 +877,21 @@ function environment.util.Bint( bits, wordbits )
         return self
     end
 
+    internal.increment = increment
+
     --- Increment a number by one considering bints.
     -- @param x A bint or a lua number to increment.
-    function internal.increment( x )
+    function static.increment( x )
         local ix = tobint( x, true )
         if ix then
-            return ix:_inc()
+            return increment( ix )
         end
 
         return x + 1
     end
 
     --- Decrement a bint by one (in-place).
-    function internal:_dec()
+    local decrement = function( self )
         for i = 1, BINT_SIZE do
             local tmp = self[ i ]
 
@@ -923,12 +906,14 @@ function environment.util.Bint( bits, wordbits )
         return self
     end
 
+    internal.decrement = decrement
+
     --- Decrement a number by one considering bints.
     -- @param x A bint or a lua number to decrement.
-    function internal.decrement( x )
+    function static.decrement( x )
         local ix = tobint( x, true )
         if ix then
-            return ix:_dec()
+            return decrement( ix )
         end
 
         return x - 1
@@ -950,7 +935,7 @@ function environment.util.Bint( bits, wordbits )
     --- Take absolute of a bint (in-place).
     function internal:_abs()
         if self:IsNegative() then
-            self:_unm()
+            negation( self )
         end
 
         return self
@@ -999,50 +984,60 @@ function environment.util.Bint( bits, wordbits )
             return bint_zero()
         elseif y < BINT_BITS then
 
-            return bint_band( x, bint_one():__shl( y ) ):_dec()
+            return decrement( bint_band( x, bint_lshift( bint_one(), y ) ) )
         end
 
         return bint_new( x )
     end
 
-    --- Rotate left integer x by y bits considering bints.
-    -- @param x A bint or a lua integer.
-    -- @param y Number of bits to rotate.
-    function internal.brol( x, y )
-        x, y = bint_assert_convert( x ), bint_assert_tointeger( y )
+    do
 
-        if y > 0 then
-            return bint_bor( x:__shl( y ), x:__shr( BINT_BITS - y ) )
-        elseif y < 0 then
-            if y ~= math_mininteger then
-                return x:bror( -y )
-            else
-                x:bror( -( y + 1 ) )
-                x:bror( 1 )
+        local bint_bror
+
+        --- Rotate left integer x by y bits considering bints.
+        -- @param x A bint or a lua integer.
+        -- @param y Number of bits to rotate.
+        local bint_brol = function( x, y )
+            x, y = bint_assert_convert( x ), bint_assert_tointeger( y )
+
+            if y > 0 then
+                return bint_bor( bint_lshift( x, y ), bint_rshift( x, BINT_BITS - y ) )
+            elseif y < 0 then
+                if y ~= math_mininteger then
+                    return bint_bror( x, -y )
+                else
+                    bint_bror( x, -( y + 1 ) )
+                    bint_bror( x, 1 )
+                end
             end
+
+            return x
         end
 
-        return x
-    end
+        internal.brol = bint_brol
 
-    --- Rotate right integer x by y bits considering bints.
-    -- @param x A bint or a lua integer.
-    -- @param y Number of bits to rotate.
-    function internal.bror( x, y )
-        x, y = bint_assert_convert( x ), bint_assert_tointeger( y )
+        --- Rotate right integer x by y bits considering bints.
+        -- @param x A bint or a lua integer.
+        -- @param y Number of bits to rotate.
+        bint_bror = function( x, y )
+            x, y = bint_assert_convert( x ), bint_assert_tointeger( y )
 
-        if y > 0 then
-            return bint_bor( x:__shr( y ), x:__shl( BINT_BITS - y ) )
-        elseif y < 0 then
-            if y ~= math_mininteger then
-                return x:brol( -y )
-            else
-                x:brol( -( y + 1 ) )
-                x:brol( 1 )
+            if y > 0 then
+                return bint_bor( bint_rshift( x, y ), bint_lshift( x, BINT_BITS - y ) )
+            elseif y < 0 then
+                if y ~= math_mininteger then
+                    return bint_brol( x, -y )
+                else
+                    bint_brol( x, -( y + 1 ) )
+                    bint_brol( x, 1 )
+                end
             end
+
+            return x
         end
 
-        return x
+        internal.bror = bint_bror
+
     end
 
     --- Truncate a number to a bint.
@@ -1109,7 +1104,7 @@ function environment.util.Bint( bits, wordbits )
     --- Add an integer to a bint (in-place).
     -- @param y An integer to be added.
     -- @raise Asserts in case inputs are not convertible to integers.
-    function internal:_add( y )
+    add = function( self, y )
         y = bint_assert_convert( y )
 
         local carry = 0
@@ -1121,6 +1116,8 @@ function environment.util.Bint( bits, wordbits )
 
         return self
     end
+
+    internal.add = add
 
     --- Add two numbers considering bints.
     -- @param x A bint or a lua number to be added.
@@ -1145,7 +1142,7 @@ function environment.util.Bint( bits, wordbits )
     --- Subtract an integer from a bint (in-place).
     -- @param y An integer to subtract.
     -- @raise Asserts in case inputs are not convertible to integers.
-    function internal:_sub( y )
+    function internal:sub( y )
         y = bint_assert_convert( y )
 
         local borrow = 0
@@ -1246,148 +1243,153 @@ function environment.util.Bint( bits, wordbits )
         return x == y
     end
 
-    internal.eq = bint_eq
+    internal.equal = bint_eq
 
-    local function findleftbit( x )
-        for i = BINT_SIZE, 1, -1 do
-            local v = x[ i ]
-            if v ~= 0 then
-                local j = 0
+    local bint_udivmod, bint_ult
+    do
 
-                repeat
-                    v = rshift( v, 1 )
-                    j = j + 1
-                until v == 0
+        local function findleftbit( x )
+            for i = BINT_SIZE, 1, -1 do
+                local v = x[ i ]
+                if v ~= 0 then
+                    local j = 0
 
-                return ( i - 1 ) * BINT_WORDBITS + j - 1, i
-            end
-        end
-    end
+                    repeat
+                        v = rshift( v, 1 )
+                        j = j + 1
+                    until v == 0
 
-    -- Single word division modulus
-    local function sudivmod( nume, deno )
-        local carry = 0
-        local rema
-
-        for i = BINT_SIZE, 1, -1 do
-            carry = bor( carry, nume[ i ] )
-            nume[ i ] = math_fdiv( carry, deno )
-            rema = carry % deno
-            carry = lshift( rema, BINT_WORDBITS )
-        end
-
-        return rema
-    end
-
-    --- Perform unsigned division and modulo operation between two integers considering bints.
-    -- This is effectively the same of @{internal.udiv} and @{internal.umod}.
-    -- @param x The numerator, must be a bint or a lua integer.
-    -- @param y The denominator, must be a bint or a lua integer.
-    -- @return The quotient following the remainder, both bints.
-    -- @raise Asserts on attempt to divide by zero
-    -- or if inputs are not convertible to integers.
-    -- @see internal.udiv
-    -- @see internal.umod
-    local bint_udivmod = function( x, y )
-        local nume, deno = bint_new( x ), bint_assert_convert( y )
-
-        -- compute if high bits of denominator are all zeros
-        local ishighzero = true
-        for i = 2, BINT_SIZE do
-            if deno[ i ] ~= 0 then
-                ishighzero = false
-                break
+                    return ( i - 1 ) * BINT_WORDBITS + j - 1, i
+                end
             end
         end
 
-        if ishighzero then
-            -- try to divide by a single word (optimization)
-            local low = deno[ 1 ]
-            assert( low ~= 0, 'attempt to divide by zero' )
+        -- Single word division modulus
+        local function sudivmod( nume, deno )
+            local carry = 0
+            local rema
 
-            -- denominator is one
-            if low == 1 then
-                return nume, bint_zero()
-
-            -- can do single word division
-            elseif low <= ( BINT_WORDMSB - 1 ) then
-                return nume, bint_fromuinteger( sudivmod( nume, low ) )
+            for i = BINT_SIZE, 1, -1 do
+                carry = bor( carry, nume[ i ] )
+                nume[ i ] = math_fdiv( carry, deno )
+                rema = carry % deno
+                carry = lshift( rema, BINT_WORDBITS )
             end
+
+            return rema
         end
 
-        if nume:ult( deno ) then
-            -- denominator is greater than numerator
-            return bint_zero(), nume
-        end
+        --- Perform unsigned division and modulo operation between two integers considering bints.
+        -- This is effectively the same of @{internal.udiv} and @{internal.umod}.
+        -- @param x The numerator, must be a bint or a lua integer.
+        -- @param y The denominator, must be a bint or a lua integer.
+        -- @return The quotient following the remainder, both bints.
+        -- @raise Asserts on attempt to divide by zero
+        -- or if inputs are not convertible to integers.
+        -- @see internal.udiv
+        -- @see internal.umod
+        bint_udivmod = function( x, y )
+            local nume, deno = bint_new( x ), bint_assert_convert( y )
 
-        -- align leftmost digits in numerator and denominator
-        local denolbit = findleftbit( deno )
-        local numelbit, numesize = findleftbit( nume )
-
-        local bit = numelbit - denolbit
-        deno = deno:__shl( bit )
-
-        local wordmaxp1 = BINT_WORDMAX + 1
-        local wordbitsm1 = BINT_WORDBITS - 1
-        local denosize = numesize
-        local quot = bint_zero()
-
-        while bit >= 0 do
-            -- compute denominator <= numerator
-            local size = math_max( numesize, denosize )
-            local le = true
-
-            for i = size, 1, -1 do
-                local a, b = deno[ i ], nume[ i ]
-                if a ~= b then
-                    le = a < b
+            -- compute if high bits of denominator are all zeros
+            local ishighzero = true
+            for i = 2, BINT_SIZE do
+                if deno[ i ] ~= 0 then
+                    ishighzero = false
                     break
                 end
             end
 
-            -- if the portion of the numerator above the denominator is greater or equal than to the denominator
-            if le then
-                -- subtract denominator from the portion of the numerator
-                local borrow = 0
-                for i = 1, size do
-                    local res = nume[ i ] + wordmaxp1 - deno[ i ] - borrow
-                    nume[ i ] = band( res, BINT_WORDMAX )
-                    borrow = bxor( rshift( res, BINT_WORDBITS ), 1 )
-                end
+            if ishighzero then
+                -- try to divide by a single word (optimization)
+                local low = deno[ 1 ]
+                assert( low ~= 0, 'attempt to divide by zero' )
 
-                -- concatenate 1 to the right bit of the quotient
-                local i = math_fdiv( bit, BINT_WORDBITS ) + 1
-                quot[ i ] = bor( quot[ i ], lshift( 1, bit % BINT_WORDBITS ) )
-            end
+                -- denominator is one
+                if low == 1 then
+                    return nume, bint_zero()
 
-            -- shift right the denominator in one bit
-            for i = 1, denosize - 1 do
-                deno[ i ] = band( bor( rshift( deno[ i ], 1 ), lshift( deno[ i + 1 ], wordbitsm1 ) ), BINT_WORDMAX )
-            end
-
-            local lastdenoword = rshift( deno[ denosize ], 1 )
-            deno[ denosize ] = lastdenoword
-
-            -- recalculate denominator size (optimization)
-            if lastdenoword == 0 then
-                while deno[ denosize ] == 0 do
-                    denosize = denosize - 1
-                end
-
-                if denosize == 0 then
-                    break
+                -- can do single word division
+                elseif low <= ( BINT_WORDMSB - 1 ) then
+                    return nume, bint_fromuinteger( sudivmod( nume, low ) )
                 end
             end
 
-            -- decrement current set bit for the quotient
-            bit = bit - 1
+            if bint_ult( nume, deno ) then
+                -- denominator is greater than numerator
+                return bint_zero(), nume
+            end
+
+            -- align leftmost digits in numerator and denominator
+            local denolbit = findleftbit( deno )
+            local numelbit, numesize = findleftbit( nume )
+
+            local bit = numelbit - denolbit
+            deno = bint_lshift( deno, bit )
+
+            local wordmaxp1 = BINT_WORDMAX + 1
+            local wordbitsm1 = BINT_WORDBITS - 1
+            local denosize = numesize
+            local quot = bint_zero()
+
+            while bit >= 0 do
+                -- compute denominator <= numerator
+                local size = math_max( numesize, denosize )
+                local le = true
+
+                for i = size, 1, -1 do
+                    local a, b = deno[ i ], nume[ i ]
+                    if a ~= b then
+                        le = a < b
+                        break
+                    end
+                end
+
+                -- if the portion of the numerator above the denominator is greater or equal than to the denominator
+                if le then
+                    -- subtract denominator from the portion of the numerator
+                    local borrow = 0
+                    for i = 1, size do
+                        local res = nume[ i ] + wordmaxp1 - deno[ i ] - borrow
+                        nume[ i ] = band( res, BINT_WORDMAX )
+                        borrow = bxor( rshift( res, BINT_WORDBITS ), 1 )
+                    end
+
+                    -- concatenate 1 to the right bit of the quotient
+                    local i = math_fdiv( bit, BINT_WORDBITS ) + 1
+                    quot[ i ] = bor( quot[ i ], lshift( 1, bit % BINT_WORDBITS ) )
+                end
+
+                -- shift right the denominator in one bit
+                for i = 1, denosize - 1 do
+                    deno[ i ] = band( bor( rshift( deno[ i ], 1 ), lshift( deno[ i + 1 ], wordbitsm1 ) ), BINT_WORDMAX )
+                end
+
+                local lastdenoword = rshift( deno[ denosize ], 1 )
+                deno[ denosize ] = lastdenoword
+
+                -- recalculate denominator size (optimization)
+                if lastdenoword == 0 then
+                    while deno[ denosize ] == 0 do
+                        denosize = denosize - 1
+                    end
+
+                    if denosize == 0 then
+                        break
+                    end
+                end
+
+                -- decrement current set bit for the quotient
+                bit = bit - 1
+            end
+
+            -- the remaining numerator is the remainder
+            return quot, nume
         end
 
-        -- the remaining numerator is the remainder
-        return quot, nume
-    end
+        internal.udivmod = bint_udivmod
 
-    internal.udivmod = bint_udivmod
+    end
 
     --- Perform unsigned division between two integers considering bints.
     -- @param x The numerator, must be a bint or a lua integer.
@@ -1483,31 +1485,31 @@ function environment.util.Bint( bits, wordbits )
             local isdenoneg = band( iy[ BINT_SIZE ], BINT_WORDMSB ) ~= 0
 
             if isnumeneg then
-                ix = ix:__unm()
+                ix = -ix
             end
 
             if isdenoneg then
-                iy = iy:__unm()
+                iy = -iy
             end
 
             local quot, rema = bint_udivmod( ix, iy )
             if isnumeneg ~= isdenoneg then
-                quot:_unm()
+                negation( quot )
 
                 -- round quotient towards minus infinity
                 if not rema:IsZero() then
-                    quot:_dec()
+                    decrement( quot )
 
                     -- adjust the remainder
                     if isnumeneg and not isdenoneg then
-                        rema:_unm():_add( y )
+                        add( negation( rema ), y )
                     elseif isdenoneg and not isnumeneg then
-                        rema:_add( y )
+                        add( rema, y )
                     end
                 end
             elseif isnumeneg then
                 -- adjust the remainder
-                rema:_unm()
+                negation( rema )
             end
 
             return quot, rema
@@ -1533,20 +1535,20 @@ function environment.util.Bint( bits, wordbits )
             local isdenoneg = band( iy[ BINT_SIZE ], BINT_WORDMSB ) ~= 0
 
             if isnumeneg then
-                ix = ix:__unm()
+                ix = -ix
             end
 
             if isdenoneg then
-                iy = iy:__unm()
+                iy = -iy
             end
 
             local quot, rema = bint_udivmod( ix, iy )
             if isnumeneg ~= isdenoneg then
-                quot:_unm()
+                negation( quot )
 
                 -- round quotient towards minus infinity
                 if not rema:IsZero() then
-                    quot:_dec()
+                    decrement( quot )
                 end
             end
 
@@ -1600,11 +1602,11 @@ function environment.util.Bint( bits, wordbits )
         repeat
             if y:IsEven() then
                 x = x * x
-                y:_shrone()
+                bint_shrone( y )
             else
                 z = x * z
                 x = x * x
-                y:_dec():_shrone()
+                bint_shrone( decrement( y ) )
             end
         until y:IsOne()
 
@@ -1634,7 +1636,7 @@ function environment.util.Bint( bits, wordbits )
                 z = bint_umod( z * x, m )
             end
 
-            y:_shrone()
+            bint_shrone( y )
             x = bint_umod( x * x, m )
         end
 
@@ -1656,14 +1658,15 @@ function environment.util.Bint( bits, wordbits )
     -- @param y An integer with the number of bits to shift.
     -- @return The result of shift operation, a bint.
     -- @raise Asserts in case inputs are not convertible to integers.
-    function internal.__shl( x, y )
+    bint_lshift = function( x, y )
         x, y = bint_new( x ), bint_assert_tointeger( y )
+
         if y == math_mininteger or math_abs( y ) >= BINT_BITS then
             return bint_zero()
         end
 
         if y < 0 then
-            return x:__shr( -y )
+            return bint_rshift( x, -y )
         end
 
         local nvals = math_fdiv( y, BINT_WORDBITS )
@@ -1684,37 +1687,62 @@ function environment.util.Bint( bits, wordbits )
         return x
     end
 
-    --- Bitwise right shift integers considering bints.
-    -- @param x An integer to perform the bitwise shift.
-    -- @param y An integer with the number of bits to shift.
-    -- @return The result of shift operation, a bint.
-    -- @raise Asserts in case inputs are not convertible to integers.
-    function internal.__shr( x, y )
-        x, y = bint_new( x ), bint_assert_tointeger( y )
-        if y == math_mininteger or math_abs( y ) >= BINT_BITS then
-            return bint_zero()
-        end
+    internal.lshift = bint_lshift
+    internal.__shl = bint_lshift
 
-        if y < 0 then
-            return x:__shl( -y )
-        end
+    do
 
-        local nvals = math_fdiv( y, BINT_WORDBITS )
-        if nvals ~= 0 then
-            x:_shrwords( nvals )
-            y = y - ( nvals * BINT_WORDBITS )
-        end
+        --- Bitwise right shift integers considering bints.
+        -- @param x An integer to perform the bitwise shift.
+        -- @param y An integer with the number of bits to shift.
+        -- @return The result of shift operation, a bint.
+        -- @raise Asserts in case inputs are not convertible to integers.
+        bint_rshift = function( x, y )
+            x, y = bint_new( x ), bint_assert_tointeger( y )
 
-        if y ~= 0 then
-            local wordbitsmy = BINT_WORDBITS - y
-            for i = 1, BINT_SIZE - 1 do
-                x[ i ] = band( bor( rshift( x[ i ], y ), lshift( x[ i + 1 ], wordbitsmy ) ), BINT_WORDMAX )
+            if y == math_mininteger or math_abs( y ) >= BINT_BITS then
+                return bint_zero()
             end
 
-            x[ BINT_SIZE ] = rshift( x[ BINT_SIZE ], y )
+            if y < 0 then
+                return bint_lshift( x, -y )
+            end
+
+            local nvals = math_fdiv( y, BINT_WORDBITS )
+            if nvals ~= 0 then
+                -- Bitwise right shift words of a bint (in-place). Used only internally.
+                if nvals < BINT_SIZE then
+                    for i = 1, BINT_SIZE - nvals do
+                        x[ i ] = x[ i + nvals ]
+                    end
+
+                    for i = BINT_SIZE - nvals + 1, BINT_SIZE do
+                        x[ i ] = 0
+                    end
+                else
+                    for i = 1, BINT_SIZE do
+                        x[ i ] = 0
+                    end
+                end
+
+                y = y - ( nvals * BINT_WORDBITS )
+            end
+
+            if y ~= 0 then
+                local wordbitsmy = BINT_WORDBITS - y
+                for i = 1, BINT_SIZE - 1 do
+                    x[ i ] = band( bor( rshift( x[ i ], y ), lshift( x[ i + 1 ], wordbitsmy ) ), BINT_WORDMAX )
+                end
+
+                x[ BINT_SIZE ] = rshift( x[ BINT_SIZE ], y )
+            end
+
+            return x
         end
 
-        return x
+        internal.rshift = bint_rshift
+        internal.__shr = bint_rshift
+
     end
 
     -- BAND ( a & b )
@@ -1745,6 +1773,14 @@ function environment.util.Bint( bits, wordbits )
         end
 
         static.band = bint_band
+
+        function internal:IsUnsigned()
+            return bint_band( self, BINT_MININTEGER ):IsZero()
+        end
+
+        function internal:ToSigned()
+            return self - BINT_MININTEGER
+        end
 
     end
 
@@ -1806,38 +1842,56 @@ function environment.util.Bint( bits, wordbits )
             return internal_bxor( bint_new( x ), y )
         end
 
-    end
-
-    --- Bitwise NOT a bint (in-place).
-    function internal:_bnot()
-        for i = 1, BINT_SIZE do
-            self[ i ] = band( bnot( self[ i ] ), BINT_WORDMAX )
+        function internal:ToUnsigned()
+            return internal_bxor( self, BINT_MININTEGER )
         end
 
-        return self
     end
 
-    --- Bitwise NOT a bint.
-    -- @param x An integer to perform bitwise NOT.
-    -- @raise Asserts in case inputs are not convertible to integers.
-    function internal.__bnot( x )
-        local y = setmetatable( {}, internal )
-        for i = 1, BINT_SIZE do
-            y[ i ] = band( bnot( x[ i ] ), BINT_WORDMAX )
+    -- BNOT ( ~ a )
+    do
+
+        --- Bitwise NOT a bint (in-place).
+        local bint_bnot = function( self )
+            for i = 1, BINT_SIZE do
+                self[ i ] = band( bnot( self[ i ] ), BINT_WORDMAX )
+            end
+
+            return self
         end
 
-        return y
+        internal.bnot = bint_bnot
+
+        --- Negate a bint (in-place). This effectively applies two's complements.
+        negation = function( self )
+            return increment( bint_bnot( self ) )
+        end
+
     end
 
-    --- Negate a bint (in-place). This effectively applies two's complements.
-    function internal:_unm()
-        return self:_bnot():_inc()
-    end
+    do
 
-    --- Negate a bint. This effectively applies two's complements.
-    -- @param x A bint to perform negation.
-    function internal.__unm( x )
-       return x:__bnot():_inc()
+        --- Bitwise NOT a bint.
+        -- @param x An integer to perform bitwise NOT.
+        -- @raise Asserts in case inputs are not convertible to integers.
+        local bint_bnot = function( x )
+            local y = setmetatable( {}, internal )
+            for i = 1, BINT_SIZE do
+                y[ i ] = band( bnot( x[ i ] ), BINT_WORDMAX )
+            end
+
+            return y
+        end
+
+        internal.__bnot = bint_bnot
+        static.bnot = bint_bnot
+
+        --- Negate a bint. This effectively applies two's complements.
+        -- @param x A bint to perform negation.
+        internal.__unm = function( x )
+            return increment( bint_bnot( x ) )
+        end
+
     end
 
     --- Compare if integer x is less than y considering bints (unsigned version).
@@ -1845,8 +1899,9 @@ function environment.util.Bint( bits, wordbits )
     -- @param y Right integer to compare.
     -- @raise Asserts in case inputs are not convertible to integers.
     -- @see internal.__lt
-    function internal.ult( x, y )
+    bint_ult = function( x, y )
         x, y = bint_assert_convert( x ), bint_assert_convert( y )
+
         for i = BINT_SIZE, 1, -1 do
             local a, b = x[ i ], y[ i ]
             if a ~= b then
@@ -1856,6 +1911,8 @@ function environment.util.Bint( bits, wordbits )
 
         return false
     end
+
+    internal.ult = bint_ult
 
     --- Compare if bint x is less or equal than y considering bints (unsigned version).
     -- @param x Left integer to compare.

@@ -2,10 +2,11 @@ _G = _G
 import environment, Logger, sql from _G.gpm
 import file, istable, CLIENT, SERVER, MENU_DLL from _G
 import async, await, debug, util, path, string, Promise, CodeCompileError, FileSystemError, error, argument from environment
-import ByteStream, IsBinaryModuleInstalled from util
+import ByteStream, IsBinaryModuleInstalled, SHA256 from util
 import byte, sub, len, match, ByteSplit from string
 import resolve, getDirectory, getFile from path
 import concat from environment.table
+import get, save from sql.files
 import fempty from debug
 import Find from file
 
@@ -402,10 +403,10 @@ do
                 if directoryPath ~= "" and directoryPath ~= "/"
                     createDir( directoryPath, true, gamePath, true )
 
-            f = Open( filePath, fileMode, gamePath )
-            if f
-                setmetatable( f, @.__class.__base )
-                return true, f
+            cls = Open( filePath, fileMode, gamePath )
+            if cls
+                setmetatable( cls, @.__class.__base )
+                return true, cls
 
             return true, nil
 
@@ -496,7 +497,12 @@ do
         base.WriteDate = ByteStream.WriteDate
 
     append = lib.Append = ( filePath, content, gamePath, skipNormalize ) ->
-        fileHandle = fileClass( filePath, "ab", gamePath, skipNormalize )
+        unless skipNormalize
+            filePath, gamePath = normalizeGamePath( filePath, gamePath )
+
+        assertWriteAllowed( filePath, gamePath )
+
+        fileHandle = fileClass( filePath, "ab", gamePath, true )
         if fileHandle
             Write( fileHandle, content )
             Close( fileHandle )
@@ -505,30 +511,34 @@ do
         return false
 
     read = lib.Read = ( filePath, gamePath, length, skipNormalize, validateHash ) ->
-        fileHandle = fileClass( filePath, "rb", gamePath, skipNormalize )
+        unless skipNormalize
+            filePath, gamePath = normalizeGamePath( filePath, gamePath )
+
+        fileHandle = fileClass( filePath, "rb", gamePath, true )
         if fileHandle
             content = Read( fileHandle, length )
             Close( fileHandle )
 
             if validateHash
-                fullPath = absoluteGamePath( filePath, gamePath, false )
-                hash = util.SHA256( content )
-                f = sql.files.get( fullPath )
-
-                unless f and (not f.hash or f.hash == hash) and f.size == #content
+                cache = get( absoluteGamePath( filePath, gamePath, false ) )
+                unless cache and ( not cache.hash or cache.hash == SHA256( content ) ) and cache.size == len( content )
                     return nil
 
             return content
 
     write = lib.Write = ( filePath, content, gamePath, skipNormalize, saveHash ) ->
-        fileHandle = fileClass( filePath, "wb", gamePath, skipNormalize )
+        unless skipNormalize
+            filePath, gamePath = normalizeGamePath( filePath, gamePath )
+
+        assertWriteAllowed( filePath, gamePath )
+
+        fileHandle = fileClass( filePath, "wb", gamePath, true )
         if fileHandle
             Write( fileHandle, content )
             Close( fileHandle )
 
             if saveHash
-                fullPath = absoluteGamePath( filePath, gamePath, false )
-                sql.files.save( fullPath, #content, nil, util.SHA256( content ) )
+                save( absoluteGamePath( filePath, gamePath, false ), len( content ), nil, SHA256( content ) )
 
             return true
 
@@ -801,12 +811,9 @@ do
             state = Read filePath, gamePath, ( _, __, iState, iContent ) ->
                 if iState == 0
                     if validateHash
-                        fullPath = absoluteGamePath( filePath, gamePath, false )
-                        hash = util.SHA256( iContent )
-                        f = sql.files.get( fullPath )
-
-                        unless f and (not f.hash or f.hash == hash) and f.size == #iContent
-                            promise\Reject( FileSystemError "File hash mismatch for '" .. fullPath .. "'" )
+                        cache = get( absoluteGamePath( filePath, gamePath, false ) )
+                        unless cache and ( not cache.hash or cache.hash == SHA256( iContent ) ) and cache.size == len( iContent )
+                            promise\Reject( FileSystemError "File hash mismatch for '" .. absoluteGamePath( filePath, gamePath, false ) .. "'" )
                             return nil
 
                     promise\Resolve( iContent )
@@ -840,7 +847,7 @@ do
                 if iState == 0
                     fullPath = absoluteGamePath( iFilePath, iGamePath, false )
                     if saveHash
-                        sql.files.save( fullPath, #content, nil, util.SHA256(content) )
+                        save( fullPath, len( content ), nil, SHA256( content ) )
 
                     promise\Resolve( fullPath )
                     return nil

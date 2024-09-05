@@ -281,7 +281,7 @@ do
         return position
 
     Int64 = environment.Int64 = util.Bint( 64 )
-    import FromBigEndian, FromLittleEndian, ToBigEndian, ToLittleEndian from Int64
+    import ToBint, FromBigEndian, FromLittleEndian, ToBigEndian, ToLittleEndian, ToUnsigned, IsUnsigned from Int64
 
     util.ByteStream = environment.class(
         "ByteStream",
@@ -455,10 +455,24 @@ do
 
             -- UInt64
             ReadUInt64: ( isBigEndian ) =>
-                return @ReadUInt( 8, isBigEndian )
+                binary = @Read( 8 )
+                unless binary
+                    return nil, "eof"
+
+                if setEndianness( isBigEndian )
+                    return ToUnsigned( FromBigEndian( binary ) )
+
+                return ToUnsigned( FromLittleEndian( binary ) )
 
             WriteUInt64: ( number, isBigEndian ) =>
-                @WriteUInt( number, 8, isBigEndian )
+                number = ToBint( number )
+                unless IsUnsigned( number )
+                    ToUnsigned( number )
+
+                if setEndianness( isBigEndian )
+                    return @Write( ToBigEndian( number ) )
+
+                return @Write( ToLittleEndian( number ) )
 
             -- Int
             ReadInt: ( bytes, isBigEndian ) =>
@@ -488,10 +502,14 @@ do
 
             -- Int64
             ReadInt64: ( isBigEndian ) =>
-                if setEndianness( isBigEndian )
-                    return FromBigEndian( @Read( 8 ) )
+                binary = @Read( 8 )
+                unless binary
+                    return nil, "eof"
 
-                return FromLittleEndian( @Read( 8 ) )
+                if setEndianness( isBigEndian )
+                    return FromBigEndian( binary )
+
+                return FromLittleEndian( binary )
 
             WriteInt64: ( number, isBigEndian ) =>
                 if setEndianness( isBigEndian )
