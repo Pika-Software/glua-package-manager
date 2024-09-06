@@ -3,9 +3,9 @@ import CLIENT, SERVER, gpm, pcall from _G
 import environment from gpm
 
 import debug, string, path, file, util, pairs, isurl, isstring, argument, URL, ModuleError, error, PackageError, Promise from environment
+import getDirectory, getExtension from path
 import NormalizeGamePath, AbsoluteGamePath, Find from file
 import concat, IsEmpty, Merge from environment.table
-import stripExtension, getDirectory from path
 import await, async from Promise
 newClass = environment.class
 import getfpath from debug
@@ -27,62 +27,6 @@ if SERVER
     import IsBytecode from string
     import AddCSLuaFile from _G
 
-    addFile = async ( filePath, gamePath, mountTable ) ->
-        content = await AsyncRead( filePath, gamePath, true )
-        unless IsBytecode( content )
-            mountTable[ "/lua/" .. filePath .. ".lua" ] = content
-
-        return nil
-
-    addFilePath = ( filePath, gamePath, mountTable, isLuaGamePath ) ->
-        basePath = getDirectory( filePath, true )
-        searchable = getFile( filePath )
-
-        filePath, extension = stripExtension( filePath )
-        if LuaExtensions[ extension ]
-            filePath ..= ".*"
-        else
-            filePath ..= "." .. extension
-
-        files, dirs = Find( filePath, gamePath, true )
-
-        for index = 1, #files
-            fileName, extension = stripExtension( files[ index ] )
-
-            if isLuaGamePath
-                if extension == "lua" or Exists( basePath .. fileName .. ".lua", gamePath, true )
-                    AddCSLuaFile( basePath .. fileName .. ".lua" )
-
-            elseif extension == "txt"
-                await addFile( basePath .. fileName .. "." .. extension, gamePath, mountTable )
-
-        for directoryName in *dirs
-            directoryPath = basePath .. directoryName
-            if directoryPath == filePath
-                addFilePath( directoryPath .. "/*", gamePath, mountTable, isLuaGamePath )
-            else
-                addFilePath( directoryPath .. "/" .. searchable, gamePath, mountTable, isLuaGamePath )
-
-        return nil
-
-    asyncAddCSLuaFile = async ( filePath, gamePath ) ->
-        mountTable = {}
-        addFilePath( filePath, gamePath, mountTable, LuaGamePaths[ gamePath ] or false )
-
-        if IsEmpty( mountTable )
-            return nil
-
-        gma = GMA!
-        gma\SetTitle( "gpm.ACSLF::" .. AbsoluteGamePath( filePath, gamePath ) )
-
-        for fileName, content in pairs( mountTable )
-            gma\SetFile( fileName, content, false )
-
-        for fileName in *await( gma\AsyncMount( false ) )
-            AddCSLuaFile( fileName )
-
-        return nil
-
     addcsluafile = ( filePath = "", gamePath, skipNormalize ) ->
         if filePath == "" or getFile( filePath ) == "."
             fenv = getfenv( 2 )
@@ -101,8 +45,29 @@ if SERVER
         unless skipNormalize
             filePath, gamePath = NormalizeGamePath( filePath, gamePath )
 
-        return asyncAddCSLuaFile( filePath, gamePath )
+        unless LuaGamePaths[ gamePath ]
+            error "Sending lua files from '" .. gamePath .. "' game path is not allowed.", 2
 
+        basePath = getDirectory( filePath, true )
+        searchable = getFile( filePath )
+
+        files, dirs = Find( filePath, gamePath, true )
+
+        for index = 1, #files
+            fileName = files[ index ]
+            if LuaExtensions[ getExtension( fileName, false ) ]
+                AddCSLuaFile( basePath .. fileName )
+            else
+                error "Attept to send non-lua file '" .. basePath .. fileName .. "'.", 2
+
+        for directoryName in *dirs
+            directoryPath = basePath .. directoryName
+            if directoryPath == filePath
+                addFilePath( directoryPath .. "/*", gamePath )
+            else
+                addFilePath( directoryPath .. "/" .. searchable, gamePath )
+
+        return nil
 else
 
     addcsluafile = environment.debug.fempty
@@ -142,8 +107,8 @@ do
     do
 
         import AsyncWrite, Time from file
+        import stripExtension from path
         import PathFromURL from string
-
         -- startTime = environment.os.time! - ( gpm.StartTime or 0 )
 
         -- cache files have different paths for client and server
@@ -232,9 +197,9 @@ do
 
         loader.Module = moduleClass
 
-    import getFileName, getExtension from path
     import STATE_REJECTED from Promise
     import rawset, tobool from _G
+    import getFileName from path
     import Logger from util
 
     default = environment.Color( 50, 100, 200 )\DoCorrection!
