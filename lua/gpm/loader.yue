@@ -230,7 +230,7 @@ do
                 return nil
 
             if gamePath == file.LuaPath
-                addcsluafile( filePath )
+                addcsluafile( filePath, gamePath, true )
 
             return packageClass( URL( AbsoluteGamePath( filePath, gamePath ), "file:///" ), info )
 
