@@ -78,13 +78,16 @@ export stripDirectory = ( path ) ->
 
     return path, ""
 
-export stripExtension = ( path ) ->
+export stripExtension = ( path, withDot ) ->
     for index = len( path ), 1, -1
 		ch = byte( path, index )
 		if ch == 0x2F --[[ / ]] or ch == 0x5C --[[ \ ]]
             return path, ""
 
         if ch == 0x2E --[[ . ]]
+            if withDot
+                return sub( path, 1, index - 1 ), sub( path, index )
+
             return sub( path, 1, index - 1 ), sub( path, index + 1 )
 
     return path, ""
