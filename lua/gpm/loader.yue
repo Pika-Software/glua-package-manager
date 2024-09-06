@@ -110,6 +110,10 @@ unless istable( loader )
 packages = loader.Packages = {}
 modules = loader.Modules = {}
 
+sources = loader.Sources
+unless istable( sources )
+    sources = loader.Sources = {}
+
 getSource = ( protocol ) ->
     if isstring( protocol ) and IsURL( protocol )
         protocol = URL( protocol ).scheme
@@ -786,7 +790,6 @@ do
         }
     )
 
-
     loader.Require = requireClass
 
 local includeClass
@@ -821,10 +824,6 @@ do
     import Logger, ispromise from gpm
     import reject from Promise
     import join from path
-
-    sources = loader.Sources
-    unless istable( sources )
-        sources = loader.Sources = {}
 
     findSource = loader.FindSource = ( scheme ) ->
         source = sources[ scheme ]
