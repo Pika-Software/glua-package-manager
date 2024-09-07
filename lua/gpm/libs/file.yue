@@ -682,6 +682,8 @@ else
 local asyncRead
 do
 
+    import captureStack, appendStack, popCallStack, pushCallStack from FileSystemError
+
     functions = {
         { "Append", false },
         { "Write", false },
@@ -799,12 +801,17 @@ do
 
             promise = Promise!
 
+            appendStack( captureStack() )
+            stack = popCallStack()
+
             state = Append( filePath, content, ( iFilePath, iGamePath, iState ) ->
                 if iState == 0
                     promise\Resolve( absoluteGamePath( iFilePath, iGamePath, false ) )
                     return nil
 
+                pushCallStack( stack )
                 promise\Reject( FileSystemError FSASYNC[ iState ] )
+                popCallStack()
                 return nil
             gamePath )
 
@@ -823,6 +830,9 @@ do
 
             promise = Promise!
 
+            appendStack( captureStack() )
+            stack = popCallStack()
+
             state = Read filePath, gamePath, ( _, __, iState, iContent ) ->
                 if iState == 0
                     if validateHash
@@ -834,7 +844,9 @@ do
                     promise\Resolve( iContent )
                     return nil
 
+                pushCallStack( stack )
                 promise\Reject( FileSystemError FSASYNC[ iState ] )
+                popCallStack()
                 return nil
 
             if state ~= 0
@@ -858,6 +870,10 @@ do
 
             promise = Promise!
 
+            appendStack( captureStack() )
+            stack = popCallStack()
+
+
             state = Write( filePath, content, gamePath, ( iFilePath, iGamePath, iState ) ->
                 if iState == 0
                     fullPath = absoluteGamePath( iFilePath, iGamePath, false )
@@ -867,7 +883,9 @@ do
                     promise\Resolve( fullPath )
                     return nil
 
+                pushCallStack( stack )
                 promise\Reject( FileSystemError FSASYNC[ iState ] )
+                popCallStack()
                 return nil
 
             )

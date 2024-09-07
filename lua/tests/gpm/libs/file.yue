@@ -29,6 +29,7 @@ return
                 test( "lua/gpm/init.lua", "gpm/init.lua", LUA_GAME_PATH )
                 test( "data/hello.txt", "hello.txt", "DATA" )
 
+
         *   name: "NormalizeGamePath(...) must handle relative paths"
             func: ->
                 from file import NormalizeGamePath
@@ -47,6 +48,7 @@ return
                 filePath, gamePath = NormalizeGamePath( "./foo.bar", "DATA" )
                 expect( filePath ).to.equal( root .. "/foo.bar" )
                 expect( gamePath ).to.equal( LUA_GAME_PATH )
+
 
         *   name: "NormalizeGamePath(...) should not modify paths that are already in the correct format"
             func: ->
@@ -67,6 +69,7 @@ return
                 test( "", "ABC" )
                 test( "hello/world.vtf", "FOO / BAR" )
         
+
         *   name: "NormalizeGamePath(...) should handle URL objects (not strings)"
             func: ->
                 from file import NormalizeGamePath
