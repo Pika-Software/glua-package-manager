@@ -1,10 +1,10 @@
 _G = _G
 import environment, Logger, sql from _G.gpm
 import file, istable, CLIENT, SERVER, MENU_DLL from _G
-import async, await, debug, util, path, string, Promise, CodeCompileError, FileSystemError, error, argument from environment
+import async, await, debug, util, path, string, Promise, CodeCompileError, FileSystemError, error, argument, tostring from environment
 import ByteStream, IsBinaryModuleInstalled, SHA256 from util
 import byte, sub, len, match, ByteSplit from string
-import resolve, getDirectory, getFile from path
+import resolve, getDirectory, getFile, getCurrentDirectory from path
 import concat from environment.table
 import get, save from sql.files
 import fempty from debug
@@ -57,21 +57,40 @@ do
     }
 
     normalizeGamePath = lib.NormalizeGamePath = ( absolutePath, gamePath ) ->
-        if isurl( absolutePath )
+        if not gamePath and isurl( absolutePath )
+            if absolutePath.scheme != "file"
+                error FileSystemError "Cannot resolve URL '#{absolutePath}' because it is not a file URL."
+
             absolutePath = absolutePath.pathname
 
-        absolutePath = sub( resolve( absolutePath ), 2 )
-
-        if gamePath
-            return absolutePath, gamePath
-
-        rootFolder, relativePath = match( absolutePath, "^([^/]+)/?(.*)" )
-        if rootFolder
-            gamePath = dir2path[ rootFolder ]
+        firstByte = byte( absolutePath )
+        if firstByte == 0x2F --[[ / ]]
+            absolutePath = sub( absolutePath, 2 ) -- resolve it? 
             if gamePath
-                return relativePath, gamePath
+                return absolutePath, gamePath
 
-        return absolutePath, "GAME"
+        elseif firstByte == 0x2E --[[ . ]]
+            secondByte = byte( absolutePath, 2 )
+
+            if secondByte == 0x2F --[[ / ]] or (secondByte == 0x2E --[[ . ]] and byte( absolutePath, 3 ) == 0x2F --[[ / ]])
+                currentDir = sub( getCurrentDirectory(), 5 ) -- remove /lua from the beginning
+                if currentDir == ""
+                    error FileSystemError "Cannot resolve relative path '#{absolutePath}' because main file is unknown."
+
+                absolutePath = sub( resolve(currentDir .. absolutePath), 2)
+                gamePath = luaPath
+
+        unless gamePath
+            for i = 1, #absolutePath
+                if byte( absolutePath, i ) == 0x2F --[[ / ]]
+                    rootDir = sub( absolutePath, 1, i - 1 )
+                    gamePath = dir2path[ rootDir ]
+                    if gamePath
+                        absolutePath = sub( absolutePath, i + 1 )
+
+                    break
+        
+        return absolutePath, gamePath or "GAME"
 
     path2dir = {
         DOWNLOAD: "/download"
@@ -425,12 +444,8 @@ do
 
         import ReadULong, WriteULong, ReadByte, WriteByte, Seek, Skip, Tell from legacy
 
-        do
-
-            import tostring from _G
-
-            base.IsValid = ( fileHandle ) ->
-                return tostring( fileHandle ) ~= "File [NULL]"
+        base.IsValid = ( fileHandle ) ->
+            return tostring( fileHandle ) ~= "File [NULL]"
 
         base.SeekToBegin = ( fileHandle ) ->
             return Seek( fileHandle, 0 )

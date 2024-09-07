@@ -1,0 +1,8 @@
+from _G import gpm
+from gpm import file
+
+return
+    cases:
+        *   name: "NormalizeGamePath(...) must convert absolute path to correct format "
+            func: ->
+                -- TODO: Implement test
