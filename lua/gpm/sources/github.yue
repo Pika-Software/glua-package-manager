@@ -191,7 +191,7 @@ class GithubSource extends loader.Source
                 continue
 
             -- first remove first directory from the path (appended by github)
-            entryPath = string.sub( entry.path, string.indexOf(entry.path, "/") + 1 )
+            entryPath = string.sub( entry.path, string.IndexOf(entry.path, "/") + 1 )
 
             -- then remove the root directory
             unless string.StartsWith( entryPath, root )

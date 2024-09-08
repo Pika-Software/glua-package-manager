@@ -72,10 +72,14 @@ string.slice = sub
 string.gmatch or= string.gfind
 
 string.StartsWith = ( str, startStr ) ->
-	return sub( str, 1, len( startStr ) ) == startStr
+	return str == startStr or sub( str, 1, len( startStr ) ) == startStr
 
 string.EndsWith = ( str, endStr ) ->
-	return endStr == "" or sub( str, len( str ) - len( endStr ) ) == endStr
+    if endStr == "" or str == endStr
+        return true
+
+    length = len( str )
+	return sub( str, length - len( endStr ) + 1, length ) == endStr
 
 string.concat = ( ... ) ->
     args = { ... }
@@ -86,7 +90,7 @@ string.concat = ( ... ) ->
 
     return concat( args, "", 1, length )
 
-string.indexOf = ( str, searchable, position, withPattern ) ->
+string.IndexOf = ( str, searchable, position, withPattern ) ->
     unless searchable
         return 0
 

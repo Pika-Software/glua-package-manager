@@ -1,0 +1,124 @@
+from _G import gpm
+from gpm import string, table
+
+return
+    cases:
+        *   name: "string.slice(...) must return a slice of given string"
+            func: ->
+                test = ( str, startPos, endPos, expected ) ->
+                    result = string.slice(str, startPos, endPos)
+                    expect( result ).to.eq( expected )
+
+                test( "hello", 1, 5, "hello" )
+                test( "hello", 1, 1, "h" )
+                test( "hello", 5, 5, "o" )
+                test( "hello", 0, 0, "" )
+                return
+
+        *   name: "string.StartsWith(...) must return true if string starts with given string"
+            func: ->
+                test1 = ( str, startStr ) ->
+                    result = string.StartsWith(str, startStr)
+                    expect( result ).to.beTrue()
+
+                test1( "hello", "hel" )
+                test1( "hello", "hello" )
+                test1( "hello", "hell" )
+
+                test2 = ( str, startStr ) ->
+                    result = string.StartsWith(str, startStr)
+                    expect( result ).to.beFalse()
+
+                test2( "hello", "his" )
+                test2( "hello", "helll" )
+                test2( "hello", "helllll" )
+                return
+
+        *   name: "string.EndsWith(...) must return true if string ends with given string"
+            func: ->
+                test1 = ( str, endStr ) ->
+                    result = string.EndsWith(str, endStr)
+                    expect( result ).to.beTrue()
+
+                test1( "hello", "lo" )
+                test1( "hello", "hello" )
+                test1( "hello", "ello" )
+
+                test2 = ( str, endStr ) ->
+                    result = string.EndsWith(str, endStr)
+                    expect( result ).to.beFalse()
+
+                test2( "hello", "ll" )
+                test2( "hello", "helll" )
+                test2( "hello", "helllll" )
+                return
+
+        *   name: "string.concat(...) must concatenate given strings"
+            func: ->
+                test = ( expected, ... ) ->
+                    result = string.concat(...)
+                    expect( result ).to.eq( expected )
+
+                test( "hello world", "hello", " world" )
+                test( "oh hi mark", "oh ", "hi", " mark" )
+                test( "glua package manager", "glua", " ", "package", " ", "manager" )
+                return
+
+        *   name: "string.IndexOf(...) must return index of given string"
+            func: ->
+
+                paragraph = "I think Ruth's dog is cuter than your dog!"
+
+                test = ( str, searchable, position, withPattern, expected ) ->
+                    expect( string.IndexOf(str, searchable, position, withPattern) ).to.eq( expected )
+                    return
+
+                test( paragraph, "dog", 1, false, 16 )
+                test( paragraph, "dog", 17, false, 39 )
+                test( paragraph, "%w+'s", 1, true, 9 )
+                return
+
+        *   name: "string.Split(...) must return split strings"
+            func: ->
+                from table import Equal
+
+                test = ( str, pattern, withPattern, expected ) ->
+                    expect( Equal( string.Split(str, pattern, withPattern), expected ) ).to.beTrue()
+
+                test( "hello world", " ", false, [ "hello", "world" ] )
+                test( "hello world", "%s+", true, [ "hello", "world" ] )
+                test( "hello user, can you help other users?", "user", false, [ "hello ", ", can you help other ", "s?" ] )
+                return
+
+        *   name: "string.Count(...) must return pattern repetition count"
+            func: ->
+                test = ( str, pattern, withPattern, expected ) ->
+                    expect( string.Count(str, pattern, withPattern) ).to.eq( expected )
+
+                test( "hello world", "l", false, 3 )
+                test( "hello world", "o", false, 2 )
+                test( "hello world", "x", false, 0 )
+                test( "visual studio code", "[ios]", true, 6 )
+                return
+
+        *   name: "string.ByteSplit(...) must return table with splited parts of given string by byte"
+            func: ->
+                from table import Equal
+
+                test = ( str, byte, expected ) ->
+                    expect( Equal( string.ByteSplit(str, byte), expected ) ).to.beTrue()
+
+                test( "hello world", 0x20, [ "hello", "world" ] )
+                test( "glua performance is really bad", 0x20, [ "glua", "performance", "is", "really", "bad" ] )
+                test( "more and more strings", 0x6F, [ "m", "re and m", "re strings"] )
+                return
+
+        *   name: "string.ByteCount(...) must return byte count of given string"
+            func: ->
+                test = ( str, byte, expected ) ->
+                    expect( string.ByteCount(str, byte) ).to.eq( expected )
+
+                test( "hello world", 0x20, 1 )
+                test( "hello again", 0x61, 2 )
+                test( "+++++++++++++", 0x2B, 13 )
+                return
