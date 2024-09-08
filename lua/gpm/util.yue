@@ -107,14 +107,14 @@ do
             return { str }
 
         if pattern == ""
-            ret = {}
+            result = {}
             for index = 1, len( str )
-                ret[ index ] = sub( str, index, index )
+                result[ index ] = sub( str, index, index )
 
-            return ret
+            return result
 
         withPattern = withPattern ~= true
-        ret, rlength = {}, 0
+        result, rlength = {}, 0
         pointer = 1
 
         while true
@@ -123,13 +123,13 @@ do
                 break
 
             rlength += 1
-            ret[ rlength ] = sub( str, pointer, startPos - 1 )
+            result[ rlength ] = sub( str, pointer, startPos - 1 )
             pointer = endPos + 1
 
         rlength += 1
-        ret[ rlength ] = sub( str, pointer )
+        result[ rlength ] = sub( str, pointer )
 
-        return ret, rlength
+        return result, rlength
 
     string.Explode = ( pattern, str, withPattern ) ->
         return split( str, pattern, withPattern )
@@ -1018,28 +1018,26 @@ table.Add = ( destination, source, isSequential ) ->
 
     return destination
 
-table.Invert = ( tbl, makeCopy ) ->
-    if makeCopy
-        result = {}
-        for key, value in pairs( tbl )
-            result[ value ] = key
+table.Flip = ( tbl, noCopy ) ->
+    if noCopy
+        keys, length = {}, 0
+        for key in pairs( tbl )
+            length += 1
+            keys[ length ] = key
 
-        return result
+        for i = 1, length
+            key = keys[ i ]
+            value = tbl[ key ]
+            tbl[ key ] = nil
+            tbl[ value ] = key
 
-    keys, length = {}, 0
-    for key in pairs( tbl )
-        length += 1
-        keys[length] = key
-    
-    for i = 1, length
-        key = keys[i]
-        value = tbl[key]
-        tbl[ key ] = nil
-        tbl[ value ] = key
+        return tbl
 
-    return tbl
+    result = {}
+    for key, value in pairs( tbl )
+        result[ value ] = key
 
-table.Flip = table.Invert
+    return result
 
 table.HasValue = ( tbl, any, isSequential ) ->
 	if isSequential
@@ -1681,6 +1679,22 @@ do
     os.unix2dos = ( u ) ->
         data = date( "*t", u )
         return bor( lshift( data.hour, 11 ), lshift( data.min, 5 ), fdiv( data.sec, 2 ) ), bor( lshift( data.year - 1980, 9 ), lshift( data.month, 5 ), data.day )
+
+    table.Reverse = ( tbl, noCopy ) ->
+        length = #tbl
+
+        if noCopy
+            length += 1
+            for index = 1, fdiv( length, 2 ), 1
+                tbl[ index ], tbl[ length - index ] = tbl[ length - index ], tbl[ index ]
+
+            return tbl
+
+        result = {}
+        for index = length, 1, -1
+            result[ length - index + 1 ] = tbl[ index ]
+
+        return result
 
 -- Garry's Mod hooks
 do

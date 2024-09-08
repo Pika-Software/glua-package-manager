@@ -24,7 +24,7 @@ return
                 expect( Count({ foo: "bar", hello: "world" }) ).to.equal( 2 )
                 expect( Count({ 1, 2, 3, test: "Count", gpm: "Awesome" }) )
                 return
-        
+
         *   name: "table.Equal(...) must return true if tables are equal"
             func: ->
                 from table import Equal
@@ -46,7 +46,7 @@ return
                 expect( Equal({ 1, 2, 3, test: "Count", gpm: "Awesome" }, { 1, 2, 3, test: "Count" }) ).to.beFalse()
                 expect( Equal({ { nested: "table" } }, { { nested: "table", unnested: "array" } }) ).to.beFalse()
                 return
-        
+
         *   name: "table.unpack(...) must work same as unpack(...)"
             func: ->
                 from table import Equal
@@ -55,7 +55,7 @@ return
                     result1 = { table.unpack(...) }
                     result2 = { unpack(...) }
                     expect( Equal(result1, result2) ).to.beTrue()
-                
+
                 test( {1, 2, 3, 4, 5} )
                 test( {1, 2, 3, nil, 5} )
                 test( {nil, 2, 3, nil, 5} )
@@ -65,7 +65,7 @@ return
                 test( {"hello", 1, true, ->, "world", {}, false} )
                 test( {} )
                 return
-        
+
         *   name: "table.pack(...) must have .n field and contain all values"
             func: ->
                 test = ( ... ) ->
@@ -74,12 +74,12 @@ return
                     expect( result.n ).to.equal( n )
 
                     expect( table.Equal(result, { n: n, ...}) ).to.beTrue()
-                
+
                 test()
                 test(1, 2, 3, 4)
                 test(nil, 2, false, "hello", {})
                 return
-        
+
         *   name: "table.Add(...) must work same as original"
             func: ->
                 test = ( target, source ) ->
@@ -96,13 +96,13 @@ return
                 test( {"One", "Two"}, {nil, "Three", "Four", "Five"} )
                 test( {true, false}, { test: "everyting" } )
                 return
-        
+
         *   name: "table.Add(...) with isSequantial=true must work sequantialy"
             func: ->
                 test = ( target, source, expected ) ->
                     table.Add(target, source, true)
                     expect( table.Equal(target, expected) ).to.beTrue()
-                
+
                 test( {}, {}, {} )
                 test( { 1 }, { 2 }, { 1, 2 } )
                 test( { nil, 3, 4 }, { 1, 2, 3 }, { nil, 3, 4, 1, 2, 3 } )
@@ -113,27 +113,43 @@ return
                 t[3] = true
                 test( t, { false }, { false, nil, true } )
                 return
-        
-        *   name: "table.Invert(...) must invert keys and values"
+
+        *   name: "table.Flip(...) must invert keys and values"
             func: ->
                 test = ( input, expected ) ->
-                    result1 = table.Invert(input, true)
-                    result2 = table.Invert(input)
+                    result1 = table.Flip(input)
+                    result2 = table.Flip(input, true)
                     expect( table.Equal(result1, result2) ).to.beTrue()
                     expect( table.Equal(result2, expected) ).to.beTrue()
-                
+
                 test( {}, {} )
                 test( { "hello": "world" }, { "world": "hello" } )
                 test( { [true]: false }, { [false]: true } )
                 test( { [3]: 1 }, { [1]: 3 } )
                 test( { "never": "gonna", "give": "you", "up" }, { "gonna": "never", "you": "give", "up": 1 } )
                 return
-        
+
+        *   name: "table.Reverse(...) must work same as original"
+            func: ->
+                test = ( input, expected ) ->
+                    result1 = table.Reverse(input)
+                    result2 = table.Reverse(input, true)
+                    expect( table.Equal(result1, result2) ).to.beTrue()
+                    expect( table.Equal(result2, expected) ).to.beTrue()
+
+                test( {}, {} )
+                test( { 1, 2, 3 }, { 3, 2, 1 } )
+                test( { "hello", "world" }, { "world", "hello" } )
+                test( { true, false }, { false, true } )
+                test( { nil, 3, 4 }, { 4, 3, nil } )
+                test( { "never", "gonna", "give", "you" }, { "you", "give", "gonna", "never" } )
+                return
+
         *   name: "table.HasValue(...) must return true if table has value"
             func: ->
                 test = ( input, value, expected, isSequantial ) ->
                     expect( table.HasValue(input, value, isSequantial) ).to.equal( expected )
-                
+
                 test( {}, "hello", false )
                 test( { "hello" }, "hello", true )
                 test( { "hello" }, "world", false )
@@ -144,7 +160,7 @@ return
                 test( { "hello", "world" }, "test", false, true )
                 test( {1, 2, 3, 4}, "welcome", false, true )
                 return
-        
+
         *   name: "table.Empty(...) must empty any table"
             func: ->
                 test = ( input ) ->
@@ -168,13 +184,13 @@ return
                 test( {nil, {}, hello: "world", "test": "empty", foo: {}}, 4 )
                 test( {nil, {}, hello: "world", "test": "empty", foo: {}, [1]: 2, [3]: 4}, 6 )
                 return
-        
+
         *   name: "table.GetKeys(...) must return all keys in table"
             func: ->
                 test = ( input, expected ) ->
                     result = table.GetKeys(input)
                     expect( table.Equal(result, expected) ).to.beTrue()
-                
+
                 test( {}, {} )
                 test( {1, 2, 3}, {1, 2, 3} )
                 test( {true, false, "ok"}, {1, 2, 3} )
@@ -187,7 +203,7 @@ return
                 test = ( input, expected ) ->
                     result = table.GetValues(input)
                     expect( table.Equal(result, expected) ).to.beTrue()
-                
+
                 test( {}, {} )
                 test( {1, 2, 3}, {1, 2, 3} )
                 test( {true, false, "ok"}, {true, false, "ok"} )
@@ -199,7 +215,7 @@ return
             func: ->
                 test = ( input, expected ) ->
                     expect( table.IsSequential(input) ).to.equal( expected )
-                
+
                 test( {}, true )
                 test( {1, 2, 3}, true )
                 test( {true, false, "ok"}, true )
@@ -207,13 +223,13 @@ return
                 test( { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 }, true )
                 test( { [false]: true }, false)
                 return
-        
+
         *   name: "table.RemoveByValue(...) must remove value from table"
             func: ->
                 test = ( input, value, expected, isSequantial ) ->
                     table.RemoveByValue(input, value, isSequantial)
                     expect( table.Equal(input, expected) ).to.beTrue()
-                
+
                 test( {}, "hello", {}, false )
                 test( { "hello" }, "hello", {}, false )
                 test( { "hello" }, "world", { "hello" }, false )
@@ -222,13 +238,13 @@ return
                 test( { "hello", "world" }, "test", { "hello", "world" }, true )
                 test( {1, 2, 3, 4}, "welcome", {1, 2, 3, 4}, true )
                 return
-        
+
         *   name: "table.RemoveSameValues(...) must remove multiple same values"
             func: ->
                 test = ( input, value, expected, isSequantial ) ->
                     table.RemoveSameValues(input, value, isSequantial)
                     expect( table.Equal(input, expected) ).to.beTrue()
-                
+
                 test( {}, "hello", {}, false )
                 test( { "hello" }, "hello", {}, false )
                 test( { "hello" }, "world", { "hello" }, false )
@@ -240,13 +256,13 @@ return
                 test( {1, 2, 3, 4, 1, 2, 3, 4}, 1, {2, 3, 4, 2, 3, 4}, true )
                 test( {1, 2, 3, 4, 1, 2, 3, 4}, 1, {2, 3, 4, 2, 3, 4}, true )
                 return
-        
+
         *   name: "table.GetValue(...) must tranverse table with given key delimited by '.'"
             func: ->
                 test = ( tbl, key, expected ) ->
-                    expect( table.GetValue(tbl, key) ).to.eq( expected )         
+                    expect( table.GetValue(tbl, key) ).to.eq( expected )
 
-                test( {}, "test", nil )       
+                test( {}, "test", nil )
                 test( { "test": "works" }, "test", "works" )
                 test( { "test": { "works": "fine" } }, "test.works", "fine" )
                 test( { "test": { "works": { "fine": "too" } } }, "test.works.fine", "too" )
@@ -254,7 +270,7 @@ return
                 test( { "test": { "works": { "fine": "too" } } }, "test.wont.work.really", nil )
                 test( {}, "test.wont.work.really", nil )
                 return
-        
+
         *   name: "table.SetValue(...) must set value by given key delimited by '.' and create missing tables"
             func: ->
                 test = ( tbl, key, value, expected ) ->
@@ -276,7 +292,7 @@ return
                 test = ( tbl, startPos, endPos ) ->
                     result = table.Slice(tbl, startPos, endPos)
                     expect( table.Equal(result, { table.unpack(tbl, startPos, endPos) }) ).to.beTrue()
-                
+
                 test( {1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, 1, 5 )
                 test( {1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, 3, 7 )
                 test( {1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, 5, 10 )
@@ -319,7 +335,7 @@ return
                 test = ( tbl, expected ) ->
                     result = table.LowerKeyNames(tbl)
                     expect( table.Equal(result, expected) ).to.beTrue()
-                
+
                 test( {}, {} )
                 test( { "Hello": "World" }, { "hello": "World" } )
                 test( { "Hello": "World", "Test": "This" }, { "hello": "World", "test": "This" } )
@@ -331,7 +347,7 @@ return
                 test = ( tbl, expected ) ->
                     result = table.Flip(tbl)
                     expect( table.Equal(result, expected) ).to.beTrue()
-                
+
                 test( {}, {} )
                 test( { "hello": "world" }, { "world": "hello" } )
                 test( { [true]: false }, { [false]: true } )
