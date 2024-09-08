@@ -43,7 +43,6 @@ do
         if a == b
             return true
 
-        print("comparing", a, b)
         for key, value in pairs( a )
             alt = rawget( b, key )
             if alt == nil
