@@ -12,6 +12,8 @@ local _G = _G
 ]]
 
 local environment = _G.gpm.environment
+local isstring = environment.isstring
+local isnumber = environment.isnumber
 local string = environment.string
 local table = environment.table
 local class = environment.class
@@ -26,8 +28,6 @@ end
 local getmetatable = _G.getmetatable
 local setmetatable = _G.setmetatable
 local tonumber = _G.tonumber
-local isstring = _G.isstring
-local isnumber = _G.isnumber
 local assert = _G.assert
 
 local struct_Read, struct_Write
@@ -116,14 +116,22 @@ function environment.util.Bint( bits, wordbits )
     local BINT_WORDMSB = lshift( 1, BINT_WORDBITS - 1 )
     local BINT_LEPACKFMT = '<' .. string_rep( 'I' .. math_fdiv( wordbits, 8 ), BINT_SIZE )
     local BINT_MATHMININTEGER, BINT_MATHMAXINTEGER
-    local BINT_MININTEGER
+    local BINT_MINSIGNED
 
     -- Base letters to use in internal.ToBase
     local BASE_LETTERS = { [ 0 ] = '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z' }
 
+    --- Check if the input is a bint.
+    -- @param x Any lua value.
+    local bint_isbind = function( x )
+        return getmetatable( x ) == internal
+    end
+
+    static.IsBint = bint_isbind
+
     --- Create a new bint with 0 value.
     local bint_zero = function()
-        local x = setmetatable( {}, internal )
+        local x = setmetatable( { [ 0 ] = false }, internal )
         for i = 1, BINT_SIZE do
             x[ i ] = 0
         end
@@ -135,7 +143,7 @@ function environment.util.Bint( bits, wordbits )
 
     --- Create a new bint with 1 value.
     local bint_one = function()
-        local x = setmetatable( { [ 1 ] = 1 }, internal )
+        local x = setmetatable( { [ 0 ] = false, [ 1 ] = 1 }, internal )
         for i = 2, BINT_SIZE do
             x[ i ] = 0
         end
@@ -177,7 +185,7 @@ function environment.util.Bint( bits, wordbits )
                 return bint_zero()
             end
 
-            local n = setmetatable( {}, internal )
+            local n = setmetatable( { [ 0 ] = false }, internal )
             for i = 1, BINT_SIZE do
                 n[ i ] = band( x, BINT_WORDMAX )
                 x = rshift( x, BINT_WORDBITS )
@@ -202,19 +210,19 @@ function environment.util.Bint( bits, wordbits )
                 return bint_zero()
             end
 
-            local neg = false
+            local negative = false
             if x < 0 then
                 x = math_abs( x )
-                neg = true
+                negative = true
             end
 
-            local n = setmetatable( {}, internal )
+            local n = setmetatable( { [ 0 ] = true }, internal )
             for i = 1, BINT_SIZE do
                 n[ i ] = band( x, BINT_WORDMAX )
                 x = rshift( x, BINT_WORDBITS )
             end
 
-            if neg then
+            if negative then
                 negation( n )
             end
 
@@ -321,17 +329,17 @@ function environment.util.Bint( bits, wordbits )
     -- @return A new bint or nil in case the conversion failed.
     -- @see internal.FromBase
     local bint_fromstring = function( s )
-        if not isstring( s ) then
-            return nil
+        if isstring( s ) then
+            if string_find( s, '^[+-]?[0-9]+$', 1, false ) then -- decimal
+                return bint_frombase( s, 10 )
+            elseif string_find( s, '^[+-]?0[xX][0-9a-fA-F]+$', 1, false ) then -- hex
+                return bint_frombase( string_gsub( s, '0[xX]', '', 1 ), 16 )
+            elseif string_find( s, '^[+-]?0[bB][01]+$', 1, false ) then -- binary
+                return bint_frombase( string_gsub( s, '0[bB]', '', 1 ), 2 )
+            end
         end
 
-        if string_find( s, '^[+-]?[0-9]+$', 1, false ) then -- decimal
-            return bint_frombase( s, 10 )
-        elseif string_find( s, '^[+-]?0[xX][0-9a-fA-F]+$', 1, false ) then -- hex
-            return bint_frombase( string_gsub( s, '0[xX]', '', 1 ), 16 )
-        elseif string_find( s, '^[+-]?0[bB][01]+$', 1, false ) then -- binary
-            return bint_frombase( string_gsub( s, '0[bB]', '', 1 ), 2 )
-        end
+        return nil
     end
 
     static.FromString = bint_fromstring
@@ -340,7 +348,7 @@ function environment.util.Bint( bits, wordbits )
     -- @param buffer Buffer of bytes, extra bytes are trimmed from the right, missing bytes are padded to the right.
     -- @raise An assert is thrown in case buffer is not an string.
     -- @return A bint.
-    function static.FromLittleEndian( buffer )
+    function static.FromLittleEndian( buffer, signed )
         assert( isstring( buffer ), 'buffer is not a string' )
 
         if string_len( buffer ) > BINT_BYTES then -- trim extra bytes from the right
@@ -349,14 +357,16 @@ function environment.util.Bint( bits, wordbits )
             buffer = buffer .. string_rep( '\x00', BINT_BYTES - string_len( buffer ) )
         end
 
-        return setmetatable( struct_Read( BINT_LEPACKFMT, buffer ), internal )
+        local obj = setmetatable( struct_Read( BINT_LEPACKFMT, buffer ), internal )
+        obj[ 0 ] = signed == true
+        return obj
     end
 
     --- Create a new bint from a buffer of big-endian bytes.
     -- @param buffer Buffer of bytes, extra bytes are trimmed from the left, missing bytes are padded to the left.
     -- @raise An assert is thrown in case buffer is not an string.
     -- @return A bint.
-    function static.FromBigEndian( buffer )
+    function static.FromBigEndian( buffer, signed )
         assert( isstring( buffer ), 'buffer is not a string' )
 
         if string_len( buffer ) > BINT_BYTES then -- trim extra bytes from the left
@@ -365,7 +375,9 @@ function environment.util.Bint( bits, wordbits )
             buffer = string_rep( '\x00', BINT_BYTES - string_len( buffer ) ) .. buffer
         end
 
-        return setmetatable( struct_Read( BINT_LEPACKFMT, string_reverse( buffer ) ), internal )
+        local obj = setmetatable( struct_Read( BINT_LEPACKFMT, string_reverse( buffer ) ), internal )
+        obj[ 0 ] = signed == true
+        return obj
     end
 
     --- Create a new bint from a value.
@@ -376,9 +388,9 @@ function environment.util.Bint( bits, wordbits )
     -- @see static.Parse
     local bint_new = function( x )
         -- return a clone
-        if getmetatable( x ) == internal then
+        if bint_isbind( x ) then
             local n = setmetatable( {}, internal )
-            for i = 1, BINT_SIZE do
+            for i = 0, BINT_SIZE do
                 n[ i ] = x[ i ]
             end
 
@@ -398,7 +410,7 @@ function environment.util.Bint( bits, wordbits )
     end
 
     internal.new = function( self, x )
-        if getmetatable( x ) == internal then
+        if bint_isbind( x ) then
             for i = 1, BINT_SIZE do
                 self[ i ] = x[ i ]
             end
@@ -417,7 +429,7 @@ function environment.util.Bint( bits, wordbits )
     -- @see internal.new
     -- @see internal.Parse
     local tobint = function( x, clone )
-        if getmetatable( x ) == internal then
+        if bint_isbind( x ) then
             if not clone then
                 return x
             end
@@ -463,15 +475,58 @@ function environment.util.Bint( bits, wordbits )
 
     static.Parse = bint_parse
 
+    --- Check if a number is negative considering bints.
+    -- Zero is guaranteed to never be negative for bints.
+    -- @param x A bint or a lua number.
+    local bint_isnegative = function( x )
+        if bint_isbind( x ) then
+            return band( x[ BINT_SIZE ], BINT_WORDMSB ) ~= 0
+        end
+
+        return x < 0
+    end
+
+    internal.IsNegative = bint_isnegative
+
+    --- Check if a number is 0 considering bints.
+    -- @param x A bint or a lua number.
+    local bint_iszero = function( x )
+        if bint_isbind( x ) then
+            for i = 1, BINT_SIZE do
+                if x[ i ] ~= 0 then
+                    return false
+                end
+            end
+
+            return true
+        end
+
+        return x == 0
+    end
+
+    internal.IsZero = bint_iszero
+
+    --- Check if a number is positive considering bints.
+    -- @param x A bint or a lua number.
+    local bint_ispositive = function( x )
+        if bint_isbind( x ) then
+            return not bint_isnegative( x ) and not bint_iszero( x )
+        end
+
+        return x > 0
+    end
+
+    internal.IsPositive = bint_ispositive
+
     --- Convert a bint to a signed integer.
     -- It works by taking absolute values then applying the sign bit in case needed.
     -- Note that lua cannot represent values larger than 64 bits,
     -- in that case integer values wrap around.
     -- @param x A bint or value to be converted into an unsigned integer.
     -- @return An integer or nil in case the input cannot be represented by an integer.
-    local toLuaNumber = function( x, uintOnly )
-        if getmetatable( x ) == internal then
-            local isNegative = uintOnly ~= true and x:IsNegative()
+    local toLuaNumber = function( x )
+        if bint_isbind( x ) then
+            local isNegative = bint_isnegative( x )
             if isNegative then
                 x = -x
             end
@@ -494,7 +549,7 @@ function environment.util.Bint( bits, wordbits )
     internal.ToLuaNumber = toLuaNumber
 
     local function bint_assert_tointeger( x )
-        x = toLuaNumber( x, false )
+        x = toLuaNumber( x )
         if not x then
             error( 'value has no integer representation', 2 )
         end
@@ -509,9 +564,9 @@ function environment.util.Bint( bits, wordbits )
     -- @return A lua number or nil in case the input cannot be represented by a number.
     -- @see internal.ToInteger
     local bint_tonumber = function( x )
-        if getmetatable( x ) == internal then
+        if bint_isbind( x ) then
             if x <= BINT_MATHMAXINTEGER and x >= BINT_MATHMININTEGER then
-                return toLuaNumber( x, false )
+                return toLuaNumber( x )
             end
 
             return tonumber( tostring( x ), 10 )
@@ -531,7 +586,7 @@ function environment.util.Bint( bits, wordbits )
     -- When unsigned is false the symbol '-' is prepended in negative values.
     -- @return A string representing the input.
     -- @raise An assert is thrown in case the base is invalid.
-    function internal.ToBase( x, base, unsigned )
+    local toBase = function( x, base, unsigned )
         x = tobint( x )
         if not x then
             -- x is a fractional float or something else
@@ -549,10 +604,10 @@ function environment.util.Bint( bits, wordbits )
             unsigned = base ~= 10
         end
 
-        local isxneg = x:IsNegative()
+        local isxneg = bint_isnegative( x )
         if ( ( base == 10 and not unsigned ) or ( base == 16 and unsigned and not isxneg ) ) and ( x <= BINT_MATHMAXINTEGER and x >= BINT_MATHMININTEGER ) then
             -- integer is small, use tostring or string.format (faster)
-            local n = toLuaNumber( x, false )
+            local n = toLuaNumber( x )
             if base == 10 then
                 return tostring( n )
             elseif unsigned then
@@ -564,7 +619,7 @@ function environment.util.Bint( bits, wordbits )
         local neg = not unsigned and isxneg
         x = neg and x:abs() or bint_new( x )
 
-        local xiszero = x:IsZero()
+        local xiszero = bint_iszero( x )
         if xiszero then
             return '0'
         end
@@ -618,6 +673,8 @@ function environment.util.Bint( bits, wordbits )
         return table_concat( ss )
     end
 
+    internal.ToBase = toBase
+
     local function bint_assert_convert( x )
         return assert( tobint( x ), 'value has not integer representation' )
     end
@@ -656,26 +713,10 @@ function environment.util.Bint( bits, wordbits )
         return s
     end
 
-    --- Check if a number is 0 considering bints.
-    -- @param x A bint or a lua number.
-    function internal.IsZero( x )
-        if getmetatable( x ) == internal then
-            for i = 1, BINT_SIZE do
-                if x[ i ] ~= 0 then
-                    return false
-                end
-            end
-
-            return true
-        end
-
-        return x == 0
-    end
-
     --- Check if a number is 1 considering bints.
     -- @param x A bint or a lua number.
     function internal.IsOne( x )
-        if getmetatable( x ) == internal then
+        if bint_isbind( x ) then
             if x[ 1 ] ~= 1 then
                 return false
             end
@@ -695,7 +736,7 @@ function environment.util.Bint( bits, wordbits )
     --- Check if a number is -1 considering bints.
     -- @param x A bint or a lua number.
     local bint_isminusone = function( x )
-        if getmetatable( x ) == internal then
+        if bint_isbind( x ) then
             for i = 1, BINT_SIZE do
                 if x[ i ] ~= BINT_WORDMAX then
                     return false
@@ -756,8 +797,8 @@ function environment.util.Bint( bits, wordbits )
     --- Check if a number is positive considering bints.
     -- @param x A bint or a lua number.
     function internal.IsPositive( x )
-        if getmetatable( x ) == internal then
-            return not x:IsNegative() and not x:IsZero()
+        if bint_isbind( x ) then
+            return not bint_isnegative( x ) and not x:IsZero()
         end
 
         return x > 0
@@ -766,7 +807,7 @@ function environment.util.Bint( bits, wordbits )
     --- Check if a number is even considering bints.
     -- @param x A bint or a lua number.
     function internal.IsEven( x )
-        if getmetatable( x ) == internal then
+        if bint_isbind( x ) then
             return bint_band( x[ 1 ], 1 ) == 0
         end
 
@@ -776,7 +817,7 @@ function environment.util.Bint( bits, wordbits )
     --- Check if a number is odd considering bints.
     -- @param x A bint or a lua number.
     function internal.IsOdd( x )
-        if getmetatable( x ) == internal then
+        if bint_isbind( x ) then
             return bint_band( x[ 1 ], 1 ) == 1
         end
 
@@ -898,32 +939,37 @@ function environment.util.Bint( bits, wordbits )
         return self
     end
 
-    --- Take absolute of a bint (in-place).
-    function internal:_abs()
-        if self:IsNegative() then
-            negation( self )
+    local bint_abs
+    do
+
+        --- Take absolute of a bint (in-place).
+        local local_abs = function( self )
+            if bint_isnegative( self ) then
+                negation( self )
+            end
+
+            return self
         end
 
-        return self
-    end
+        --- Take absolute of a number considering bints.
+        -- @param x A bint or a lua number to take the absolute.
+        bint_abs = function( x )
+            local ix = tobint( x, true )
+            if ix then
+                return local_abs( ix )
+            end
 
-    --- Take absolute of a number considering bints.
-    -- @param x A bint or a lua number to take the absolute.
-    local bint_abs = function( x )
-        local ix = tobint( x, true )
-        if ix then
-            return ix:_abs()
+            return math_abs( x )
         end
 
-        return math_abs( x )
-    end
+        internal.abs = bint_abs
 
-    internal.abs = bint_abs
+    end
 
     --- Take the floor of a number considering bints.
     -- @param x A bint or a lua number to perform the floor operation.
     function internal.floor( x )
-        if getmetatable( x ) == internal then
+        if bint_isbind( x ) then
             return bint_new( x )
         end
 
@@ -933,7 +979,7 @@ function environment.util.Bint( bits, wordbits )
     --- Take ceil of a number considering bints.
     -- @param x A bint or a lua number to perform the ceil operation.
     function internal.ceil( x )
-        if getmetatable( x ) == internal then
+        if bint_isbind( x ) then
             return bint_new( x )
         end
 
@@ -1011,7 +1057,7 @@ function environment.util.Bint( bits, wordbits )
     -- @param x A number to truncate.
     -- @return A new bint or nil in case the input does not fit in a bint or is not a number.
     function internal.trunc( x )
-        if getmetatable( x ) == internal then
+        if bint_isbind( x ) then
             return bint_new( x )
         end
 
@@ -1400,7 +1446,7 @@ function environment.util.Bint( bits, wordbits )
             quot, rema = math_fdiv( ax, ay ), ax % ay
         end
 
-        local isxneg, isyneg = bint_isneg( x ), bint_isneg( y )
+        local isxneg, isyneg = bint_isnegative( x ), bint_isnegative( y )
         if isxneg ~= isyneg then
             quot = -quot
         end
@@ -1962,7 +2008,7 @@ function environment.util.Bint( bits, wordbits )
     --- Convert a bint to a string on base 10.
     -- @see internal.ToBase
     function internal:__tostring()
-        return self:ToBase( 10 )
+        return toBase( self, 10 )
     end
 
     BINT_MATHMININTEGER, BINT_MATHMAXINTEGER = bint_new( math.mininteger ), bint_new( math.maxinteger )
