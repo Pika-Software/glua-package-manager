@@ -1026,9 +1026,16 @@ table.Invert = ( tbl, makeCopy ) ->
 
         return result
 
-    for key, value in pairs( tbl )
-        tbl[ value ] = key
+    keys, length = {}, 0
+    for key in pairs( tbl )
+        length += 1
+        keys[length] = key
+    
+    for i = 1, length
+        key = keys[i]
+        value = tbl[key]
         tbl[ key ] = nil
+        tbl[ value ] = key
 
     return tbl
 
@@ -1147,7 +1154,7 @@ table.SetValue = ( tbl, str, value ) ->
         key = sub( str, pointer, startPos - 1 )
         pointer = startPos + 1
 
-        if tbl[ key ] == nil
+        unless istable( tbl[ key ] )
             tbl[ key ] = {}
 
         tbl = tbl[ key ]
