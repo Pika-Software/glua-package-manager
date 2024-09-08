@@ -1011,7 +1011,7 @@ table.Add = ( destination, source, isSequential ) ->
 
     else
 
-        -- shitty garry implementation
+        -- shitty garry implementation 🤨
         for _, value in pairs( source )
             length += 1
             destination[ length ] = value
