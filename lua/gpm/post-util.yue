@@ -293,8 +293,8 @@ do
         @position = position
         return position
 
-    Int64 = environment.Int64 = util.Bint( 64 )
-    import IsBint, IsUnsigned, ToBint, FromBigEndian, FromLittleEndian, ToBigEndian, ToLittleEndian, ToUnsigned, ToLuaNumber from Int64
+    Number64 = environment.Number64 = util.Bint( 64 )
+    import IsBint, ToBint, FromBigEndian, FromLittleEndian, ToBigEndian, ToLittleEndian, ToLuaNumber from Number64
 
     util.ByteStream = environment.class(
         "ByteStream",
@@ -476,25 +476,19 @@ do
                     if byte( binary, 1 ) == 0 and byte( binary, 2 ) == 0
                         return readUInt( nil, sub( binary, 3 ), 6 )
 
-                    return ToUnsigned( FromBigEndian( binary ) )
+                    return FromBigEndian( binary, false )
 
                 if byte( binary, 7 ) == 0 and byte( binary, 8 ) == 0
                     return readUInt( nil, binary, 6 )
 
-                return ToUnsigned( FromLittleEndian( binary ) )
+                return FromLittleEndian( binary, false )
 
             WriteUInt64: ( number, isBigEndian ) =>
                 local isBint
                 if isstring( number )
                     number = ToBint( number )
-                    unless IsUnsigned( number )
-                        ToUnsigned( number )
-
                     isBint = true
                 elseif IsBint( number )
-                    unless IsUnsigned( number )
-                        ToUnsigned( number )
-
                     isBint = true
                 else
                     isBint = false
@@ -556,12 +550,12 @@ do
                     if byte( binary, 1 ) == 0 and byte( binary, 2 ) == 0
                         return readInt( nil, sub( binary, 3 ), 6 )
 
-                    return FromBigEndian( binary )
+                    return FromBigEndian( binary, true )
 
                 if byte( binary, 7 ) == 0 and byte( binary, 8 ) == 0
                     return readInt( nil, binary, 6 )
 
-                return FromLittleEndian( binary )
+                return FromLittleEndian( binary, true )
 
             WriteInt64: ( number, isBigEndian ) =>
                 local isBint

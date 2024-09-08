@@ -216,7 +216,7 @@ function environment.util.Bint( bits, wordbits )
                 negative = true
             end
 
-            local n = setmetatable( { [ 0 ] = true }, internal )
+            local n = setmetatable( { [ 0 ] = negative }, internal )
             for i = 1, BINT_SIZE do
                 n[ i ] = band( x, BINT_WORDMAX )
                 x = rshift( x, BINT_WORDBITS )
@@ -272,7 +272,7 @@ function environment.util.Bint( bits, wordbits )
     -- @param[opt] base Base that the number is represented, defaults to 10.
     -- Must be at least 2 and at most 36.
     -- @return A new bint or nil in case the conversion failed.
-    local bint_frombase = function( s, base )
+    local bint_frombase = function( s, base, signed )
         if not isstring( s ) then
             return nil
         end
@@ -316,6 +316,10 @@ function environment.util.Bint( bits, wordbits )
 
         if sign == '-' then
             negation( n )
+        end
+
+        if signed ~= nil then
+            n[ 0 ] = signed == true
         end
 
         return n
@@ -394,6 +398,7 @@ function environment.util.Bint( bits, wordbits )
                 n[ i ] = x[ i ]
             end
 
+            n[ 0 ] = n[ 0 ] or false
             return n
         end
 
@@ -410,15 +415,16 @@ function environment.util.Bint( bits, wordbits )
     end
 
     internal.new = function( self, x )
-        if bint_isbind( x ) then
-            for i = 1, BINT_SIZE do
-                self[ i ] = x[ i ]
-            end
-
-            return nil
-        end
-
         return true, bint_new( x )
+    end
+
+    function internal:IsSigned()
+        return self[ 0 ] or false
+    end
+
+    function internal:SetSigned( value )
+        self[ 0 ] = value == true
+        return self
     end
 
     --- Convert a value to a bint if possible.
@@ -436,10 +442,11 @@ function environment.util.Bint( bits, wordbits )
 
             -- return a clone
             local n = setmetatable( {}, internal )
-            for i = 1, BINT_SIZE do
+            for i = 0, BINT_SIZE do
                 n[ i ] = x[ i ]
             end
 
+            n[ 0 ] = n[ 0 ] or false
             return n
         end
 
@@ -480,7 +487,7 @@ function environment.util.Bint( bits, wordbits )
     -- @param x A bint or a lua number.
     local bint_isnegative = function( x )
         if bint_isbind( x ) then
-            return band( x[ BINT_SIZE ], BINT_WORDMSB ) ~= 0
+            return x[ 0 ] and band( x[ BINT_SIZE ], BINT_WORDMSB ) ~= 0
         end
 
         return x < 0
@@ -616,8 +623,8 @@ function environment.util.Bint( bits, wordbits )
         end
 
         local ss = {}
-        local neg = not unsigned and isxneg
-        x = neg and x:abs() or bint_new( x )
+        local negative = not unsigned and isxneg
+        x = negative and x:abs() or bint_new( x )
 
         local xiszero = bint_iszero( x )
         if xiszero then
@@ -666,7 +673,7 @@ function environment.util.Bint( bits, wordbits )
             end
         until xiszero
 
-        if neg then
+        if negative then
             table_insert( ss, 1, '-' )
         end
 
@@ -737,6 +744,10 @@ function environment.util.Bint( bits, wordbits )
     -- @param x A bint or a lua number.
     local bint_isminusone = function( x )
         if bint_isbind( x ) then
+            if not x[ 0 ] then
+                return false
+            end
+
             for i = 1, BINT_SIZE do
                 if x[ i ] ~= BINT_WORDMAX then
                     return false
@@ -751,57 +762,34 @@ function environment.util.Bint( bits, wordbits )
 
     internal.IsMinusOne = bint_isminusone
 
-    --- Check if the input is a bint.
-    -- @param x Any lua value.
-    function static.IsBint( x )
-        return getmetatable( x ) == internal
-    end
-
     --- Check if the input is a lua integer or a bint.
     -- @param x Any lua value.
     function static.IsIntegral( x )
-        return getmetatable( x ) == internal or math_type( x ) == 'integer'
+        return bint_isbind( x ) or math_type( x ) == 'integer'
     end
 
     --- Check if the input is a bint or a lua number.
     -- @param x Any lua value.
     function static.IsNumeric( x )
-        return getmetatable( x ) == internal or isnumber( x )
+        return bint_isbind( x ) or isnumber( x )
     end
 
     --- Get the number type of the input (bint, integer or float).
     -- @param x Any lua value.
     -- @return Returns "bint" for bints, "integer" for lua integers,
     -- "float" from lua floats or nil otherwise.
-    function internal.type( x )
-        if getmetatable( x ) == internal then
-            return 'bint'
+    do
+
+        local BINT_NAME = 'integer' .. BINT_SIZE
+
+        function internal.type( x )
+            if bint_isbind( x ) then
+                return BINT_NAME
+            end
+
+            return math_type( x )
         end
 
-        return math_type( x )
-    end
-
-    --- Check if a number is negative considering bints.
-    -- Zero is guaranteed to never be negative for bints.
-    -- @param x A bint or a lua number.
-    local bint_isneg = function( x )
-        if getmetatable( x ) == internal then
-            return band( x[ BINT_SIZE ], BINT_WORDMSB ) ~= 0
-        end
-
-        return x < 0
-    end
-
-    internal.IsNegative = bint_isneg
-
-    --- Check if a number is positive considering bints.
-    -- @param x A bint or a lua number.
-    function internal.IsPositive( x )
-        if bint_isbind( x ) then
-            return not bint_isnegative( x ) and not x:IsZero()
-        end
-
-        return x > 0
     end
 
     --- Check if a number is even considering bints.
@@ -816,7 +804,7 @@ function environment.util.Bint( bits, wordbits )
 
     --- Check if a number is odd considering bints.
     -- @param x A bint or a lua number.
-    function internal.IsOdd( x )
+    local bint_isodd = function( x )
         if bint_isbind( x ) then
             return bint_band( x[ 1 ], 1 ) == 1
         end
@@ -824,9 +812,11 @@ function environment.util.Bint( bits, wordbits )
         return math_abs( x ) % 2 == 1
     end
 
+    internal.IsOdd = bint_isodd
+
     --- Create a new bint with the maximum possible integer value.
-    function static.MaxInteger()
-        local x = setmetatable( {}, internal )
+    function static.MaxSigned()
+        local x = setmetatable( { [ 0 ] = true }, internal )
         for i = 1, BINT_SIZE - 1 do
             x[ i ] = BINT_WORDMAX
         end
@@ -836,8 +826,8 @@ function environment.util.Bint( bits, wordbits )
     end
 
     --- Create a new bint with the minimum possible integer value.
-    function static.MinInteger()
-        local x = setmetatable( {}, internal )
+    function static.MinSigned()
+        local x = setmetatable( { [ 0 ] = true }, internal )
         for i = 1, BINT_SIZE - 1 do
             x[ i ] = 0
         end
@@ -845,6 +835,20 @@ function environment.util.Bint( bits, wordbits )
         x[ BINT_SIZE ] = BINT_WORDMSB
         return x
     end
+
+    --- Create a new bint with the maximum possible unsigned integer value.
+    function static.MaxUnsigned()
+        local x = setmetatable( { [ 0 ] = false }, internal )
+        for i = 1, BINT_SIZE - 1 do
+            x[ i ] = BINT_WORDMAX
+        end
+
+        x[ BINT_SIZE ] = BINT_WORDMAX
+        return x
+    end
+
+    --- Create a new bint with the minimum possible unsigned integer value.
+    static.MinUnsigned = bint_zero
 
     --- Bitwise left shift a bint in one bit (in-place).
     function internal:_shlone()
@@ -1138,7 +1142,7 @@ function environment.util.Bint( bits, wordbits )
         local ix, iy = tobint( x ), tobint( y )
 
         if ix and iy then
-            local z, carry = setmetatable( {}, internal ), 0
+            local z, carry = setmetatable( { [ 0 ] = ix[ 0 ] }, internal ), 0
             for i = 1, BINT_SIZE do
                 local tmp = ix[ i ] + iy[ i ] + carry
                 carry = rshift( tmp, BINT_WORDBITS )
@@ -1177,7 +1181,7 @@ function environment.util.Bint( bits, wordbits )
 
         if ix and iy then
             local wordmaxp1, borrow = BINT_WORDMAX + 1, 0
-            local z = setmetatable( {}, internal )
+            local z = setmetatable( { [ 0 ] = ix[ 0 ] }, internal )
 
             for i = 1, BINT_SIZE do
                 local res = ix[ i ] + wordmaxp1 - iy[ i ] - borrow
@@ -1201,6 +1205,8 @@ function environment.util.Bint( bits, wordbits )
             local z = bint_zero()
             local s = sizep1
             local e = 0
+
+            z[ 0 ] = ix[ 0 ]
 
             for i = 1, BINT_SIZE do
                 if ix[ i ] ~= 0 or iy[ i ] ~= 0 then
@@ -1234,6 +1240,10 @@ function environment.util.Bint( bits, wordbits )
     -- @param x A bint to compare.
     -- @param y A bint to compare.
     function internal.__eq( x, y )
+        if x[ 0 ] ~= y[ 0 ] and ( x > BINT_MINSIGNED or y > BINT_MINSIGNED ) then
+            return false
+        end
+
         for i = 1, BINT_SIZE do
             if x[ i ] ~= y[ i ] then
                 return false
@@ -1257,7 +1267,45 @@ function environment.util.Bint( bits, wordbits )
 
     internal.equal = bint_eq
 
-    local bint_udivmod, bint_ult
+    --- Compare if bint x is less or equal than y considering bints (unsigned version).
+    -- @param x Left integer to compare.
+    -- @param y Right integer to compare.
+    -- @raise Asserts in case inputs are not convertible to integers.
+    -- @see internal.__le
+    function internal.ule( x, y )
+        x, y = bint_assert_convert( x ), bint_assert_convert( y )
+
+        for i = BINT_SIZE, 1, -1 do
+            local a, b = x[ i ], y[ i ]
+            if a ~= b then
+                return a < b
+            end
+        end
+
+        return true
+    end
+
+    --- Compare if integer x is less than y considering bints (unsigned version).
+    -- @param x Left integer to compare.
+    -- @param y Right integer to compare.
+    -- @raise Asserts in case inputs are not convertible to integers.
+    -- @see internal.__lt
+    local bint_ult = function( x, y )
+        x, y = bint_assert_convert( x ), bint_assert_convert( y )
+
+        for i = BINT_SIZE, 1, -1 do
+            local a, b = x[ i ], y[ i ]
+            if a ~= b then
+                return a < b
+            end
+        end
+
+        return false
+    end
+
+    internal.ult = bint_ult
+
+    local bint_udivmod
     do
 
         local function findleftbit( x )
@@ -1440,7 +1488,7 @@ function environment.util.Bint( bits, wordbits )
 
         local ix, iy = tobint( ax ), tobint( ay )
         if ix and iy then
-            assert( not ( bint_eq( x, BINT_MININTEGER ) and bint_isminusone( y ) ), 'division overflow')
+            assert( not ( bint_eq( x, BINT_MINSIGNED ) and bint_isminusone( y ) ), 'division overflow')
             quot, rema = bint_udivmod( ix, iy )
         else
             quot, rema = math_fdiv( ax, ay ), ax % ay
@@ -1493,8 +1541,8 @@ function environment.util.Bint( bits, wordbits )
     local bint_idivmod = function( x, y )
         local ix, iy = tobint( x ), tobint( y )
         if ix and iy then
-            local isnumeneg = band( ix[ BINT_SIZE ], BINT_WORDMSB ) ~= 0
-            local isdenoneg = band( iy[ BINT_SIZE ], BINT_WORDMSB ) ~= 0
+            local isnumeneg = ix[ 0 ] and band( ix[ BINT_SIZE ], BINT_WORDMSB ) ~= 0
+            local isdenoneg = iy[ 0 ] and band( iy[ BINT_SIZE ], BINT_WORDMSB ) ~= 0
 
             if isnumeneg then
                 ix = -ix
@@ -1509,7 +1557,7 @@ function environment.util.Bint( bits, wordbits )
                 negation( quot )
 
                 -- round quotient towards minus infinity
-                if not rema:IsZero() then
+                if not bint_iszero( rema ) then
                     decrement( quot )
 
                     -- adjust the remainder
@@ -1543,8 +1591,8 @@ function environment.util.Bint( bits, wordbits )
     function internal.__idiv( x, y )
         local ix, iy = tobint( x ), tobint( y )
         if ix and iy then
-            local isnumeneg = band( ix[ BINT_SIZE ], BINT_WORDMSB ) ~= 0
-            local isdenoneg = band( iy[ BINT_SIZE ], BINT_WORDMSB ) ~= 0
+            local isnumeneg = ix[ 0 ] and band( ix[ BINT_SIZE ], BINT_WORDMSB ) ~= 0
+            local isdenoneg = iy[ 0 ] and band( iy[ BINT_SIZE ], BINT_WORDMSB ) ~= 0
 
             if isnumeneg then
                 ix = -ix
@@ -1559,7 +1607,7 @@ function environment.util.Bint( bits, wordbits )
                 negation( quot )
 
                 -- round quotient towards minus infinity
-                if not rema:IsZero() then
+                if not bint_iszero( rema ) then
                     decrement( quot )
                 end
             end
@@ -1601,7 +1649,7 @@ function environment.util.Bint( bits, wordbits )
     -- @see internal.upowmod
     function internal.ipow( x, y )
         y = bint_assert_convert( y )
-        if y:IsZero() then
+        if bint_iszero( y ) then
             return bint_one()
         elseif y:IsOne() then
             return bint_new( x )
@@ -1643,8 +1691,10 @@ function environment.util.Bint( bits, wordbits )
         x = bint_umod( x, m )
 
         local z = bint_one()
-        while not y:IsZero() do
-            if y:IsOdd() then
+        z[ 0 ] = x[ 0 ]
+
+        while not bint_iszero( y ) do
+            if bint_isodd( y ) then
                 z = bint_umod( z * x, m )
             end
 
@@ -1661,8 +1711,23 @@ function environment.util.Bint( bits, wordbits )
     -- @param y The exponent, a bint or lua number.
     -- @return The result of the pow operation, a lua number.
     -- @see internal.ipow
-    function internal.__pow( x, y )
-        return bint_tonumber( x ) ^ bint_tonumber( y )
+    do
+
+        local load = environment.load
+        local cache = {}
+
+        function internal.__pow( x, y )
+            x, y = bint_abs( tobint( x ) ), bint_assert_tointeger( y )
+
+            local func = cache[ y ]
+            if not func then
+                func = load( 'local x=...;return x' .. string_rep( '*x', y - 1 ), 'Int' .. bits .. '^' .. y )
+                cache[ y ] = func
+            end
+
+            return func( x )
+        end
+
     end
 
     --- Bitwise left shift integers considering bints.
@@ -1794,14 +1859,6 @@ function environment.util.Bint( bits, wordbits )
 
         static.band = bint_band
 
-        function internal:IsUnsigned()
-            return bint_band( self, BINT_MININTEGER ):IsZero()
-        end
-
-        function internal:ToSigned()
-            return self - BINT_MININTEGER
-        end
-
     end
 
     -- BOR ( a | b )
@@ -1851,8 +1908,8 @@ function environment.util.Bint( bits, wordbits )
             return self
         end
 
-        internal.bxor = internal_bxor
         internal.__bxor = internal_bxor
+        internal.bxor = internal_bxor
 
         --- Bitwise XOR two integers considering bints.
         -- @param x An integer to perform bitwise XOR.
@@ -1860,10 +1917,6 @@ function environment.util.Bint( bits, wordbits )
         -- @raise Asserts in case inputs are not convertible to integers.
         static.bxor = function( x, y )
             return internal_bxor( bint_new( x ), y )
-        end
-
-        function internal:ToUnsigned()
-            return internal_bxor( self, BINT_MININTEGER )
         end
 
     end
@@ -1884,6 +1937,7 @@ function environment.util.Bint( bits, wordbits )
 
         --- Negate a bint (in-place). This effectively applies two's complements.
         negation = function( self )
+            self[ 0 ] = true
             return increment( bint_bnot( self ) )
         end
 
@@ -1895,7 +1949,7 @@ function environment.util.Bint( bits, wordbits )
         -- @param x An integer to perform bitwise NOT.
         -- @raise Asserts in case inputs are not convertible to integers.
         local bint_bnot = function( x )
-            local y = setmetatable( {}, internal )
+            local y = setmetatable( { [ 0 ] = x[ 0 ] }, internal )
             for i = 1, BINT_SIZE do
                 y[ i ] = band( bnot( x[ i ] ), BINT_WORDMAX )
             end
@@ -1914,43 +1968,6 @@ function environment.util.Bint( bits, wordbits )
 
     end
 
-    --- Compare if integer x is less than y considering bints (unsigned version).
-    -- @param x Left integer to compare.
-    -- @param y Right integer to compare.
-    -- @raise Asserts in case inputs are not convertible to integers.
-    -- @see internal.__lt
-    bint_ult = function( x, y )
-        x, y = bint_assert_convert( x ), bint_assert_convert( y )
-
-        for i = BINT_SIZE, 1, -1 do
-            local a, b = x[ i ], y[ i ]
-            if a ~= b then
-                return a < b
-            end
-        end
-
-        return false
-    end
-
-    internal.ult = bint_ult
-
-    --- Compare if bint x is less or equal than y considering bints (unsigned version).
-    -- @param x Left integer to compare.
-    -- @param y Right integer to compare.
-    -- @raise Asserts in case inputs are not convertible to integers.
-    -- @see internal.__le
-    function internal.ule( x, y )
-        x, y = bint_assert_convert( x ), bint_assert_convert( y )
-        for i = BINT_SIZE, 1, -1 do
-            local a, b = x[ i ], y[ i ]
-            if a ~= b then
-                return a < b
-            end
-        end
-
-        return true
-    end
-
     --- Compare if number x is less than y considering bints and signs.
     -- @param x Left value to compare, a bint or lua number.
     -- @param y Right value to compare, a bint or lua number.
@@ -1958,8 +1975,8 @@ function environment.util.Bint( bits, wordbits )
     function internal.__lt( x, y )
         local ix, iy = tobint( x ), tobint( y )
         if ix and iy then
-            local xneg = band( ix[ BINT_SIZE ], BINT_WORDMSB ) ~= 0
-            local yneg = band( iy[ BINT_SIZE ], BINT_WORDMSB ) ~= 0
+            local xneg = ix[ 0 ] and band( ix[ BINT_SIZE ], BINT_WORDMSB ) ~= 0
+            local yneg = iy[ 0 ] and band( iy[ BINT_SIZE ], BINT_WORDMSB ) ~= 0
 
             if xneg == yneg then
                 for i = BINT_SIZE, 1, -1 do
@@ -1985,8 +2002,8 @@ function environment.util.Bint( bits, wordbits )
     function internal.__le( x, y )
         local ix, iy = tobint( x ), tobint( y )
         if ix and iy then
-            local xneg = band( ix[ BINT_SIZE ], BINT_WORDMSB ) ~= 0
-            local yneg = band( iy[ BINT_SIZE ], BINT_WORDMSB ) ~= 0
+            local xneg = ix[ 0 ] and band( ix[ BINT_SIZE ], BINT_WORDMSB ) ~= 0
+            local yneg = iy[ 0 ] and band( iy[ BINT_SIZE ], BINT_WORDMSB ) ~= 0
 
             if xneg == yneg then
                 for i = BINT_SIZE, 1, -1 do
@@ -2008,13 +2025,13 @@ function environment.util.Bint( bits, wordbits )
     --- Convert a bint to a string on base 10.
     -- @see internal.ToBase
     function internal:__tostring()
-        return toBase( self, 10 )
+        return toBase( self, 10, not self[ 0 ] )
     end
 
     BINT_MATHMININTEGER, BINT_MATHMAXINTEGER = bint_new( math.mininteger ), bint_new( math.maxinteger )
-    BINT_MININTEGER = static.MinInteger()
+    BINT_MINSIGNED = static.MinSigned()
 
-    local cls = class( 'Int' .. bits, internal, static )
+    local cls = class( 'number' .. bits, internal, static )
     memo[ memoindex ] = cls
     return cls
 end
