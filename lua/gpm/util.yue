@@ -1039,6 +1039,8 @@ table.Invert = ( tbl, makeCopy ) ->
 
     return tbl
 
+table.Flip = table.Invert
+
 table.HasValue = ( tbl, any, isSequential ) ->
 	if isSequential
 		for index = 1, #tbl

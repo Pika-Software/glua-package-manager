@@ -177,16 +177,6 @@ do
         SafeAwait( Delay( delay ) )
         return nil
 
-table.Flip = ( tbl ) ->
-    length = #tbl
-    finish = fdiv( length, 2 )
-    length += 1
-
-    for index = 1, finish, 1
-        tbl[ index ], tbl[ length - index ] = tbl[ length - index ], tbl[ index ]
-
-    return tbl
-
 do
 
     import struct from environment
