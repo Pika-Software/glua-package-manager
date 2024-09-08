@@ -2,7 +2,7 @@ _G = _G
 import environment from _G.gpm
 import char, byte, sub, gsub, gmatch, len from _G.string
 import band, bor, lshift, rshift from environment.bit
-import concat, unpack, Invert from environment.table
+import concat, unpack, Flip from environment.table
 import min, max from _G.math
 import tonumber from _G
 
@@ -1178,7 +1178,7 @@ do
 		["𐑏"]: "𐐧"
 	}
 
-	upper2lower = Invert( lower2upper, true )
+	upper2lower = Flip( lower2upper, true )
 
 	metatable = {
 		__index: ( tbl, key ) ->

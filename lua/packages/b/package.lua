@@ -1,7 +1,7 @@
 exports = "./init.lua"
 
 dependencies = {
-    ["abc"] = "0.1.0",
+    -- ["abc"] = "0.1.0",
 }
 
 send = {
