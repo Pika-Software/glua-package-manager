@@ -43,9 +43,10 @@ do
         if a == b
             return true
 
+        print("comparing", a, b)
         for key, value in pairs( a )
             alt = rawget( b, key )
-            unless alt
+            if alt == nil
                 return false
 
             if not ( getmetatable( value ) or getmetatable( alt ) ) and istable( value ) and istable( alt )
@@ -56,7 +57,7 @@ do
 
         for key, value in pairs( b )
             alt = rawget( a, key )
-            unless alt
+            if alt == nil
                 return false
 
             if not ( getmetatable( value ) or getmetatable( alt ) ) and istable( value ) and istable( alt )
