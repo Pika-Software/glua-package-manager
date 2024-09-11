@@ -352,7 +352,7 @@ do
         return trim( str, pattern, -1 )
 
     string.IsURL = ( str ) ->
-        return match( str, "^%l[%l+-.]+%:[^%z\x01-\x20\x7F-\xFF\"<>^`{-}]*$" ) ~= nil
+        return match( str, "^%l[%l+-.]+%:[^%z\x01-\x20\x7F-\xFF\"<>^`:{-}]*$" ) ~= nil
 
 string.Extract = ( str, pattern, default ) ->
     startPos, endPos, matched = find( str, pattern, 1, false )
