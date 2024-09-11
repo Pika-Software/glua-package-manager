@@ -14,7 +14,7 @@ return
                     expect( resultPath ).to.equal( filePath )
                     expect( resultGamePath ).to.equal( gamePath )
                     return
-                
+
                 test( "/", "", "GAME" )
                 test( "/hello.txt", "hello.txt", "GAME" )
                 test( "/lua/foo/bar.lua", "foo/bar.lua", LUA_GAME_PATH )
@@ -68,7 +68,7 @@ return
                 test( "lua/gpm/init.lua", "GAME" )
                 test( "", "ABC" )
                 test( "hello/world.vtf", "FOO / BAR" )
-        
+                return
 
         *   name: "NormalizeGamePath(...) should handle URL objects (not strings)"
             func: ->

@@ -122,3 +122,72 @@ return
                 test( "hello again", 0x61, 2 )
                 test( "+++++++++++++", 0x2B, 13 )
                 return
+
+        *   name: "string.IsASCII(...) must return true if given value is ASCII number"
+            func: ->
+                test = ( value, expected ) ->
+                    expect( string.IsASCII(value) ).to.eq( expected )
+
+                test( 0, true )
+                test( 255, true )
+                test( 256, false )
+                test( -1, false )
+                return
+
+        *   name: "string.TrimByte(...) must return trimmed string"
+            func: ->
+                test = ( str, bytes, expected ) ->
+                    expect( string.TrimByte(str, bytes) ).to.eq( expected )
+
+                test( "hello world", 0x20, "hello world" )
+                test( "lllo worllll", 0x6C, "o wor" )
+                test( "                  hello world", 0x20, "hello world", 1 )
+                test( "hello world                  ", 0x20, "hello world", -1 )
+                return
+
+        *   name: "string.TrimBytes(...) must return trimmed string"
+            func: ->
+                test = ( str, bytes, expected ) ->
+                    expect( string.TrimBytes(str, bytes) ).to.eq( expected )
+
+                test( "   hello world   ", { 0x20 }, "hello world" )
+                test( "\t\t\t\thello world                      ", { 0x20, 0x09 }, "hello world" )
+                test( "lllllllllllllllllllooolllllllllllll\t\t\t\t\t            ", { 0x20, 0x09, 0x6C }, "ooo" )
+                return
+
+        *   name: "string.PatternSafe(...) must return safe pattern"
+            func: ->
+                test = ( pattern, expected ) ->
+                    expect( string.PatternSafe(pattern) ).to.eq( expected )
+
+                test( "hello", "hello" )
+                test( "hello%world", "hello%%world" )
+                test( "(hello)[world]", "%(hello%)%[world%]" )
+                test( "[[\\$$]]", "%[%[\\%$%$%]%]" )
+                return
+
+        *   name: "string.Trim(...) must return trimmed string"
+            func: ->
+                test = ( str, pattern, expected ) ->
+                    expect( string.Trim(str, pattern) ).to.eq( expected )
+
+                test( "hello world", " ", "hello world" )
+                test( "     hello world\t\t\t\t\t", "%s", "hello world", 0 )
+                test( "     \t\t\tok,,,", "%s%p", "ok" )
+                test( "\n\n\n\t\t\t\t\rtest", "%c", "test", 1 )
+                test( "yep              ", nil, "yep", -1 )
+                return
+
+        *   name: "string.IsURL(...) must return true if given string is URL"
+            func: ->
+                test = ( str, expected ) ->
+                    expect( string.IsURL(str) ).to.eq( expected )
+
+                test( "https://google.com", true )
+                test( "http://google.com", true )
+                test( "google.com", false )
+                test( "www.google.com", false )
+                test( "file://google.com", true )
+                test( "ftp://google.com:80", false )
+                return
+

@@ -204,9 +204,6 @@ do
         return byte0 >= 0 and byte0 <= 255
 
     string.TrimByte = ( str, byte0, dir = 0 ) ->
-        unless isASCII( byte0 )
-            error "invalid byte", 2
-
         startPos, endPos = 1, len( str )
 
         if dir ~= -1
@@ -234,8 +231,8 @@ do
                 bytes[ key ] = nil
 
             elseif isbool( value )
-                unless isnumber( key ) and isASCII( key )
-                   error "invalid bytes", 2
+                unless isnumber( key )
+                    error "invalid bytes", 2
             else
                 error "invalid bytes", 2
 
@@ -327,13 +324,14 @@ do
 
     trim = string.Trim = ( str, pattern, dir = 0 ) ->
         if pattern
-            length = len( pattern )
-            if length == 0
+            if pattern == ""
                 pattern = "%s"
-            elseif length == 1
-                pattern = chars[ byte( pattern, 1 ) ] or pattern
-            elseif length ~= 2 or byte( pattern, 1 ) ~= 0x25
-                error "invalid character", 2
+            else
+                length = len( pattern )
+                if length == 1
+                    pattern = chars[ byte( pattern, 1 ) ] or pattern
+                elseif length ~= 2 or byte( pattern, 1 ) ~= 0x25
+                    pattern = "[" .. pattern .. "]"
         else
             pattern = "%s"
 
