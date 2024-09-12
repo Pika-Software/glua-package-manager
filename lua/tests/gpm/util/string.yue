@@ -221,3 +221,12 @@ return
                 test( "hello world", 5, "world" )
                 return
 
+        *   name: "string.Replace(...) must return replaced string"
+            func: ->
+                test = ( str, searchable, replaceable, withPattern, expected ) ->
+                    expect( string.Replace(str, searchable, replaceable, withPattern) ).to.equal( expected )
+
+                test( "hello world", "hello", "hi", false, "hi world" )
+                test( "hello world", ".", "*", true, "***********" )
+                test( "my little message", " ", "_", true, "my_little_message" )
+                return
