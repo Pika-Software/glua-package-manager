@@ -1,7 +1,7 @@
 _G = _G
 import gpm, SERVER from _G
 import environment, Logger from gpm
-import istable, pcall, require from _G
+import istable, pcall, require, tonumber from _G
 import math, string, table, os, util, argument, isfunction, isstring, isnumber, error from environment
 import byte, sub, gsub, len, find from string
 import IsBinaryModuleInstalled from util
@@ -737,8 +737,8 @@ do
 
     import band, bor, lshift, rshift from environment.bit
     import match, ByteCount from string
-    import tostring, tonumber from _G
     import isuint, max from math
+    import tostring from _G
     import sort from table
 
     compare = ( a, b ) ->
