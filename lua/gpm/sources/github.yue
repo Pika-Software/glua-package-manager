@@ -1,10 +1,10 @@
 -- Seconds iteration of github source handler
 
 _G = _G
-import pairs, tostring from _G -- functions
-import environment from _G.gpm -- environment
+import pairs, tostring, gpm from _G -- functions
+import environment, Logger from gpm -- environment
 
-import URL, Package, SourceError, Logger from environment -- classes
+import URL, Package, SourceError from environment -- classes
 import async, await from environment -- functions
 
 -- libraries
@@ -22,7 +22,7 @@ CACHE_DIR = "/data/gpm/cache/github/"
 -- github:user/repo[/branch]
 -- or
 -- github://user/repo[/branch]
-class GithubSource extends environment.loader.Source
+class GithubSource extends gpm.loader.Source
     GetDefaultBranch = ( user, repository ) ->
         -- if we have local default branch, just use it and do not fetch it from github
         -- probably it wont be changed, and there is no need to recheck it every time
