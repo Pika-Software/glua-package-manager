@@ -5,7 +5,7 @@ import async, await, debug, util, path, string, Promise, CodeCompileError, FileS
 import ByteStream, IsBinaryModuleInstalled, SHA256 from util
 import byte, sub, len, match, ByteSplit from string
 import resolve, getDirectory, getFile, getCurrentDirectory from path
-import concat from environment.table
+import concat, Add from environment.table
 import get, save from sql.files
 import fempty from debug
 import Find from file
@@ -27,6 +27,13 @@ else
     luaPath = "LUA"
 
 lib.LuaPath = luaPath
+
+luaGamePaths = lib.LuaGamePaths = {
+    "LuaMenu": true
+    "lsv": true
+    "LUA": true
+    "lcl": true
+}
 
 luaExtensions = lib.LuaExtensions = {
     lua: true
@@ -58,14 +65,14 @@ do
 
     normalizeGamePath = lib.NormalizeGamePath = ( absolutePath, gamePath ) ->
         if not gamePath and isurl( absolutePath )
-            if absolutePath.scheme != "file"
+            if absolutePath.scheme ~= "file"
                 error FileSystemError "Cannot resolve URL '#{absolutePath}' because it is not a file URL."
 
             absolutePath = absolutePath.pathname
 
         firstByte = byte( absolutePath )
         if firstByte == 0x2F --[[ / ]]
-            absolutePath = sub( absolutePath, 2 ) -- resolve it? 
+            absolutePath = sub( absolutePath, 2 ) -- resolve it?
             if gamePath
                 return absolutePath, gamePath
 
@@ -77,19 +84,19 @@ do
                 if currentDir == ""
                     error FileSystemError "Cannot resolve relative path '#{absolutePath}' because main file is unknown."
 
-                absolutePath = sub( resolve(currentDir .. absolutePath), 2)
+                absolutePath = sub( resolve( currentDir .. absolutePath ), 2 )
                 gamePath = luaPath
 
         unless gamePath
-            for i = 1, #absolutePath
-                if byte( absolutePath, i ) == 0x2F --[[ / ]]
-                    rootDir = sub( absolutePath, 1, i - 1 )
+            for index = 1, len( absolutePath )
+                if byte( absolutePath, index ) == 0x2F --[[ / ]]
+                    rootDir = sub( absolutePath, 1, index - 1 )
                     gamePath = dir2path[ rootDir ]
                     if gamePath
-                        absolutePath = sub( absolutePath, i + 1 )
+                        absolutePath = sub( absolutePath, index + 1 )
 
                     break
-        
+
         return absolutePath, gamePath or "GAME"
 
     path2dir = {
@@ -124,7 +131,12 @@ lib.Find = ( filePath, gamePath, skipNormalize ) ->
     unless skipNormalize
         filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
-    return Find( filePath, gamePath )
+    files, dirs = Find( filePath, gamePath )
+    if CLIENT and luaGamePaths[ gamePath ]
+        files2, dirs2 = Find( "lua/" .. filePath, "WORKSHOP" )
+        return Add( files, files2, true ), Add( dirs, dirs2, true )
+
+    return files, dirs
 
 do
 
@@ -169,13 +181,6 @@ do
             file.Rename( "/data/test.txt", "test2.txt" )
 
     ]]
-
-luaGamePaths = lib.LuaGamePaths = {
-    "LuaMenu": true
-    "lsv": true
-    "LUA": true
-    "lcl": true
-}
 
 local isFileMounted, isDirMounted
 do
@@ -729,7 +734,7 @@ do
                 "Install": ->
                     return {
                         "Read": ( fileName, gamePath, func ) ->
-                            content = read( fileName, gamePath, nil, true )
+                            content = read( fileName, gamePath, nil, true, false )
                             state = content == nil and -1 or 0
                             func( fileName, gamePath, state, content )
                             return state
