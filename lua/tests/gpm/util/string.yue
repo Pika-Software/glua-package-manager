@@ -191,3 +191,33 @@ return
                 test( "ftp://google.com:80", false )
                 return
 
+        *   name: "string.Extract(...) must return table with splited parts of given string"
+            func: ->
+                test = ( str, pattern, default, expected ) ->
+                    expect( string.Extract( str, pattern, default ) ).to.equal( expected )
+
+                test( "hello world", " ", nil, "helloworld" )
+                test( "hello world", "^%w+", nil, " world" )
+                test( "hello user, can you help other users?", "user", nil, "hello , can you help other users?" )
+                return
+
+        *   name: "string.Left(...) must return left part of given string"
+            func: ->
+                test = ( str, num, expected ) ->
+                    expect( string.Left(str, num) ).to.equal( expected )
+
+                test( "hello world", 5, "hello" )
+                test( "hello world", 0, "" )
+                test( "hello world", 10, "hello worl" )
+                return
+
+        *   name: "string.Right(...) must return right part of given string"
+            func: ->
+                test = ( str, num, expected ) ->
+                    expect( string.Right(str, num) ).to.equal( expected )
+
+                test( "hello world", 5, "world" )
+                test( "hello world", 0, "hello world" )
+                test( "hello world", 5, "world" )
+                return
+
