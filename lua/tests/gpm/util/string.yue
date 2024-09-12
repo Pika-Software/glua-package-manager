@@ -7,7 +7,7 @@ return
             func: ->
                 test = ( str, startPos, endPos, expected ) ->
                     result = string.slice(str, startPos, endPos)
-                    expect( result ).to.eq( expected )
+                    expect( result ).to.equal( expected )
 
                 test( "hello", 1, 5, "hello" )
                 test( "hello", 1, 1, "h" )
@@ -57,7 +57,7 @@ return
             func: ->
                 test = ( expected, ... ) ->
                     result = string.concat(...)
-                    expect( result ).to.eq( expected )
+                    expect( result ).to.equal( expected )
 
                 test( "hello world", "hello", " world" )
                 test( "oh hi mark", "oh ", "hi", " mark" )
@@ -70,7 +70,7 @@ return
                 paragraph = "I think Ruth's dog is cuter than your dog!"
 
                 test = ( str, searchable, position, withPattern, expected ) ->
-                    expect( string.IndexOf(str, searchable, position, withPattern) ).to.eq( expected )
+                    expect( string.IndexOf(str, searchable, position, withPattern) ).to.equal( expected )
                     return
 
                 test( paragraph, "dog", 1, false, 16 )
@@ -93,7 +93,7 @@ return
         *   name: "string.Count(...) must return pattern repetition count"
             func: ->
                 test = ( str, pattern, withPattern, expected ) ->
-                    expect( string.Count(str, pattern, withPattern) ).to.eq( expected )
+                    expect( string.Count(str, pattern, withPattern) ).to.equal( expected )
 
                 test( "hello world", "l", false, 3 )
                 test( "hello world", "o", false, 2 )
@@ -116,7 +116,7 @@ return
         *   name: "string.ByteCount(...) must return byte count of given string"
             func: ->
                 test = ( str, byte, expected ) ->
-                    expect( string.ByteCount(str, byte) ).to.eq( expected )
+                    expect( string.ByteCount(str, byte) ).to.equal( expected )
 
                 test( "hello world", 0x20, 1 )
                 test( "hello again", 0x61, 2 )
@@ -126,7 +126,7 @@ return
         *   name: "string.IsASCII(...) must return true if given value is ASCII number"
             func: ->
                 test = ( value, expected ) ->
-                    expect( string.IsASCII(value) ).to.eq( expected )
+                    expect( string.IsASCII(value) ).to.equal( expected )
 
                 test( 0, true )
                 test( 255, true )
@@ -137,7 +137,7 @@ return
         *   name: "string.TrimByte(...) must return trimmed string"
             func: ->
                 test = ( str, bytes, expected ) ->
-                    expect( string.TrimByte(str, bytes) ).to.eq( expected )
+                    expect( string.TrimByte(str, bytes) ).to.equal( expected )
 
                 test( "hello world", 0x20, "hello world" )
                 test( "lllo worllll", 0x6C, "o wor" )
@@ -148,7 +148,7 @@ return
         *   name: "string.TrimBytes(...) must return trimmed string"
             func: ->
                 test = ( str, bytes, expected ) ->
-                    expect( string.TrimBytes(str, bytes) ).to.eq( expected )
+                    expect( string.TrimBytes(str, bytes) ).to.equal( expected )
 
                 test( "   hello world   ", { 0x20 }, "hello world" )
                 test( "\t\t\t\thello world                      ", { 0x20, 0x09 }, "hello world" )
@@ -158,7 +158,7 @@ return
         *   name: "string.PatternSafe(...) must return safe pattern"
             func: ->
                 test = ( pattern, expected ) ->
-                    expect( string.PatternSafe(pattern) ).to.eq( expected )
+                    expect( string.PatternSafe(pattern) ).to.equal( expected )
 
                 test( "hello", "hello" )
                 test( "hello%world", "hello%%world" )
@@ -169,7 +169,7 @@ return
         *   name: "string.Trim(...) must return trimmed string"
             func: ->
                 test = ( str, pattern, expected ) ->
-                    expect( string.Trim(str, pattern) ).to.eq( expected )
+                    expect( string.Trim(str, pattern) ).to.equal( expected )
 
                 test( "hello world", " ", "hello world" )
                 test( "     hello world\t\t\t\t\t", "%s", "hello world", 0 )
@@ -181,7 +181,7 @@ return
         *   name: "string.IsURL(...) must return true if given string is URL"
             func: ->
                 test = ( str, expected ) ->
-                    expect( string.IsURL(str) ).to.eq( expected )
+                    expect( string.IsURL(str) ).to.equal( expected )
 
                 test( "https://google.com", true )
                 test( "http://google.com", true )

@@ -260,7 +260,7 @@ return
         *   name: "table.GetValue(...) must tranverse table with given key delimited by '.'"
             func: ->
                 test = ( tbl, key, expected ) ->
-                    expect( table.GetValue(tbl, key) ).to.eq( expected )
+                    expect( table.GetValue(tbl, key) ).to.equal( expected )
 
                 test( {}, "test", nil )
                 test( { "test": "works" }, "test", "works" )
