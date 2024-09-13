@@ -973,6 +973,10 @@ do
     -- this one has [name@version or url] = Promise
     dependencies = loader.Dependencies = {}
 
+    -- used for reloading server if not all dependencies were installed
+    lastHumanCount = 0
+    getHumanCount = -> #_G.player.GetHumans()
+
     local installDependency, resolveDependencies
 
     installDependency = async ( pkg, name, target, force ) ->
@@ -1050,7 +1054,7 @@ do
 
         -- alright, it seems that all dependencies were installed
         -- let's restart server if there is any humans on the servers
-        if #_G.player.GetHumans! > 0
+        if getHumanCount() > lastHumanCount
             RunConsoleCommand( "changelevel", game.GetMap() )
 
         return nil
@@ -1076,6 +1080,9 @@ do
     loader.InitializePackage = initializePackage
 
     loader.Startup = async ->
+        if SERVER
+            lastHumanCount = getHumanCount()
+
         Logger\Info( "Parsing `packages/` directory..." )
         _, folders = Find( "packages/*", file.LuaPath, true )
         base = URL( "file:///lua/packages/" )
