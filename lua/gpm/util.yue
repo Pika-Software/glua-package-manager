@@ -967,7 +967,7 @@ debug.getstack = ( startPos ) ->
     stack, length = {}, 0
 
     for level = 1 + ( startPos or 1 ), 16
-        info = getinfo( level, "Snl" )
+        info = getinfo( level, "Snluf" )
         unless info
             break
 
