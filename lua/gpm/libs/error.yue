@@ -23,7 +23,7 @@
 ]]
 import environment from _G.gpm
 import isstring, tostring, ErrorNoHaltWithStack, ErrorNoHalt, getmetatable from gpm.environment
-import getstack from environment.debug
+import getstack, getupvalue, getlocal, fempty from environment.debug
 classExtend = environment.extend
 import format, rep from string
 import concat from table
@@ -79,18 +79,97 @@ mergeStack = ( stack ) ->
 
     return stack
 
+dumpFile = fempty
+do
+    import math, file, MsgC, Msg from environment
+    import Split, find, sub from environment.string
+
+    gray = Color( 180, 180, 180 )
+    white = Color( 225, 225, 225 )
+    danger = Color( 239, 68, 68 )
+
+    dumpFile = (message, fileName, line) ->
+        unless fileName and line
+            return
+        
+        data = file.Read( fileName, "GAME" )
+        unless data and #data > 0
+            return
+        
+        lines = Split( data, "\n" )
+        unless lines and lines[ line ]
+            return
+        
+        start = math.max( 1, line - 5 )
+        finish = math.min( #lines, line + 3 )
+        numWidth = math.floor( math.log10( finish ) ) + 1
+
+        longestLine = 0
+        firstChar = math.huge
+        for i = start, finish
+            code = lines[ i ]
+
+            pos = find( code, "%S" )
+            if pos and pos < firstChar
+                firstChar = pos
+            
+            longestLine = math.max( longestLine, #code )
+        
+        longestLine = math.min( longestLine - firstChar, 120 )
+        
+        MsgC( gray, rep(" ", numWidth + 3), rep("_", longestLine + 4), "\n", rep(" ", numWidth + 2), "|\n" )
+
+        numFormat = " %0" .. numWidth .. "d | "
+        for i = start, finish
+            code = lines[ i ]
+            MsgC( i == line and white or gray , format(numFormat, i), sub(code, firstChar, longestLine + firstChar), "\n" )
+
+            if i == line
+                space = (find( code, "%S" ) or 1 ) - 1
+                MsgC( gray, rep( " ", numWidth + 2 ), "| ", sub( code, firstChar, space ), danger, "^ ", tostring( message ), "\n" )
+                MsgC( gray, rep( " ", numWidth + 2 ), "|\n" )
+
+        MsgC( gray, rep(" ", numWidth + 2), "|\n", rep(" ", numWidth + 3), rep("¯", longestLine + 4), "\n\n" )
+
 errorClass = environment.class(
     "Error",
     {
         name: "Error"
 
-        new: ( @message, @fileName, @lineNumber, stackPos ) =>
-            @stack = stack = captureStack( stackPos or 3 )
+        new: ( @message, @fileName, @lineNumber, stackPos = 3 ) =>
+            @stack = stack = captureStack( stackPos )
             mergeStack( stack )
 
             if first := stack[ 1 ]
                 @fileName or= first.short_src
                 @lineNumber or= first.currentline
+
+                -- TODO: prevent recording these values on client in production
+                if getupvalue and first.func and first.nups and first.nups > 0
+                    upvalues = @upvalues = {}
+                    for i = 1, first.nups
+                        name, value = getupvalue( first.func, i )
+                        if name == nil
+                            @upvalues = nil
+                            break
+
+                        upvalues[i] = { :name, :value }
+
+                if getlocal
+                    locals = @locals = {}
+                    i = 1
+                    while true
+                        name, value = getlocal( stackPos, i )
+                        if name == nil
+                            break
+
+                        if name != "(*temporary)"
+                            locals[] = { :name, :value }
+                        
+                        i += 1
+                
+                    if #locals == 0
+                        @locals = nil
 
             return nil
 
@@ -104,18 +183,34 @@ errorClass = environment.class(
             if isstring( @ )
                 return ErrorNoHaltWithStack( @ )
 
-            lines, length = { "\n[ERROR] " .. tostring( @ ) }, 1
+            lines = { "\n[ERROR] " .. tostring( @ ) }
 
+            -- Add stack trace
             stack = @stack
-            for index = 1, #stack
-                length += 1
-                info = stack[ index ]
-                lines[ length ] = format( "%s %d. %s - %s:%d", rep( " ", index ), index, info.name or "unknown", info.short_src, info.currentline or -1 )
+            for i = 1, #stack
+                info = stack[ i ]
+                lines[] = format( "%s %d. %s - %s:%d", rep( " ", i ), i, info.name or "unknown", info.short_src, info.currentline or -1 )
+            
+            -- Add locals
+            if locals := @locals
+                lines[] = "\n=== Locals ==="
 
-            length += 1
-            lines[ length ] = "\n"
+                for entry in *locals
+                    lines[] = format( "  - %s = %s", entry.name, entry.value )
 
-            ErrorNoHalt concat( lines, "\n", 1, length )
+            -- Add upvalues
+            if upvalues := @upvalues
+                lines[] = "\n=== Upvalues ==="
+
+                for entry in *upvalues
+                    lines[] = format( "  - %s = %s", entry.name, entry.value )
+
+            lines[] = "\n"
+
+            ErrorNoHalt concat( lines, "\n" )
+
+            -- TODO: disable this in client-side production environment
+            dumpFile( @name .. ": " .. @message, @fileName, @lineNumber )
             return nil
     },
     {
