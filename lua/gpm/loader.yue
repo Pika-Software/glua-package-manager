@@ -1,5 +1,5 @@
 _G = _G
-import CLIENT, SERVER, gpm, pcall from _G
+import CLIENT, SERVER, gpm, pcall, AddCSLuaFile from _G
 import environment from gpm
 
 import debug, string, path, file, util, pairs, isurl, isstring, argument, URL, ModuleError, error, PackageError, Promise from environment
@@ -23,7 +23,6 @@ if SERVER
 
     import getCurrentFile, getCurrentDirectory, getFile from path
     import LuaGamePaths, LuaExtensions from file
-    import AddCSLuaFile from _G
 
     addFilePath = ( filePath, gamePath ) ->
         basePath = getDirectory( filePath, true )
@@ -233,7 +232,7 @@ do
                 return nil
 
             if gamePath == file.LuaPath
-                addcsluafile( replaceExtension( filePath, "lua" ), gamePath, true )
+                AddCSLuaFile( replaceExtension( filePath, "lua" ) )
 
             return packageClass( URL( AbsoluteGamePath( filePath, gamePath ), "file:///" ), info )
 
