@@ -3,7 +3,7 @@ import CLIENT, SERVER, gpm, pcall from _G
 import environment from gpm
 
 import debug, string, path, file, util, pairs, isurl, isstring, argument, URL, ModuleError, error, PackageError, Promise from environment
-import getDirectory, getExtension from path
+import getDirectory, getExtension, replaceExtension from path
 import NormalizeGamePath, AbsoluteGamePath, Find from file
 import concat, IsEmpty, Merge from environment.table
 import await, async from Promise
@@ -21,11 +21,31 @@ local addcsluafile
 
 if SERVER
 
-    import AsyncRead, Exists, LuaGamePaths, LuaExtensions from file
     import getCurrentFile, getCurrentDirectory, getFile from path
-    import GMA from environment.addon
-    import IsBytecode from string
+    import LuaGamePaths, LuaExtensions from file
     import AddCSLuaFile from _G
+
+    addFilePath = ( filePath, gamePath ) ->
+        basePath = getDirectory( filePath, true )
+        searchable = getFile( filePath )
+
+        files, dirs = Find( filePath, gamePath, true )
+
+        for index = 1, #files
+            fileName = files[ index ]
+            if LuaExtensions[ getExtension( fileName, false ) ]
+                AddCSLuaFile( basePath .. replaceExtension( fileName, "lua" ) )
+            else
+                error "Attept to send non-lua file '" .. basePath .. fileName .. "'.", 2
+
+        for directoryName in *dirs
+            directoryPath = basePath .. directoryName
+            if directoryPath == filePath
+                addFilePath( directoryPath .. "/*", gamePath )
+            else
+                addFilePath( directoryPath .. "/" .. searchable, gamePath )
+
+        return nil
 
     addcsluafile = ( filePath = "", gamePath, skipNormalize ) ->
         if filePath == "" or getFile( filePath ) == "."
@@ -48,26 +68,9 @@ if SERVER
         unless LuaGamePaths[ gamePath ]
             error "Sending lua files from '" .. gamePath .. "' game path is not allowed.", 2
 
-        basePath = getDirectory( filePath, true )
-        searchable = getFile( filePath )
-
-        files, dirs = Find( filePath, gamePath, true )
-
-        for index = 1, #files
-            fileName = files[ index ]
-            if LuaExtensions[ getExtension( fileName, false ) ]
-                AddCSLuaFile( basePath .. fileName )
-            else
-                error "Attept to send non-lua file '" .. basePath .. fileName .. "'.", 2
-
-        for directoryName in *dirs
-            directoryPath = basePath .. directoryName
-            if directoryPath == filePath
-                addcsluafile( directoryPath .. "/*", gamePath, true )
-            else
-                addcsluafile( directoryPath .. "/" .. searchable, gamePath, true )
-
+        addFilePath( filePath, gamePath )
         return nil
+
 else
 
     addcsluafile = environment.debug.fempty
@@ -230,8 +233,7 @@ do
                 return nil
 
             if gamePath == file.LuaPath
-                includePath = path.replaceExtension( filePath, "lua" )
-                addcsluafile( includePath, gamePath, true )
+                addcsluafile( replaceExtension( filePath, "lua" ), gamePath, true )
 
             return packageClass( URL( AbsoluteGamePath( filePath, gamePath ), "file:///" ), info )
 
