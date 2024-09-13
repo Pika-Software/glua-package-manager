@@ -1,6 +1,7 @@
 _G = _G
-import environment from _G.gpm
-import pairs, error, rawget, getfenv, getmetatable, setmetatable, istable, tostring from _G
+import gpm, pairs, error, rawget, getfenv, getmetatable, setmetatable, istable, tostring, tonumber from _G
+
+import environment from gpm
 import string, table, debug, util, os from environment
 import byte, sub, gsub, format, len, find from string
 import concat, remove from table
@@ -1238,7 +1239,6 @@ do
 do
 
     import abs, clamp, floor, lerp from math
-    import tonumber from _G
     import char from string
 
     -- color correction credits goes to 0x00000ED (https://github.com/0x00000ED)
@@ -1625,7 +1625,7 @@ do
     isEdge = jit.versionnum ~= 20004
     is32 = jit.arch == "x86"
 
-    head = "lua/bin/gm" .. ( ( CLIENT and not MENU_DLL ) and "cl" or "sv" ) .. "_"
+    head = "lua/bin/gm" .. ( ( _G.CLIENT and not _G.MENU_DLL ) and "cl" or "sv" ) .. "_"
     tail = "_" .. ( { "osx64", "osx", "linux64", "linux", "win64", "win32" } )[ ( system.IsWindows() and 4 or 0 ) + ( system.IsLinux() and 2 or 0 ) + ( is32 and 1 or 0 ) + 1 ] .. ".dll"
 
     isBinaryModuleInstalled = util.IsBinaryModuleInstalled = ( name ) ->
@@ -1899,3 +1899,39 @@ do
                 return nil
 
             return nil
+
+do
+
+    local getConVar
+    do
+
+        import GetConVar_Internal from _G
+        cache = {}
+
+        getConVar = environment.GetConVar = ( name ) ->
+            if convar := cache[ name ]
+                return convar
+
+            convar = GetConVar_Internal( name )
+            if convar == nil
+                return nil
+
+            cache[ name ] = convar
+            return convar
+
+    developer = getConVar( "developer" )
+
+    if _G.game.IsDedicated!
+        isInDebug = developer\GetInt! > 1
+
+        _G.cvars.AddChangeCallback( "developer", ( _, __, str ) ->
+            isInDebug = ( tonumber( str, 10 ) or 0 ) > 1
+        "GLua Package Manager::Debug" )
+
+        gpm.IsInDebug = ->
+            return isInDebug
+    else
+        import GetInt from getmetatable( developer )
+
+        gpm.IsInDebug = ->
+            return GetInt( developer ) > 0

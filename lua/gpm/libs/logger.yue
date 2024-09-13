@@ -1,9 +1,9 @@
 _G = _G
-import gpm, timer from _G
-import environment from gpm
+import gpm, timer, tostring from _G
+import environment, IsInDebug from gpm
 
 import format, gsub, sub, len from environment.string
-import util, Color, tostring from environment
+import util, Color, argument from environment
 
 isLoading = true
 timer.Simple 0, ->
@@ -12,16 +12,14 @@ timer.Simple 0, ->
 dateScheme, limit = "%d-%m-%Y %H:%M:%S ", 200
 do
 
-    import CreateConVar from environment
-    import FCVAR_ARCHIVE from _G
+    import FCVAR_ARCHIVE, CreateConVar from _G
 
     dateScheme = CreateConVar( "gpm_logger_date", "0", FCVAR_ARCHIVE, "Allows the logger to display date.", 0, 1 )\GetBool! and "%d-%m-%Y %H:%M:%S " or "%H:%M:%S "
     limit = CreateConVar( "gpm_logger_limit", limit, FCVAR_ARCHIVE, "Maximum number of messages displayed per second.", 0, 2 ^ 16 )\GetInt!
 
-local isInDebug
 do
 
-    import AddChangeCallback from environment.cvars
+    import AddChangeCallback from _G.cvars
 
     AddChangeCallback( "gpm_logger_date", ( _, __, new ) ->
         dateScheme = ( new == "1" and "%d-%m-%Y %H:%M:%S " or "%H:%M:%S ")
@@ -35,23 +33,6 @@ do
         return nil
     "GLua Package Manager::Logger" )
 
-    developer = _G.GetConVar( "developer" )
-
-    if _G.game.IsDedicated!
-        isDebug = developer\GetInt! > 0
-
-        AddChangeCallback( "developer", ( _, __, new ) ->
-            isDebug = ( tonumber( new, 10 ) or 0 ) > 0
-        "GLua Package Manager::Logger" )
-
-        isInDebug = ->
-            return isDebug
-    else
-        import GetInt from _G.getmetatable( developer )
-
-        isInDebug = ->
-            return GetInt( developer ) > 0
-
 secondaryTextColor = Color( 150, 150, 150 )
 primaryTextColor = Color( 200, 200, 200 )
 white = Color( 255, 255, 255 )
@@ -62,19 +43,18 @@ debug = Color( 0, 200, 150 )
 
 local state, stateColor
 if MENU_DLL
-    state = "Main Menu"
+    state = "[Main Menu] "
     stateColor = Color( 75, 175, 80 )
 elseif CLIENT
-    state = "Client"
+    state = "[ Client ]  "
     stateColor = Color( 225, 170, 10 )
 elseif SERVER
-    state = "Server"
+    state = "[ Server ]  "
     stateColor = Color( 5, 170, 250 )
 else
-    state = "Unknown"
+    state = "[ Unknown ] "
     stateColor = white
 
-state = "[" .. state .. "] "
 queue = util.Queue!
 
 local display
@@ -136,30 +116,47 @@ loggerClass = environment.class( "Logger", {
     __tostring: =>
         return format( "Logger: %p [%s]", @, @title )
 
-    new: ( @title = "unknown", @title_color = white, @interpolation = true, @IsInDebug = isInDebug ) =>
+    new: ( title, title_color, interpolation, debug_func ) =>
+        argument( title, 1, "string" )
+        @title = title
+
+        if title_color
+            argument( title_color, 2, "Color" )
+            @title_color = title_color
+        else
+            @title_color = white
+
+        if interpolation == nil
+            @interpolation = true
+        else
+            @interpolation = interpolation == true
+
+        if debug_fn
+            argument( debug_func, 1, "function" )
+            @IsInDebug = debug_func
+        else
+            @IsInDebug = IsInDebug
+
         @text_color = primaryTextColor
+        return nil
 
     Log: log
 
     Info: ( ... ) =>
-        log( @, info, " INFO ", ... )
+        log( @, info, "INFO ", ... )
         return nil
 
     Warn: ( ... ) =>
-        log( @, warn, " WARN ", ... )
+        log( @, warn, "WARN ", ... )
         return nil
 
     Error: ( ... ) =>
-        log( @, error, "ERROR ", ... )
-        return nil
-
-    Loaded: ( ... ) =>
-        log( @, debug, "LOADED", ... )
+        log( @, error, "ERROR", ... )
         return nil
 
     Debug: ( ... ) =>
         if @IsInDebug!
-            log( @, debug, "DEBUG ", ... )
+            log( @, debug, "DEBUG", ... )
 
         return nil
 } )

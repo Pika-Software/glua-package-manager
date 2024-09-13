@@ -99,7 +99,6 @@ do
             __sandbox: true,
             __index: ( child, key ) ->
                 value = parent[ key ]
-
                 if istable( value )
                     metatable = getmetatable( value )
                     if not metatable or metatable.__sandbox
@@ -135,7 +134,7 @@ include( "gpm/libs/date.lua" )
 
 -- LibDeflate
 deflate = include( "gpm/libs/3rd-party/deflate.lua" )
-Logger\Loaded( "LibDeflate v%s", deflate._VERSION )
+Logger\Info( "LibDeflate v%s loaded.", deflate._VERSION )
 environment.deflate = deflate
 
 -- gm_promise ( modified for gpm )
