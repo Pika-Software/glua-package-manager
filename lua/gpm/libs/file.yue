@@ -6,9 +6,9 @@ import ByteStream, IsBinaryModuleInstalled, SHA256 from util
 import byte, sub, len, match, ByteSplit from string
 import resolve, getDirectory, getFile, getCurrentDirectory from path
 import concat, Add from environment.table
+import Find, Exists, IsDir from file
 import get, save from sql.files
 import fempty from debug
-import Find from file
 
 -- Entropia File System Watcher: https://github.com/Pika-Software/gm_efsw
 if SERVER and not _G.efsw and IsBinaryModuleInstalled( "efsw" ) and pcall( require, "efsw" )
@@ -251,25 +251,43 @@ do
 local isDir, isFile, createDir
 do
 
-    import Delete, Exists, IsDir from file
+    import Delete from file
 
     lib.Exists = ( filePath, gamePath, skipNormalize ) ->
         unless skipNormalize
             filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
-        return Exists( filePath, gamePath ) or isFileMounted( filePath, gamePath, true ) or isDirMounted( filePath, gamePath, true )
+        return ( isFileMounted( filePath, gamePath, true ) or isDirMounted( filePath, gamePath, true ) ) or Exists( filePath, gamePath ) or ( CLIENT and luaGamePaths[ gamePath ] and Exists( "lua/" .. filePath, "WORKSHOP" ) )
 
     isDir = lib.IsDir = ( filePath, gamePath, skipNormalize ) ->
         unless skipNormalize
             filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
-        return IsDir( filePath, gamePath ) or isDirMounted( filePath, gamePath, true )
+        return isDirMounted( filePath, gamePath, true ) or IsDir( filePath, gamePath ) or ( CLIENT and luaGamePaths[ gamePath ] and IsDir( "lua/" .. filePath, "WORKSHOP" ) )
 
     isFile = lib.IsFile = ( filePath, gamePath, skipNormalize ) ->
         unless skipNormalize
             filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
-        return ( Exists( filePath, gamePath ) and not IsDir( filePath, gamePath ) ) or isFileMounted( filePath, gamePath, true )
+        if isFileMounted( filePath, gamePath, true )
+            return true
+
+        if isDirMounted( filePath, gamePath, true )
+            return false
+
+        if Exists( filePath, gamePath )
+            if IsDir( filePath, gamePath )
+                return false
+
+            return true
+
+        if CLIENT and luaGamePaths[ gamePath ] and Exists( "lua/" .. filePath, "WORKSHOP" )
+            if IsDir( "lua/" .. filePath, "WORKSHOP" )
+                return false
+
+            return true
+
+        return false
 
     do
 
@@ -530,16 +548,19 @@ do
 
         return false
 
-    read = lib.Read = ( filePath, gamePath, length, skipNormalize, validateHash ) ->
+    read = lib.Read = ( filePath, gamePath, length, skipNormalize, verifyHash ) ->
         unless skipNormalize
             filePath, gamePath = normalizeGamePath( filePath, gamePath )
+
+        if CLIENT and luaGamePaths[ gamePath ] and not ( Exists( filePath, gamePath ) and not IsDir( filePath, gamePath ) )
+            filePath, gamePath = "lua/" .. filePath, "WORKSHOP"
 
         fileHandle = fileClass( filePath, "rb", gamePath, true )
         if fileHandle
             content = Read( fileHandle, length )
             Close( fileHandle )
 
-            if validateHash
+            if verifyHash
                 cache = get( absoluteGamePath( filePath, gamePath, false ) )
                 unless cache and ( not cache.hash or cache.hash == SHA256( content ) ) and cache.size == len( content )
                     return nil
@@ -829,9 +850,12 @@ do
 
         import Read from functions
 
-        asyncRead = lib.AsyncRead = ( filePath, gamePath, skipNormalize, validateHash ) ->
+        asyncRead = lib.AsyncRead = ( filePath, gamePath, skipNormalize, verifyHash ) ->
             unless skipNormalize
                 filePath, gamePath = normalizeGamePath( filePath, gamePath )
+
+            if CLIENT and luaGamePaths[ gamePath ] and not ( Exists( filePath, gamePath ) and not IsDir( filePath, gamePath ) )
+                filePath, gamePath = "lua/" .. filePath, "WORKSHOP"
 
             promise = Promise!
 
@@ -840,7 +864,7 @@ do
 
             state = Read filePath, gamePath, ( _, __, iState, iContent ) ->
                 if iState == 0
-                    if validateHash
+                    if verifyHash
                         cache = get( absoluteGamePath( filePath, gamePath, false ) )
                         unless cache and ( not cache.hash or cache.hash == SHA256( iContent ) ) and cache.size == len( iContent )
                             promise\Reject( FileSystemError "File hash mismatch for '" .. absoluteGamePath( filePath, gamePath, false ) .. "'" )
@@ -908,12 +932,12 @@ do
             pointer += 1
             return lines[ pointer ], pointer
 
-    lib.AsyncLines = ( filePath, gamePath, skipNormalize ) ->
-        return func( asyncRead( filePath, gamePath, skipNormalize ) )
+    lib.AsyncLines = ( filePath, gamePath, skipNormalize, verifyHash ) ->
+        return func( asyncRead( filePath, gamePath, skipNormalize, verifyHash ) )
 
 do
 
-    import stripDirectory, getFileName, getExtension from path
+    import stripDirectory, getFileName, getExtension, stripExtension from path
     import load from environment
 
     extension2mode = {
@@ -924,20 +948,20 @@ do
         lc: "bt"
     }
 
-    extension2type = {
-        moon: "moonscript"
-        yue: "yuescript"
-        luac: "bytecode"
-        lc: "bytecode"
-        lua: "lua"
+    mode2type = {
+        mt: "moonscript"
+        yt: "yuescript"
+        bt: "bytecode"
+        bt: "bytecode"
+        t: "lua"
     }
 
-    asyncCompile = async ( filePath, gamePath, env, config ) ->
-        filePath, directoryPath = stripDirectory( filePath, true )
-        filePath = directoryPath .. getFileName( filePath, false )
+    asyncCompile = async ( filePath, gamePath, env, config, verifyHash ) ->
+        filePath, extension = stripExtension( filePath )
+        filePath ..= "."
 
         extensions = {}
-        for fileName in *Find( filePath .. ".*", gamePath )
+        for fileName in *Find( filePath .. "*", gamePath )
             extensions[ getExtension( fileName, false ) ] = true
 
         local extension
@@ -956,55 +980,43 @@ do
         elseif extensions.lua
             extension = "lua"
 
-        filePath ..= "." .. ( extension or "lua" )
+        filePath ..= extension or "lua"
 
-        unless extension
+        mode = extension2mode[ extension ]
+        unless mode
             error CodeCompileError "Could not determine compile mode for '" .. filePath .. "'"
 
-        content = await asyncRead( filePath, gamePath, true )
+        content = await asyncRead( filePath, gamePath, true, verifyHash )
         chunkName = absoluteGamePath( filePath, gamePath, true )
 
         return {
-            func: load( content, chunkName, extension2mode[ extension ] or "t", env, config ),
-            type: extension2type[ extension ] or "lua",
+            func: load( content, chunkName, mode, env, config ),
+            type: mode2type[ mode ],
             path: "/" .. chunkName,
             :content
         }
 
-    lib.AsyncCompile = ( filePath, env, config, gamePath, skipNormalize ) ->
+    lib.AsyncCompile = ( filePath, env, config, gamePath, skipNormalize, verifyHash ) ->
         argument( filePath, 1, "string" )
 
         unless skipNormalize
             filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
-        if CLIENT and isFileMounted( filePath, gamePath, true )
-            if luaGamePaths[ gamePath ]
-                filePath = "lua/" .. filePath
+        return asyncCompile( filePath, gamePath, env, config, verifyHash )
 
-            gamePath = "WORKSHOP"
-
-        return asyncCompile( filePath, gamePath, env, config )
-
-    lib.Compile = ( filePath, env, config, gamePath, skipNormalize ) ->
+    lib.Compile = ( filePath, env, config, gamePath, skipNormalize, verifyHash ) ->
         argument( filePath, 1, "string" )
 
         unless skipNormalize
             filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
-        if CLIENT and isFileMounted( filePath, gamePath, true )
-            if luaGamePaths[ gamePath ]
-                filePath = "lua/" .. filePath
-
-            gamePath = "WORKSHOP"
-
-        filePath, directoryPath = stripDirectory( filePath, true )
-        filePath = directoryPath .. getFileName( filePath, false )
+        filePath, extension = stripExtension( filePath )
+        filePath ..= "."
 
         extensions = {}
-        for fileName in *Find( filePath .. ".*", gamePath )
+        for fileName in *Find( filePath .. "*", gamePath )
             extensions[ getExtension( fileName, false ) ] = true
 
-        local extension
         if extensions.yue
             extension = "yue"
 
@@ -1020,34 +1032,29 @@ do
         elseif extensions.lua
             extension = "lua"
 
-        filePath ..= "." .. ( extension or "lua" )
+        filePath ..= extension or "lua"
 
+        mode = extension2mode[ extension ]
         unless mode
             error CodeCompileError "Could not determine compile mode for '" .. filePath .. "'"
 
-        content = read( filePath, gamePath, nil, true )
+        content = read( filePath, gamePath, nil, true, verifyHash )
         chunkName = absoluteGamePath( filePath, gamePath, true )
 
         return {
-            func: load( content, chunkName, extension2mode[ extension ] or "t", env, config ),
+            func: load( content, chunkName, mode, env, config ),
+            type: mode2type[ mode ],
             path: "/" .. chunkName,
-            :content,
-            :type
+            :content
         }
 
-    environment.loadfile = ( filePath, mode, env, config, gamePath, skipNormalize ) ->
+    environment.loadfile = ( filePath, mode, env, config, gamePath, skipNormalize, verifyHash ) ->
         argument( filePath, 1, "string" )
 
         unless skipNormalize
             filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
-        if CLIENT and isFileMounted( filePath, gamePath, true )
-            if luaGamePaths[ gamePath ]
-                filePath = "lua/" .. filePath
-
-            gamePath = "WORKSHOP"
-
-        return load( read( filePath, gamePath, nil, true ), absoluteGamePath( filePath, gamePath, true ), mode, env, config )
+        return load( read( filePath, gamePath, nil, true, verifyHash ), absoluteGamePath( filePath, gamePath, true ), mode, env, config )
 
 do
 
