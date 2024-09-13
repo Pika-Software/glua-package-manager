@@ -63,9 +63,9 @@ if SERVER
         for directoryName in *dirs
             directoryPath = basePath .. directoryName
             if directoryPath == filePath
-                addFilePath( directoryPath .. "/*", gamePath )
+                addcsluafile( directoryPath .. "/*", gamePath, true )
             else
-                addFilePath( directoryPath .. "/" .. searchable, gamePath )
+                addcsluafile( directoryPath .. "/" .. searchable, gamePath, true )
 
         return nil
 else
