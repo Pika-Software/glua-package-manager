@@ -939,7 +939,7 @@ do
 
     import stripDirectory, getFileName, getExtension, stripExtension from path
     import load from environment
-    import CompileFile from _G
+    -- import CompileFile from _G
 
     extension2mode = {
         luac: "bt"
@@ -989,20 +989,20 @@ do
         unless mode
             error CodeCompileError "Could not determine compile mode for '" .. chunkName .. "'"
 
-        if CLIENT and luaGamePaths[ gamePath ] and getExtension( filePath, false ) == "lua"
-            func = CompileFile( filePath )
-            unless func
-                error CodeCompileError "Could not compile '" .. chunkName .. "'"
+        -- if CLIENT and luaGamePaths[ gamePath ] and getExtension( filePath, false ) == "lua"
+        --     func = CompileFile( filePath )
+        --     unless func
+        --         error CodeCompileError "Could not compile '" .. chunkName .. "'"
 
-            if env
-                setfenv( func, env )
+        --     if env
+        --         setfenv( func, env )
 
-            return {
-                :func,
-                type: mode2type[ mode ],
-                path: "/" .. chunkName,
-                content: ""
-            }
+        --     return {
+        --         :func,
+        --         type: mode2type[ mode ],
+        --         path: "/" .. chunkName,
+        --         content: ""
+        --     }
 
         content = await asyncRead( filePath, gamePath, true, verifyHash )
 
@@ -1057,20 +1057,20 @@ do
         unless mode
             error CodeCompileError "Could not determine compile mode for '" .. chunkName .. "'"
 
-        if CLIENT and luaGamePaths[ gamePath ] and getExtension( filePath, false ) == "lua"
-            func = CompileFile( filePath )
-            unless func
-                error CodeCompileError "Could not compile '" .. chunkName .. "'"
+        -- if CLIENT and luaGamePaths[ gamePath ] and getExtension( filePath, false ) == "lua"
+        --     func = CompileFile( filePath )
+        --     unless func
+        --         error CodeCompileError "Could not compile '" .. chunkName .. "'"
 
-            if env
-                setfenv( func, env )
+        --     if env
+        --         setfenv( func, env )
 
-            return {
-                :func,
-                type: mode2type[ mode ],
-                path: "/" .. chunkName,
-                content: ""
-            }
+        --     return {
+        --         :func,
+        --         type: mode2type[ mode ],
+        --         path: "/" .. chunkName,
+        --         content: ""
+        --     }
 
         content = read( filePath, gamePath, nil, true, verifyHash )
 
@@ -1087,15 +1087,15 @@ do
         unless skipNormalize
             filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
-        if CLIENT and luaGamePaths[ gamePath ] and getExtension( filePath, false ) == "lua"
-            func = CompileFile( filePath )
-            unless func
-                error CodeCompileError "Could not compile '" .. filePath .. "'"
+        -- if CLIENT and luaGamePaths[ gamePath ] and getExtension( filePath, false ) == "lua"
+        --     func = CompileFile( filePath )
+        --     unless func
+        --         error CodeCompileError "Could not compile '" .. filePath .. "'"
 
-            if env
-                setfenv( func, env )
+        --     if env
+        --         setfenv( func, env )
 
-            return func
+        --     return func
 
         return load( read( filePath, gamePath, nil, true, verifyHash ), absoluteGamePath( filePath, gamePath, true ), mode, env, config )
 
