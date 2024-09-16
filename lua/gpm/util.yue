@@ -2,12 +2,12 @@ _G = _G
 import gpm, pairs, error, rawget, getfenv, getmetatable, setmetatable, istable, tostring, tonumber from _G
 
 import environment from gpm
-import string, table, debug, util, os from environment
+import string, table, util from environment
 import byte, sub, gsub, format, len, find from string
 import concat, remove from table
 import rshift, band from _G.bit
 import min, max from _G.math
-import getinfo from debug
+import getinfo from _G.debug
 
 :isbool, :isnumber, :isstring, :isfunction = _G
 
@@ -21,26 +21,201 @@ do
 
         return error( tostring( message ), level )
 
+-- table
+unless table.unpack
+    table.unpack = _G.unpack
+
 do
 
-    import next from _G
+    import select from _G
 
-    table.IsEmpty = ( tbl ) ->
-        return next( tbl ) == nil
+    unless table.pack
+        table.pack = ( ... ) ->
+            return { n: select( "#", ... ), ... }
 
-    table.Count = ( tbl ) ->
-        length = 0
+    unless table.create
+        table.create = ( length, ... ) ->
+            unless length
+                return { ... }, select( "#", ... )
 
-        key = next( tbl )
-        while key
+            if length == 0
+                return {}, 0
+
+            count = select( "#", ... )
+            if count == 0
+                return {}, 0
+
+            result = {}
+
+            if count == 1
+                if length > 0
+                    for index = 1, length, 1
+                        result[ index ] = ...
+                else
+                    for index = -1, length, -1
+                        result[ index ] = ...
+
+                return result, length
+
+            args = { ... }
+
+            if length > 0
+                for index = 1, length, 1
+                    result[ index ] = args[ index ]
+            else
+                count = -length
+                for index = count, 1, -1
+                    result[ count - index + 1 ] = args[ index ]
+
+            return result, length
+
+unless table.insert
+    table.insert = ( tbl, index, value ) ->
+        length = #tbl
+        if value == nil
             length += 1
-            key = next( tbl, key )
+            index, value = length, index
 
-        return length
+        for j = length, index, -1
+            tbl[ j + 1 ] = tbl[ j ]
+
+        tbl[ index ] = value
+        return index
+
+table.Add = ( destination, source, isSequential ) ->
+    length = #destination
+
+    if isSequential
+        for index = 1, #source
+            destination[ length + index ] = source[ index ]
+    else
+        for _, value in pairs( source )
+            length += 1
+            destination[ length ] = value
+
+    return destination
+
+table.RemoveByValue = ( tbl, any, isSequential ) ->
+    if isSequential
+        for index = 1, #tbl
+            if tbl[ index ] == any
+                remove( tbl, index )
+                return index
+
+    else
+
+        for key, value in pairs( tbl )
+            if value == any
+                tbl[ key ] = nil
+                return key
+
+    return nil
+
+table.RemoveSameValues = ( tbl, any, isSequential ) ->
+    if isSequential
+        ::removed::
+
+        for index = 1, #tbl
+            if tbl[ index ] == any
+                remove( tbl, index )
+                goto removed
+
+    else
+
+        for key, value in pairs( tbl )
+            if value == any
+                tbl[ key ] = nil
+
+    return nil
+
+table.Flip = ( tbl, noCopy ) ->
+    if noCopy
+        keys, length = {}, 0
+        for key in pairs( tbl )
+            length += 1
+            keys[ length ] = key
+
+        for i = 1, length
+            key = keys[ i ]
+            value = tbl[ key ]
+            tbl[ key ] = nil
+            tbl[ value ] = key
+
+        return tbl
+
+    result = {}
+    for key, value in pairs( tbl )
+        result[ value ] = key
+
+    return result
+
+table.HasValue = ( tbl, any, isSequential ) ->
+	if isSequential
+		for index = 1, #tbl
+			if tbl[ index ] == any
+                return true
+    else
+        for _, value in pairs( tbl )
+            if value == any
+                return true
+
+	return false
+
+table.GetValues = ( tbl ) ->
+    result, length = {}, 0
+
+    for _, value in pairs( tbl )
+        length += 1
+        result[ length ] = value
+
+    return result, length
+
+table.GetValue = ( tbl, str ) ->
+    pointer = 1
+
+    for _ = 1, len( str )
+        startPos = find( str, ".", pointer, true )
+        unless startPos
+            break
+
+        tbl = tbl[ sub( str, pointer, startPos - 1 ) ]
+        if tbl == nil
+            return
+
+        pointer = startPos + 1
+
+    return tbl[ sub( str, pointer ) ]
+
+table.SetValue = ( tbl, str, value ) ->
+    pointer = 1
+
+    for _ = 1, len( str )
+        startPos = find( str, ".", pointer, true )
+        unless startPos
+            break
+
+        key = sub( str, pointer, startPos - 1 )
+        pointer = startPos + 1
+
+        unless istable( tbl[ key ] )
+            tbl[ key ] = {}
+
+        tbl = tbl[ key ]
+
+    tbl[ sub( str, pointer ) ] = value
+
+table.Slice = ( tbl, startPos, endPos, step ) ->
+	result, length = {}, 0
+
+	for index = startPos or 1, endPos or #tbl, step or 1
+        length += 1
+        result[ length ] = tbl[ index ]
+
+	return result
 
 do
 
-    equal = table.Equal = ( a, b ) ->
+    equal = ( a, b ) ->
         if a == b
             return true
 
@@ -67,6 +242,118 @@ do
                 return false
 
         return true
+
+    table.Equal = equal
+
+table.IsSequential = ( tbl ) ->
+    index = 1
+
+    for _ in pairs( tbl )
+        if tbl[ index ] == nil
+            return false
+
+        index += 1
+
+    return true
+
+do
+
+    import next from _G
+
+    table.IsEmpty = ( tbl ) ->
+        return next( tbl ) == nil
+
+    table.Empty = ( tbl ) ->
+        for key in pairs( tbl )
+            tbl[ key ] = nil
+
+        return tbl
+
+    table.GetKeys = ( tbl ) ->
+        result, length = {}, 0
+
+        key = next( tbl )
+        while key
+            length += 1
+            result[ length ] = key
+            key = next( tbl, key )
+
+        return result, length
+
+    table.Count = ( tbl ) ->
+        length = 0
+
+        key = next( tbl )
+        while key
+            length += 1
+            key = next( tbl, key )
+
+        return length
+
+do
+
+    import random from _G.math
+    index, length = 1, 0
+
+    table.Shuffle = ( tbl ) ->
+        length = #tbl
+        for i = length, 1, -1
+            index = random( 1, length )
+            tbl[ i ], tbl[ index ] = tbl[ index ], tbl[ i ]
+
+        return tbl
+
+    do
+
+        keys = setmetatable( {}, { __mode: "v" } )
+
+        table.Random = ( tbl, isSequential ) ->
+            if isSequential
+                length = #tbl
+                if length == 0
+                    return nil, nil
+
+                if length == 1
+                    index = 1
+                else
+                    index = random( 1, length )
+
+            else
+
+                length = 0
+                for key in pairs( tbl )
+                    length += 1
+                    keys[ length ] = key
+
+                if length == 0
+                    return nil, nil
+
+                if length == 1
+                    index = keys[ 1 ]
+                else
+                    index = keys[ random( 1, length ) ]
+
+            return tbl[ index ], index
+
+do
+
+    import lower from _G.string
+
+    lowerKeyNames = ( tbl ) ->
+        for key, value in pairs( tbl )
+            if istable( value )
+                value = lowerKeyNames( value )
+
+            if isstring( key )
+                tbl[ key ] = nil
+                tbl[ lower( key ) ] = value
+            elseif istable( key )
+                tbl[ key ] = nil
+                tbl[ lowerKeyNames( key ) ] = value
+
+        return tbl
+
+    table.LowerKeyNames = lowerKeyNames
 
 -- string
 string.slice = sub
@@ -834,6 +1121,8 @@ do
 
 do
 
+    import debug from _G
+
     getmetatabled = debug.getmetatable or getmetatable
     setmetatabled = debug.setmetatable or setmetatable
 
@@ -935,7 +1224,7 @@ do
     environment.isfunction = isfunction
 
     -- Make jit happy <3
-    debug.fempty = object
+    environment.debug.fempty = object
 
     -- thread
     object = _G.coroutine.create( object )
@@ -953,6 +1242,7 @@ do
 
 -- my cool math '^'
 math = setmetatable( _G.include( "gpm/libs/math.lua" ), table.SandboxMetatable( _G.math ) )
+import debug from environment
 environment.math = math
 
 math.type = ( number ) ->
@@ -996,245 +1286,6 @@ do
             return gsub( gsub( sub( info.source, 2 ), "^(.-)(lua/.*)$", lff ), "^(.-)([%w_]+/gamemode/.*)$", lff )
 
         return ""
-
--- table
-unless table.unpack
-    table.unpack = _G.unpack
-
-unless table.pack
-    import select from _G
-    table.pack = ( ... ) ->
-        return { n: select( "#", ... ), ... }
-
-table.Add = ( destination, source, isSequential ) ->
-    length = #destination
-    if isSequential
-        for index = 1, #source
-            destination[ length + index ] = source[ index ]
-
-    else
-
-        -- shitty garry implementation 🤨
-        for _, value in pairs( source )
-            length += 1
-            destination[ length ] = value
-
-    return destination
-
-table.Flip = ( tbl, noCopy ) ->
-    if noCopy
-        keys, length = {}, 0
-        for key in pairs( tbl )
-            length += 1
-            keys[ length ] = key
-
-        for i = 1, length
-            key = keys[ i ]
-            value = tbl[ key ]
-            tbl[ key ] = nil
-            tbl[ value ] = key
-
-        return tbl
-
-    result = {}
-    for key, value in pairs( tbl )
-        result[ value ] = key
-
-    return result
-
-table.HasValue = ( tbl, any, isSequential ) ->
-	if isSequential
-		for index = 1, #tbl
-			if tbl[ index ] == any
-                return true
-
-    else
-
-        for _, value in pairs( tbl )
-            if value == any
-                return true
-
-	return false
-
-table.Empty = ( tbl ) ->
-    for key in pairs( tbl )
-        tbl[ key ] = nil
-
-table.GetKeyCount = ( tbl ) ->
-    length = 0
-
-    for _ in pairs( tbl )
-        length += 1
-
-    return length
-
-table.GetKeys = ( tbl ) ->
-    result, length = {}, 0
-
-    for key in pairs( tbl )
-        length += 1
-        result[ length ] = key
-
-    return result, length
-
-table.GetValues = ( tbl ) ->
-    result, length = {}, 0
-
-    for _, value in pairs( tbl )
-        length += 1
-        result[ length ] = value
-
-    return result, length
-
-table.IsSequential = ( tbl ) ->
-    index = 1
-
-    for _ in pairs( tbl )
-        if tbl[ index ] == nil
-            return false
-
-        index += 1
-
-    return true
-
-table.RemoveByValue = ( tbl, any, isSequential ) ->
-    if isSequential
-        for index = 1, #tbl
-            if tbl[ index ] == any
-                remove( tbl, index )
-                return index
-
-    else
-
-        for key, value in pairs( tbl )
-            if value == any
-                tbl[ key ] = nil
-                return key
-
-    return nil
-
-table.RemoveSameValues = ( tbl, any, isSequential ) ->
-    if isSequential
-        ::removed::
-
-        for index = 1, #tbl
-            if tbl[ index ] == any
-                remove( tbl, index )
-                goto removed
-
-    else
-
-        for key, value in pairs( tbl )
-            if value == any
-                tbl[ key ] = nil
-
-    return nil
-
-table.GetValue = ( tbl, str ) ->
-    pointer = 1
-
-    for _ = 1, len( str )
-        startPos = find( str, ".", pointer, true )
-        unless startPos
-            break
-
-        tbl = tbl[ sub( str, pointer, startPos - 1 ) ]
-        if tbl == nil
-            return
-
-        pointer = startPos + 1
-
-    return tbl[ sub( str, pointer ) ]
-
-table.SetValue = ( tbl, str, value ) ->
-    pointer = 1
-
-    for _ = 1, len( str )
-        startPos = find( str, ".", pointer, true )
-        unless startPos
-            break
-
-        key = sub( str, pointer, startPos - 1 )
-        pointer = startPos + 1
-
-        unless istable( tbl[ key ] )
-            tbl[ key ] = {}
-
-        tbl = tbl[ key ]
-
-    tbl[ sub( str, pointer ) ] = value
-
-table.Slice = ( tbl, startPos, endPos, step ) ->
-	result, length = {}, 0
-
-	for index = startPos or 1, endPos or #tbl, step or 1
-        length += 1
-        result[ length ] = tbl[ index ]
-
-	return result
-
-do
-
-    import random from math
-    index, length = 1, 0
-
-    table.Shuffle = ( tbl ) ->
-        length = #tbl
-        for i = length, 1, -1
-            index = random( 1, length )
-            tbl[ i ], tbl[ index ] = tbl[ index ], tbl[ i ]
-
-        return tbl
-
-    do
-
-        keys = setmetatable( {}, { __mode: "v" } )
-
-        table.Random = ( tbl, isSequential ) ->
-            if isSequential
-                length = #tbl
-                if length == 0
-                    return nil, nil
-
-                if length == 1
-                    index = 1
-                else
-                    index = random( 1, length )
-
-            else
-
-                length = 0
-                for key in pairs( tbl )
-                    length += 1
-                    keys[ length ] = key
-
-                if length == 0
-                    return nil, nil
-
-                if length == 1
-                    index = keys[ 1 ]
-                else
-                    index = keys[ random( 1, length ) ]
-
-            return tbl[ index ], index
-
-do
-
-    import lower from string
-
-    lowerKeyNames = table.LowerKeyNames = ( tbl ) ->
-        for key, value in pairs( tbl )
-            if istable( value )
-                value = lowerKeyNames( value )
-
-            if isstring( key )
-                tbl[ key ] = nil
-                tbl[ lower( key ) ] = value
-            elseif istable( key )
-                tbl[ key ] = nil
-                tbl[ lowerKeyNames( key ) ] = value
-
-        return tbl
 
 do
 
@@ -1655,48 +1706,52 @@ do
 
 do
 
-    import time from os
+    import os from environment
 
-    os.dos2unix = ( t, d ) ->
-        data = { year: 1980, month: 1, day: 1, hour: 0, min: 0, sec: 0 }
+    do
 
-        if t
-            data.hour = rshift( band( t, 0xF800 ), 11 )
-            data.min = rshift( band( t, 0x07E0 ), 5 )
-            data.sec = band( t, 0x001F ) * 2
+        import time from os
 
-        if d
-            data.year += rshift( band( d, 0xFE00 ), 9 )
-            data.month = rshift( band( d, 0x01E0 ), 5 )
-            data.day = band( d, 0x001F )
+        os.dos2unix = ( t, d ) ->
+            data = { year: 1980, month: 1, day: 1, hour: 0, min: 0, sec: 0 }
 
-        return time( data )
+            if t
+                data.hour = rshift( band( t, 0xF800 ), 11 )
+                data.min = rshift( band( t, 0x07E0 ), 5 )
+                data.sec = band( t, 0x001F ) * 2
 
-do
+            if d
+                data.year += rshift( band( d, 0xFE00 ), 9 )
+                data.month = rshift( band( d, 0x01E0 ), 5 )
+                data.day = band( d, 0x001F )
 
-    import lshift, bor from bit
-    import fdiv from math
-    import date from os
+            return time( data )
 
-    os.unix2dos = ( u ) ->
-        data = date( "*t", u )
-        return bor( lshift( data.hour, 11 ), lshift( data.min, 5 ), fdiv( data.sec, 2 ) ), bor( lshift( data.year - 1980, 9 ), lshift( data.month, 5 ), data.day )
+    do
 
-    table.Reverse = ( tbl, noCopy ) ->
-        length = #tbl
+        import lshift, bor from _G.bit
+        import fdiv from math
+        import date from os
 
-        if noCopy
-            length += 1
-            for index = 1, fdiv( length, 2 ), 1
-                tbl[ index ], tbl[ length - index ] = tbl[ length - index ], tbl[ index ]
+        os.unix2dos = ( u ) ->
+            data = date( "*t", u )
+            return bor( lshift( data.hour, 11 ), lshift( data.min, 5 ), fdiv( data.sec, 2 ) ), bor( lshift( data.year - 1980, 9 ), lshift( data.month, 5 ), data.day )
 
-            return tbl
+        table.Reverse = ( tbl, noCopy ) ->
+            length = #tbl
 
-        result = {}
-        for index = length, 1, -1
-            result[ length - index + 1 ] = tbl[ index ]
+            if noCopy
+                length += 1
+                for index = 1, fdiv( length, 2 ), 1
+                    tbl[ index ], tbl[ length - index ] = tbl[ length - index ], tbl[ index ]
 
-        return result
+                return tbl
+
+            result = {}
+            for index = length, 1, -1
+                result[ length - index + 1 ] = tbl[ index ]
+
+            return result
 
 -- Garry's Mod hooks
 do

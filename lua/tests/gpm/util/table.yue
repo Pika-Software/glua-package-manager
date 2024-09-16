@@ -80,6 +80,10 @@ return
                 test(nil, 2, false, "hello", {})
                 return
 
+        *   name: "table.create(...) must work same as original"
+            func: ->
+                -- TODO: table.create
+
         *   name: "table.Add(...) must work same as original"
             func: ->
                 test = ( target, source ) ->
@@ -171,18 +175,6 @@ return
                 test( {1, 2, 3} )
                 test( {true, false, "ok"} )
                 test( {nil, {}, hello: "world", "test": "empty", foo: {}} )
-                return
-
-        *   name: "table.GetKeyCount(...) must return number of keys in table"
-            func: ->
-                test = ( input, expected ) ->
-                    expect( table.GetKeyCount(input) ).to.equal( expected )
-
-                test( {}, 0 )
-                test( {1, 2, 3}, 3 )
-                test( {true, false, "ok"}, 3 )
-                test( {nil, {}, hello: "world", "test": "empty", foo: {}}, 4 )
-                test( {nil, {}, hello: "world", "test": "empty", foo: {}, [1]: 2, [3]: 4}, 6 )
                 return
 
         *   name: "table.GetKeys(...) must return all keys in table"
@@ -310,7 +302,6 @@ return
                 result = table.Shuffle( table.Copy(tbl) )
                 expect( table.Equal(result, tbl) ).to.beFalse()
                 expect( table.Count(result) ).to.equal( table.Count(tbl) )
-                expect( table.GetKeyCount(result) ).to.equal( table.GetKeyCount(tbl) )
                 expect( table.Equal(table.GetKeys( tbl ), table.GetKeys( result )) ).to.beTrue()
                 expect( table.Equal(table.GetValues( tbl ), table.GetValues( result )) ).to.beFalse()
                 return
