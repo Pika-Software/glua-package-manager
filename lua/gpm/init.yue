@@ -129,7 +129,7 @@ for key, value in _G.pairs( include( "gpm/libs/error.lua" ) )
 environment.utf8 = setmetatable( include( "gpm/libs/utf8.lua" ), sandboxMetatable( _G.utf8 ) )
 environment.ipaml = include( "gpm/libs/3rd-party/ip.lua" )
 environment.struct = include( "gpm/libs/struct.lua" )
-include( "gpm/libs/3rd-party/bint.lua" )
+include( "gpm/libs/3rd-party/bigint.lua" )
 include( "gpm/libs/date.lua" )
 
 -- LibDeflate
@@ -161,6 +161,9 @@ do
 include( "gpm/libs/yaml.lua" )
 include( "gpm/post-util.lua" )
 include( "gpm/sql.lua" )
+
+do
+    return
 
 gpm.sql.migrate( "initial file table" )
 
