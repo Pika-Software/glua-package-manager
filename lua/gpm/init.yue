@@ -140,6 +140,9 @@ environment.deflate = deflate
 -- gm_promise ( modified for gpm )
 include( "gpm/libs/promise.lua" )
 
+-- task system (async, await, Futures)
+include( "gpm/libs/futures.lua" )
+
 -- gm_url
 do
 
