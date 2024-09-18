@@ -162,9 +162,6 @@ include( "gpm/libs/yaml.lua" )
 include( "gpm/post-util.lua" )
 include( "gpm/sql.lua" )
 
-do
-    return
-
 gpm.sql.migrate( "initial file table" )
 
 include( "gpm/libs/file.lua" )
@@ -192,7 +189,8 @@ for fileName in *Find( "gpm/sources/*.lua", "LUA" )
 if SERVER
     include( "gpm/test.lua" )
 
-gpm.loader.Startup!\Catch( environment.Error.display )
+if false
+    gpm.loader.Startup!\Catch( environment.Error.display )
 
 Logger\Info( "Start-up time: %.4f sec.", SysTime! - gpm.StartTime )
 

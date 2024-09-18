@@ -69,6 +69,51 @@ do
 
             return result, length
 
+table.move = ( source, first, last, offset, destination = source ) ->
+    for index = 0, last - first
+        destination[ offset + index ] = source[ first + index ]
+
+    return destination
+
+do
+
+    copy = ( source, isSequential, deepCopy, copyKeys = false, copies = {} ) ->
+        result = copies[ source ]
+        unless result
+            result = {}
+            if deepCopy
+                setmetatable( result, getmetatable( source ) )
+
+            copies[ source ] = result
+
+        if isSequential
+            if deepCopy
+                for index = 1, #source
+                    value = source[ index ]
+                    if istable( value )
+                        value = copy( value, true, true, copyKeys, copies )
+
+                    result[ index ] = value
+            else
+                for index = 1, #source
+                    result[ index ] = source[ index ]
+        elseif deepCopy
+            for key, value in pairs( source )
+                if istable( value )
+                    value = copy( value, false, true, copyKeys, copies )
+
+                if copyKeys and istable( key )
+                    result[ copy( value, false, true, true, copies ) ] = value
+                else
+                    result[ key ] = value
+        else
+            for key, value in pairs( source )
+                result[ key ] = value
+
+        return result
+
+    table.copy = copy
+
 unless table.insert
     table.insert = ( tbl, index, value ) ->
         length = #tbl
