@@ -2026,7 +2026,7 @@ do
 
         _G.cvars.AddChangeCallback( "developer", ( _, __, str ) ->
             isInDebug = ( tonumber( str, 10 ) or 0 ) > 1
-        "GLua Package Manager::Debug" )
+        "gLua Package Manager::Debug" )
 
         gpm.IsInDebug = ->
             return isInDebug

@@ -35,16 +35,20 @@ do
     gpm.UserName = username
 
     splashes = {
+        "eW91dHViZS5jb20vd2F0Y2g/dj1kUXc0dzlXZ1hjUQ=="
+        "I'm not here to tell you how great I am!"
+        "I'm here to show you how great I am!"
         "Millions of pieces without a tether"
         "Why are we always looking for more?"
         "Don't worry, " .. username .. " :>"
+        "T2gsIHlvdSdyZSBhIHNtYXJ0IG9uZS4="
         "Take it in and breathe the light"
-        "Don't bring your light near me."
         "Big Brother is watching you"
         "Hello, " .. username .. "!"
         "I'll make you a promise."
         "Flying over rooftops..."
         "We need more packages!"
+        "Play SOMA sometime;"
         "Where's fireworks!?"
         "Looking For More ♪"
         "Now on Yuescript!"

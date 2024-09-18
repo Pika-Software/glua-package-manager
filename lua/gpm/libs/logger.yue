@@ -23,15 +23,15 @@ do
 
     AddChangeCallback( "gpm_logger_date", ( _, __, new ) ->
         dateScheme = ( new == "1" and "%d-%m-%Y %H:%M:%S " or "%H:%M:%S ")
-    "GLua Package Manager::Logger")
+    "gLua Package Manager::Logger")
 
     AddChangeCallback( "gpm_logger_limit", ( _, __, new ) ->
         limit = tonumber( new, 10  )
         if limit
-            timer.Adjust( "GLua Package Manager::Logger", 1 / limit, 0 )
+            timer.Adjust( "gLua Package Manager::Logger", 1 / limit, 0 )
 
         return nil
-    "GLua Package Manager::Logger" )
+    "gLua Package Manager::Logger" )
 
 secondaryTextColor = Color( 150, 150, 150 )
 primaryTextColor = Color( 200, 200, 200 )
@@ -74,10 +74,10 @@ dequeue = ->
 
     return nil
 
-timer.Create( "GLua Package Manager::Logger", 1 / limit, 0, dequeue )
+timer.Create( "gLua Package Manager::Logger", 1 / limit, 0, dequeue )
 
-_G.hook.Add "ShutDown", "GLua Package Manager::Logger", ->
-    timer.Remove "GLua Package Manager::Logger"
+_G.hook.Add "ShutDown", "gLua Package Manager::Logger", ->
+    timer.Remove "gLua Package Manager::Logger"
 
     while not queue\IsEmpty!
         dequeue!

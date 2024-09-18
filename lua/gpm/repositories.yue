@@ -32,7 +32,7 @@ unless istable( list )
         repositories.List = list
 
         if SERVER
-            environment.file.Set( "/lua/gpm/vfs/repositories.lua", "return '" .. util.TableToJSON( list, false ) .. "'", "GLua Package Manager::Repositories" )
+            environment.file.Set( "/lua/gpm/vfs/repositories.lua", "return '" .. util.TableToJSON( list, false ) .. "'", "gLua Package Manager::Repositories" )
             _G.AddCSLuaFile( "lua/gpm/vfs/repositories.lua" )
 
     elseif CLIENT
