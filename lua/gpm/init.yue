@@ -35,9 +35,11 @@ do
     gpm.UserName = username
 
     splashes = {
+        "We will have a great Future together."
         "Millions of pieces without a tether"
         "Why are we always looking for more?"
         "Don't worry, " .. username .. " :>"
+        "Never forget to finish your tasks!"
         "Take it in and breathe the light"
         "Don't bring your light near me."
         "Big Brother is watching you"
@@ -137,9 +139,6 @@ deflate = include( "gpm/libs/3rd-party/deflate.lua" )
 Logger\Info( "LibDeflate v%s loaded.", deflate._VERSION )
 environment.deflate = deflate
 
--- gm_promise ( modified for gpm )
-include( "gpm/libs/promise.lua" )
-
 -- task system (async, await, Futures)
 include( "gpm/libs/futures.lua" )
 
@@ -192,7 +191,7 @@ for fileName in *Find( "gpm/sources/*.lua", "LUA" )
 if SERVER
     include( "gpm/test.lua" )
 
-gpm.loader.Startup!\Catch( environment.Error.display )
+gpm.futures.run gpm.loader.Startup()
 
 Logger\Info( "Start-up time: %.4f sec.", SysTime! - gpm.StartTime )
 

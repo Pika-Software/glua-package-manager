@@ -75,10 +75,9 @@ repositories.RemoveRepository = ( href ) ->
 
     return table.RemoveByValue( list, href, true )
 
-import await, async, SafeAwait, AllSettled from environment.Promise
 import IsURL, match, find from environment.string
 import sort from environment.table
-import URL from environment
+import URL, async, await, futures from environment
 
 local request
 do
@@ -110,7 +109,7 @@ apis["github.com"] = ( url, name, parent ) ->
 
     name or= repository
 
-    ok, response = SafeAwait( request( "https://api.github.com/repos/" .. user .. "/" .. repository .. "/tags" ) )
+    ok, response = pawait request( "https://api.github.com/repos/" .. user .. "/" .. repository .. "/tags" )
     if not ok or response.status ~= 200
         return nil
 
@@ -154,7 +153,7 @@ do
         if getExtension( url.pathname ) ~= "json"
             return nil
 
-        ok, response = SafeAwait( request( url.href ) )
+        ok, response = pawait request( url.href )
         if not ok or response.status ~= 200
             return nil
 
@@ -257,7 +256,7 @@ updateRepository = repositories.UpdateRepository = async ( repository, map, patt
         performPackage( repository, await( tasks[ 1 ] ) )
         return nil
 
-    for result in *await( AllSettled( tasks ) )
+    for result in *await( futures.allSettled( tasks ) )
         performPackage( repository, result.value )
 
     return nil
@@ -291,7 +290,7 @@ fetchRepository = repositories.FetchRepository = async ( repository, name, versi
         if offline
             return packages
 
-        success, response = SafeAwait( request( repository.url ) )
+        success, response = pawait request( repository.url )
         if not success or response.status ~= 200
             Logger\Warn( "Failed to fetch repository '%s': %s", repository.url, response )
             return packages
@@ -306,7 +305,7 @@ fetchRepository = repositories.FetchRepository = async ( repository, name, versi
     if offline
         return searchPackages( repository, name, version, withPattern )
 
-    success, response = SafeAwait( request( repository.url ) )
+    success, response = pawait request( repository.url )
     if not success or response.status ~= 200
         Logger\Warn( "Failed to fetch repository '%s': %s", repository.url, response )
         return searchPackages( repository, name, version, withPattern )

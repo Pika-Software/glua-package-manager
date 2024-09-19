@@ -5,7 +5,7 @@ import tonumber, tostring, SysTime, error from _G
 import HTTP, async, await, WebClientError from environment
 import Base64Decode, JSONToTable from environment.util
 import upper, gsub, IsURL from environment.string
-import Delay from environment.Promise
+import sleep from environment.futures
 import time from environment.os
 
 local api_token
@@ -38,7 +38,7 @@ export request = async ( method, path, headers, body, cache ) ->
     if rateLimitReset > currentTime
         diff = rateLimitReset - currentTime
         if diff < 30 -- I think waiting 30 seconds is acceptable
-            await Delay( diff )
+            await sleep( diff )
         else
             error WebClientError "Github API rate limit exceeded (#{path})"
 
@@ -49,7 +49,7 @@ export request = async ( method, path, headers, body, cache ) ->
         diff = mutationNextTime - SysTime!
         if diff > 0
             mutationNextTime += 1000
-            await Delay( diff )
+            await sleep( diff )
         else
             mutationNextTime = SysTime! + 1000
 

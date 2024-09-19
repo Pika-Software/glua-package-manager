@@ -34,7 +34,7 @@ class GithubSource extends gpm.loader.Source
 
         Logger\Debug( "Fetching information for Github repository '%s/%s'...", user, repository )
 
-        branch = getRepository( user, repository )\await().default_branch
+        branch = ( await getRepository( user, repository ) ).default_branch
         unless branch
             error SourceError "Failed to fetch default branch for '#{user}/#{repository}' from Github API."
 

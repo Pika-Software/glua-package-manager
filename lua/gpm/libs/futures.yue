@@ -141,7 +141,7 @@ do
         
         return result( @ )
 
-    Future = futures.Future = environment.class( "Future", {
+    Future = environment.Future = futures.Future = environment.class( "Future", {
         :FUTURE_STATE_PENDING
         :FUTURE_STATE_FINISHED
         :FUTURE_STATE_CANCELLED
@@ -258,7 +258,7 @@ asyncThread = ( fn, ... ) ->
     return
 
 
-futures.async = ( fn ) ->
+environment.async = futures.async = ( fn ) ->
     return ( ... ) ->
         thread = coroutine_create( asyncThread )
         
@@ -300,7 +300,7 @@ yieldInner = ( listener, ok, action, value ) ->
     internalError( "unexpected result from '#{listener}' in yield(...): #{result}" )
     return
 
-futures.yield = ( ... ) ->
+environment.yield = futures.yield = ( ... ) ->
     current = coroutine_running()
     unless current
         return throw FutureError "yield(...) cannot be called outside of async function"
@@ -396,7 +396,7 @@ resumeThread = ( thread, current ) ->
         return internalError( "resuming myself is impossible, aka await( coroutine.running() ) ('#{thread}')" )
 
 
-futures.anext = ( thread ) ->
+anext = environment.anext = futures.anext = ( thread ) ->
     current = coroutine_running()
     unless current
         return error FutureError "anext(...) cannot be called outside of async function"
@@ -411,12 +411,18 @@ futures.anext = ( thread ) ->
     
     return resumeThread( thread, current )
 
-do
-    anext = futures.anext
-    futures.apairs = ( thread ) -> return anext, thread
+
+environment.apairs = futures.apairs = ( thread ) -> return anext, thread
 
 
-futures.await = ( thread ) ->
+isawaitable = environment.isawaitable = futures.isawaitable = ( any ) ->
+    if isthread( any )
+        return true
+    
+    meta = getmetatable( any )
+    return meta and meta.__await
+
+await = environment.await = futures.await = ( thread ) ->
     current = coroutine_running()
     unless current
         return error FutureError "await(...) cannot be called outside of async function"
@@ -432,9 +438,7 @@ futures.await = ( thread ) ->
     return resumeThread( thread, current )
 
 
-do
-    import await from futures
-    futures.pawait = ( thread ) -> return pcall( await, thread )
+environment.pawait = futures.pawait = ( thread ) -> return pcall( await, thread )
 
 
 do
@@ -449,7 +453,7 @@ do
         cancelThread( @_thread )
         return cancelFuture( @, ... )
 
-    Task = futures.Task = environment.class( "Task", {
+    Task = environment.Task = futures.Task = environment.class( "Task", {
         new: ( thread ) =>
             unless isthread( thread )
                 return throw TypeError "Task(...) expects a thread, got #{type( thread )}"
@@ -539,9 +543,13 @@ do
                     if fut\done()
                         return
                     
+                    -- backwards compability with promise.allSettled? do we need it?
+                    status = (task\cancelled() or task\error()) and "rejected" or "fulfilled"
+
                     results[i] = {
-                        result: task\result(),
-                        error: task\error()
+                        :status
+                        value: status == "fulfilled" and task\result() or nil
+                        reason: status == "rejected" and task\error() or nil
                     }
 
                     totalDone += 1
@@ -555,9 +563,11 @@ do
 
 do
     import Simple from gpm.timer
-    import Future from futures
+    import Future, await from futures
 
-    futures.sleep = ( seconds, result ) ->
+    sleep = futures.sleep = ( seconds, result ) ->
         fut = Future()
         Simple( seconds, -> fut\setResult(result) )
         return fut
+
+    environment.sleep = ( ... ) -> return await sleep( ... )
