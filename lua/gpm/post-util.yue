@@ -2,7 +2,7 @@ _G = _G
 import gpm, SERVER from _G
 import environment, Logger from gpm
 import istable, pcall, require, tonumber from _G
-import math, string, table, os, util, argument, isfunction, isstring, isnumber, error from environment
+import math, string, table, os, util, argument, isfunction, isnumber, error from environment
 import byte, sub, gsub, len, find from string
 import IsBinaryModuleInstalled from util
 import concat from table
@@ -274,8 +274,8 @@ do
         @position = position
         return position
 
-    Number64 = environment.Number64 = util.Bint( 64 )
-    import IsBint, ToBint, FromBigEndian, FromLittleEndian, ToBigEndian, ToLittleEndian, ToLuaNumber from Number64
+    import BInt, IsBInt from environment
+    import FromBytes, ToBytes, ToNumber, CastSigned from BInt
 
     util.ByteStream = environment.class(
         "ByteStream",
@@ -457,39 +457,37 @@ do
                     if byte( binary, 1 ) == 0 and byte( binary, 2 ) == 0
                         return readUInt( nil, sub( binary, 3 ), 6 )
 
-                    return FromBigEndian( binary, false )
+                    return FromBytes( binary, false )
 
                 if byte( binary, 7 ) == 0 and byte( binary, 8 ) == 0
                     return readUInt( nil, binary, 6 )
 
-                return FromLittleEndian( binary, false )
+                return FromBytes( binary, true )
 
             WriteUInt64: ( number, isBigEndian ) =>
                 local isBint
-                if isstring( number )
-                    number = ToBint( number )
-                    isBint = true
-                elseif IsBint( number )
-                    isBint = true
-                else
+                if isnumber( number )
                     isBint = false
+                else
+                    number = BInt( number )
+                    isBint = true
 
                 if isBint or number > 0xFFFFFFFFFFFF
                     if setEndianness( isBigEndian )
-                        return @Write( ToBigEndian( number ) )
+                        return @Write( ToBytes( number, 8, false ) )
 
-                    return @Write( ToLittleEndian( number ) )
+                    return @Write( ToBytes( number, 8, true ) )
 
                 if setEndianness( isBigEndian )
                     @Write( "\0\0" )
 
                     if isBint
-                        return @Write( writeUInt( nil, ToLuaNumber( number, true ), 6 ) )
+                        return @Write( writeUInt( nil, ToNumber( number ), 6 ) )
 
                     return @Write( writeUInt( nil, number, 6 ) )
 
                 if isBint
-                    @Write( writeUInt( nil, ToLuaNumber( number, true ), 6 ) )
+                    @Write( writeUInt( nil, ToNumber( number ), 6 ) )
                 else
                     @Write( writeUInt( nil, number, 6 ) )
 
@@ -531,37 +529,37 @@ do
                     if byte( binary, 1 ) == 0 and byte( binary, 2 ) == 0
                         return readInt( nil, sub( binary, 3 ), 6 )
 
-                    return FromBigEndian( binary, true )
+                    return CastSigned( FromBytes( binary, false ), 8 )
 
                 if byte( binary, 7 ) == 0 and byte( binary, 8 ) == 0
                     return readInt( nil, binary, 6 )
 
-                return FromLittleEndian( binary, true )
+                return CastSigned( FromBytes( binary, true ), 8 )
 
             WriteInt64: ( number, isBigEndian ) =>
                 local isBint
-                if isstring( number )
-                    number = ToBint( number )
-                    isBint = true
+                if isnumber( number )
+                    isBint = false
                 else
-                    isBint = IsBint( number )
+                    number = BInt( number )
+                    isBint = true
 
                 if isBint or number > 0xFFFFFFFFFFFF
                     if setEndianness( isBigEndian )
-                        return @Write( ToBigEndian( number ) )
+                        return @Write( ToBytes( number, 8, false ) )
 
-                    return @Write( ToLittleEndian( number ) )
+                    return @Write( ToBytes( number, 8, true ) )
 
                 if setEndianness( isBigEndian )
                     @Write( "\0\0" )
 
                     if isBint
-                        return @Write( writeInt( nil, ToLuaNumber( number, true ), 6 ) )
+                        return @Write( writeInt( nil, ToNumber( number ), 6 ) )
 
                     return @Write( writeInt( nil, number, 6 ) )
 
                 if isBint
-                    @Write( writeInt( nil, ToLuaNumber( number, true ), 6 ) )
+                    @Write( writeInt( nil, ToNumber( number ), 6 ) )
                 else
                     @Write( writeInt( nil, number, 6 ) )
 
@@ -728,6 +726,7 @@ do
 
     import band, bor, lshift, rshift from environment.bit
     import match, ByteCount from string
+    import isstring from environment
     import isuint, max from math
     import tostring from _G
     import sort from table

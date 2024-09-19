@@ -12,7 +12,7 @@ import Version from util
 
 file.CreateDir( "/data/gpm/vfs", true )
 
-_G.hook.Add "ShutDown", "GLua Package Manager::VFS", ->
+_G.hook.Add "ShutDown", "gLua Package Manager::VFS", ->
     file.Delete( "/data/gpm/vfs" )
     return nil
 

@@ -36,17 +36,21 @@ do
 
     splashes = {
         "We will have a great Future together."
+        "eW91dHViZS5jb20vd2F0Y2g/dj1kUXc0dzlXZ1hjUQ=="
+        "I'm not here to tell you how great I am!"
+        "I'm here to show you how great I am!"
         "Millions of pieces without a tether"
         "Why are we always looking for more?"
         "Don't worry, " .. username .. " :>"
         "Never forget to finish your tasks!"
+        "T2gsIHlvdSdyZSBhIHNtYXJ0IG9uZS4="
         "Take it in and breathe the light"
-        "Don't bring your light near me."
         "Big Brother is watching you"
         "Hello, " .. username .. "!"
         "I'll make you a promise."
         "Flying over rooftops..."
         "We need more packages!"
+        "Play SOMA sometime;"
         "Where's fireworks!?"
         "Looking For More ♪"
         "Now on Yuescript!"
@@ -131,7 +135,7 @@ for key, value in _G.pairs( include( "gpm/libs/error.lua" ) )
 environment.utf8 = setmetatable( include( "gpm/libs/utf8.lua" ), sandboxMetatable( _G.utf8 ) )
 environment.ipaml = include( "gpm/libs/3rd-party/ip.lua" )
 environment.struct = include( "gpm/libs/struct.lua" )
-include( "gpm/libs/3rd-party/bint.lua" )
+include( "gpm/libs/3rd-party/bigint.lua" )
 include( "gpm/libs/date.lua" )
 
 -- LibDeflate
@@ -191,7 +195,8 @@ for fileName in *Find( "gpm/sources/*.lua", "LUA" )
 if SERVER
     include( "gpm/test.lua" )
 
-gpm.futures.run gpm.loader.Startup()
+if false
+    gpm.futures.run gpm.loader.Startup()
 
 Logger\Info( "Start-up time: %.4f sec.", SysTime! - gpm.StartTime )
 

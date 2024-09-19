@@ -202,7 +202,7 @@ unless sql.__optimized
     sql.__optimized = true
 
 -- truncate WAL journal on shutdown
-_G.hook.Add "ShutDown", "GLua Package Manager::SQLite", ->
+_G.hook.Add "ShutDown", "gLua Package Manager::SQLite", ->
     if _G.sql.Query( "pragma wal_checkpoint(TRUNCATE)" ) == false
         Logger\Error( "Failed to truncate WAL journal: %s", _G.sql.LastError() )
 
