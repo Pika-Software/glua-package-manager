@@ -7,8 +7,6 @@ local function print( ... )
     Logger:Info( table.concat(tbl, "\t" ) )
 end
 
-AddCSLuaFile()
-
 -- require "abc"
 
 -- print("Importing units...")

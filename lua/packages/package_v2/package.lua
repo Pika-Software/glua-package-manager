@@ -9,5 +9,6 @@ dependencies = {
 exports = "./init.lua"
 
 send = {
+    "init.lua",
     "submodule.lua"
 }
