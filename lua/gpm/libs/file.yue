@@ -909,7 +909,7 @@ do
                     if saveHash
                         save( fullPath, len( content ), nil, SHA256( content ) )
 
-                    fut\setResolve( fullPath )
+                    fut\setResult( fullPath )
                     return nil
 
                 pushCallStack( stack )

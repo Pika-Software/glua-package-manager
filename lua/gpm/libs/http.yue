@@ -119,7 +119,7 @@ do
             parameters.headers[ userAgentKey ] = http.UserAgent
 
         parameters.success = ( status, body, headers ) ->
-            fut\setError( { :status, :body, :headers } )
+            fut\setResult( { :status, :body, :headers } )
             return nil
 
         parameters.failed = ( msg ) ->
