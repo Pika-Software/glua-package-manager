@@ -1,10 +1,11 @@
 _G = _G
 import gpm, SERVER from _G
 import environment, Logger from gpm
-import istable, pcall, require, tonumber from _G
-import math, string, table, os, util, argument, isfunction, isnumber, error from environment
-import byte, sub, gsub, len, find from string
-import IsBinaryModuleInstalled from util
+import istable, pcall, require, tonumber, tostring from _G
+import math, string, table, os, util, argument, isstring, isnumber, isfunction, throw, type from environment
+import byte, sub, gsub, len, find, format from string
+import Create, Remove, Simple from environment.timer
+import CRC, IsBinaryModuleInstalled from util
 import concat from table
 import fdiv from math
 import time from os
@@ -24,7 +25,7 @@ do
             installed = false
 
     yueFail = ->
-        error CodeCompileError "Attempt to compile Yuescript failed, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader."
+        throw CodeCompileError "Attempt to compile Yuescript failed, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader."
 
     if installed
         moonloader = environment.moon = _G.moonloader
@@ -45,7 +46,7 @@ do
     else
 
         moonFail = ->
-            error CodeCompileError "Attempt to compile MoonScript failed, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader."
+            throw CodeCompileError "Attempt to compile MoonScript failed, install gm_moonloader and try again, https://github.com/Pika-Software/gm_moonloader."
 
         environment.moon = {
             PreCacheFile: moonFail,
@@ -92,7 +93,7 @@ do
 
             msg = "Bytecode compilation is not supported. Please install gmbc (https://github.com/willox/gmbc)"
             if handleError
-                error msg, 2
+                throw msg, 2
                 return nil
 
             return msg
@@ -118,7 +119,7 @@ do
 
                     msg = "Bytecode compilation is not supported."
                     if handleError
-                        error msg, 2
+                        throw msg, 2
                         return nil
 
                     return msg
@@ -144,7 +145,7 @@ do
 
                 msg = "wrong load mode"
                 if handleError
-                    error msg, 2
+                    throw msg, 2
                     return nil
 
                 return msg
@@ -163,7 +164,7 @@ do
 
                 return load( concat( result, "", 1, length ), chunkName, mode, env, config, handleError )
 
-        error "Invalid argument #1 to 'load' (string/function expected)", 2
+        throw "Invalid argument #1 to 'load' (string/function expected)", 2
         return nil
 
     environment.load = load
@@ -200,11 +201,11 @@ do
         string.packsize = struct.SizeOf
 
     -- Byte Stream
-    import char, reverse, format from string
     import deflate, Color from environment
     import unix2dos, dos2unix from os
-    import CRC, Date from util
+    import char, reverse from string
     import clamp from math
+    import Date from util
 
     local readInt, writeInt
     do
@@ -663,7 +664,7 @@ do
 
                 method = compressionMethods[ compressionMethod ]
                 unless method
-                    error "Unsupported compression method: " .. compressionMethod
+                    throw "Unsupported compression method: " .. compressionMethod
                     return nil
 
                 -- Compression method
@@ -735,9 +736,7 @@ do
 
     import band, bor, lshift, rshift from environment.bit
     import match, ByteCount from string
-    import isstring from environment
     import isuint, max from math
-    import tostring from _G
     import sort from table
 
     compare = ( a, b ) ->
@@ -789,7 +788,7 @@ do
 
         preRelease = match( str, "^-(%w[%.%w-]*)$" )
         if not preRelease or match( preRelease, "%.%." )
-            error "the pre-release '" .. str .. "' is not valid"
+            throw "the pre-release '" .. str .. "' is not valid"
             return nil
 
         return preRelease
@@ -800,7 +799,7 @@ do
 
         build = match( str, "^%+(%w[%.%w-]*)$" )
         if not build or match( build, "%.%." )
-            error "the build '" .. str .. "' is not valid"
+            throw "the build '" .. str .. "' is not valid"
             return nil
 
         return build
@@ -819,7 +818,7 @@ do
                     build = parseBuild( str )
 
                 else
-                    error "the parameter '" .. str .. "' must begin with + or - to denote a pre-release or a build", 3
+                    throw "the parameter '" .. str .. "' must begin with + or - to denote a pre-release or a build", 3
                     return nil
 
         return preRelease, build
@@ -840,29 +839,29 @@ do
 
     parse = ( major, minor, patch, preRelease, build ) ->
         unless major
-            error "at least one parameter is needed", 2
+            throw "at least one parameter is needed", 2
             return nil
 
         if isnumber( major )
             unless isuint( major )
-                error "major version must be unsigned integer", 2
+                throw "major version must be unsigned integer", 2
 
             if minor
                 unless isnumber( minor )
-                    error "minor version must be a number", 2
+                    throw "minor version must be a number", 2
 
                 unless isuint( minor )
-                    error "minor version must be unsigned integer", 2
+                    throw "minor version must be unsigned integer", 2
 
             else
                 minor = 0
 
             if patch
                 unless isnumber( patch )
-                    error "patch version must be a number", 2
+                    throw "patch version must be a number", 2
 
                 unless isuint( patch )
-                    error "patch version must be unsigned integer", 2
+                    throw "patch version must be unsigned integer", 2
 
             else
                 patch = 0
@@ -879,7 +878,7 @@ do
 
             major, minor, patch, extra = match( tostring( major ), "^(%d+)%.?(%d*)%.?(%d*)(.-)$" )
             unless major
-                error "the major version of '#{str}' is missing", 2
+                throw "the major version of '#{str}' is missing", 2
                 return nil
 
             major = tonumber( major, 10 )
@@ -897,10 +896,10 @@ do
             preRelease, build = parsePreReleaseAndBuild( extra )
 
         if major > 0x3ff or minor > 0x7ff or patch > 0x7ff
-            error "version is too large (max 1023.2047.2047)", 2
+            throw "version is too large (max 1023.2047.2047)", 2
 
         elseif major < 0 or minor < 0 or patch < 0
-            error "version is too small (min 0.0.0)", 2
+            throw "version is too small (min 0.0.0)", 2
 
         return major, minor, patch, preRelease, build
 
@@ -1030,7 +1029,7 @@ do
 
                 pos = find( str, "%d" )
                 unless pos
-                    error "Version range must starts with number: " .. str, 2
+                    throw "Version range must starts with number: " .. str, 2
                     return nil
 
                 -- X-Ranges 1.2.x 1.X 1.2.*
@@ -1119,7 +1118,7 @@ do
 
                     return @ < sv\nextMinor!
 
-                error "Invaild operator: '" .. operator .. "'", 2
+                throw "Invaild operator: '" .. operator .. "'", 2
                 return nil
 
             nextMajor: =>
@@ -1134,17 +1133,17 @@ do
             toNumber: =>
                 major = tonumber( @major, 10 )
                 if major > 0x3ff
-                    error "major version is too large (max 1023)", 2
+                    throw "major version is too large (max 1023)", 2
                     return nil
 
                 minor = tonumber( @minor, 10 )
                 if minor > 0x7ff
-                    error "minor version is too large (max 2047)", 2
+                    throw "minor version is too large (max 2047)", 2
                     return nil
 
                 patch = tonumber( @patch, 10 )
                 if patch > 0x7ff
-                    error "patch version is too large (max 2047)", 2
+                    throw "patch version is too large (max 2047)", 2
                     return nil
 
                 return bor( lshift( patch, 21 ), lshift( minor, 10 ), major )
@@ -1174,7 +1173,6 @@ do
 do
 
     import GetValue, SetValue from table
-    import Create, Remove from environment.timer
     import serialize, deserialize from environment.yaml
     import IsFile, AsyncWrite, Read, Write from environment.file
 
@@ -1245,9 +1243,9 @@ do
 
 if _G.sql
 
-    import SQLError, throw from environment
-    import sql, pairs, xpcall from _G
+    import SQLError from environment
     import SQLSafe from string
+    import sql, pairs from _G
     import Query from sql
     lib = environment.sql
 
@@ -1329,3 +1327,400 @@ if _G.sql
         throw result
         return nil
 
+do
+
+    import net, ErrorNoHaltWithStack from environment
+    import Broadcast, Start, Send, SendToServer, ReadBool, WriteBool, ReadData, WriteData, ReadString, WriteString, ReadUInt, WriteUInt from net
+    import Compress, Decompress, CompressedSize from util
+    import abs, ceil, log from math
+    import xpcall from _G
+
+    CHUNK_SIZE = 2 ^ 16 - 2 ^ 10
+
+    registry = {}
+    list = {}
+
+    if _G.SERVER
+        util.AddNetworkString( "gLua Package Manager::NetTransfer" )
+
+    net.Receive "gLua Package Manager::NetTransfer", ( bits, ply ) ->
+        obj = registry[ ReadString! ]
+        if obj
+            obj\Incoming( bits, ply )
+
+        return nil
+
+    -- https://wiki.facepunch.com/gmod/Enums/TYPE
+    isPlayerAllowed = ( netTransfer, filter, ply ) ->
+        unless filter
+            return true
+
+        switch type( filter )
+            when "boolean"
+                return filter
+
+            when "number"
+                return ply\EntIndex! == filter
+
+            when "string"
+                unless ply\IsBot!
+                    if ply\SteamID64! == filter
+                        return true
+
+                    if ply\SteamID! == filter
+                        return true
+
+                return find( ply\Nick!, filter ) ~= nil
+
+            when "table"
+                for value in *filter
+                    if isPlayerAllowed( netTransfer, value, ply )
+                        return true
+
+                return false
+
+            when "function"
+                return filter( netTransfer, ply )
+
+            when "Entity"
+                return ply == filter
+
+            when "Vector"
+                return ply\TestPVS( filter )
+
+            when "RecipientFilter"
+                return isPlayerAllowed( netTransfer, filter\GetPlayers!, ply )
+
+        return false
+
+    net.Transfer = environment.class(
+        "NetTransfer",
+        {
+            __tostring: =>
+                return format( "NetTransfer: %p [%s]", @, @name )
+
+            new: ( transferName, doCRC = false, unreliable = false ) =>
+                argument( transferName, 1, "string" )
+
+                transfer = registry[ transferName ]
+                if transfer
+                    transfer\SetVerifyChecksums( doCRC )
+                    transfer\SetUnreliable( unreliable )
+                    return true, transfer
+
+                registry[ transferName ] = @
+
+                @timeout = 10
+                @compressed = false
+                @name = transferName
+                @name_bytes = len( transferName ) + 1
+
+                @receiving_name = format( "[R] NetTransfer: %p", @ )
+                @receiving = false
+
+                @sending_name = format( "[S] NetTransfer: %p", @ )
+                @sending = false
+
+                @SetTransmissionSpeed( 1.2, true )
+                @SetVerifyChecksums( doCRC )
+                @SetUnreliable( unreliable )
+
+                return false, nil
+
+            -- Receive timeout
+            GetTimeout: =>
+                return @timeout
+
+            SetTimeout: ( seconds ) =>
+                argument( seconds, 1, "number" )
+                @timeout = abs( seconds )
+                return @
+
+            -- Transmission speed ( Message per second )
+            --[[
+
+                Maximum speed is available at value 4,
+                values higher than this do not guarantee
+                speed increase, 0.8 guarantees synchronization
+                between receiving and sending.
+
+                High speed may interfere with
+                normal net library operations.
+
+            ]]
+
+            GetTransmissionSpeed: =>
+                return 1 / @transmission_speed
+
+            SetTransmissionSpeed: ( mps, noCeil ) =>
+                argument( mps, 1, "number" )
+                @transmission_speed = 1 / ( noCeil and mps or ceil( mps ) )
+
+            -- Unreliable networking
+            IsUnreliable: =>
+                return @unreliable
+
+            SetUnreliable: ( value ) =>
+                @unreliable = value == true
+                return @
+
+            -- Checksums verify
+            IsVerifyChecksums: =>
+                return @do_verify
+
+            SetVerifyChecksums: ( value ) =>
+                @do_verify = value == true
+                return @
+
+            -- Player filter
+            GetPlayerFilter: =>
+                return @player_filter
+
+            SetPlayerFilter: ( value ) =>
+                @player_filter = value
+                return @
+
+            IsAllowedPlayer: ( ply ) =>
+                return isPlayerAllowed( @, @player_filter, ply )
+
+            -- LZMA data compression
+            IsCompressedData: =>
+                return @compressed
+
+            CompressData: =>
+                if @compressed
+                    return @transmitted_data
+
+                data = Compress( @transmitted_data )
+                @transmitted_data = data
+                @compressed = true
+                return data
+
+            DecompressData: =>
+                unless @compressed
+                    return @transmitted_data
+
+                data = Decompress( @transmitted_data )
+                @transmitted_data = data
+                @compressed = false
+                return data
+
+            -- Transmitted data
+            GetTransmittedData: =>
+                return @transmitted_data
+
+            GetTransmittedDataSize: =>
+                if @compressed
+                    return CompressedSize( @transmitted_data )
+
+                return len( @transmitted_data )
+
+            SetTransmittedData: ( str, compress, decompress ) =>
+                argument( str, 1, "string" )
+                @transmitted_data = str
+
+                if compress
+                    return @CompressData!
+
+                if decompress
+                    return @DecompressData!
+
+                return str
+
+            -- Networking
+            StartTransmission: =>
+                Start( "gLua Package Manager::NetTransfer", @unreliable )
+                WriteString( @name )
+                return @
+
+            EndTransmission: ( target ) =>
+                if SERVER
+                    if target
+                        Send( target )
+                    else
+                        Broadcast!
+                else
+                    SendToServer!
+
+                return @
+
+            -- Aborting
+            AbortSending: =>
+                Remove( @sending_name )
+                @sending = false
+                return @
+
+            AbortReceiving: =>
+                Remove( @receiving_name )
+
+                unless @permanent_receive
+                    @receive_fn = nil
+
+                @compressed = false
+                @receiving = false
+                @data = nil
+                return @
+
+            Abort: =>
+                @AbortReceiving!
+                @AbortSending!
+                return @
+
+            -- Sending
+            IsSending: =>
+                return @sending
+
+            Send: ( ply ) =>
+                if @sending
+                    return nil
+
+                if SERVER and not @IsAllowedPlayer( ply )
+                    return nil
+
+                transmitted_data = @transmitted_data
+                bytes = len( transmitted_data )
+
+                total = ceil( bytes / CHUNK_SIZE )
+                uint_bits = ceil( log( total + 1, 2 ) )
+                uint_bits = uint_bits < 1 and 1 or uint_bits
+                @sending = true
+
+                @StartTransmission!
+
+                WriteUInt( uint_bits - 1, 5 )
+                WriteUInt( total, uint_bits )
+                WriteBool( @compressed )
+
+                if @do_verify
+                    WriteUInt( tonumber( CRC( transmitted_data ), 10 ), 32 )
+
+                @EndTransmission( ply )
+
+                pointer, index = 0, 0
+                Create @sending_name, @transmission_speed, total, ->
+                    unless @sending
+                        return nil
+
+                    index += 1
+
+                    size = bytes > CHUNK_SIZE and CHUNK_SIZE or bytes
+                    bytes -= size
+
+                    @StartTransmission!
+
+                    WriteData( sub( transmitted_data, pointer + 1, pointer + size ), size )
+                    pointer += size
+
+                    @EndTransmission( ply )
+
+                    progress_fn = @progress_fn
+                    if progress_fn
+                        xpcall( progress_fn, ErrorNoHaltWithStack, @, index / total, size )
+
+                    if index == total
+                        @AbortSending!
+
+                    return nil
+
+                return @
+
+            -- Receiving
+            IsReceiving: =>
+                return @receiving
+
+            Receive: ( func, permanent ) =>
+                argument( func, 1, "function" )
+                @receive_fn = func
+                @permanent_receive = permanent == true
+                return @
+
+            Incoming: ( bits, ply ) =>
+                receive_fn = @receive_fn
+                unless receive_fn
+                    return nil
+
+                if SERVER and not @IsAllowedPlayer( ply )
+                    return nil
+
+                Create @receiving_name, @timeout, 1, ->
+                    @Error( format( "Timeout, no response for %d seconds.", @timeout ) )
+                    return nil
+
+                unless @receiving
+                    @total = ReadUInt( ReadUInt( 5 ) + 1 )
+                    @compressed = ReadBool!
+
+                    if @do_verify
+                        @checksum = tostring( ReadUInt( 32 ) )
+
+                    @receiving = true
+                    @received = 0
+                    @data = {}
+                    return nil
+
+                received, total = @received + 1, @total
+                bytes = ( bits / 8 ) - @name_bytes
+
+                @data[ received ] = ReadData( bytes )
+                @received = received
+
+                progress_fn = @progress_fn
+                if progress_fn
+                    xpcall( progress_fn, ErrorNoHaltWithStack, @, received / total, bytes )
+
+                if received == total
+                    data = concat( @data, "", 1, received )
+                    @AbortReceiving!
+
+                    if @do_verify and CRC( data ) ~= @checksum
+                        @Error( "Checksum does not match expected, failure." )
+                        return nil
+
+                    if @compressed
+                        data = Decompress( data )
+
+                    @transmitted_data = data
+
+                    xpcall( receive_fn, ErrorNoHaltWithStack, @, data, ply )
+                    return nil
+
+                return nil
+
+            -- Other
+            OnProgress: ( func ) =>
+                argument( func, 1, "function" )
+                @progress_fn = func
+                return @
+
+            Error: ( message, ... ) =>
+                @Abort!
+
+                error_fn = @__error
+                if error_fn
+                    xpcall( error_fn, ErrorNoHaltWithStack, @, message, ... )
+
+                throw( "#{@} error: " .. message )
+                return nil
+
+            OnError: ( func ) =>
+                argument( func, 1, "function" )
+                @__error = func
+                return @
+
+            Register: =>
+                name = @name
+
+                obj = registry[ name ]
+                if obj
+                    return obj
+
+                registry[ name ] = @
+                return @
+
+            Remove: =>
+                @Abort!
+                registry[ @name ] = nil
+                return @
+
+        }
+    )
