@@ -1,8 +1,9 @@
 from _G import gpm, setmetatable
 from gpm import environment, string, RuntimeError, FutureError, FutureCancelError, TypeError, InvalidStateError
-from gpm import throw, iserror, isstring, isnumber, isthread, isfunction, tostring, type, getmetatable
+from gpm import throw, iserror, isstring, isnumber, isthread, isfunction, tostring, type, getmetatable, xpcall, pcall
 from string import match
 
+-- these functions are not in camelCase, just because I like them this way :p
 { create: coroutine_create, resume: coroutine_resume, running: coroutine_running, status: coroutine_status, yield: coroutine_yield } = _G.coroutine
 
 
@@ -26,6 +27,8 @@ RESULT_FINISHED = futures.RESULT_FINISHED = 6 -- async thread finished
 RESULT_FAILED = futures.RESULT_FAILED = 7 -- used in case if main thread is awaiting for async thread to finish (only used internally, function listeners should not recieve this)
 RESULT_PENDING = futures.RESULT_PENDING = 8 -- marks that async thread is waiting for async task to finish
 RESULT_YIELDING = futures.RESULT_YIELDING = 9 -- marks that async thread is yielding
+RESULT_CANCELLED = futures.RESULT_CANCELLED = 10 -- marks that async thread execution was cancelled
+
 
 transformError = ( err ) ->
     if isnumber( err )
@@ -94,12 +97,12 @@ do
 
     result = =>
         if @_state == FUTURE_STATE_CANCELLED
-            throw InvalidStateError "future was cancelled"
+            return throw InvalidStateError "future was cancelled"
         elseif @_state != FUTURE_STATE_FINISHED
-            throw InvalidStateError "future is not finished yet"
+            return throw InvalidStateError "future is not finished yet"
 
         if @_error
-            throw( @_error )
+            return throw( @_error )
         
         return @_result
 
@@ -128,6 +131,9 @@ do
 
             action = coroutine_yield( RESULT_PENDING )
             if action != ACTION_CONTINUE
+                if action == ACTION_CANCEL
+                    return throw FutureCancelError()
+
                 return internalError( "unexpected action '#{action}' in await( Future ... )" )
 
         unless done( @ )
@@ -185,9 +191,7 @@ do
     
         __aiter: __aiter
         __await: __aiter
-        __acancel: =>
-            unless done( @ )
-                cancel( @ )
+        __acancel: cancel
     } )
 
     environment.isfuture = futures.IsFuture = ( any ) ->
@@ -226,7 +230,7 @@ asyncIteratableThread = ( ok, value, ... ) ->
             return handleError( FutureError( "listener '#{listener}' is dead/running, cannot return result" ), true )
     
     if isfunction( listener )
-        return RESULT_FINISHED, listener( current, true, RESULT_FINISHED, ... )
+        return RESULT_FINISHED, listener( current, true, RESULT_FINISHED, value, ... )
 
     internalError( "async function in thread '#{current}' has invalid listener '#{listener}'" )
     return
@@ -429,10 +433,131 @@ futures.await = ( thread ) ->
 
 
 do
+    import await from futures
+    futures.pawait = ( thread ) -> return pcall( await, thread )
+
+
+do
+    import Future, run from futures
+
+    cancelThread = futures.cancel
+    cancelFuture = Future.cancel
+    setResult = Future.setResult
+    setError = Future.setError
+
+    cancel = ( ... ) =>
+        cancelThread( @_thread )
+        return cancelFuture( @, ... )
+
+    Task = futures.Task = environment.class( "Task", {
+        new: ( thread ) =>
+            unless isthread( thread )
+                return throw TypeError "Task(...) expects a thread, got #{type( thread )}"
+
+            -- ugly, but yeah, this is gpm classes
+            @__class.__parent.__init( @ )
+
+            @_thread = thread
+
+            run( thread, ( thread, ok, result, ... ) ->
+                unless ok
+                    return setError( @, result )
+                
+                if result == RESULT_FINISHED
+                    return setResult( @, ... )
+                
+                if result == RESULT_YIELDING
+                    cancelThread( thread )
+                    return setResult( @, ... )
+                
+                if result == RESULT_CANCELLED
+                    return cancel( @ )
+                
+                setError( @, FutureError( "unexpected result '#{result}' from thread '#{thread}'" ) )
+            )
+
+            return
+        
+        :cancel
+
+        getThread: => return @_thread
+    }, nil, Future )
+
+    -- Make set* methods private
+    Task.__base.setResult = nil
+    Task.__base.setError = nil
+
+
+do
+    import Future, Task from futures
+
+    -- converts thread to Task and waits for task/future-like object to finish and calls callback with task
+    waitForTask = ( task, fn ) ->
+        if isthread( task )
+            task = Task( task )
+        
+        unless task.addCallback and task.result and task.error and task.cancelled
+            return false
+        
+        task\addCallback( fn )
+
+        return true
+
+    futures.all = ( tasks ) ->
+        fut, results, taskLen = Future(), {}, #tasks
+        if taskLen != 0
+            totalDone = 0
+            for i = 1, taskLen
+                waitForTask( tasks[i], (task) ->
+                    if fut\done()
+                        return
+                    
+                    if task\cancelled()
+                        fut\cancel()
+                        return
+                    
+                    if err := task\error()
+                        fut\setError( err )
+                        return
+                    
+                    results[i] = task\result()
+                    totalDone += 1
+                    if totalDone == taskLen
+                        fut\setResult( results )
+                )
+        else
+            fut\setResult( results )
+
+        return fut
+
+    futures.allSettled = ( tasks ) ->
+        fut, results, taskLen = Future(), {}, #tasks
+        if taskLen != 0
+            totalDone = 0
+            for i = 1, taskLen
+                waitForTask( tasks[i], (task) ->
+                    if fut\done()
+                        return
+                    
+                    results[i] = {
+                        result: task\result(),
+                        error: task\error()
+                    }
+
+                    totalDone += 1
+                    if totalDone == taskLen
+                        fut\setResult( results )
+                )
+        else
+            fut\setResult( results )
+
+        return fut
+
+do
     import Simple from gpm.timer
     import Future from futures
 
-    futures.sleep = ( seconds ) ->
+    futures.sleep = ( seconds, result ) ->
         fut = Future()
-        Simple( seconds, -> fut\setResult() )
+        Simple( seconds, -> fut\setResult(result) )
         return fut
