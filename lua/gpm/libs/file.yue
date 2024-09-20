@@ -1,7 +1,7 @@
 _G = _G
 import environment, Logger, sql from _G.gpm
 import file, istable, CLIENT, SERVER, MENU_DLL from _G
-import async, await, debug, util, path, string, Promise, CodeCompileError, FileSystemError, error, argument, tostring from environment
+import async, await, debug, util, path, string, Future, CodeCompileError, FileSystemError, error, argument, tostring from environment
 import ByteStream, IsBinaryModuleInstalled, SHA256 from util
 import byte, sub, len, match, ByteSplit from string
 import resolve, getDirectory, getFile, getCurrentDirectory from path
@@ -825,26 +825,26 @@ do
 
             assertWriteAllowed( filePath, gamePath )
 
-            promise = Promise!
+            fut = Future!
 
             appendStack( captureStack() )
             stack = popCallStack()
 
             state = Append( filePath, content, ( iFilePath, iGamePath, iState ) ->
                 if iState == 0
-                    promise\Resolve( absoluteGamePath( iFilePath, iGamePath, false ) )
+                    fut\setResult( absoluteGamePath( iFilePath, iGamePath, false ) )
                     return nil
 
                 pushCallStack( stack )
-                promise\Reject( FileSystemError FSASYNC[ iState ] )
+                fut\setError( FileSystemError FSASYNC[ iState ] )
                 popCallStack()
                 return nil
             gamePath )
 
             if state ~= 0
-                promise\Reject( FileSystemError FSASYNC[ state ] )
+                fut\setError( FileSystemError FSASYNC[ state ] )
 
-            return promise
+            return fut
 
     do
 
@@ -857,7 +857,7 @@ do
             if CLIENT and luaGamePaths[ gamePath ] and not ( Exists( filePath, gamePath ) and not IsDir( filePath, gamePath ) )
                 filePath, gamePath = "lua/" .. filePath, "WORKSHOP"
 
-            promise = Promise!
+            fut = Future!
 
             appendStack( captureStack() )
             stack = popCallStack()
@@ -867,21 +867,21 @@ do
                     if verifyHash
                         cache = get( absoluteGamePath( filePath, gamePath, false ) )
                         unless cache and ( not cache.hash or cache.hash == SHA256( iContent ) ) and cache.size == len( iContent )
-                            promise\Reject( FileSystemError "File hash mismatch for '" .. absoluteGamePath( filePath, gamePath, false ) .. "'" )
+                            fut\setError( FileSystemError "File hash mismatch for '" .. absoluteGamePath( filePath, gamePath, false ) .. "'" )
                             return nil
 
-                    promise\Resolve( iContent )
+                    fut\setResult( iContent )
                     return nil
 
                 pushCallStack( stack )
-                promise\Reject( FileSystemError FSASYNC[ iState ] )
+                fut\setError( FileSystemError FSASYNC[ iState ] )
                 popCallStack()
                 return nil
 
             if state ~= 0
-                promise\Reject( FileSystemError FSASYNC[ state ] )
+                fut\setError( FileSystemError FSASYNC[ state ] )
 
-            return promise
+            return fut
 
     do
 
@@ -897,7 +897,7 @@ do
             if directoryPath ~= "" and directoryPath ~= "/"
                 createDir( directoryPath, true, gamePath, true )
 
-            promise = Promise!
+            fut = Future!
 
             appendStack( captureStack() )
             stack = popCallStack()
@@ -909,25 +909,26 @@ do
                     if saveHash
                         save( fullPath, len( content ), nil, SHA256( content ) )
 
-                    promise\Resolve( fullPath )
+                    fut\setResult( fullPath )
                     return nil
 
                 pushCallStack( stack )
-                promise\Reject( FileSystemError FSASYNC[ iState ] )
+                fut\setError( FileSystemError FSASYNC[ iState ] )
                 popCallStack()
                 return nil
 
             )
 
             if state ~= 0
-                promise\Reject( FileSystemError FSASYNC[ state ] )
+                fut\setError( FileSystemError FSASYNC[ state ] )
 
-            return promise
+            return fut
 
 do
 
-    func = async ( promise ) ->
-        lines, pointer = ByteSplit( await( promise ), 0xa --[[ \n ]] ), 0
+    -- TODO: convert it to async generator (with yield), so it can be used with apairs
+    func = async ( task ) ->
+        lines, pointer = ByteSplit( await( task ), 0xa --[[ \n ]] ), 0
         return ->
             pointer += 1
             return lines[ pointer ], pointer
@@ -1198,7 +1199,7 @@ do
         if uniqueName
             gma\SetTitle( uniqueName )
 
-        return gma\AsyncMount( false )
+        return await gma\AsyncMount( false )
 
     mountZIPData = lib.MountZIPData = async ( data, uniqueName ) ->
         gma = GMA!
@@ -1231,7 +1232,7 @@ do
             if IsFilePathAllowed( filePath )
                 gma\SetFile( filePath, content )
 
-        return gma\AsyncMount( false )
+        return await gma\AsyncMount( false )
 
     asyncMount = async ( filePath, gamePath ) ->
         return await mountZIPData( await( asyncRead( filePath, gamePath, true ) ), "file:///" .. filePath )
@@ -1242,4 +1243,4 @@ do
         unless skipNormalize
             filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
-        return asyncMount( filePath, gamePath )
+        return await asyncMount( filePath, gamePath )

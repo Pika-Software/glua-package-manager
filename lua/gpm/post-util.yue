@@ -171,15 +171,6 @@ do
 
 do
 
-    import Delay, SafeAwait from environment.Promise
-
-    environment.sleep = ( delay = 0 ) ->
-        argument( delay, 1, "number" )
-        SafeAwait( Delay( delay ) )
-        return nil
-
-do
-
     import struct from environment
     import io from struct
 

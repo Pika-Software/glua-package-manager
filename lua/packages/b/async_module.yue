@@ -1,4 +1,4 @@
-await Promise.delay( 0 )
+sleep( 0 )
 
 global abc = 123
 export data = "async data"

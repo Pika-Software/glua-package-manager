@@ -186,10 +186,10 @@ errorClass = environment.class(
             lines = { "\n[ERROR] " .. tostring( @ ) }
 
             -- Add stack trace
-            stack = @stack
-            for i = 1, #stack
-                info = stack[ i ]
-                lines[] = format( "%s %d. %s - %s:%d", rep( " ", i ), i, info.name or "unknown", info.short_src, info.currentline or -1 )
+            if stack := @stack
+                for i = 1, #stack
+                    info = stack[ i ]
+                    lines[] = format( "%s %d. %s - %s:%d", rep( " ", i ), i, info.name or "unknown", info.short_src, info.currentline or -1 )
             
             -- Add locals
             if locals := @locals
@@ -210,8 +210,10 @@ errorClass = environment.class(
             ErrorNoHalt concat( lines, "\n" )
 
             -- TODO: disable this in client-side production environment
-            dumpFile( @name .. ": " .. @message, @fileName, @lineNumber )
-            return nil
+            if @message and @fileName and @lineNumber
+                dumpFile( @name .. ": " .. @message, @fileName, @lineNumber )
+
+            return
     },
     {
         __inherited: ( child ) =>
@@ -229,14 +231,16 @@ errorClass = environment.class(
 )
 
 export NotImplementedError = classExtend( errorClass, "NotImplementedError" )
+export FutureCancelError = classExtend( errorClass, "FutureCancelError" )
+export InvalidStateError = classExtend( errorClass, "InvalidStateError" )
 export CodeCompileError = classExtend( errorClass, "CodeCompileError" )
 export FileSystemError = classExtend( errorClass, "FileSystemError" )
 export WebClientError = classExtend( errorClass, "WebClientError" )
 export RuntimeError = classExtend( errorClass, "RuntimeError" )
 export PackageError = classExtend( errorClass, "PackageError" )
-export PromiseError = classExtend( errorClass, "PromiseError" )
 export ModuleError = classExtend( errorClass, "ModuleError" )
 export SourceError = classExtend( errorClass, "SourceError" )
+export FutureError = classExtend( errorClass, "FutureError" )
 export AddonError = classExtend( errorClass, "AddonError" )
 export RangeError = classExtend( errorClass, "RangeError" )
 export TypeError = classExtend( errorClass, "TypeError" )

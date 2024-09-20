@@ -2,11 +2,10 @@ _G = _G
 import CLIENT, SERVER, gpm, pcall, AddCSLuaFile from _G
 import environment from gpm
 
-import debug, string, path, file, util, pairs, isurl, isstring, argument, URL, ModuleError, error, PackageError, Promise from environment
+import async, await, debug, string, path, file, util, pairs, isurl, isstring, argument, URL, ModuleError, error, PackageError, Future, Task from environment
 import getDirectory, getExtension, replaceExtension from path
 import NormalizeGamePath, AbsoluteGamePath, Find, LuaPath from file
 import concat, IsEmpty, Merge from environment.table
-import await, async from Promise
 newClass = environment.class
 import getfpath from debug
 import Version from util
@@ -153,7 +152,7 @@ do
                             error ModuleError "file '#{@url}' does not exist"
 
                         compileResult = await AsyncCompile( filePath, @env, config, gamePath, true )
-                        @func = func = compileResult.func
+                        @func = func = async( compileResult.func )
                         @name = getfpath( func ) or "unknown"
                         return func
 
@@ -164,7 +163,7 @@ do
                     if not @func
                         error ModuleError "module #{@url} was not loaded"
 
-                    return async( @func )( ... )
+                    return @func( ... )
             },
             {
                 getAll: ->
@@ -193,13 +192,12 @@ do
                         m = moduleClass( url, env )
                         await m\load!
 
-                    return m\run!
+                    return await m\run!
             }
         )
 
         loader.Module = moduleClass
 
-    import STATE_REJECTED from Promise
     import rawset, tobool from _G
     import getFileName from path
     import Logger from util
@@ -258,8 +256,8 @@ do
 
         cached = packages[ url.href ]
         if cached
-            if cached.state ~= STATE_REJECTED
-                return cached
+            if not cached\done() or not cached\error()
+                return await cached
 
             -- clear cache if parsing failed
             packages[ url.href ] = nil
@@ -290,9 +288,9 @@ do
             config[ key ] = value
 
         -- also cache result so next calls will return current package
-        promise = parse( filePath, gamePath, config )
-        packages[ url.href ] = promise
-        return promise
+        task = Task( parse( filePath, gamePath, config ) )
+        packages[ url.href ] = task
+        return await task
 
     packageClass = newClass( "Package", {
         __tostring: =>
@@ -795,8 +793,7 @@ local asyncImport, findSource
 do
 
     import SourceError from environment
-    import Logger, ispromise from gpm
-    import reject from Promise
+    import Logger, isawaitable from gpm
     import join from path
 
     findSource = loader.FindSource = ( scheme ) ->
@@ -866,7 +863,7 @@ do
 
     loader.FetchInfo = async ( url, base, env, parent ) ->
         url = getFileURL( url )
-        return findSource( url.scheme )\FetchInfo( url, base, env, parent )
+        return await findSource( url.scheme )\FetchInfo( url, base, env, parent )
 
     do
 
@@ -884,10 +881,10 @@ do
                 -- if package has dependencies, wait until they are resolved
                 if dependencies := package.__dependencies
                     for name, dep in pairs( dependencies )
-                        if ispromise( dep )
+                        if isawaitable( dep )
                             await dep
 
-            return run( resolved, env )
+            return await run( resolved, env )
 
             -- source = findSource( resolved.scheme )
             -- info or= await source\FetchInfo( resolved, base )
@@ -967,7 +964,7 @@ do
 
     import display from environment.Error
     import Logger, repositories from gpm
-    import all, allSettled from Promise
+    import all, allSettled from gpm.futures
 
     -- this one has [name@version or url] = Promise
     dependencies = loader.Dependencies = {}
@@ -992,7 +989,7 @@ do
             if task
                 return task
 
-            dependencies[ ref ] = task = installDependency( pkg, name, target, true )
+            dependencies[ ref ] = task = Task( installDependency( pkg, name, target, true ) )
             unless pkg.__dependencies[ name ]
                 pkg.__dependencies[ name ] = task
 
@@ -1035,7 +1032,7 @@ do
 
     loader.InstallDependency = installDependency
 
-    resolveDependencies = async ( pkg ) ->
+    resolveDependencies = loader.ResolveDependencies = async ( pkg ) ->
         unless pkg.dependencies
             return nil
 
@@ -1048,7 +1045,7 @@ do
 
         -- hacky way to determine if all packages were installed
         for _, task in pairs( dependencies )
-            if task.state == task.STATE_PENDING
+            unless task\done()
                 return nil
 
         -- alright, it seems that all dependencies were installed
@@ -1057,8 +1054,6 @@ do
             RunConsoleCommand( "changelevel", game.GetMap() )
 
         return nil
-
-    loader.ResolveDependencies = resolveDependencies
 
     initializePackage = async ( pkg ) ->
         if SERVER
