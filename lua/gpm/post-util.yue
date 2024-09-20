@@ -1446,6 +1446,7 @@ do
             SetTransmissionSpeed: ( mps, noCeil ) =>
                 argument( mps, 1, "number" )
                 @transmission_speed = 1 / ( noCeil and mps or ceil( mps ) )
+                return @
 
             -- Unreliable networking
             IsUnreliable: =>
@@ -1613,7 +1614,7 @@ do
 
                     return nil
 
-                return @
+                return nil
 
             -- Receiving
             IsReceiving: =>
@@ -1673,7 +1674,6 @@ do
                     @transmitted_data = data
 
                     xpcall( receive_fn, ErrorNoHaltWithStack, @, data, ply )
-                    return nil
 
                 return nil
 
