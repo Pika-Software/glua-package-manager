@@ -1562,6 +1562,7 @@ do
 
     } )
 
+    environment.color_white = colorClass( 255, 255, 255, 255 )
     environment.Color = colorClass
 
 -- Stack

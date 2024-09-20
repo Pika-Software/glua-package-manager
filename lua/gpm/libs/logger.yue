@@ -1,41 +1,18 @@
 _G = _G
-import gpm, timer, tostring from _G
+import date from _G.os
+import gpm, tostring, MsgC from _G
 import environment, IsInDebug from gpm
-
 import format, gsub, sub, len from environment.string
-import util, Color, argument from environment
+import Color, argument, color_white from environment
 
-isLoading = true
-timer.Simple 0, ->
-    isLoading = false
+dateScheme = _G.CreateConVar( "gpm_logger_date", "0", _G.FCVAR_ARCHIVE, "Allows the logger to display date.", 0, 1 )\GetBool! and "%d-%m-%Y %H:%M:%S " or "%H:%M:%S "
 
-dateScheme, limit = "%d-%m-%Y %H:%M:%S ", 200
-do
+_G.cvars.AddChangeCallback( "gpm_logger_date", ( _, __, new ) ->
+    dateScheme = ( new == "1" and "%d-%m-%Y %H:%M:%S " or "%H:%M:%S " )
+"gLua Package Manager::Logger")
 
-    import FCVAR_ARCHIVE, CreateConVar from _G
-
-    dateScheme = CreateConVar( "gpm_logger_date", "0", FCVAR_ARCHIVE, "Allows the logger to display date.", 0, 1 )\GetBool! and "%d-%m-%Y %H:%M:%S " or "%H:%M:%S "
-    limit = CreateConVar( "gpm_logger_limit", limit, FCVAR_ARCHIVE, "Maximum number of messages displayed per second.", 0, 2 ^ 16 )\GetInt!
-
-do
-
-    import AddChangeCallback from _G.cvars
-
-    AddChangeCallback( "gpm_logger_date", ( _, __, new ) ->
-        dateScheme = ( new == "1" and "%d-%m-%Y %H:%M:%S " or "%H:%M:%S ")
-    "gLua Package Manager::Logger")
-
-    AddChangeCallback( "gpm_logger_limit", ( _, __, new ) ->
-        limit = tonumber( new, 10  )
-        if limit
-            timer.Adjust( "gLua Package Manager::Logger", 1 / limit, 0 )
-
-        return nil
-    "gLua Package Manager::Logger" )
-
-secondaryTextColor = Color( 150, 150, 150 )
 primaryTextColor = Color( 200, 200, 200 )
-white = Color( 255, 255, 255 )
+secondaryTextColor = Color( 150, 150, 150 )
 info = Color( 70, 135, 255 )
 warn = Color( 255, 130, 90 )
 error = Color( 250, 55, 40 )
@@ -53,40 +30,11 @@ elseif SERVER
     stateColor = Color( 5, 170, 250 )
 else
     state = "[ Unknown ] "
-    stateColor = white
-
-queue = util.Queue!
-
-local display
-do
-
-    import date from environment.os
-    import MsgC from environment
-
-    display = ( levelColor, level, titleColor, title, msgColor, msg ) ->
-        MsgC( secondaryTextColor, date( dateScheme ), stateColor, state, levelColor, level, secondaryTextColor, " --> ", titleColor, title, secondaryTextColor, " : ", msgColor, msg .. "\n" )
-        return nil
-
-dequeue = ->
-    data = queue\Dequeue!
-    if data
-        display( data[ 1 ], data[ 2 ], data[ 3 ], data[ 4 ], data[ 5 ], data[ 6 ] )
-
-    return nil
-
-timer.Create( "gLua Package Manager::Logger", 1 / limit, 0, dequeue )
-
-_G.hook.Add "ShutDown", "gLua Package Manager::Logger", ->
-    timer.Remove "gLua Package Manager::Logger"
-
-    while not queue\IsEmpty!
-        dequeue!
-
-    return nil
+    stateColor = color_white
 
 log = ( color, level, str, ... ) =>
     if @interpolation
-        args = {...}
+        args = { ... }
         for index = 1, #args
             args[ tostring( index ) ] = tostring( args[ index ] )
 
@@ -105,11 +53,7 @@ log = ( color, level, str, ... ) =>
     if ( len( str ) + titleLength ) > 950
         str = sub( str, 1, 950 - titleLength ) .. "..."
 
-    if isLoading
-        display( color, level, @title_color, title, @text_color, str )
-    else
-        queue\Enqueue( { color, level, @title_color, title, @text_color, str } )
-
+    MsgC( secondaryTextColor, date( dateScheme ), stateColor, state, color, level, secondaryTextColor, " --> ", @title_color, title, secondaryTextColor, " : ", @text_color, str .. "\n" )
     return nil
 
 loggerClass = environment.class( "Logger", {
@@ -124,7 +68,7 @@ loggerClass = environment.class( "Logger", {
             argument( title_color, 2, "Color" )
             @title_color = title_color
         else
-            @title_color = white
+            @title_color = color_white
 
         if interpolation == nil
             @interpolation = true
@@ -161,7 +105,7 @@ loggerClass = environment.class( "Logger", {
         return nil
 } )
 
-util.Logger = loggerClass
+environment.util.Logger = loggerClass
 
 logger = loggerClass( "gpm@" .. gpm.VERSION, environment.Color( 180, 180, 255 ), false )
 gpm.Logger = logger
