@@ -314,26 +314,22 @@ do
 
         return tbl
 
-    table.GetKeys = ( tbl ) ->
-        result, length = {}, 0
+table.GetKeys = ( tbl ) ->
+    result, length = {}, 0
 
-        key = next( tbl )
-        while key
-            length += 1
-            result[ length ] = key
-            key = next( tbl, key )
+    for key in pairs( tbl )
+        length += 1
+        result[ length ] = key
 
-        return result, length
+    return result, length
 
-    table.Count = ( tbl ) ->
-        length = 0
+table.Count = ( tbl ) ->
+    length = 0
 
-        key = next( tbl )
-        while key
-            length += 1
-            key = next( tbl, key )
+    for _ in pairs( tbl )
+        length += 1
 
-        return length
+    return length
 
 do
 
