@@ -1,0 +1,29 @@
+_G = _G
+import gpm from _G
+import Logger from gpm
+
+if _G.SERVER
+
+    transport = rawget( gpm, "Transport" )
+    unless istable( transport )
+        transport = {}
+        rawset( gpm, "Transport", transport )
+
+    transport.legacy = _G.AddCSLuaFile
+
+    transport.net = ( filePath ) ->
+
+        return nil
+
+    selected = transport[ _G.CreateConVar( "gpm_lua_transport", "legacy", _G.FCVAR_ARCHIVE, "Selected Lua transport" ) ] or transport.net
+
+    _G.cvars.AddChangeCallback( "gpm_lua_transport", ( _, __, str ) ->
+        selected = transport[ str ] or transport.net
+    "gLua Package Manager::Lua Transport:" )
+
+    gpm.AddCSLuaFile = ( filePath ) ->
+        Logger\Debug( "Sending file '".. filePath .. "' to client..." )
+        return selected( filePath )
+
+-- if _G.CLIENT
+

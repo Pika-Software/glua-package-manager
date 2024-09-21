@@ -1,6 +1,6 @@
 _G = _G
-import CLIENT, SERVER, gpm, pcall, AddCSLuaFile from _G
-import environment from gpm
+import CLIENT, SERVER, gpm, pcall from _G
+import environment, AddCSLuaFile from gpm
 
 import async, await, debug, string, path, file, util, pairs, isurl, isstring, argument, URL, ModuleError, error, PackageError, Future, Task from environment
 import getDirectory, getExtension, replaceExtension from path

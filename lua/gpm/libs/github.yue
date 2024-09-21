@@ -11,7 +11,7 @@ import time from environment.os
 local api_token
 if SERVER
     convar = _G.CreateConVar( "gpm_github_token", "", { _G.FCVAR_ARCHIVE, _G.FCVAR_PROTECTED, 16 --[[FCVAR_HIDDEN]] }, "https://github.com/settings/tokens" )
-    environment.cvars.AddChangeCallback( convar\GetName!, ( ( _, __, new ) -> api_token = new ), "gLua Package Manager::Github API" )
+    _G.cvars.AddChangeCallback( convar\GetName!, ( ( _, __, new ) -> api_token = new ), "gLua Package Manager::Github API" )
     api_token = convar\GetString!
 else
     api_token = ""

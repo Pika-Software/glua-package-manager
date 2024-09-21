@@ -9,6 +9,8 @@ import rshift, band from _G.bit
 import min, max from _G.math
 import getinfo from _G.debug
 
+environment.FCVAR_HIDDEN = 16
+
 :isbool, :isnumber, :isstring, :isfunction = _G
 
 do
