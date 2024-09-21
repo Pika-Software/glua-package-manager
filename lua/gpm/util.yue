@@ -3,7 +3,7 @@ import gpm, pairs, error, rawget, getfenv, getmetatable, setmetatable, istable, 
 
 import environment from gpm
 import string, table, util from environment
-import byte, sub, gsub, format, len, find from string
+import byte, sub, gsub, format, len, find, match from string
 import concat, remove from table
 import rshift, band from _G.bit
 import min, max from _G.math
@@ -649,8 +649,6 @@ do
 
         return concat( result, "", 1, size )
 
-    import match from string
-
     trim = string.Trim = ( str, pattern, dir = 0 ) ->
         if pattern
             if pattern == ""
@@ -682,6 +680,9 @@ do
 
     string.IsURL = ( str ) ->
         return match( str, "^%l[%l+-.]+%:[^%z\x01-\x20\x7F-\xFF\"<>^`:{-}]*$" ) ~= nil
+
+    string.IsSteamID = ( str ) ->
+        return match( str, "^STEAM_[0-5]:[01]:%d+$" ) ~= nil
 
 string.Extract = ( str, pattern, default ) ->
     startPos, endPos, matched = find( str, pattern, 1, false )
@@ -1046,6 +1047,60 @@ do
 do
 
     import gmatch, ByteSplit, TrimBytes from string
+
+    do
+
+        isDomain = string.IsDomain = ( str ) ->
+            if str == ""
+                return false, "empty string"
+
+            length = len( str )
+            if length > 253
+                return false, "domain is too long"
+
+            if byte( str, 1 ) == 0x2E --[[ . ]]
+                return false, "first character in domain cannot be a dot"
+
+            if byte( str, length ) == 0x2E --[[ . ]]
+                return false, "last character in domain cannot be a dot"
+
+            unless match( str, "^[%l][%l%d.]*%.[%l]+$")
+                return false, "invalid domain"
+
+            for label in *ByteSplit( str, 0x2E --[[ . ]] )
+                if label == ""
+                    return false, "empty label in domain"
+
+                if len( label ) > 63
+                    return false, "label '" .. label .. "' in domain is too long"
+
+            return true
+
+        string.IsEmail = ( str ) ->
+            if str == ""
+                return false, "empty string"
+
+            lastAt = find( str, "[^%@]+$" )
+            unless lastAt
+                return false, "@ symbol is missing"
+
+            if lastAt >= 65
+                return nil, "username is too long"
+
+            username = sub( str, 1, lastAt - 2 )
+            if username == nil or username == ""
+                return false, "username is missing"
+
+            if find( username, "[%c]" )
+                return false, "invalid characters in username"
+
+            if find( username, "%p%p" )
+                return false, "too many periods in username"
+
+            if byte( username, 1 ) == 0x22 --[[ " ]] and not byte( username, len( username ) ) == 0x22 --[[ " ]]
+                return nil, "invalid usage of quotes"
+
+            return isDomain( sub( str, lastAt, len( str ) ) )
 
     SPACE_BYTES = { 0x20 --[[ space ]], 0x09 --[[ tab ]], 0x0D --[[ cr ]], 0x0A --[[ lf ]] }
     environment.SPACE_BYTES = SPACE_BYTES
