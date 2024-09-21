@@ -3,11 +3,11 @@ import gpm, SERVER from _G
 import environment, Logger from gpm
 import istable, pcall, require, tonumber, tostring from _G
 import math, string, table, os, util, argument, isstring, isnumber, isfunction, throw, type from environment
-import byte, sub, gsub, len, find, format from string
+import byte, sub, gsub, len, find, format, match from string
 import Create, Remove, Simple from environment.timer
 import CRC, IsBinaryModuleInstalled from util
+newClass = environment.class
 import concat from table
-import fdiv from math
 import time from os
 
 do
@@ -278,7 +278,7 @@ do
     import BInt, IsBInt from environment
     import FromBytes, ToBytes, ToNumber, CastSigned from BInt
 
-    util.ByteStream = environment.class(
+    util.ByteStream = newClass(
         "ByteStream",
         {
             __tostring: =>
@@ -726,8 +726,8 @@ do
             return url.scheme .. "/" .. concat( Flip( ByteSplit( lower(url.hostname), 0x2E --[[ . ]] ) ), "/" ) .. lower(url.pathname)
 
     import band, bor, lshift, rshift from environment.bit
-    import match, ByteCount from string
     import isuint, max from math
+    import ByteCount from string
     import sort from table
 
     compare = ( a, b ) ->
@@ -900,7 +900,7 @@ do
         return a > b
 
     local versionClass
-    versionClass = environment.class(
+    versionClass = newClass(
         "Version",
         {
             __tostring: =>
@@ -1167,7 +1167,7 @@ do
     import serialize, deserialize from environment.yaml
     import IsFile, AsyncWrite, Read, Write from environment.file
 
-    environment.Config = environment.class( "Config", {
+    environment.Config = newClass( "Config", {
         new: ( name, defaults, @config_type = "yaml" ) =>
             argument( name, 1, "string" )
             @name = name
@@ -1341,50 +1341,57 @@ do
 
         return nil
 
-    -- https://wiki.facepunch.com/gmod/Enums/TYPE
-    isPlayerAllowed = ( netTransfer, filter, ply ) ->
-        unless filter
-            return true
+    local isPlayerAllowed
+    do
 
-        switch type( filter )
-            when "boolean"
-                return filter
+        import FindMetaTable from util
+        import EntIndex, TestPVS from FindMetaTable( "Entity" )
+        import SteamID64, SteamID, IsBot from FindMetaTable( "Player" )
 
-            when "number"
-                return ply\EntIndex! == filter
+        isPlayerAllowed = ( netTransfer, filter, ply ) ->
+            unless filter
+                return true
 
-            when "string"
-                unless ply\IsBot!
-                    if ply\SteamID64! == filter
-                        return true
+            -- https://wiki.facepunch.com/gmod/Enums/TYPE
+            switch type( filter )
+                when "boolean"
+                    return filter
 
-                    if ply\SteamID! == filter
-                        return true
+                when "number"
+                    return EntIndex( ply ) == filter
 
-                return find( ply\Nick!, filter ) ~= nil
+                when "string"
+                    unless IsBot( ply )
+                        if SteamID64( ply ) == filter
+                            return true
 
-            when "table"
-                for value in *filter
-                    if isPlayerAllowed( netTransfer, value, ply )
-                        return true
+                        if SteamID( ply ) == filter
+                            return true
 
-                return false
+                    return find( ply\Nick!, filter ) ~= nil
 
-            when "function"
-                return filter( netTransfer, ply )
+                when "table"
+                    for value in *filter
+                        if isPlayerAllowed( netTransfer, value, ply )
+                            return true
 
-            when "Entity"
-                return ply == filter
+                    return false
 
-            when "Vector"
-                return ply\TestPVS( filter )
+                when "function"
+                    return filter( netTransfer, ply )
 
-            when "RecipientFilter"
-                return isPlayerAllowed( netTransfer, filter\GetPlayers!, ply )
+                when "Entity"
+                    return ply == filter
 
-        return false
+                when "Vector"
+                    return TestPVS( ply, filter )
 
-    net.Transfer = environment.class(
+                when "RecipientFilter"
+                    return isPlayerAllowed( netTransfer, filter\GetPlayers!, ply )
+
+            return false
+
+    net.Transfer = newClass(
         "NetTransfer",
         {
             __tostring: =>

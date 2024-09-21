@@ -100,14 +100,12 @@ return
                 from table import Equal
 
                 test = ( expected, source, first, last, offset, destination ) ->
-                    print "source:", table.concat( expected, " " )
                     expect( Equal( table.move( source, first, last, offset, destination ), expected ) ).to.beTrue()
-                    PrintTable( source )
 
                 test( { "a" }, { "a", "b", "c" }, 1, 1, 1, {} )
                 test( { "a", "b", "c" }, { "a", "b", "c" }, 2, 3, 2, { "a" } )
                 test( { "a", "b", "c" }, { "a", "b", "c" }, 3, 3, 3, { "a", "b" } )
-                test( { "hello", "hello", "world" }, { "hello", "world" }, 1, 2, 1 )
+                test( { "hello", "hello" }, { "hello", "world" }, 1, 1, 2 )
                 return nil
 
         *   name: "table.copy(...) must copy table"
