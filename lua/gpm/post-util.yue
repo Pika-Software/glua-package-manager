@@ -171,6 +171,144 @@ do
 
 do
 
+    import BInt, IsBInt from environment
+
+    do
+
+        import IsSteamID from string
+        import ToDec from BInt
+        import fdiv from math
+
+        base = BInt( "76561197960265728" )
+
+        unless util.SteamIDTo64
+            util.SteamIDTo64 = ( sid ) ->
+                y, z = match( sid, "^STEAM_[0-5]:([01]):(%d+)$" )
+
+                sid64 = tonumber( z, 10 ) * 2
+                if y == "1"
+                    sid64 += 1
+
+                return ToDec( base + sid64 )
+
+        unless util.SteamIDFrom64
+            zero = BInt.Zero
+            two = BInt.Two
+
+            util.SteamIDFrom64 = ( sid ) ->
+                y = BInt( sid ) - base
+                return "STEAM_0:" .. ( ( y % two == zero ) and "0" or "1" ) .. ":" .. ToDec( y / two )
+
+        import SteamIDTo64, SteamIDFrom64 from util
+
+        metatable = {
+            __tostring: =>
+                return @steamid
+
+            __eq: ( other ) =>
+                return @steamid == tostring( other )
+
+            new: ( str ) =>
+                argument( str, 1, "string" )
+
+                if IsSteamID( str )
+                    @steamid = str
+                else
+                    str = SteamIDFrom64( str )
+                    if str and byte( str, 11 ) ~= 0x2D --[[ - ]]
+                        @steamid = str
+                    else
+                        throw "Invalid SteamID64", 3
+
+                return false, nil
+
+            ToXYZ: =>
+                return match( @steamid, "^STEAM_([0-5]):([01]):(%d+)$" )
+
+            ToIntegers: =>
+                x, y, z = @ToXYZ!
+                return tonumber( x, 10 ), tonumber( y, 10 ), tonumber( z, 10 )
+
+            ToSteamID: =>
+                return @steamid
+
+            ToSteamID64: =>
+                return SteamIDTo64( @steamid )
+
+            ToAccountID: =>
+                y, z = match( @steamid, "^STEAM_[0-5]:([01]):(%d+)$" )
+                return ( tonumber( z, 10 ) * 2 ) + tonumber( y, 10 )
+
+            ToHex: =>
+                return format("0x%x", @ToAccountID! )
+
+            ToSteamID3: =>
+                return format( "[U:1:%d]", @ToAccountID! )
+
+            GetUniverse: =>
+                return tonumber( match( @steamid, "^STEAM_([0-5]):[01]:%d+$" ) or 0, 10 )
+
+            SetUniverse: ( universe ) =>
+                argument( universe, 1, "number" )
+                if universe < 0 or universe > 5
+                    throw( "Invalid SteamID universe", 2 )
+
+                @steamid = "STEAM_" .. universe .. match( @steamid, "^STEAM_[0-5](:[01]:%d+)$" )
+                return @
+
+        }
+
+        environment.SteamID = newClass( "SteamID", metatable, {
+            IsValid: ( steamid ) ->
+                argument( steamid, 1, "string" )
+                return IsSteamID( steamid )
+
+            FromSteamID: ( steamid ) ->
+                argument( steamid, 1, "string" )
+
+                unless IsSteamID( steamid )
+                    throw( "Invalid SteamID", 2 )
+
+                return setmetatable( { :steamid }, metatable )
+
+            FromSteamID64: ( steamid64 ) ->
+                steamid = SteamIDFrom64( tostring( steamid64 ) )
+                if not steamid or byte( str, 11 ) == 0x2D --[[ - ]]
+                    throw( "Invalid SteamID64", 2 )
+
+                return setmetatable( { :steamid }, metatable )
+
+            FromSteamID3: ( sid3 ) ->
+                z = tonumber( match( sid3, "^%[U:%d:(%d+)%]$" ) or -1, 10 )
+                if z < 0
+                    throw( "Invalid SteamID3", 2 )
+
+                return setmetatable( {
+                    steamid: format( "STEAM_0:%s:%d", ( z % 2 == 0 ) and "0" or "1", z / 2 )
+                }, metatable )
+
+            FromHex: ( hex ) ->
+                unless isnumber( hex )
+                    hex = tonumber( hex, 16 )
+
+                argument( hex, 1, "number" )
+
+                if hex < 0
+                    throw( "Invalid hex", 2 )
+
+                return setmetatable( {
+                    steamid: format( "STEAM_0:%s:%d", ( hex % 2 == 0 ) and "0" or "1", fdiv( hex, 2 ) )
+                }, metatable )
+
+            FromAccountID: ( accountid ) ->
+                argument( accountid, 1, "number" )
+
+                return setmetatable( {
+                    steamid: format( "STEAM_0:%s:%d", ( accountid % 2 == 0 ) and "0" or "1", fdiv( accountid, 2 ) )
+                }, metatable )
+        } )
+
+
     import struct from environment
     import io from struct
 
@@ -275,7 +413,6 @@ do
         @position = position
         return position
 
-    import BInt, IsBInt from environment
     import FromBytes, ToBytes, ToNumber, CastSigned from BInt
 
     util.ByteStream = newClass(
