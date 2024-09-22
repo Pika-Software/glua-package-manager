@@ -3,9 +3,6 @@ from gpm import environment, string, RuntimeError, FutureError, FutureCancelErro
 from gpm import throw, iserror, isstring, isnumber, isthread, isfunction, tostring, type, getmetatable, xpcall, pcall
 from string import match
 
--- these functions are not in camelCase, just because I like them this way :p
-{ create: coroutine_create, resume: coroutine_resume, running: coroutine_running, status: coroutine_status, yield: coroutine_yield } = _G.coroutine
-
 
 futures = environment.futures
 unless futures
@@ -20,8 +17,7 @@ listeners = futures.listeners
 ACTION_RUN = futures.ACTION_RUN = 1 -- runs async thread in background
 ACTION_ITERATE = futures.ACTION_ITERATE = 2 -- iterates async thread until first yield or return
 ACTION_CANCEL = futures.ACTION_CANCEL = 3 -- cancels async thread
-ACTION_RESUME = futures.ACTION_RESUME = 4 -- resumes async thread
-ACTION_CONTINUE = futures.ACTION_CONTINUE = 5 -- continues async thread execution after pending it
+ACTION_WAKEUP = futures.ACTION_WAKEUP = 4 -- continues async thread execution after pending it
 
 RESULT_FINISHED = futures.RESULT_FINISHED = 6 -- async thread finished
 RESULT_FAILED = futures.RESULT_FAILED = 7 -- used in case if main thread is awaiting for async thread to finish (only used internally, function listeners should not recieve this)
@@ -29,6 +25,44 @@ RESULT_PENDING = futures.RESULT_PENDING = 8 -- marks that async thread is waitin
 RESULT_YIELDING = futures.RESULT_YIELDING = 9 -- marks that async thread is yielding
 RESULT_CANCELLED = futures.RESULT_CANCELLED = 10 -- marks that async thread execution was cancelled
 
+
+-- low level API to control coroutines
+-- also allows to use coroutines symmetricaly
+coro = futures.coro = {}
+
+coroCreate = coro.create = coroutine.create
+coroStatus = coro.status = coroutine.status
+coroRunning = coro.running = coroutine.running
+coroResume = coro.resume = coroutine.resume
+coroYield = coro.yield = coroutine.yield
+
+-- transforms RESULT_FAILED into error
+handleTransfer = ( ok, value, ... ) ->
+    if ok and value == RESULT_FAILED
+        return false, ...
+    
+    return ok, value, ...
+
+-- low level API for symmetrically transfering data between coroutines
+-- if thread == nil then coro.yield(...) is called
+coroTransfer = coro.transfer = ( thread, ... ) ->
+    status = thread and coroStatus( thread ) or "normal"
+    if status == "normal" -- probably thread resumed us, just return result
+        return handleTransfer( true, coroYield( ... ) )
+    
+    if status == "suspended" -- thread is waiting for us to resume it
+        return handleTransfer( coroResume( thread, ... ) )
+    
+    if status == "dead"
+        return false, FutureError( "coro.transfer(...): thread '#{thread}' is dead, unable to transfer data to it" )
+
+    if status == "running"
+        return false, FutureError( "coro.transfer(...): running == thread" )
+
+    return false, FutureError( "coro.transfer(...): unknown status '#{status}' for thread '#{thread}'" )
+
+
+isCancel = ( err ) -> iserror( err, "FutureCancelError" )
 
 transformError = ( err ) ->
     if isnumber( err )
@@ -45,38 +79,256 @@ transformError = ( err ) ->
 
     return err
 
-handleError = ( err, transform, noThrow ) ->
-    if transform
-        err = transformError( err )
-
-    if noThrow
-        if iserror( err )
-            return err\display()
-        
-        return RuntimeError.display( err )
+displayError = ( err ) ->
+    if iserror( err )
+        return err\display()
     
-    isCancel = iserror( err, "FutureCancelError" )
+    return RuntimeError.display( err )
 
-    current = coroutine_running()
-    listener = current and listeners[ current ]
-    if listener
-        if isthread( listener ) and coroutine_status( listener ) == "suspended"
-            unless ok, err := coroutine_resume( listener, RESULT_FAILED, err )
-                return throw err
 
-        if isfunction( listener )
-            if isCancel
-                return listener( current, true, RESULT_CANCELLED, err )
-            else
-                return listener( current, false, err )
+asyncBackgroundThread = ( silent, ok, err ) ->
+    if not silent and not ok
+        return displayError( err )
+    
+    return RESULT_FINISHED
 
-    if isCancel
-        return RESULT_CANCELLED, err
+asyncIteratableThread = ( ok, value, ... ) ->
+    current = coroRunning()
+    listener = listeners[ current ]
 
-    return throw err
+    result = ok and RESULT_FINISHED or RESULT_FAILED
 
-internalError = ( err, noThrow ) ->
-    return handleError( FutureError(err, nil, nil, 4), true, noThrow )
+    if not ok and iserror( value, "FutureCancelError" )
+        ok = true
+        result = RESULT_CANCELLED
+
+    if isthread( listener )
+        status = coroStatus( listener )
+
+        if status == "normal"
+            return result, value, ...
+
+        if status == "suspended"
+            coroResume( listener, result, value, ... )
+            return
+        
+        if status == "dead" or status == "running"
+            displayError( FutureError( "listener '#{listener}' is dead/running, cannot return result" ) )
+            return
+    
+    if isfunction( listener )
+        unless ok
+            listener( current, false, value, ... )
+        else
+            listener( current, true, result, value, ... )
+        
+        return
+    
+    displayError( FutureError( "async function in thread '#{current}' has invalid listener '#{listener}'" ) )
+    return
+
+asyncThread = ( fn, ... ) ->
+    action, value = coroYield()
+    if action == ACTION_RUN
+        -- run async thread in background, and display error unless specified to be silent
+        return asyncBackgroundThread(
+            value == nil and true or value, -- silent (currently unvailable to use)
+            xpcall( fn, transformError, ... ) -- ok, err
+        )
+    
+    if action == ACTION_ITERATE
+        unless isthread( value ) or isfunction( value )
+            throw transformError( FutureError "async function '#{fn}' was started with invalid listener '#{value}'"  )
+
+        listeners[ coroRunning() ] = value
+        return asyncIteratableThread( xpcall( fn, transformError, ... ) )
+    
+    if action == ACTION_CANCEL
+        return RESULT_CANCELLED, value or FutureCancelError()
+
+    throw transformError( FutureError "async function '#{fn}' was started with invalid action '#{action}'" )
+    return
+
+
+environment.async = futures.async = ( fn ) ->
+    return ( ... ) ->
+        thread = coroCreate( asyncThread )
+        
+        unless ok, err := coroResume( thread, fn, ... )
+            return throw err
+        
+        return thread
+
+
+futures.run = ( thread, callback ) ->
+    unless isthread( thread )
+        return throw TypeError "run(...) expects a thread, got #{type( thread )}"
+
+    if callback
+        unless isfunction( callback )
+            return throw TypeError "run(...) expects a function as a callback, got #{type( callback )}"
+
+        coroResume( thread, ACTION_ITERATE, callback )
+        return
+
+    coroResume( thread, ACTION_RUN )
+    return
+
+
+yieldInner = ( current, listener, ok, action, value, ... ) ->
+    unless ok
+        if isCancel( action )
+            return throw action
+
+        -- error happened in async thread
+        -- so async thread must handle it, not us
+        return throw FutureCancelError("unexpected error happened in async thread")
+
+    if action == ACTION_ITERATE
+        if value and listener != value
+            listeners[ current ] = value -- each iteration can have different listener
+
+        return ...
+
+    if action == ACTION_CANCEL
+        -- listener cancelled us :(((
+        throw value or FutureCancelError()
+
+    return throw FutureError "unexpected action '#{action}' from listener '#{listener}'"
+
+environment.yield = futures.yield = ( ... ) ->
+    current = coroRunning()
+    unless current
+        return throw FutureError "yield(...) cannot be called outside of async function"
+
+    listener = listeners[ current ]
+    if isthread( listener )
+        return yieldInner( current, listener, coroTransfer( listener, RESULT_YIELDING, ... ) )
+    
+    if isfunction( listener )
+        return listener( current, true, RESULT_YIELDING, ... )
+    
+    return throw FutureError "yield(...) was called, but listener is invalid ('#{listener}')"
+
+
+futures.cancel = ( thread ) ->
+    current = coroRunning()
+    unless current
+        return throw FutureError "cancel(...) cannot be called outside of async function"
+
+    unless isthread( thread )
+        meta = getmetatable( thread )
+        if meta and meta.__acancel
+            return meta.__acancel( thread, current )
+
+        return throw TypeError "cancel(...) expects a thread, got '#{thread}'"
+    
+    ok = coroTransfer( thread, ACTION_CANCEL, FutureCancelError() )
+    return ok
+
+
+anextInner = ( ok, result, ... ) ->
+    unless ok
+        return throw result
+    
+    if result == RESULT_YIELDING
+        return ...
+
+    if result == RESULT_FINISHED or result == RESULT_CANCELLED
+        return -- end of iteration
+    
+    if result == RESULT_PENDING
+        return anextInner( coroTransfer( nil, RESULT_PENDING ) )
+    
+    throw FutureError "unexpected result '#{result}' in anext(...)"
+    return
+
+anext = environment.anext = futures.anext = ( thread, ... ) ->
+    current = coroRunning()
+    unless current
+        return throw FutureError "anext(...) cannot be called outside of async function"
+
+    unless isthread( thread )
+        -- support for custom defined async iterators
+        meta = getmetatable( thread )
+        if meta and meta.__aiter
+            return meta.__aiter( thread, current )
+
+        return throw TypeError "anext(...) expects a thread, got '#{thread}'"
+    
+    return anextInner( coroTransfer( thread, ACTION_ITERATE, current, ... ) )
+
+environment.apairs = futures.apairs = ( thread, ... ) -> return anext, thread, ...
+
+
+awaitInner = ( thread, ok, result, ... ) ->
+    unless ok
+        return throw result
+    
+    if result == RESULT_FINISHED
+        return ...
+
+    if result == RESULT_PENDING
+        return awaitInner( thread, coroTransfer( nil, RESULT_PENDING ) )
+
+    if result == RESULT_CANCELLED
+        return
+    
+    if result == RESULT_YIELDING
+        futures.cancel( thread ) -- cancel async generator, it is misused
+        return throw FutureError "unable await(...) async generator"
+    
+    throw FutureError "unexpected result '#{result}' in await(...)"
+    return
+
+await = environment.await = futures.await = ( thread ) ->
+    current = coroRunning()
+    unless current
+        return throw FutureError "await(...) cannot be called outside of async function"
+
+    unless isthread( thread )
+        -- support for custom defined awaitables
+        meta = getmetatable( thread )
+        if meta and meta.__await
+            return meta.__await( thread, current )
+
+        return throw TypeError "await(...) expects a thread, got '#{thread}'"
+    
+    return awaitInner( thread, coroTransfer( thread, ACTION_ITERATE, current ) )
+
+environment.pawait = futures.pawait = ( thread ) -> return pcall( await, thread )
+
+
+isawaitable = environment.isawaitable = futures.isawaitable = ( any ) ->
+    if isthread( any )
+        return true
+    
+    meta = getmetatable( any )
+    return meta and meta.__await
+
+
+-- Suspends current coroutine until futures.continue(...) is called
+-- Used internally by Future
+pending = futures.pending = ->
+    unless coroRunning()
+        return throw FutureError "futures.pending() cannot be called outside of async function"
+
+    action, value = coroYield( RESULT_PENDING )
+    if action == ACTION_CANCEL
+        return throw value or FutureCancelError()
+    
+    if action == ACTION_WAKEUP
+        return value
+    
+    throw FutureError "unexpected action '#{action}' in futures.pending(...)"
+
+-- Resumes coroutine that was waiting with futures.pending(...)
+-- You also can optionally pass a value to it
+-- Used internally by Future
+wakeup = futures.wakeup = ( thread, value ) ->
+    coroResume( thread, ACTION_WAKEUP, value )
+    return
+
 
 do
     FUTURE_STATE_PENDING = 1
@@ -90,7 +342,7 @@ do
         
         @_callbacks = []
         for fn in *callbacks
-            xpcall( fn, RuntimeError.display, @ )
+            xpcall( fn, displayError, @ )
     
     done = => @_state != FUTURE_STATE_PENDING
     cancelled = => @_state == FUTURE_STATE_CANCELLED
@@ -106,40 +358,11 @@ do
         
         return @_result
 
-    cancel = =>
-        if done( @ )
-            return false
-        
-        @_state = FUTURE_STATE_CANCELLED
-        _runCallbacks( @ )
-        return true
-
     addCallback = ( fn ) =>
         if done( @ )
             xpcall( fn, RuntimeError.display, @ )
         else
             @_callbacks[] = fn
-
-    __aiter = ( current ) =>
-        unless done( @ )
-            addCallback( @, ->
-                unless ok, err := coroutine_resume( current, ACTION_CONTINUE )
-                    -- if thread has thrown an error
-                    -- it must handle it, so we do not need to do anything
-                    return
-            )
-
-            action = coroutine_yield( RESULT_PENDING )
-            if action != ACTION_CONTINUE
-                if action == ACTION_CANCEL
-                    return throw FutureCancelError()
-
-                return internalError( "unexpected action '#{action}' in await( Future ... )" )
-
-        unless done( @ )
-            throw InvalidStateError "future is not finished even after it's state changed???"
-        
-        return result( @ )
 
     Future = environment.Future = futures.Future = environment.class( "Future", {
         :FUTURE_STATE_PENDING
@@ -182,6 +405,14 @@ do
             _runCallbacks( @ )
             return
         
+        cancel: =>
+            if done( @ )
+                return false
+            
+            @_state = FUTURE_STATE_CANCELLED
+            _runCallbacks( @ )
+            return true
+        
         removeCallback: ( fn ) =>
             callbacks = []
             for cb in *@_callbacks
@@ -189,256 +420,23 @@ do
                     callbacks[] = cb
             @_callbacks = callbacks
     
-        __aiter: __aiter
-        __await: __aiter
-        __acancel: cancel
+        __await: ( current ) =>
+            unless done( @ )
+                addCallback( @, -> wakeup( current ) )
+                pending()
+
+            unless done( @ )
+                throw InvalidStateError "future is not finished even after it's state changed???"
+            
+            return result( @ )
+
+        __acancel: =>
+            return @\cancel()
     } )
 
     environment.isfuture = futures.IsFuture = ( any ) ->
         metatable = getmetatable( any )
         return metatable and metatable.__class == Future
-
-
-asyncBackgroundThread = ( silent, ok, err ) ->
-    unless ok
-        return handleError( err, false, silent )
-    
-    return RESULT_FINISHED
-
-asyncIteratableThread = ( ok, value, ... ) ->
-    unless ok
-        return handleError( value )
-    
-    current = coroutine_running()
-    listener = listeners[ current ]
-    if isthread( listener )
-        status = coroutine_status( listener )
-        if status == "normal"
-            return RESULT_FINISHED, value, ...
-
-        if status == "suspended"
-            ok, value = coroutine_resume( listener, RESULT_FINISHED, value, ... )
-            if ok and value == ACTION_ITERATE
-                ok, value = coroutine_resume( listener, RESULT_FINISHED ) -- if apairs is waiting for us, tell it's done
-
-            unless ok
-                return handleError( value, true, true )
-
-            return
-        
-        if status == "dead" or status == "running"
-            return handleError( FutureError( "listener '#{listener}' is dead/running, cannot return result" ), true )
-    
-    if isfunction( listener )
-        return RESULT_FINISHED, listener( current, true, RESULT_FINISHED, value, ... )
-
-    internalError( "async function in thread '#{current}' has invalid listener '#{listener}'" )
-    return
-
-asyncThread = ( fn, ... ) ->
-    action, value = coroutine_yield()
-    if action == ACTION_RUN
-        -- run async thread in background, and display error unless specified to be silent
-        return asyncBackgroundThread(
-            value == nil and true or value, -- silent
-            xpcall( fn, transformError, ... ) -- ok, err
-        )
-    
-    if action == ACTION_ITERATE
-        unless isthread( value ) or isfunction( value )
-            internalError( "async function '#{fn}' was started with invalid listener '#{value}'" )
-
-        listeners[ coroutine_running() ] = value
-        return asyncIteratableThread( xpcall( fn, transformError, ... ) )
-    
-    if action == ACTION_CANCEL
-        return RESULT_CANCELLED, FutureCancelError()
-
-    internalError( "async function '#{fn}' was started with invalid action '#{action}'" )
-    return
-
-
-environment.async = futures.async = ( fn ) ->
-    return ( ... ) ->
-        thread = coroutine_create( asyncThread )
-        
-        unless ok, err := coroutine_resume( thread, fn, ... )
-            return handleError( err, true )
-        
-        return thread
-
-
-futures.run = ( thread, callback ) ->
-    unless isthread( thread )
-        return throw TypeError "run(...) expects a thread, got #{type( thread )}"
-    
-    if callback and not isfunction( callback )
-        return throw TypeError "run(...) expects a function as a callback, got #{type( callback )}"
-
-    if callback
-        return coroutine_resume( thread, ACTION_ITERATE, callback )
-    else
-        return coroutine_resume( thread, ACTION_RUN )
-
-
-yieldInner = ( listener, ok, action, value ) ->
-    unless ok
-        -- error happened in listner, we don't care about it
-        -- it must be handled by listener itself
-        return -- maybe handleError( result, true, true )?
-
-    if action == ACTION_ITERATE
-        -- value here is listener
-        -- value is ignore here because listener already
-        -- set in listeners table on async function initialization
-        return
-    
-    if action == ACTION_CANCEL
-        -- listener cancelled us :(((
-        throw value or FutureCancelError()
-
-    internalError( "unexpected result from '#{listener}' in yield(...): #{result}" )
-    return
-
-environment.yield = futures.yield = ( ... ) ->
-    current = coroutine_running()
-    unless current
-        return throw FutureError "yield(...) cannot be called outside of async function"
-
-    listener = listeners[ current ]
-    if isthread( listener )
-        status = coroutine_status( listener )
-        if status == "normal" -- listener resumed us, just return result
-            return yieldInner( listener, true, coroutine_yield( RESULT_YIELDING, ... ) )
-        
-        if status == "suspended" -- listener is waiting for us to resume it
-            return yieldInner( listener, coroutine_resume( listener, RESULT_YIELDING, ... ) )
-
-        if status == "dead" -- something bad happened to listener, we cannot continue operating
-            internalError( "async listener '#{listener}' is dead, cannot yield(...)" )
-        
-        if status == "running" -- listener has resumed itself (he succeded in that, what??? how???)
-            internalError( "resuming myself is impossible (current: '#{current}' == listener: '#{listener}')" )
-
-        return
-    
-    if isfunction( listener )
-        return listener( current, true, RESULT_YIELDING, ... )
-    
-    internalError( "yield(...) was called, but listener is invalid ('#{listener}')" )
-    return
-
-
-futures.cancel = ( thread ) ->
-    current = coroutine_running()
-    unless current
-        return error FutureError "cancel(...) cannot be called outside of async function"
-
-    unless isthread( thread )
-        meta = getmetatable( thread )
-        if meta and meta.__acancel
-            return meta.__acancel( thread, current )
-
-        return error TypeError "cancel(...) expects a thread, got #{type( thread )}"
-    
-    threadStatus = coroutine_status( thread )
-    if threadStatus == "normal" -- just return cancel action to async thread
-        result, value = coroutine_yield( ACTION_CANCEL )
-        if result == RESULT_FAILED
-            handleError( value, true, true)
-            return false
-        
-        return true
-    
-    if threadStatus == "suspended" -- resume async to tell it must be cancelled >:)s
-        unless ok, err := coroutine_resume( thread, ACTION_CANCEL )
-            handleError( err, true, true )
-            return false
-
-        return true
-
-    -- thread is dead or running, we cannot cancel it
-    return false
-
-
-resumeThreadInner = ( thread, current, ok, result, ... ) ->
-    -- error happened in async thread
-    unless ok
-        return throw result
-    
-    -- async thread returned successful result synchronously, just return it
-    if result == RESULT_FINISHED or result == RESULT_YIELDING
-        return ...
-    
-    -- async thread has some task to do, so let it resume us when it's done
-    if result == RESULT_PENDING
-        return resumeThreadInner( thread, current, true, coroutine_yield( RESULT_PENDING ) )
-    
-    -- error happened asynchronously and async thread forwared it to us
-    if result == RESULT_FAILED -- rare case when async thread failed
-        return throw ..., nil
-
-    -- thread was cancelled, just return
-    if result == RESULT_CANCELLED
-        return
-
-    return internalError( "unknown result from #{thread} in await(...)/anext(...): #{result}" )
-
-resumeThread = ( thread, current ) ->
-    threadStatus = coroutine_status( thread )
-    if threadStatus == "normal" -- thread must be resuming current thread
-        return resumeThreadInner( thread, current, true, coroutine_yield( ACTION_ITERATE, current ) )
-
-    if threadStatus == "suspended" -- just resume thread and handle its result
-        return resumeThreadInner( thread, current, coroutine_resume( thread, ACTION_ITERATE, current ) )
-
-    if threadStatus == "running"
-        return internalError( "resuming myself is impossible, aka await( coroutine.running() ) ('#{thread}')" )
-
-
-anext = environment.anext = futures.anext = ( thread ) ->
-    current = coroutine_running()
-    unless current
-        return error FutureError "anext(...) cannot be called outside of async function"
-
-    unless isthread( thread )
-        -- support for custom defined async iterators
-        meta = getmetatable( thread )
-        if meta and meta.__aiter
-            return meta.__aiter( thread, current )
-
-        return error TypeError "anext(...) expects a thread, got #{type( thread )}"
-    
-    return resumeThread( thread, current )
-
-
-environment.apairs = futures.apairs = ( thread ) -> return anext, thread
-
-
-isawaitable = environment.isawaitable = futures.isawaitable = ( any ) ->
-    if isthread( any )
-        return true
-    
-    meta = getmetatable( any )
-    return meta and meta.__await
-
-await = environment.await = futures.await = ( thread ) ->
-    current = coroutine_running()
-    unless current
-        return error FutureError "await(...) cannot be called outside of async function"
-
-    unless isthread( thread )
-        -- support for custom defined awaitables
-        meta = getmetatable( thread )
-        if meta and meta.__await
-            return meta.__await( thread, current )
-
-        return error TypeError "await(...) expects a thread, got #{type( thread )}"
-    
-    return resumeThread( thread, current )
-
-
-environment.pawait = futures.pawait = ( thread ) -> return pcall( await, thread )
 
 
 do
@@ -472,10 +470,10 @@ do
                 
                 if result == RESULT_YIELDING
                     cancelThread( thread )
-                    return setResult( @, ... )
+                    return setError( @, FutureError "Task(...) unable to wait for async generator result" )
                 
                 if result == RESULT_CANCELLED
-                    return cancel( @ )
+                    return cancelFuture( @ )
                 
                 setError( @, FutureError( "unexpected result '#{result}' from thread '#{thread}'" ) )
             )
