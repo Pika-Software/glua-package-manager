@@ -9,7 +9,9 @@ import rshift, band from _G.bit
 import min, max from _G.math
 import getinfo from _G.debug
 
+-- constants
 environment.FCVAR_HIDDEN = 16
+environment.TYPE_COLOR = 255
 
 :isbool, :isnumber, :isstring, :isfunction = _G
 
@@ -753,6 +755,7 @@ do
         "CMoveData": 17
         "CRecipientFilter": 18
         "CUserCmd": 19
+        -- empty: 20
         "IMaterial": 21
         "Panel": 22
         "CLuaParticle": 23
@@ -1771,6 +1774,18 @@ do
 
     import system, jit, require from _G
     import Exists from _G.file
+
+    -- ULib support ( I really don't like this )
+    if Exists( "ulib/shared/hook.lua", "LUA" )
+        ok, f = _G.pcall( _G.CompileFile, "ulib/shared/hook.lua" )
+        if ok and f
+            _G.pcall( f )
+
+    environment.PRE_HOOK = _G.PRE_HOOK or -2
+    environment.PRE_HOOK_RETURN = _G.PRE_HOOK_RETURN or -1
+    environment.NORMAL_HOOK = _G.NORMAL_HOOK or 0
+    environment.POST_HOOK_RETURN = _G.POST_HOOK_RETURN or 1
+    environment.POST_HOOK = _G.POST_HOOK or 2
 
     isEdge = jit.versionnum ~= 20004
     is32 = jit.arch == "x86"
