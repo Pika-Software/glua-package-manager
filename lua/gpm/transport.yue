@@ -1,6 +1,6 @@
 _G = _G
 import gpm from _G
-import Logger from gpm
+import environment, Logger from gpm
 
 if _G.SERVER
 
@@ -15,15 +15,14 @@ if _G.SERVER
 
         return nil
 
-    selected = transport[ _G.CreateConVar( "gpm_lua_transport", "legacy", _G.FCVAR_ARCHIVE, "Selected Lua transport" ) ] or transport.net
+    selected = transport[ _G.CreateConVar( "gpm_lua_transport", "legacy", _G.FCVAR_ARCHIVE, "Selected Lua transport" )\GetString! ] or transport.legacy
 
     _G.cvars.AddChangeCallback( "gpm_lua_transport", ( _, __, str ) ->
-        selected = transport[ str ] or transport.net
+        selected = transport[ str ] or transport.legacy
     "gLua Package Manager::Lua Transport:" )
 
-    gpm.AddCSLuaFile = ( filePath ) ->
+    gpm.SendFile = ( filePath ) ->
         Logger\Debug( "Sending file '".. filePath .. "' to client..." )
         return selected( filePath )
-
--- if _G.CLIENT
-
+else
+    gpm.SendFile = environment.debug.fempty

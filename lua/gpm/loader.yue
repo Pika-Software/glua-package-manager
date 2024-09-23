@@ -1,6 +1,6 @@
 _G = _G
 import CLIENT, SERVER, gpm, pcall from _G
-import environment, AddCSLuaFile from gpm
+import environment, SendFile from gpm
 
 import async, await, debug, string, path, file, util, pairs, isurl, isstring, argument, URL, ModuleError, error, PackageError, Future, Task from environment
 import getDirectory, getExtension, replaceExtension from path
@@ -32,7 +32,7 @@ if SERVER
         for index = 1, #files
             fileName = files[ index ]
             if LuaExtensions[ getExtension( fileName, false ) ]
-                AddCSLuaFile( basePath .. replaceExtension( fileName, "lua" ) )
+                SendFile( basePath .. replaceExtension( fileName, "lua" ) )
             else
                 error "Attept to send non-lua file '" .. basePath .. fileName .. "'.", 2
 
@@ -69,11 +69,7 @@ if SERVER
         addFilePath( filePath, gamePath )
         return nil
 
-else
-
-    addcsluafile = environment.debug.fempty
-
-environment.AddCSLuaFile = addcsluafile
+environment.AddCSLuaFile = addcsluafile or debug.fempty
 
 :loader = gpm
 unless istable( loader )
@@ -230,7 +226,7 @@ do
                 return nil
 
             if gamePath == LuaPath
-                AddCSLuaFile( replaceExtension( filePath, "lua" ) )
+                SendFile( replaceExtension( filePath, "lua" ) )
 
             return packageClass( URL( AbsoluteGamePath( filePath, gamePath ), "file:///" ), info )
 

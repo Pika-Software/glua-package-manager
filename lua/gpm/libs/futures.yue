@@ -40,7 +40,7 @@ coroYield = coro.yield = coroutine.yield
 handleTransfer = ( ok, value, ... ) ->
     if ok and value == RESULT_FAILED
         return false, ...
-    
+
     return ok, value, ...
 
 -- low level API for symmetrically transfering data between coroutines
@@ -49,10 +49,10 @@ coroTransfer = coro.transfer = ( thread, ... ) ->
     status = thread and coroStatus( thread ) or "normal"
     if status == "normal" -- probably thread resumed us, just return result
         return handleTransfer( true, coroYield( ... ) )
-    
+
     if status == "suspended" -- thread is waiting for us to resume it
         return handleTransfer( coroResume( thread, ... ) )
-    
+
     if status == "dead"
         return false, FutureError( "coro.transfer(...): thread '#{thread}' is dead, unable to transfer data to it" )
 
@@ -82,14 +82,14 @@ transformError = ( err ) ->
 displayError = ( err ) ->
     if iserror( err )
         return err\display()
-    
+
     return RuntimeError.display( err )
 
 
 asyncBackgroundThread = ( silent, ok, err ) ->
     if not silent and not ok
         return displayError( err )
-    
+
     return RESULT_FINISHED
 
 asyncIteratableThread = ( ok, value, ... ) ->
@@ -111,19 +111,19 @@ asyncIteratableThread = ( ok, value, ... ) ->
         if status == "suspended"
             coroResume( listener, result, value, ... )
             return
-        
+
         if status == "dead" or status == "running"
             displayError( FutureError( "listener '#{listener}' is dead/running, cannot return result" ) )
             return
-    
+
     if isfunction( listener )
         unless ok
             listener( current, false, value, ... )
         else
             listener( current, true, result, value, ... )
-        
+
         return
-    
+
     displayError( FutureError( "async function in thread '#{current}' has invalid listener '#{listener}'" ) )
     return
 
@@ -135,14 +135,14 @@ asyncThread = ( fn, ... ) ->
             value == nil and true or value, -- silent (currently unvailable to use)
             xpcall( fn, transformError, ... ) -- ok, err
         )
-    
+
     if action == ACTION_ITERATE
         unless isthread( value ) or isfunction( value )
             throw transformError( FutureError "async function '#{fn}' was started with invalid listener '#{value}'"  )
 
         listeners[ coroRunning() ] = value
         return asyncIteratableThread( xpcall( fn, transformError, ... ) )
-    
+
     if action == ACTION_CANCEL
         return RESULT_CANCELLED, value or FutureCancelError()
 
@@ -153,10 +153,10 @@ asyncThread = ( fn, ... ) ->
 environment.async = futures.async = ( fn ) ->
     return ( ... ) ->
         thread = coroCreate( asyncThread )
-        
+
         unless ok, err := coroResume( thread, fn, ... )
             return throw err
-        
+
         return thread
 
 
@@ -204,10 +204,10 @@ environment.yield = futures.yield = ( ... ) ->
     listener = listeners[ current ]
     if isthread( listener )
         return yieldInner( current, listener, coroTransfer( listener, RESULT_YIELDING, ... ) )
-    
+
     if isfunction( listener )
         return listener( current, true, RESULT_YIELDING, ... )
-    
+
     return throw FutureError "yield(...) was called, but listener is invalid ('#{listener}')"
 
 
@@ -222,7 +222,7 @@ futures.cancel = ( thread ) ->
             return meta.__acancel( thread, current )
 
         return throw TypeError "cancel(...) expects a thread, got '#{thread}'"
-    
+
     ok = coroTransfer( thread, ACTION_CANCEL, FutureCancelError() )
     return ok
 
@@ -230,16 +230,16 @@ futures.cancel = ( thread ) ->
 anextInner = ( ok, result, ... ) ->
     unless ok
         return throw result
-    
+
     if result == RESULT_YIELDING
         return ...
 
     if result == RESULT_FINISHED or result == RESULT_CANCELLED
         return -- end of iteration
-    
+
     if result == RESULT_PENDING
         return anextInner( coroTransfer( nil, RESULT_PENDING ) )
-    
+
     throw FutureError "unexpected result '#{result}' in anext(...)"
     return
 
@@ -255,7 +255,7 @@ anext = environment.anext = futures.anext = ( thread, ... ) ->
             return meta.__aiter( thread, current )
 
         return throw TypeError "anext(...) expects a thread, got '#{thread}'"
-    
+
     return anextInner( coroTransfer( thread, ACTION_ITERATE, current, ... ) )
 
 environment.apairs = futures.apairs = ( thread, ... ) -> return anext, thread, ...
@@ -264,7 +264,7 @@ environment.apairs = futures.apairs = ( thread, ... ) -> return anext, thread, .
 awaitInner = ( thread, ok, result, ... ) ->
     unless ok
         return throw result
-    
+
     if result == RESULT_FINISHED
         return ...
 
@@ -273,11 +273,11 @@ awaitInner = ( thread, ok, result, ... ) ->
 
     if result == RESULT_CANCELLED
         return
-    
+
     if result == RESULT_YIELDING
         futures.cancel( thread ) -- cancel async generator, it is misused
         return throw FutureError "unable await(...) async generator"
-    
+
     throw FutureError "unexpected result '#{result}' in await(...)"
     return
 
@@ -293,7 +293,7 @@ await = environment.await = futures.await = ( thread ) ->
             return meta.__await( thread, current )
 
         return throw TypeError "await(...) expects a thread, got '#{thread}'"
-    
+
     return awaitInner( thread, coroTransfer( thread, ACTION_ITERATE, current ) )
 
 environment.pawait = futures.pawait = ( thread ) -> return pcall( await, thread )
@@ -302,7 +302,7 @@ environment.pawait = futures.pawait = ( thread ) -> return pcall( await, thread 
 isawaitable = environment.isawaitable = futures.isawaitable = ( any ) ->
     if isthread( any )
         return true
-    
+
     meta = getmetatable( any )
     return meta and meta.__await
 
@@ -316,10 +316,10 @@ pending = futures.pending = ->
     action, value = coroYield( RESULT_PENDING )
     if action == ACTION_CANCEL
         return throw value or FutureCancelError()
-    
+
     if action == ACTION_WAKEUP
         return value
-    
+
     throw FutureError "unexpected action '#{action}' in futures.pending(...)"
 
 -- Resumes coroutine that was waiting with futures.pending(...)
@@ -339,11 +339,11 @@ do
         callbacks = @_callbacks
         unless callbacks
             return
-        
+
         @_callbacks = []
         for fn in *callbacks
             xpcall( fn, displayError, @ )
-    
+
     done = => @_state != FUTURE_STATE_PENDING
     cancelled = => @_state == FUTURE_STATE_CANCELLED
 
@@ -355,7 +355,7 @@ do
 
         if @_error
             return throw( @_error )
-        
+
         return @_result
 
     addCallback = ( fn ) =>
@@ -384,13 +384,13 @@ do
                 throw InvalidStateError "future was cancelled"
             elseif @_state != FUTURE_STATE_FINISHED
                 throw InvalidStateError "future is not finished yet"
-            
+
             return @_error
 
         setResult: ( result ) =>
             if @_state != FUTURE_STATE_PENDING
                 throw InvalidStateError "future is already finished"
-            
+
             @_result = result
             @_state = FUTURE_STATE_FINISHED
             _runCallbacks( @ )
@@ -399,27 +399,27 @@ do
         setError: ( err ) =>
             if @_state != FUTURE_STATE_PENDING
                 throw InvalidStateError "future is already finished"
-            
+
             @_error = err
             @_state = FUTURE_STATE_FINISHED
             _runCallbacks( @ )
             return
-        
+
         cancel: =>
             if done( @ )
                 return false
-            
+
             @_state = FUTURE_STATE_CANCELLED
             _runCallbacks( @ )
             return true
-        
+
         removeCallback: ( fn ) =>
             callbacks = []
             for cb in *@_callbacks
                 if cb != fn
                     callbacks[] = cb
             @_callbacks = callbacks
-    
+
         __await: ( current ) =>
             unless done( @ )
                 addCallback( @, -> wakeup( current ) )
@@ -427,7 +427,7 @@ do
 
             unless done( @ )
                 throw InvalidStateError "future is not finished even after it's state changed???"
-            
+
             return result( @ )
 
         __acancel: =>
@@ -464,22 +464,22 @@ do
             run( thread, ( thread, ok, result, ... ) ->
                 unless ok
                     return setError( @, result )
-                
+
                 if result == RESULT_FINISHED
                     return setResult( @, ... )
-                
+
                 if result == RESULT_YIELDING
                     cancelThread( thread )
                     return setError( @, FutureError "Task(...) unable to wait for async generator result" )
-                
+
                 if result == RESULT_CANCELLED
                     return cancelFuture( @ )
-                
+
                 setError( @, FutureError( "unexpected result '#{result}' from thread '#{thread}'" ) )
             )
 
             return
-        
+
         :cancel
 
         getThread: => return @_thread
@@ -507,9 +507,9 @@ do
                 @_putp += 1
                 @_queue[ @_putp ] = value
                 return true
-            
+
             return false
-        
+
         -- Gets value from queue, returns nil if queue is empty
         get: =>
             if @_getp != @_putp -- only do anything if queue is not empty
@@ -520,9 +520,9 @@ do
                 if @_getp == @_putp -- if queue is empty, reset pointers
                     @_getp = 0
                     @_putp = 0
-                
+
                 return value
-        
+
         -- Returns size of the queue
         size: => @_putp - @_getp
         -- Returns true if queue is empty
@@ -539,7 +539,7 @@ do
             @_setters = BasicQueue()
             @_closed = false
             @_maxSize = maxSize
-        
+
         qsize: => @_queue\size()
         empty: => @_queue\empty()
 
@@ -547,7 +547,7 @@ do
         full: =>
             if @_maxSize == 0
                 return false
-            
+
             return @qsize() >= @_maxSize
 
         -- Puts value into queue, return true if successfull, false if queue is full
@@ -558,17 +558,17 @@ do
             if @_queue\put( value )
                 if getter := @_getters\get()
                     wakeup( getter )
-                
+
                 return true
 
             return false
 
         -- Returns value from the queue (basically pops it)
         -- returns nil if queue is empty
-        getNow: => 
+        getNow: =>
             if @empty() or @closed()
                 return nil
-            
+
             value = @_queue\get()
             if value != nil
                 if setter := @_setters\get()
@@ -581,17 +581,17 @@ do
             while block and @empty() and not @closed()
                 @_getters\put( coroRunning() )
                 pending()
-            
+
             return @getNow()
-        
+
         -- Puts value into queue, or awaits untils a space is available (if maxsize is specified)
         put: async ( value, block = true ) =>
             while block and @full() and not @closed()
                 @_setters\put( coroRunning() )
                 pending()
-            
+
             return @putNow( value )
-        
+
         -- Closes the queue, all getters will get nil, all putters will get false
         close: =>
             if @_closed
@@ -600,12 +600,12 @@ do
             @_closed = true
             while not @_getters\empty()
                 wakeup( @_getters\get() )
-            
+
             while not @_setters\empty()
                 wakeup( @_setters\get() )
-            
+
             return
-        
+
         closed: => @_closed
     } )
 
@@ -617,10 +617,10 @@ do
     waitForTask = ( task, fn ) ->
         if isthread( task )
             task = Task( task )
-        
+
         unless task.addCallback and task.result and task.error and task.cancelled
             return false
-        
+
         task\addCallback( fn )
 
         return true
@@ -633,15 +633,15 @@ do
                 waitForTask( tasks[i], (task) ->
                     if fut\done()
                         return
-                    
+
                     if task\cancelled()
                         fut\cancel()
                         return
-                    
+
                     if err := task\error()
                         fut\setError( err )
                         return
-                    
+
                     results[i] = task\result()
                     totalDone += 1
                     if totalDone == taskLen
@@ -660,7 +660,7 @@ do
                 waitForTask( tasks[i], (task) ->
                     if fut\done()
                         return
-                    
+
                     -- backwards compability with promise.allSettled? do we need it?
                     status = (task\cancelled() or task\error()) and "rejected" or "fulfilled"
 
