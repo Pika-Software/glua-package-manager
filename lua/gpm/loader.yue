@@ -3,8 +3,8 @@ import CLIENT, SERVER, gpm, pcall from _G
 import environment, SendFile from gpm
 
 import async, await, debug, string, path, file, util, pairs, isurl, isstring, argument, URL, ModuleError, error, PackageError, Future, Task from environment
-import getDirectory, getExtension, replaceExtension from path
 import NormalizeGamePath, AbsoluteGamePath, Find, LuaPath from file
+import getDirectory, getExtension, replaceExtension from path
 import concat, IsEmpty, Merge from environment.table
 newClass = environment.class
 import getfpath from debug
@@ -93,7 +93,7 @@ getSource = ( protocol ) ->
 
 -- Resolves specifier as it is package specifier
 -- See https://nodejs.org/api/esm.html#resolution-algorithm-specification PACKAGE_RESOLVE
-import find, match, gsub, format, StartsWith, IsURL from string
+import find, match, gsub, format, StartsWith, IsURL, PathFromURL from string
 import AsyncCompile, IsFile from file
 
 local moduleClass, packageClass, packageRead
@@ -105,7 +105,6 @@ do
 
         import AsyncWrite, Time from file
         import stripExtension from path
-        import PathFromURL from string
         -- startTime = environment.os.time! - ( gpm.StartTime or 0 )
 
         -- cache files have different paths for client and server
@@ -831,7 +830,7 @@ do
                 Logger\Debug( "  - #{@} was registered for #{protocol}:"  )
 
             WorkingDirectory: ( url ) =>
-                return URL( join("file:///lua/gpm/vfs/modules/", string.PathFromURL( url ) ) .. "/" )
+                return URL( join("file:///lua/gpm/vfs/modules/", PathFromURL( url ) ) .. "/" )
         },
         {
             get: getSource
