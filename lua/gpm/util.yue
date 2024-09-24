@@ -1818,6 +1818,40 @@ do
         error "Binary module '" .. filePath .. "' was not found.", 2
         return nil
 
+    do
+
+        import ceil, log from math
+
+        util.BitToBytes = ( number ) ->
+            return ceil( number / 8 )
+
+        util.BytesToBit = ( number ) ->
+            return ceil( number ) * 8
+
+        util.BitCount = ( value ) ->
+            if isnumber( value )
+                return max( 1, ceil( log( value + 1, 2 ) ) )
+
+            if isstring( value )
+                return len( value ) * 8
+
+            if isbool( value )
+                return 1
+
+            return -1
+
+        util.ByteCount = ( value ) ->
+            if isnumber( value )
+                return max( 1, ceil( log( value + 1, 2 ) / 8 ) )
+
+            if isstring( value )
+                return len( value )
+
+            if isbool( value )
+                return 1
+
+            return -1
+
 do
 
     import os from environment

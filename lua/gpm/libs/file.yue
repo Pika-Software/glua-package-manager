@@ -1,6 +1,6 @@
 _G = _G
 import environment, Logger, sql from _G.gpm
-import file, istable, CLIENT, SERVER, MENU_DLL from _G
+import file, istable, CLIENT, SERVER, MENU_DLL, pcall from _G
 import async, await, debug, util, path, string, Future, CodeCompileError, FileSystemError, error, argument, tostring from environment
 import ByteStream, IsBinaryModuleInstalled, SHA256 from util
 import byte, sub, len, match, ByteSplit from string
@@ -990,18 +990,21 @@ do
         unless mode
             error CodeCompileError "Could not determine compile mode for '" .. chunkName .. "'"
 
-        if CLIENT and luaGamePaths[ gamePath ] and getExtension( filePath, false ) == "lua"
-            func = CompileFile( filePath )
-            unless func
+        if CLIENT and luaGamePaths[ gamePath ] and not isFileMounted( filePath, gamePath, true ) and getExtension( filePath, false ) == "lua"
+            ok, result = pcall( CompileFile, filePath )
+            unless ok
+                error CodeCompileError "Failed to compile '" .. chunkName .. "', " .. result
+
+            unless result
                 error CodeCompileError "Could not compile '" .. chunkName .. "'"
 
             if env
-                setfenv( func, env )
+                setfenv( result, env )
 
             return {
-                :func,
-                type: mode2type[ mode ],
-                path: "/" .. chunkName,
+                func: result
+                type: mode2type[ mode ]
+                path: "/" .. chunkName
                 content: ""
             }
 
@@ -1058,18 +1061,21 @@ do
         unless mode
             error CodeCompileError "Could not determine compile mode for '" .. chunkName .. "'"
 
-        if CLIENT and luaGamePaths[ gamePath ] and getExtension( filePath, false ) == "lua"
-            func = CompileFile( filePath )
-            unless func
+        if CLIENT and luaGamePaths[ gamePath ] and not isFileMounted( filePath, gamePath, true ) and getExtension( filePath, false ) == "lua"
+            ok, result = pcall( CompileFile, filePath )
+            unless ok
+                error CodeCompileError "Failed to compile '" .. chunkName .. "', " .. result
+
+            unless result
                 error CodeCompileError "Could not compile '" .. chunkName .. "'"
 
             if env
-                setfenv( func, env )
+                setfenv( result, env )
 
             return {
-                :func,
-                type: mode2type[ mode ],
-                path: "/" .. chunkName,
+                func: result
+                type: mode2type[ mode ]
+                path: "/" .. chunkName
                 content: ""
             }
 
@@ -1088,15 +1094,18 @@ do
         unless skipNormalize
             filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
-        if CLIENT and luaGamePaths[ gamePath ] and getExtension( filePath, false ) == "lua"
-            func = CompileFile( filePath )
-            unless func
-                error CodeCompileError "Could not compile '" .. filePath .. "'"
+        if CLIENT and luaGamePaths[ gamePath ] and not isFileMounted( filePath, gamePath, true ) and getExtension( filePath, false ) == "lua"
+            ok, result = pcall( CompileFile, filePath )
+            unless ok
+                error CodeCompileError "Failed to compile '" .. chunkName .. "', " .. result
+
+            unless result
+                error CodeCompileError "Could not compile '" .. chunkName .. "'"
 
             if env
-                setfenv( func, env )
+                setfenv( result, env )
 
-            return func
+            return result
 
         return load( read( filePath, gamePath, nil, true, verifyHash ), absoluteGamePath( filePath, gamePath, true ), mode, env, config )
 

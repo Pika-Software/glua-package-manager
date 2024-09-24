@@ -3,200 +3,200 @@ import getmetatable, math from _G
 import abs, atan2, ceil, min, max, random, sqrt, pow, floor, log, pi from math
 
 -- Constants
-export e = math.exp(1)
-export ln10 = log(10)
-export ln2 = log(2)
-export log10e = log(e, 10)
-export log2e = log(e, 2)
-export sqrt1_2 = sqrt(0.5)
-export sqrt2 = sqrt(2)
+export e = math.exp( 1 )
+export ln10 = log( 10 )
+export ln2 = log( 2 )
+export log10e = log( e, 10 )
+export log2e = log( e, 2 )
+export sqrt1_2 = sqrt( 0.5 )
+export sqrt2 = sqrt( 2 )
 
 export maxinteger = 0x7FFFFFFF
 export mininteger = -0x80000000
 
 export pow2 = setmetatable( {
-    [0]: 1.0
-    [1]: 2.0
-    [2]: 4.0
-    [3]: 8.0
-    [4]: 16.0
-    [5]: 32.0
-    [6]: 64.0
-    [7]: 128.0
-    [8]: 256.0
-    [9]: 512.0
-    [10]: 1024.0
+    [  0 ]: 1.0
+    [  1 ]: 2.0
+    [  2 ]: 4.0
+    [  3 ]: 8.0
+    [  4 ]: 16.0
+    [  5 ]: 32.0
+    [  6 ]: 64.0
+    [  7 ]: 128.0
+    [  8 ]: 256.0
+    [  9 ]: 512.0
+    [ 10 ]: 1024.0
 }, {
-    __index: (n) =>
-        v = pow(2.0, n)
-        rawset(@, n, v)
+    __index: ( n ) =>
+        v = pow( 2.0, n )
+        rawset( @, n, v )
         return v
 } )
 
 export mod2 = setmetatable( {
-    [0]: 0
-    [1]: 1
-    [2]: 0
-    [3]: 1
-    [4]: 0
-    [5]: 1
-    [6]: 0
-    [7]: 1
-    [8]: 0
-    [9]: 1
-    [10]: 0
+    [  0 ]: 0
+    [  1 ]: 1
+    [  2 ]: 0
+    [  3 ]: 1
+    [  4 ]: 0
+    [  5 ]: 1
+    [  6 ]: 0
+    [  7 ]: 1
+    [  8 ]: 0
+    [  9 ]: 1
+    [ 10 ]: 0
 }, {
-    __index: (n) =>
+    __index: ( n ) =>
         v = n % 2
-        rawset(@, n, v)
+        rawset( @, n, v )
         return v
 } )
 
 -- https://github.com/ToxicFrog/vstruct/blob/master/frexp.lua
-export frexp = math.frexp or (x) ->
+export frexp = math.frexp or ( x ) ->
     if x == 0
         return 0.0, 0.0
 
-    e = floor(log(abs(x)) / ln2)
+    e = floor( log( abs( x ) ) / ln2 )
     if e > 0
         x = x * pow2[ -e ]
     else
         x = x / pow2[ e ]
 
     -- Normalize to the range [0.5,1)
-    if abs(x) >= 1.0
+    if abs( x ) >= 1.0
         x, e = x / 2, e + 1
 
     return x, e
 
 -- is checks
-export isuint = (n) -> n >= 0 and (n % 1) == 0
-export isfloat = (n) -> (n % 1) ~= 0
-export isint = (n) -> (n % 1) == 0
+export isuint = ( n ) -> n >= 0 and ( n % 1 ) == 0
+export isfloat = ( n ) -> ( n % 1 ) ~= 0
+export isint = ( n ) -> ( n % 1 ) == 0
 
-export isequalwith = (a, b, tolerance) -> abs(a - b) <= tolerance
-export isdivideable = (n, d) -> (n % d) == 0
+export isequalwith = ( a, b, tolerance ) -> abs( a - b ) <= tolerance
+export isdivideable = ( n, d ) -> ( n % d ) == 0
 
-export isbool = (n) -> n == 0 or n == 1
-export iseven = (n) -> mod2[ n ] == 0
-export isodd = (n) -> mod2[ n ] == 1
+export isbool = ( n ) -> n == 0 or n == 1
+export iseven = ( n ) -> mod2[ n ] == 0
+export isodd = ( n ) -> mod2[ n ] == 1
 
 export inf = 1 / 0
-export isinf = (n) -> n == inf
+export isinf = ( n ) -> n == inf
 
 export nan = 0 / 0
-export isnan = (n) -> n == nan
+export isnan = ( n ) -> n == nan
 
-export isfinite = (n) -> not (isinf(n) or isnan(n))
-export ispositive = (n) -> n > 0 or 1 / n == inf
-export isnegative = (n) -> n < 0 or 1 / n == -inf
+export isfinite = ( n ) -> not ( isinf( n ) or isnan( n ) )
+export ispositive = ( n ) -> n > 0 or 1 / n == inf
+export isnegative = ( n ) -> n < 0 or 1 / n == -inf
 
 -- Sign
-export sign = (n) -> ispositive(n) and 1 or -1
+export sign = ( n ) -> ispositive( n ) and 1 or -1
 
 -- Rounding
-export round = (n, d) ->
+export round = ( n, d ) ->
     if d
-        l = pow(10, d)
-        return floor(n * l + 0.5) / l
+        l = pow( 10, d )
+        return floor( n * l + 0.5 ) / l
 
-    return floor(n + 0.5)
+    return floor( n + 0.5 )
 
-export nearest = (n, d) -> round(n / d) * d
+export nearest = ( n, d ) -> round( n / d ) * d
 
-export trunc = (n, d) ->
+export trunc = ( n, d ) ->
     if d
-        l = pow(10, d)
-        return (n < 0 and ceil or floor)(n * l) / l
+        l = pow( 10, d )
+        return ( n < 0 and ceil or floor )( n * l ) / l
 
-    return (n < 0 and ceil or floor)(n)
+    return ( n < 0 and ceil or floor )( n )
 
 -- Logarithms
-export log1p = (n) -> log(n + 1)
-export log2 = (n) -> log(n) / ln2
+export log1p = ( n ) -> log( n + 1 )
+export log2 = ( n ) -> log( n ) / ln2
 
 -- Other
-export rand = (a, b) -> a + (b - a) * random()
-export fdiv = (a, b) -> floor(a / b)
-export hypot = (...) ->
+export rand = ( a, b ) -> a + ( b - a ) * random()
+export fdiv = ( a, b ) -> floor( a / b )
+export hypot = ( ... ) ->
     s = 0
-    for n in *{...}
-        s += pow(n, 2)
+    for n in *{ ... }
+        s += pow( n, 2 )
 
-    return sqrt(s)
+    return sqrt( s )
 
-export cbrt = (n) -> pow(n, 1 / 3)
-export root = (n, d) -> pow(n, 1 / d)
-export timef = (c,s,f) -> (c - s) / (f - s)
-export approach = (a, b, d) ->
+export cbrt = ( n ) -> pow( n, 1 / 3 )
+export root = ( n, d ) -> pow( n, 1 / d )
+export timef = ( c, s, f ) -> ( c - s ) / ( f - s )
+export approach = ( a, b, d ) ->
     c = b - a
-    return a + sign(c) * min(abs(c), d)
+    return a + sign( c ) * min( abs( c ), d )
 
-export mod = ( n, d ) -> n - d * floor(n / d)
+export mod = ( n, d ) -> n - d * floor( n / d )
 
 -- Clamp
-export clamp = (n, a, b) -> min(max(n, a), b)
-export clamp01 = (n) -> clamp(n, 0, 1)
+export clamp = ( n, a, b ) -> min( max( n, a ), b )
+export clamp01 = ( n ) -> clamp( n, 0, 1 )
 
 -- Lerp
-export lerp = (d, a, b) -> a + (b - a) * d
-export lerp01 = (d, a, b) -> lerp(a, b, clamp01(d))
+export lerp = ( d, a, b ) -> a + ( b - a ) * d
+export lerp01 = ( d, a, b ) -> lerp( a, b, clamp01( d ) )
 
 -- Inverse Lerp
-export ilerp = (d, a, b) -> (d - a) / (b - a)
-export ilerp01 = (d, a, b) -> ilerp(clamp01(d), a, b)
+export ilerp = ( d, a, b ) -> ( d - a ) / ( b - a )
+export ilerp01 = ( d, a, b ) -> ilerp( clamp01( d ), a, b )
 
 -- Remap
-export remap = (n, a, b, c, d) -> c + (d - c) * (n - a) / (b - a)
-export remap01 = (n, a, b) -> remap(n, a, b, 0, 1)
+export remap = ( n, a, b, c, d ) -> c + ( d - c ) * ( n - a ) / ( b - a )
+export remap01 = ( n, a, b ) -> remap( n, a, b, 0, 1 )
 
 -- Snap
-export snap = (n, a) -> floor(n / a + 0.5) * a
+export snap = ( n, a ) -> floor( n / a + 0.5 ) * a
 
 -- Degrees and Radians
-export dtor = (n) -> n * pi / 180
-export rtod = (n) -> n * 180 / pi
+export dtor = ( n ) -> n * pi / 180
+export rtod = ( n ) -> n * 180 / pi
 
 -- Angle
-export angle = (x1, y1, x2, y2) -> rtod(atan2(y2 - y1, x2 - x1))
-export anorm = (a) -> ((a + 180) % 360) - 180
-export adiff = (a1, a2) ->
-    diff = anorm(a1 - a2)
+export angle = ( x1, y1, x2, y2 ) -> rtod( atan2( y2 - y1, x2 - x1 ) )
+export anorm = ( a ) -> ( ( a + 180 ) % 360 ) - 180
+export adiff = ( a1, a2 ) ->
+    diff = anorm( a1 - a2 )
     if diff < 180
         return diff
 
     return diff - 360
 
 -- Magnitude
-export magnitude = (x1, y1, x2, y2) -> sqrt(pow(x2 - x1, 2) + pow(y2 - y1, 2))
+export magnitude = ( x1, y1, x2, y2 ) -> sqrt( pow( x2 - x1, 2 ) + pow( y2 - y1, 2 ) )
 
 -- Normalize
-export direction = (x1, y1, x2, y2) ->
-    diff = magnitude(x1, y1, x2, y2)
+export direction = ( x1, y1, x2, y2 ) ->
+    diff = magnitude( x1, y1, x2, y2 )
     if diff == 0
         return 0, 0
 
-    return (x2 - x1) / diff, (y2 - y1) / diff
+    return ( x2 - x1 ) / diff, ( y2 - y1 ) / diff
 
 -- Dot
-export dot = (x1, y1, x2, y2) -> x1 * x2 + y1 * y2
+export dot = ( x1, y1, x2, y2 ) -> x1 * x2 + y1 * y2
 
 -- Range
-export inrange = (n, a, b) -> n >= a and n <= b
-export trianglesign = (x1, y1, x2, y2, x3, y3) -> (x1 - x3) * (y2 - y3) - (x2 - x3) * (y1 - y3)
+export inrange = ( n, a, b ) -> n >= a and n <= b
+export trianglesign = ( x1, y1, x2, y2, x3, y3 ) -> ( x1 - x3 ) * ( y2 - y3 ) - ( x2 - x3 ) * ( y1 - y3 )
 
-export inrect = (x, y, x1, y1, x2, y2) -> inrange(x, x1, x2) and inrange(y, y1, y2)
-export incircle = (x, y, cx, cy, r) -> pow(x - cx, 2) + pow(y - cy, 2) <= pow(r, 2)
-export ontangent = (x, y, x1, y1, x2, y2) -> trianglesign(x, y, x1, y1, x2, y2) == 0
-export intriangle = (x, y, x1, y1, x2, y2, x3, y3) -> trianglesign(x, y, x1, y1, x2, y2) * trianglesign(x, y, x2, y2, x3, y3) > 0
+export inrect = ( x, y, x1, y1, x2, y2 ) -> inrange( x, x1, x2 ) and inrange( y, y1, y2 )
+export incircle = ( x, y, cx, cy, r ) -> pow( x - cx, 2 ) + pow( y - cy, 2 ) <= pow( r, 2 )
+export ontangent = ( x, y, x1, y1, x2, y2 ) -> trianglesign( x, y, x1, y1, x2, y2 ) == 0
+export intriangle = ( x, y, x1, y1, x2, y2, x3, y3 ) -> trianglesign( x, y, x1, y1, x2, y2 ) * trianglesign( x, y, x2, y2, x3, y3 ) > 0
 
-export inpoly = (x, y, poly) ->
+export inpoly = ( x, y, poly ) ->
     inside, length = false, #poly
 
     j = length
     for i = 1, length
-        px, py, lpx, lpy = poly[i][1], poly[i][2], poly[j][1], poly[j][2]
-        if (py < y and lpy >= y or lpy < y and py >= y) and (px + (y - py) / (lpy - py) * (lpx - px) < x)
+        px, py, lpx, lpy = poly[ i ][ 1 ], poly[ i ][ 2 ], poly[ j ][ 1 ], poly[ j ][ 2 ]
+        if ( py < y and lpy >= y or lpy < y and py >= y ) and ( px + ( y - py ) / ( lpy - py ) * ( lpx - px ) < x )
             inside = not inside
 
         j = i
@@ -204,51 +204,51 @@ export inpoly = (x, y, poly) ->
     return inside
 
 export Point = _G.gpm.environment.class( "Point", {
-    new: (x, y) =>
-        assert isfinite(x), "x must be finite"
-        assert isfinite(y), "y must be finite"
-        @[1] = x
-        @[2] = y
+    new: ( x, y ) =>
+        assert isfinite( x ), "x must be finite"
+        assert isfinite( y ), "y must be finite"
+        @[ 1 ] = x
+        @[ 2 ] = y
 
-    __tostring: => "Point(" .. @[1] .. "; " .. @[2] .. ")"
-    __eq: (a, b) => a[1] == b[1] and a[2] == b[2]
+    __tostring: => "Point(" .. @[ 1 ] .. "; " .. @[ 2 ] .. ")"
+    __eq: ( a, b ) => a[ 1 ] == b[ 1 ] and a[ 2 ] == b[ 2 ]
 
-    __add: (a, b) => Point(a[1] + b[1], a[2] + b[2])
-    __sub: (a, b) => Point(a[1] - b[1], a[2] - b[2])
+    __add: ( a, b ) => Point( a[ 1 ] + b[ 1 ], a[ 2 ] + b[ 2 ] )
+    __sub: ( a, b ) => Point( a[ 1 ] - b[ 1 ], a[ 2 ] - b[ 2 ] )
 
-    __mul: (a, b) => Point(a[1] * b[1], a[2] * b[2])
-    __div: (a, b) => Point(a[1] / b[1], a[2] / b[2])
-    __unm: (a) => Point(-a[1], -a[2])
+    __mul: ( a, b ) => Point( a[ 1 ] * b[ 1 ], a[ 2 ] * b[ 2 ] )
+    __div: ( a, b ) => Point( a[ 1 ] / b[ 1 ], a[ 2 ] / b[ 2 ] )
+    __unm: ( a ) => Point( -a[ 1 ], -a[ 2 ] )
 
-    copy: => Point(@[1], @[2])
+    copy: => Point( @[ 1 ], @[ 2 ] )
 
-    unpack: => @[1], @[2]
+    unpack: => @[ 1 ], @[ 2 ]
 
-    angle: (p) => angle(@[1], @[2], p[1], p[2])
+    angle: ( p ) => angle( @[ 1 ], @[ 2 ], p[ 1 ], p[ 2 ] )
 
-    distance: (p) => magnitude(@[1], @[2], p[1], p[2])
+    distance: ( p ) => magnitude( @[ 1 ], @[ 2 ], p[ 1 ], p[ 2 ] )
 
-    normalize: (p) => @[1], @[2] = direction(@[1], @[2], p[1], p[2])
+    normalize: ( p ) => @[ 1 ], @[ 2 ] = direction( @[ 1 ], @[ 2 ], p[ 1 ], p[ 2 ] )
 
-    direction: (p) => direction(@[1], @[2], p[1], p[2])
+    direction: ( p ) => direction( @[ 1 ], @[ 2 ], p[ 1 ], p[ 2 ] )
 
-    reflect: (n) => @[1], @[2] = @[1] - 2 * n[1] * dot(@[1], @[2], n[1], n[2]), @[2] - 2 * n[2] * dot(@[1], @[2], n[1], n[2])
+    reflect: ( n ) => @[ 1 ], @[ 2 ] = @[ 1 ] - 2 * n[ 1 ] * dot( @[ 1 ], @[ 2 ], n[ 1 ], n[ 2 ] ), @[ 2 ] - 2 * n[ 2 ] * dot( @[ 1 ], @[ 2 ], n[ 1 ], n[ 2 ] )
 
-    scale: (s) => @[1], @[2] = @[1] * s, @[2] * s
+    scale: ( s ) => @[ 1 ], @[ 2 ] = @[ 1 ] * s, @[ 2 ] * s
 
-    dot: (p) => @[1] * p[1] + @[2] * p[2]
+    dot: ( p ) => @[ 1 ] * p[ 1 ] + @[ 2 ] * p[ 2 ]
 
-    lerp: (b, d) => @[1], @[2] = lerp(d, @[1], b[1]), lerp(d, @[2], b[2])
+    lerp: ( b, d ) => @[ 1 ], @[ 2 ] = lerp( d, @[ 1 ], b[ 1 ] ), lerp( d, @[ 2 ], b[ 2 ] )
 
-    clamp: (a, b) => @[1], @[2] = clamp(@[1], a[1], b[1]), clamp(@[2], a[2], b[2])
+    clamp: ( a, b ) => @[ 1 ], @[ 2 ] = clamp( @[ 1 ], a[ 1 ], b[ 1 ] ), clamp( @[ 2 ], a[ 2 ], b[ 2 ] )
 
-    inrect: (c1, c2) => inrect(@[1], @[2], c1[1], c1[2], c2[1], c2[2])
+    inrect: ( c1, c2 ) => inrect( @[ 1 ], @[ 2 ], c1[ 1 ], c1[ 2 ], c2[ 1 ], c2[ 2 ] )
 
-    incircle: (cp, cr) => incircle(@[1], @[2], cp[1], cp[2], cr)
+    incircle: ( cp, cr ) => incircle( @[ 1 ], @[ 2 ], cp[ 1 ], cp[ 2 ], cr )
 
-    intriangle: (c1, c2, c3) => intriangle(@[1], @[2], c1[1], c1[2], c2[1], c2[2], c3[1], c3[2])
+    intriangle: ( c1, c2, c3 ) => intriangle( @[ 1 ], @[ 2 ], c1[ 1 ], c1[ 2 ], c2[ 1 ], c2[ 2 ], c3[ 1 ], c3[ 2 ] )
 
-    ontangent: (c1, c2) => ontangent(@[1], @[2], c1[1], c1[2], c2[1], c2[2])
+    ontangent: ( c1, c2 ) => ontangent( @[ 1 ], @[ 2 ], c1[ 1 ], c1[ 2 ], c2[ 1 ], c2[ 2 ] )
 
-    inpoly: (poly) => inpoly(@[1], @[2], poly)
+    inpoly: ( poly ) => inpoly( @[ 1 ], @[ 2 ], poly )
 } )
