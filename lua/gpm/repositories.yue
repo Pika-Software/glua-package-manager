@@ -75,59 +75,37 @@ repositories.RemoveRepository = ( href ) ->
 
     return table.RemoveByValue( list, href, true )
 
-import IsURL, match, find from environment.string
-import sort from environment.table
 import URL, async, await, futures from environment
-
-local request
-do
-
-    import CachedFetch from environment.http
-
-    api_token = GetConVar( "gpm_github_token" )
-
-    request = ( href ) ->
-        local headers
-        if api_token
-            token = api_token\GetString!
-            if token and token ~= ""
-                headers = { Authorization: "Bearer " .. token }
-
-        return CachedFetch( href, headers )
+import IsURL, match, find from environment.string
+import getRepositoryTags from environment.github
+import CachedFetch from environment.http
+import sort from environment.table
 
 apis = repositories.APIs
 unless istable( apis )
     apis = repositories.APIs = {}
 
 apis["github.com"] = ( url, name, parent ) ->
-    if url.scheme ~= "https"
+    owner, repo = match( url.pathname, "^/([^/]+)/([^/]+)/?$" )
+    unless owner and repo
         return nil
 
-    user, repository = match( url.pathname, "^/([^/]+)/([^/]+)/?$" )
-    unless user and repository
-        return nil
+    name or= repo
 
-    name or= repository
+    ok, tags = pawait getRepositoryTags( owner, repo )
+    if ok
+        -- convert tags to version
+        for index = 1, #tags, 1
+            tags[ index ] = { version: Version( tags[ index ].name ) }
 
-    ok, response = pawait request( "https://api.github.com/repos/" .. user .. "/" .. repository .. "/tags" )
-    if not ok or response.status ~= 200
-        return nil
-
-    tags = JSONToTable( response.body )
-    unless tags
-        return nil
-
-    for index = 1, #tags, 1
-        tags[ index ] = {
-            version: Version( tags[ index ].name )
+        return {
+            name: name
+            url: owner .. "/" .. repo
+            type: TYPE_GITHUB
+            versions: tags
         }
 
-    return {
-        name: name
-        url: user .. "/" .. repository
-        type: TYPE_GITHUB
-        versions: tags
-    }
+    return nil
 
 local fetchPackages
 do
@@ -153,7 +131,7 @@ do
         if getExtension( url.pathname ) ~= "json"
             return nil
 
-        ok, response = pawait request( url.href )
+        ok, response = pawait CachedFetch( url.href )
         if not ok or response.status ~= 200
             return nil
 
@@ -290,7 +268,7 @@ fetchRepository = repositories.FetchRepository = async ( repository, name, versi
         if offline
             return packages
 
-        success, response = pawait request( repository.url )
+        success, response = pawait CachedFetch( repository.url )
         if not success or response.status ~= 200
             Logger\Warn( "Failed to fetch repository '%s': %s", repository.url, response )
             return packages
@@ -305,7 +283,7 @@ fetchRepository = repositories.FetchRepository = async ( repository, name, versi
     if offline
         return searchPackages( repository, name, version, withPattern )
 
-    success, response = pawait request( repository.url )
+    success, response = pawait CachedFetch( repository.url )
     if not success or response.status ~= 200
         Logger\Warn( "Failed to fetch repository '%s': %s", repository.url, response )
         return searchPackages( repository, name, version, withPattern )

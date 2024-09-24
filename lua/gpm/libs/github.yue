@@ -85,7 +85,7 @@ export templateRequest = ( method, path, data ) ->
 export getRepository = ( owner, repo ) ->
     return templateRequest( "GET", "/repos/{owner}/{repo}", { :owner, :repo } )
 
-export getRepositoryTags = ( owner, report ) ->
+export getRepositoryTags = ( owner, repo ) ->
     -- TODO: implement pagination?
     return templateRequest( "GET", "/repos/{owner}/{repo}/tags?per_page=100", { :owner, :repo } )
 
