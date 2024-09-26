@@ -75,7 +75,7 @@ loggerClass = environment.class( "Logger", {
         else
             @interpolation = interpolation == true
 
-        if debug_fn
+        if debug_func
             argument( debug_func, 1, "function" )
             @IsInDebug = debug_func
         else

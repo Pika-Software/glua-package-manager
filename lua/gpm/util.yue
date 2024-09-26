@@ -1344,6 +1344,7 @@ do
 -- my cool math '^'
 math = setmetatable( _G.include( "gpm/libs/math.lua" ), table.SandboxMetatable( _G.math ) )
 import debug from environment
+import clamp, lerp from math
 environment.math = math
 
 math.type = ( number ) ->
@@ -1390,7 +1391,7 @@ do
 
 do
 
-    import abs, clamp, floor, lerp from math
+    import abs, floor from math
     import char from string
 
     -- color correction credits goes to 0x00000ED (https://github.com/0x00000ED)
@@ -1666,7 +1667,7 @@ do
 
             @pointer = 0
 
-    }, nil, nil, true )
+    } )
 
 -- Queue
 do
@@ -1768,7 +1769,86 @@ do
                 front += 1
                 return front, @[ front ]
 
-    }, nil, nil, true )
+    } )
+
+do
+
+    import angle, magnitude, direction, inrect, inpoly, incircle, intriangle, ontangent, dot from math
+
+    local metatable
+    new_point = ( x, y ) ->
+        return setmetatable( { x, y }, metatable )
+
+    metatable = {
+        new: ( x, y ) =>
+            argument( x, 1, "number" )
+            argument( y, 2, "number" )
+            @[ 1 ] = x
+            @[ 2 ] = y
+
+        __tostring: => "Point(" .. @[ 1 ] .. "; " .. @[ 2 ] .. ")"
+        __eq: ( a, b ) -> a[ 1 ] == b[ 1 ] and a[ 2 ] == b[ 2 ]
+
+        __add: ( a, b ) ->
+            if isnumber( b )
+                return new_point( a[ 1 ] + b, a[ 2 ] + b )
+
+            return new_point( a[ 1 ] + b[ 1 ], a[ 2 ] + b[ 2 ] )
+
+        __sub: ( a, b ) ->
+            if isnumber( b )
+                return new_point( a[ 1 ] - b, a[ 2 ] - b )
+
+            return new_point( a[ 1 ] - b[ 1 ], a[ 2 ] - b[ 2 ] )
+
+        __mul: ( a, b ) ->
+            if isnumber( b )
+                return new_point( a[ 1 ] * b, a[ 2 ] * b )
+
+            return new_point( a[ 1 ] * b[ 1 ], a[ 2 ] * b[ 2 ] )
+
+        __div: ( a, b ) ->
+            if isnumber( b )
+                return new_point( a[ 1 ] / b, a[ 2 ] / b )
+
+            return new_point( a[ 1 ] / b[ 1 ], a[ 2 ] / b[ 2 ] )
+
+        __unm: ( a ) -> new_point( -a[ 1 ], -a[ 2 ] )
+
+        copy: => new_point( @[ 1 ], @[ 2 ] )
+
+        unpack: => @[ 1 ], @[ 2 ]
+
+        angle: ( p ) => angle( @[ 1 ], @[ 2 ], p[ 1 ], p[ 2 ] )
+
+        distance: ( p ) => magnitude( @[ 1 ], @[ 2 ], p[ 1 ], p[ 2 ] )
+
+        normalize: ( p ) => @[ 1 ], @[ 2 ] = direction( @[ 1 ], @[ 2 ], p[ 1 ], p[ 2 ] )
+
+        direction: ( p ) => direction( @[ 1 ], @[ 2 ], p[ 1 ], p[ 2 ] )
+
+        reflect: ( n ) => @[ 1 ], @[ 2 ] = @[ 1 ] - 2 * n[ 1 ] * dot( @[ 1 ], @[ 2 ], n[ 1 ], n[ 2 ] ), @[ 2 ] - 2 * n[ 2 ] * dot( @[ 1 ], @[ 2 ], n[ 1 ], n[ 2 ] )
+
+        scale: ( s ) => @[ 1 ], @[ 2 ] = @[ 1 ] * s, @[ 2 ] * s
+
+        dot: ( p ) => @[ 1 ] * p[ 1 ] + @[ 2 ] * p[ 2 ]
+
+        lerp: ( b, d ) => @[ 1 ], @[ 2 ] = lerp( d, @[ 1 ], b[ 1 ] ), lerp( d, @[ 2 ], b[ 2 ] )
+
+        clamp: ( a, b ) => @[ 1 ], @[ 2 ] = clamp( @[ 1 ], a[ 1 ], b[ 1 ] ), clamp( @[ 2 ], a[ 2 ], b[ 2 ] )
+
+        inrect: ( c1, c2 ) => inrect( @[ 1 ], @[ 2 ], c1[ 1 ], c1[ 2 ], c2[ 1 ], c2[ 2 ] )
+
+        incircle: ( cp, cr ) => incircle( @[ 1 ], @[ 2 ], cp[ 1 ], cp[ 2 ], cr )
+
+        intriangle: ( c1, c2, c3 ) => intriangle( @[ 1 ], @[ 2 ], c1[ 1 ], c1[ 2 ], c2[ 1 ], c2[ 2 ], c3[ 1 ], c3[ 2 ] )
+
+        ontangent: ( c1, c2 ) => ontangent( @[ 1 ], @[ 2 ], c1[ 1 ], c1[ 2 ], c2[ 1 ], c2[ 2 ] )
+
+        inpoly: ( poly ) => inpoly( @[ 1 ], @[ 2 ], poly )
+    }
+
+    math.Point = newClass( "Point", metatable )
 
 do
 

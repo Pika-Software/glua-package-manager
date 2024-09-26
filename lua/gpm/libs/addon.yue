@@ -171,7 +171,7 @@ import byte, sub, lower, format, len from string
 import isuint from environment.math
 import equal from environment.path
 import time from environment.os
-import Empty from table
+import Empty, remove from table
 
 sidePrefix = _G.SERVER and "s" or _G.CLIENT and "c" or _G.MENU_DLL and "m" or "u"
 
@@ -254,7 +254,7 @@ _module_0.GMA = environment.class( "GMA", {
     Parse: ( handler, doCRC ) =>
         handler\Seek( 0 )
 
-        if handler\Read( 4 ) ~= ( @Identity )
+        if handler\Read( 4 ) ~= @Identity
             error AddonError "File is not a gma"
 
         version = handler\ReadByte!

@@ -1,7 +1,7 @@
 _G = _G
 import gpm from _G
-import environment from gpm
-import argument, istable, isnumber, isstring, isfunction, SQLError, throw, Logger from environment
+import environment, Logger from gpm
+import argument, istable, isnumber, isstring, isfunction, SQLError, throw from environment
 import len, find from environment.string
 import time from environment.os
 

@@ -31,7 +31,7 @@ jobs:
 
       - name: Build .lua and remove .yue
         run: |
-          ./yue ./
+          ./yue . --target=5.2 -c
           rm yue
           find . -type f -name '*.yue' -delete
 

@@ -107,7 +107,7 @@ sl_months = {
     [ 23 ]: "Dec"
 }
 
--- added the '.2'  to avoid collision, use `fix` to remove
+-- added the ".2"  to avoid collision, use `fix` to remove
 sl_timezone = {
     [ 000 ]: "utc"
     [ 0.2 ]: "gmt"
@@ -148,7 +148,7 @@ breakdaynum = ( g ) ->
         day = g - dayfromyear( year )
 
     mi = floor( ( 100 * day + 52 ) / 3060 )
-    return floor( ( mi + 2 ) / 12 ) + year, ( ( mi + 2 ) % 12 ), day - floor( ( mi * 306 + 5 ) / 10 ) + 1
+    return floor( ( mi + 2 ) / 12 ) + year, ( mi + 2 ) % 12, day - floor( ( mi * 306 + 5 ) / 10 ) + 1
 
 --[[ for floats or int32 Lua Number data type
 local function breakdaynum2(g)
@@ -417,7 +417,7 @@ internal_methods.GetMinutes = =>
 internal_methods.GetSeconds = =>
     return floor( @__day_fraction / MILLISECONDS ) % SECONDS
 
-internal_methods.GetMilliseconds = =>
+internal_methods.GetMilliseconds = ( u ) =>
     x = @__day_fraction % MILLISECONDS
     return u and ( ( x * u ) / MILLISECONDS ) or x
 
@@ -585,137 +585,137 @@ do
 
     tvspec = {
         -- Abbreviated weekday name (Sun)
-        ['%a']: => sl_weekdays[ weekday( @__day_number ) + 7 ]
+        ["%a"]: => sl_weekdays[ weekday( @__day_number ) + 7 ]
 
         -- Full weekday name (Sunday)
-        ['%A']: => sl_weekdays[ weekday( @__day_number ) ]
+        ["%A"]: => sl_weekdays[ weekday( @__day_number ) ]
 
         -- Abbreviated month name (Dec)
-        ['%b']: => sl_months[ @GetMonth! - 1 + 12 ]
+        ["%b"]: => sl_months[ @GetMonth! - 1 + 12 ]
 
         -- Full month name (December)
-        ['%B']: => sl_months[ @GetMonth! - 1 ]
+        ["%B"]: => sl_months[ @GetMonth! - 1 ]
 
         -- Year/100 (19, 20, 30)
-        ['%C']: => format( "%.2d", trunc( @GetYear! / 100 ) )
+        ["%C"]: => format( "%.2d", trunc( @GetYear! / 100 ) )
 
         -- The day of the month as a number (range 1 - 31)
-        ['%d']: => format( "%.2d", @GetDay! )
+        ["%d"]: => format( "%.2d", @GetDay! )
 
         -- year for ISO 8601 week, from 00 (79)
-        ['%g']: => format( "%.2d", @GetISOYear! % 100 )
+        ["%g"]: => format( "%.2d", @GetISOYear! % 100 )
 
         -- year for ISO 8601 week, from 0000 (1979)
-        ['%G']: => format( "%.4d", @GetISOYear! )
+        ["%G"]: => format( "%.4d", @GetISOYear! )
 
         -- same as %b
-        ['%h']: => @fmt0( "%b" )
+        ["%h"]: => @fmt0( "%b" )
 
         -- hour of the 24-hour day, from 00 (06)
-        ['%H']: => format( "%.2d", @GetHours! )
+        ["%H"]: => format( "%.2d", @GetHours! )
 
         -- The  hour as a number using a 12-hour clock (01 - 12)
-        ['%I']: => format( "%.2d", @GetClockHour! )
+        ["%I"]: => format( "%.2d", @GetClockHour! )
 
         -- The day of the year as a number (001 - 366)
-        ['%j']: => format( "%.3d", @GetYearDay! )
+        ["%j"]: => format( "%.3d", @GetYearDay! )
 
         -- Month of the year, from 01 to 12
-        ['%m']: => format( "%.2d", @GetMonth! )
+        ["%m"]: => format( "%.2d", @GetMonth! )
 
         -- Minutes after the hour 55
-        ['%M']: => format( "%.2d", @GetMinutes! )
+        ["%M"]: => format( "%.2d", @GetMinutes! )
 
         -- AM/PM indicator (AM)
-        ['%p']: => sl_meridian[ @GetHours! > 11 and 1 or -1 ] --AM/PM indicator (AM)
+        ["%p"]: => sl_meridian[ @GetHours! > 11 and 1 or -1 ] --AM/PM indicator (AM)
 
         -- The second as a number (59, 20 , 01)
-        ['%S']: => format( "%.2d", @GetSeconds! )
+        ["%S"]: => format( "%.2d", @GetSeconds! )
 
         -- ISO 8601 day of the week, to 7 for Sunday (7, 1)
-        ['%u']: => @GetISOWeekDay!
+        ["%u"]: => @GetISOWeekDay!
 
         -- Sunday week of the year, from 00 (48)
-        ['%U']: => format( "%.2d", @GetWeekNumber! )
+        ["%U"]: => format( "%.2d", @GetWeekNumber! )
 
         -- ISO 8601 week of the year, from 01 (48)
-        ['%V']: => format( "%.2d", @GetISOWeekNumber! )
+        ["%V"]: => format( "%.2d", @GetISOWeekNumber! )
 
         -- The day of the week as a decimal, Sunday being 0
-        ['%w']: => @GetWeekDay! - 1
+        ["%w"]: => @GetWeekDay! - 1
 
         -- Monday week of the year, from 00 (48)
-        ['%W']: => format( "%.2d", @GetWeekNumber( 2 ) )
+        ["%W"]: => format( "%.2d", @GetWeekNumber( 2 ) )
 
         -- The year as a number without a century (range 00 to 99)
-        ['%y']: => format( "%.2d", @GetYear! % 100 )
+        ["%y"]: => format( "%.2d", @GetYear! % 100 )
 
         -- Year with century (2000, 1914, 0325, 0001)
-        ['%Y']: => format( "%.4d", @GetYear! )
+        ["%Y"]: => format( "%.4d", @GetYear! )
 
         -- Time zone offset, the date object is assumed local time (+1000, -0230)
-        ['%z']: =>
+        ["%z"]: =>
             b = -@GetBIAS!
             x = abs( b )
             return format( "%s%.4d", b < 0 and "-" or "+", trunc( x / 60 ) * 100 + floor( x % 60 ) )
 
         -- Time zone name, the date object is assumed local time
-        ['%Z']: => @GetTimeZone!
+        ["%Z"]: => @GetTimeZone!
 
         -- Misc -- -- Year, if year is in BCE, prints the BCE Year representation, otherwise result is similar to "%Y" (1 BCE, 40 BCE)
-        ['%\b']: =>
+        ["%\b"]: =>
             x = @GetYear!
             return format( "%.4d%s", x > 0 and x or ( 1 - x ), x > 0 and "" or " BCE" )
 
         -- Seconds including fraction (59.998, 01.123)
-        ['%\f']: =>
+        ["%\f"]: =>
             x = @GetFloatSeconds!
             return format( "%s%.9f", x >= 10 and "" or "0", x )
 
         -- percent character %
-        ['%%']: => "%"
+        ["%%"]: => "%"
 
         -- Group Spec -- -- 12-hour time, from 01:00:00 AM (06:55:15 AM); same as "%I:%M:%S %p"
-        ['%r']: => @fmt0( "%I:%M:%S %p" )
+        ["%r"]: => @fmt0( "%I:%M:%S %p" )
 
         -- hour:minute, from 01:00 (06:55); same as "%I:%M"
-        ['%R']: => @fmt0( "%I:%M" )
+        ["%R"]: => @fmt0( "%I:%M" )
 
         -- 24-hour time, from 00:00:00 (06:55:15); same as "%H:%M:%S"
-        ['%T']: => @fmt0( "%H:%M:%S" )
+        ["%T"]: => @fmt0( "%H:%M:%S" )
 
         -- month/day/year from 01/01/00 (12/02/79); same as "%m/%d/%y"
-        ['%D']: => @fmt0( "%m/%d/%y" )
+        ["%D"]: => @fmt0( "%m/%d/%y" )
 
         -- year-month-day (1979-12-02); same as "%Y-%m-%d"
-        ['%F']: => @fmt0( "%Y-%m-%d" )
+        ["%F"]: => @fmt0( "%Y-%m-%d" )
 
         -- The preferred date and time representation;  same as "%x %X"
-        ['%c']: => @fmt0( "%x %X" )
+        ["%c"]: => @fmt0( "%x %X" )
 
         -- The preferred date representation, same as "%a %b %d %\b"
-        ['%x']: => @fmt0( "%a %b %d %\b" )
+        ["%x"]: => @fmt0( "%a %b %d %\b" )
 
         -- The preferred time representation, same as "%H:%M:%\f"
-        ['%X']: => @fmt0( "%H:%M:%\f" )
+        ["%X"]: => @fmt0( "%H:%M:%\f" )
 
         -- GroupSpec -- -- Iso format, same as "%Y-%m-%dT%T"
-        ['${iso}']: => @fmt0( "%Y-%m-%dT%T" )
+        ["${iso}"]: => @fmt0( "%Y-%m-%dT%T" )
 
         -- http format, same as "%a, %d %b %Y %T GMT"
-        ['${http}']: => @fmt0( "%a, %d %b %Y %T GMT" )
+        ["${http}"]: => @fmt0( "%a, %d %b %Y %T GMT" )
 
         -- ctime format, same as "%a %b %d %T GMT %Y"
-        ['${ctime}']: => @fmt0( "%a %b %d %T GMT %Y" )
+        ["${ctime}"]: => @fmt0( "%a %b %d %T GMT %Y" )
 
         -- RFC850 format, same as "%A, %d-%b-%y %T GMT"
-        ['${rfc850}']: => @fmt0( "%A, %d-%b-%y %T GMT" )
+        ["${rfc850}"]: => @fmt0( "%A, %d-%b-%y %T GMT" )
 
         -- RFC1123 format, same as "%a, %d %b %Y %T GMT"
-        ['${rfc1123}']: => @fmt0( "%a, %d %b %Y %T GMT" )
+        ["${rfc1123}"]: => @fmt0( "%a, %d %b %Y %T GMT" )
 
         -- asctime format, same as "%a %b %d %T %Y"
-        ['${asctime}']: => @fmt0( "%a %b %d %T %Y" )
+        ["${asctime}"]: => @fmt0( "%a %b %d %T %Y" )
     }
 
     fmt0 = internal_methods.fmt0 = ( str ) =>
@@ -840,7 +840,7 @@ internal_methods.GetTimeZone = ( retName ) =>
 do
 
     date_parse = ( str ) ->
-        local year, month, day, hour, min, sec, z, w, u, j, e, x, c, day_number, day_fraction
+        local year, month, day, hour, min, sec, z, w, u, j, e, x, c
         sw = stringWalkerClass( gsub( gsub( str, "(%b())", "" ), "^(%s*)", "" ) ) -- remove comment, trim leading space
 
         error_dup = ( q ) ->
@@ -893,11 +893,11 @@ do
 
         setzn = ( zs, zn ) ->
             zn = tonumber( zn, 10 )
-            setz( ( ( zn < 24 ) and ( zn * 60 ) or ( ( zn % 100 ) + floor( zn / 100 ) * 60 ) ) * ( zs == '+' and -1 or 1 ) )
+            setz( ( ( zn < 24 ) and ( zn * 60 ) or ( ( zn % 100 ) + floor( zn / 100 ) * 60 ) ) * ( zs == "+" and -1 or 1 ) )
             return nil
 
         setzc = ( zs, zh, zm ) ->
-            setz( ( ( tonumber( zh, 10 ) * 60 ) + tonumber( zm, 10 ) ) * ( zs == '+' and -1 or 1 ) )
+            setz( ( ( tonumber( zh, 10 ) * 60 ) + tonumber( zm, 10 ) ) * ( zs == "+" and -1 or 1 ) )
             return nil
 
         if not ( sw("^(%d%d%d%d)", sety ) and ( sw( "^(%-?)(%d%d)%1(%d%d)", ( _, a, b ) ->
@@ -960,10 +960,10 @@ do
                             if not hour or hour > 12 or hour < 0
                                 return error_inv!
 
-                            if x == 'a' and hour == 12
+                            if x == "a" and hour == 12
                                 hour = 0
 
-                            if x == 'p' and hour ~= 12
+                            if x == "p" and hour ~= 12
                                 hour = hour + 12
 
                         else
@@ -991,6 +991,7 @@ do
         return ( year and ( ( w and makedaynum_isoywd( year, w, u ) ) or ( j and makedaynum( year, 0, j ) ) or makedaynum( year, month, day ) ) ) or DAYNUM_DEF, makedayfrc( hour or 0, min or 0, sec or 0, 0 ) + ( ( z or 0 ) * MINUTEMILLISECONDS )
 
     internal_methods.new = ( arg1, month, day, hour, min, sec, ms ) =>
+        local year
         if arg1
             if month
                 year, month, day = truncString( arg1 ), getmontharg( month ), truncString( day )
