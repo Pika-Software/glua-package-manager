@@ -169,6 +169,7 @@ do
 do
 
     import BInt, IsBInt from environment
+    import FromBytes, ToBytes, ToNumber, CastSigned from BInt
 
     do
 
@@ -242,6 +243,9 @@ do
             ToSteamID3: =>
                 return format( "[U:1:%d]", @ToAccountID! )
 
+            ToBinary: ( bigEndian ) =>
+                return ToBytes( BInt( SteamIDTo64( @steamid ) ), bigEndian ~= true )
+
             GetUniverse: =>
                 return tonumber( match( @steamid, "^STEAM_([0-5]):[01]:%d+$" ) or 0, 10 )
 
@@ -282,6 +286,12 @@ do
 
                 return setmetatable( {
                     steamid: format( "STEAM_0:%s:%d", ( z % 2 == 0 ) and "0" or "1", z / 2 )
+                }, metatable )
+
+            FromBinary: ( binary, bigEndian ) ->
+                argument( binary, 1, "string" )
+                return setmetatable( {
+                    steamid: SteamIDFrom64( ToDec( FromBytes( binary, bigEndian ~= true ) ) )
                 }, metatable )
 
             FromHex: ( hex ) ->
@@ -408,8 +418,6 @@ do
 
         @position = position
         return position
-
-    import FromBytes, ToBytes, ToNumber, CastSigned from BInt
 
     util.ByteStream = newClass(
         "ByteStream",
