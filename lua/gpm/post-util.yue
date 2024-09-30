@@ -351,9 +351,6 @@ do
                 }, metatable )
         } )
 
-    import struct from environment
-    import io from struct
-
     -- lua 5.3 string features
     do
 
@@ -383,11 +380,6 @@ do
         int = io.i
         readInt, writeInt = int.Read, int.Write
 
-    local readUInt, writeUInt
-    do
-        uint = io.I
-        readUInt, writeUInt = uint.Read, uint.Write
-
     local readFloat, writeFloat
     do
         float = io.f
@@ -402,29 +394,6 @@ do
     do
         quad = io.q
         readQuad, writeQuad = quad.Read, quad.Write
-
-    local setEndianness
-    do
-
-        import Little, Set from io.endianness
-        import Read from io.i
-
-        util.LZMA_PROPS_SIZE = 5
-
-        util.CompressedSize = ( binary ) ->
-            if binary == ""
-                return 0
-
-            Little!
-            return Read( nil, sub( binary, 6, 14 ), 8 )
-
-        setEndianness = ( isBigEndian ) ->
-            if isBigEndian
-                Set( "big" )
-                return true
-
-            Set( "little" )
-            return false
 
     noCompression = ( content ) ->
         return content
