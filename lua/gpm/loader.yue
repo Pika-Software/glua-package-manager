@@ -200,13 +200,6 @@ do
     default = environment.Color( 50, 100, 200 )\DoCorrection!
     environmentMetatable = { __index: environment }
 
-    hooksMeta = {
-        __index: ( tbl, key ) ->
-            new = {}
-            rawset( tbl, key, new )
-            return new
-    }
-
     -- TODO: maybe allow urls and strings instead of just local file asyncompile?
     parse = async ( filePath, gamePath, config ) ->
         compileResult = await AsyncCompile( filePath, {}, config, gamePath, true )
@@ -389,9 +382,7 @@ do
             else
                 packageLogger = Logger( name .. "@" .. version\__tostring! )
 
-            @__hooks = setmetatable( {}, hooksMeta )
             @__prefix = @__tostring! .. "::"
-            @__timers = {}
             @__dependencies = {}
 
             -- package environment

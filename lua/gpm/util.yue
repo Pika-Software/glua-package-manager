@@ -1992,6 +1992,12 @@ do
         lib = environment.hook = setmetatable( rawget( environment, "hook" ) or {}, { __index: hook } )
         import Add, Remove, GetTable from hook
         import IsEmpty from table
+        hooksMeta = {
+            __index: ( tbl, key ) ->
+                new = {}
+                rawset( tbl, key, new )
+                return new
+        }
 
         lib.Add = ( eventName, identifier, func, priority ) ->
             argument( eventName, 1, "string" )
@@ -2000,9 +2006,14 @@ do
 
             if fenv := getfenv( 2 )
                 if pkg := fenv.__package
-                    if hooks := pkg.__hooks
-                        hooks[ eventName ][ identifier ] = func
-                        return Add( eventName, pkg.__prefix .. identifier, func, priority )
+                    hooks = pkg.__hooks
+                    unless hooks
+                        hooks = {}
+                        setmetatable( hooks, hooksMeta )
+                        pkg.__hooks = hooks
+
+                    hooks[ eventName ][ identifier ] = func
+                    return Add( eventName, pkg.__prefix .. identifier, func, priority )
 
             return Add( eventName, identifier, func, priority )
 
@@ -2012,22 +2023,32 @@ do
 
             if fenv := getfenv( 2 )
                 if pkg := fenv.__package
-                    if hooks := pkg.__hooks
-                        event = hooks[ eventName ]
-                        event[ identifier ] = nil
+                    hooks = pkg.__hooks
+                    unless hooks
+                        hooks = {}
+                        setmetatable( hooks, hooksMeta )
+                        pkg.__hooks = hooks
 
-                        if IsEmpty( event )
-                            hooks[ eventName ] = nil
+                    event = hooks[ eventName ]
+                    event[ identifier ] = nil
 
-                        return Remove( eventName, pkg.__prefix .. identifier )
+                    if IsEmpty( event )
+                        hooks[ eventName ] = nil
+
+                    return Remove( eventName, pkg.__prefix .. identifier )
 
             return Remove( eventName, identifier )
 
         lib.GetTable = ->
             if fenv := getfenv( 2 )
                 if pkg := fenv.__package
-                    if hooks := pkg.__hooks
-                        return hooks
+                    hooks = pkg.__hooks
+                    unless hooks
+                        hooks = {}
+                        setmetatable( hooks, hooksMeta )
+                        pkg.__hooks = hooks
+
+                    return hooks
 
             return GetTable!
 
@@ -2049,16 +2070,19 @@ do
 
             if fenv := getfenv( 2 )
                 if pkg := fenv.__package
-                    if timers := pkg.__timers
-                        data = timers[ identifier ]
-                        unless data
-                            return nil
+                    timers = pkg.__timers
+                    unless timers
+                        timers = pkg.__timers = {}
 
-                        delay = data.delay = delay or data.delay
-                        repetitions = data.repetitions = repetitions or data.repetitions
-                        func = data.func = func or data.func
+                    data = timers[ identifier ]
+                    unless data
+                        return nil
 
-                        return Adjust( pkg.__prefix .. identifier, delay, repetitions, func)
+                    delay = data.delay = delay or data.delay
+                    repetitions = data.repetitions = repetitions or data.repetitions
+                    func = data.func = func or data.func
+
+                    return Adjust( pkg.__prefix .. identifier, delay, repetitions, func)
 
             return Adjust( identifier, delay, repetitions, func )
 
@@ -2070,16 +2094,19 @@ do
 
             if fenv := getfenv( 2 )
                 if pkg := fenv.__package
-                    if timers := pkg.__timers
-                        data = timers[ identifier ]
-                        if data
-                            data.delay = delay
-                            data.repetitions = repetitions
-                            data.func = func
-                        else
-                            timers[ identifier ] = { :delay, :repetitions, :func }
+                    timers = pkg.__timers
+                    unless timers
+                        timers = pkg.__timers = {}
 
-                        return Create( pkg.__prefix .. identifier, delay, repetitions, func )
+                    data = timers[ identifier ]
+                    if data
+                        data.delay = delay
+                        data.repetitions = repetitions
+                        data.func = func
+                    else
+                        timers[ identifier ] = { :delay, :repetitions, :func }
+
+                    return Create( pkg.__prefix .. identifier, delay, repetitions, func )
 
             return Create( identifier, delay, repetitions, func )
 
@@ -2106,9 +2133,12 @@ do
 
             if fenv := getfenv( 2 )
                 if pkg := fenv.__package
-                    if timers := pkg.__timers
-                        timers[ identifier ] = nil
-                        return Remove( pkg.__prefix .. identifier )
+                    timers = pkg.__timers
+                    unless timers
+                        timers = pkg.__timers = {}
+
+                    timers[ identifier ] = nil
+                    return Remove( pkg.__prefix .. identifier )
 
             return Remove( identifier )
 
@@ -2169,12 +2199,15 @@ do
         lib.GetTable = ->
             if fenv := getfenv( 2 )
                 if pkg := fenv.__package
-                    return pkg.__timers
+                    timers = pkg.__timers
+                    unless timers
+                        timers = pkg.__timers = {}
 
-            return {}
+                    return timers
 
-        lib.NextTick = util.NextTick = ( func, ... ) ->
-            argument( func, 1, "function" )
+            return nil
+
+        lib.Tick = ( func, ... ) ->
             args = { ... }
 
             Simple 0, ->
