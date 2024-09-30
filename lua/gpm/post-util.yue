@@ -168,8 +168,37 @@ do
 
 do
 
-    import BInt, IsBInt from environment
+    import BInt, IsBInt, struct from environment
     import FromBytes, ToBytes, ToNumber, CastSigned from BInt
+    import io from struct
+
+    local setEndianness
+    do
+
+        import Little, Set from io.endianness
+        import Read from io.i
+
+        util.LZMA_PROPS_SIZE = 5
+
+        util.CompressedSize = ( binary ) ->
+            if binary == ""
+                return 0
+
+            Little!
+            return Read( nil, sub( binary, 6, 14 ), 8 )
+
+        setEndianness = ( isBigEndian ) ->
+            if isBigEndian
+                Set( "big" )
+                return true
+
+            Set( "little" )
+            return false
+
+    local readUInt, writeUInt
+    do
+        uint = io.I
+        readUInt, writeUInt = uint.Read, uint.Write
 
     do
 
@@ -243,8 +272,10 @@ do
             ToSteamID3: =>
                 return format( "[U:1:%d]", @ToAccountID! )
 
-            ToBinary: ( bigEndian ) =>
-                return ToBytes( BInt( SteamIDTo64( @steamid ) ), bigEndian ~= true )
+            ToBinary: ( isBigEndian ) =>
+                x, y, z = @ToXYZ!
+                setEndianness( isBigEndian )
+                return writeUInt( nil, tonumber( x, 10 ), tonumber( y, 10 ), tonumber( z, 10 ), 4 )
 
             GetUniverse: =>
                 return tonumber( match( @steamid, "^STEAM_([0-5]):[01]:%d+$" ) or 0, 10 )
@@ -288,10 +319,15 @@ do
                     steamid: format( "STEAM_0:%s:%d", ( z % 2 == 0 ) and "0" or "1", z / 2 )
                 }, metatable )
 
-            FromBinary: ( binary, bigEndian ) ->
-                argument( binary, 1, "string" )
+            FromBinary: ( binary, isBigEndian ) ->
+                setEndianness( isBigEndian )
+
+                z = readUInt( nil, binary, 4 )
+                if z < 0
+                    throw( "Invalid binary SteamID", 2 )
+
                 return setmetatable( {
-                    steamid: SteamIDFrom64( ToDec( FromBytes( binary, bigEndian ~= true ) ) )
+                    steamid: format( "STEAM_0:%s:%d", ( z % 2 == 0 ) and "0" or "1", z / 2 )
                 }, metatable )
 
             FromHex: ( hex ) ->
@@ -840,6 +876,7 @@ do
             WriteDate: ( date ) =>
                 return @Write( date\ToBinary! )
 
+            -- TODO: SteamID
         },
         {
             CompressionMethods: compressionMethods
