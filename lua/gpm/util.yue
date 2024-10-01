@@ -294,6 +294,74 @@ do
 
     table.Equal = equal
 
+do
+
+    diffKeys = ( a, b, result = {}, length = 0 ) ->
+        if a == b
+            return {}, 0
+
+        for key, value in pairs( a )
+            alt = rawget( b, key )
+            if alt == nil
+                length += 1
+                result[ length ] = key
+
+            if not ( getmetatable( value ) or getmetatable( alt ) ) and istable( value ) and istable( alt )
+                result, length = diffKeys( value, alt, result, length )
+
+            if value ~= alt
+                length += 1
+                result[ length ] = key
+
+        for key, value in pairs( b )
+            alt = rawget( a, key )
+            if alt == nil
+                length += 1
+                result[ length ] = key
+
+            if not ( getmetatable( value ) or getmetatable( alt ) ) and istable( value ) and istable( alt )
+                result, length = diffKeys( value, alt, result, length )
+
+            if value ~= alt
+                length += 1
+                result[ length ] = key
+
+        return result, length
+
+    table.DiffKeys = diffKeys
+
+do
+
+    diff = ( a, b ) ->
+        result = {}
+
+        for key, value in pairs( a )
+            alt = rawget( b, key )
+            if alt == nil
+                result[ key ] = { value, alt }
+
+            if not ( getmetatable( value ) or getmetatable( alt ) ) and istable( value ) and istable( alt )
+                result[ key ] = diff( value, alt )
+
+            if value ~= alt
+                result[ key ] = { value, alt }
+
+        for key, value in pairs( b )
+            unless result[ key ]
+                alt = rawget( a, key )
+                if alt == nil
+                    result[ key ] = { value, alt }
+
+                if not ( getmetatable( value ) or getmetatable( alt ) ) and istable( value ) and istable( alt )
+                    result[ key ] = diff( value, alt )
+
+                if value ~= alt
+                    result[ key ] = { value, alt }
+
+        return result
+
+    table.Diff = diff
+
 table.IsSequential = ( tbl ) ->
     index = 1
 
