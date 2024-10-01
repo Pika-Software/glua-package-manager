@@ -1,6 +1,8 @@
 _G = _G
-import getmetatable, math from _G
+import math, tonumber from _G
 import abs, atan2, ceil, min, max, random, sqrt, pow, floor, log, pi from math
+import rep, format from _G.string
+import concat from _G.table
 
 -- Constants
 export e = math.exp( 1 )
@@ -133,6 +135,48 @@ export approach = ( a, b, d ) ->
     return a + sign( c ) * min( abs( c ), d )
 
 export mod = ( n, d ) -> n - d * floor( n / d )
+
+export binary2decimal = ( s ) -> tonumber( s, 2 )
+export decimal2binary = ( n, complement ) ->
+    if n == 0
+        if complement
+            return "00000000", 8
+
+        return "0", 1
+
+    sign = n < 0
+    if sign
+        n = -n
+
+    local bits, length
+    if sign
+        bits, length = { "-" }, 1
+    else
+        bits, length = {}, 0
+
+    while n > 0
+        length += 1
+        bits[ length ] = n % 2 == 0 and "0" or "1"
+        n = floor( n / 2 )
+
+    length += 1
+
+    for index = 1, floor( length / 2 ), 1
+        bits[ index ], bits[ length - index ] = bits[ length - index ], bits[ index ]
+
+    length -= 1
+
+    if complement
+        zeros = max( 8, 2 ^ ceil( log( length ) / ln2 ) ) - length
+        return rep( "0", zeros ) .. concat( bits, "", 1, length ), length + zeros
+
+    return concat( bits, "", 1, length ), length
+
+export hex2decimal = ( s ) -> tonumber( s, 16 )
+export decimal2hex = ( n ) -> format( "%X", n )
+
+export hex2binary = ( s ) -> decimal2binary( hex2decimal( s ) )
+export binary2hex = ( s ) -> decimal2hex( binary2decimal( s ) )
 
 -- Clamp
 export clamp = ( n, a, b ) -> min( max( n, a ), b )
