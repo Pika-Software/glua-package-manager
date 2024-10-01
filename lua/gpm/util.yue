@@ -1,5 +1,5 @@
 _G = _G
-import gpm, pairs, error, rawget, getfenv, getmetatable, setmetatable, istable, tostring, tonumber from _G
+import gpm, pairs, error, rawget, getfenv, getmetatable, setmetatable, istable, tostring, tonumber, CLIENT, SERVER, MENU_DLL from _G
 
 import environment from gpm
 import string, table, util from environment
@@ -733,8 +733,18 @@ do
     import FindMetaTable, RegisterMetaTable, TypeID, rawset, type from _G
     import Count from table
 
+    -- client/server
+    CLIENT_SERVER = CLIENT or SERVER
+    environment.CLIENT_SERVER = CLIENT_SERVER
+
+    -- client/menu
+    CLIENT_MENU = CLIENT and MENU_DLL
+    environment.CLIENT_MENU = CLIENT_MENU
+
     static = {
         "unknown": -1
+
+        -- lua types
         "nil": 0
         "boolean": 1
         "light userdata": 2
@@ -744,41 +754,51 @@ do
         "function": 6
         "userdata": 7
         "thread": 8
-        "Entity": 9
+
+        -- Entity and entity sub-classes including Player, Weapon, NPC, Vehicle, CSEnt, and NextBot
+        "Entity": CLIENT_SERVER and 9 or nil
+        "Player": CLIENT_SERVER and 9 or nil
+        "Weapon": CLIENT_SERVER and 9 or nil
+        "NPC": CLIENT_SERVER and 9 or nil
+        "Vehicle": CLIENT_SERVER and 9 or nil
+        "CSEnt": CLIENT and 9 or nil
+        "NextBot":  CLIENT_SERVER and 9 or nil
+
         "Vector": 10
         "Angle": 11
-        "PhysObj": 12
-        "ISave": 13
-        "IRestore": 14
-        "CTakeDamageInfo": 15
-        "CEffectData": 16
-        "CMoveData": 17
-        "CRecipientFilter": 18
-        "CUserCmd": 19
+
+        "PhysObj": CLIENT_SERVER and 12 or nil
+        "ISave": CLIENT_SERVER and 13 or nil
+        "IRestore": CLIENT_SERVER and 14 or nil
+        "CTakeDamageInfo": CLIENT_SERVER and 15 or nil
+        "CEffectData": CLIENT_SERVER and 16 or nil
+        "CMoveData": CLIENT_SERVER and 17 or nil
+        "CRecipientFilter": SERVER and 18 or nil
+        "CUserCmd": CLIENT_SERVER and 19 or nil
         -- empty: 20
         "IMaterial": 21
-        "Panel": 22
-        "CLuaParticle": 23
-        "CLuaEmitter": 24
+        "Panel": CLIENT_MENU and 22 or nil
+        "CLuaParticle": CLIENT and 23 or nil
+        "CLuaEmitter": CLIENT and 24 or nil
         "ITexture": 25
-        "bf_read": 26
+        "bf_read": CLIENT_SERVER and 26 or nil
         "ConVar": 27
-        "IMesh": 28
+        "IMesh": CLIENT_MENU and 28 or nil
         "VMatrix": 29 -- approved by retr0
-        "CSoundPatch": 30
-        "pixelvis_handle_t": 31
-        "dlight_t": 32
-        "IVideoWriter": 33
+        "CSoundPatch": CLIENT_SERVER and 30 or nil
+        "pixelvis_handle_t": CLIENT and 31 or nil
+        "dlight_t": CLIENT and 32 or nil
+        "IVideoWriter": CLIENT_MENU and 33 or nil
         "File": 34
-        "CLuaLocomotion": 35
-        "PathFollower": 36
-        "CNavArea": 37
-        "IGModAudioChannel": 38
-        "CNavLadder": 39
-        "CNewParticleEffect": 40
-        "ProjectedTexture": 41
-        "PhysCollide": 42
-        "SurfaceInfo": 43
+        "CLuaLocomotion": SERVER and 35 or nil
+        "PathFollower": SERVER and 36 or nil
+        "CNavArea": SERVER and 37 or nil
+        "IGModAudioChannel": CLIENT and 38 or nil
+        "CNavLadder": SERVER and 39 or nil
+        "CNewParticleEffect": CLIENT and 40 or nil
+        "ProjectedTexture": CLIENT and 41 or nil
+        "PhysCollide": CLIENT_SERVER and 42 or nil
+        "SurfaceInfo": CLIENT_SERVER and 43 or nil
         "Color": 255
     }
 
@@ -788,20 +808,22 @@ do
         argument( name, 1, "string" )
 
         metatable = metatables[ name ]
-        unless metatable
-            metatable = FindMetaTable( name )
-            unless istable( metatable )
-                return nil
+        if metatable
+            return metatable
 
-            id = static[ name ] or rawget( metatable, "MetaID" ) or rawget( metatable, "__metatable_id" ) or ( 256 + Count( metatables ) )
-            if not isnumber( id ) or id < 0
-                return nil
+        metatable = FindMetaTable( name )
+        unless istable( metatable )
+            return nil
 
-            rawset( metatable, "__metatable_name", name )
-            rawset( metatable, "__metatable_id", id )
-            rawset( metatable, "MetaName", name )
-            rawset( metatable, "MetaID", id )
-            metatables[ name ] = metatable
+        id = static[ name ] or rawget( metatable, "MetaID" ) or rawget( metatable, "__metatable_id" ) or ( 256 + Count( metatables ) )
+        if not isnumber( id ) or id < 0
+            return nil
+
+        rawset( metatable, "__metatable_name", name )
+        rawset( metatable, "__metatable_id", id )
+        rawset( metatable, "MetaName", name )
+        rawset( metatable, "MetaID", id )
+        metatables[ name ] = metatable
 
         return metatable
 
@@ -1870,7 +1892,7 @@ do
     isEdge = jit.versionnum ~= 20004
     is32 = jit.arch == "x86"
 
-    head = "lua/bin/gm" .. ( ( _G.CLIENT and not _G.MENU_DLL ) and "cl" or "sv" ) .. "_"
+    head = "lua/bin/gm" .. ( ( CLIENT and not MENU_DLL ) and "cl" or "sv" ) .. "_"
     tail = "_" .. ( { "osx64", "osx", "linux64", "linux", "win64", "win32" } )[ ( system.IsWindows() and 4 or 0 ) + ( system.IsLinux() and 2 or 0 ) + ( is32 and 1 or 0 ) + 1 ] .. ".dll"
 
     isBinaryModuleInstalled = util.IsBinaryModuleInstalled = ( name ) ->
