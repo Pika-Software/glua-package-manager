@@ -1252,122 +1252,254 @@ do
         if name == "C_Material"
             environment.CMaterial = func
 
-
-    getmetatabled = debug.getmetatable or getmetatable
-    setmetatabled = debug.setmetatable or setmetatable
-
-    -- null
     do
 
-        null = environment.null = _G.newproxy( true )
-        metatable = getmetatabled( null )
-        metatable.__metatable_name = "null"
-        metatable.__metatable_id = 0
-        metatable.MetaName = "null"
-        metatable.MetaID = 0
+        getmetatabled = debug.getmetatable or getmetatable
+        setmetatabled = debug.setmetatable or setmetatable
 
-        metatable.__tostring = ->
-            return "null"
+        -- null
+        do
 
-        registerMetaTable( "null", metatable )
+            null = environment.null = _G.newproxy( true )
+            metatable = getmetatabled( null )
+            metatable.__metatable_name = "null"
+            metatable.__metatable_id = 0
+            metatable.MetaName = "null"
+            metatable.MetaID = 0
 
-    -- nil
-    object = nil
+            metatable.__tostring = ->
+                return "null"
+
+            registerMetaTable( "null", metatable )
+
+        -- nil
+        object = nil
+        do
+
+            metatable = getmetatabled( object )
+            if metatable == nil
+                metatable = {}
+                setmetatabled( object, metatable )
+
+            registerMetaTable( "nil", metatable )
+
+        -- boolean
+        object = false
+        do
+
+            metatable = getmetatabled( object )
+            if metatable == nil
+                metatable = {}
+                setmetatabled( object, metatable )
+
+            registerMetaTable( "boolean", metatable )
+
+            isbool = ( any ) ->
+                return getmetatable( any ) == metatable
+
+        environment.isbool = isbool
+
+        -- number
+        object = 0
+        do
+
+            metatable = getmetatabled( object )
+            if metatable == nil
+                metatable = {}
+                setmetatabled( object, metatable )
+
+            registerMetaTable( "number", metatable )
+
+            isnumber = ( any ) ->
+                return getmetatable( any ) == metatable
+
+        environment.isnumber = isnumber
+
+        -- string
+        object = ""
+        do
+
+            metatable = getmetatabled( object )
+            if metatable == nil
+                metatable = {}
+                setmetatabled( object, metatable )
+
+            registerMetaTable( "string", metatable )
+
+            isstring = ( any ) ->
+                return getmetatable( any ) == metatable
+
+        environment.isstring = isstring
+
+        -- function
+        object = ->
+        do
+
+            metatable = getmetatabled( object )
+            if metatable == nil
+                metatable = {}
+                setmetatabled( object, metatable )
+
+            registerMetaTable( "function", metatable )
+
+            isfunction = ( any ) ->
+                return getmetatable( any ) == metatable
+
+            environment.iscallable = ( obj ) ->
+                tbl = getmetatable( obj )
+                if tbl and ( tbl == metatable or tbl.__call )
+                    return true
+
+                return false
+
+        environment.isfunction = isfunction
+
+        -- Make jit happy <3
+        environment.debug.fempty = object
+
+        -- thread
+        object = _G.coroutine.create( object )
+        do
+
+            metatable = getmetatabled( object )
+            if metatable == nil
+                metatable = {}
+                setmetatabled( object, metatable )
+
+            registerMetaTable( "thread", metatable )
+
+            environment.isthread = ( any ) ->
+                return getmetatable( any ) == metatable
+
+    -- Vector
     do
 
-        metatable = getmetatabled( object )
-        if metatable == nil
-            metatable = {}
-            setmetatabled( object, metatable )
+        metatable = findMetaTable( "Vector" )
 
-        registerMetaTable( "nil", metatable )
-
-    -- boolean
-    object = false
-    do
-
-        metatable = getmetatabled( object )
-        if metatable == nil
-            metatable = {}
-            setmetatabled( object, metatable )
-
-        registerMetaTable( "boolean", metatable )
-
-        isbool = ( any ) ->
+        environment.isvector = ( any ) ->
             return getmetatable( any ) == metatable
 
-    environment.isbool = isbool
-
-    -- number
-    object = 0
+    -- Angle
     do
 
-        metatable = getmetatabled( object )
-        if metatable == nil
-            metatable = {}
-            setmetatabled( object, metatable )
+        metatable = findMetaTable( "Angle" )
 
-        registerMetaTable( "number", metatable )
-
-        isnumber = ( any ) ->
+        environment.isangle = ( any ) ->
             return getmetatable( any ) == metatable
 
-    environment.isnumber = isnumber
-
-    -- string
-    object = ""
+    -- VMatrix
     do
 
-        metatable = getmetatabled( object )
-        if metatable == nil
-            metatable = {}
-            setmetatabled( object, metatable )
+        metatable = findMetaTable( "VMatrix" )
 
-        registerMetaTable( "string", metatable )
-
-        isstring = ( any ) ->
+        environment.ismatrix = ( any ) ->
             return getmetatable( any ) == metatable
 
-    environment.isstring = isstring
-
-    -- function
-    object = ->
+    -- ConVar
     do
 
-        metatable = getmetatabled( object )
-        if metatable == nil
-            metatable = {}
-            setmetatabled( object, metatable )
+        metatable = findMetaTable( "ConVar" )
 
-        registerMetaTable( "function", metatable )
-
-        isfunction = ( any ) ->
+        environment.isconvar = ( any ) ->
             return getmetatable( any ) == metatable
 
-        environment.iscallable = ( obj ) ->
-            tbl = getmetatable( obj )
-            if tbl and ( tbl == metatable or tbl.__call )
-                return true
+    -- IMesh
+    if CLIENT or MENU_DLL
+        metatable = findMetaTable( "IMesh" )
+        if metatable == nil
+            environment.ismesh = ( any ) ->
+               return getmetatable( any ) == metatable
+        else
+            environment.ismesh = ( any ) ->
+                return false
 
-            return false
+    -- Dynamic Light
+    if CLIENT
 
-    environment.isfunction = isfunction
+        metatable = findMetaTable( "dlight_t" )
 
-    -- Make jit happy <3
-    environment.debug.fempty = object
+        environment.isdynamiclight = ( any ) ->
+            return getmetatable( any ) == metatable
 
-    -- thread
-    object = _G.coroutine.create( object )
+    ENTITY = findMetaTable( "Entity" )
+
+    -- entity
+    environment.isentity = ( any ) ->
+        metatable = getmetatable( any )
+        return metatable and metatable.__metatable_id == 9
+
+    -- player
     do
 
-        metatable = getmetatabled( object )
-        if metatable == nil
-            metatable = {}
-            setmetatabled( object, metatable )
+        metatable = findMetaTable( "Player" )
 
-        registerMetaTable( "thread", metatable )
+        is = ( any ) ->
+            return getmetatable( any ) == metatable
 
-        environment.isthread = ( any ) ->
+        ENTITY.IsPlayer = is
+        environment.IsPlayer = is
+
+    -- weapon
+    do
+
+        metatable = findMetaTable( "Weapon" )
+
+        is = ( any ) ->
+            return getmetatable( any ) == metatable
+
+        ENTITY.IsWeapon = is
+        environment.IsWeapon = is
+
+    -- npc
+    do
+
+        metatable = findMetaTable( "NPC" )
+
+        is = ( any ) ->
+            return getmetatable( any ) == metatable
+
+        ENTITY.IsNPC = is
+        environment.IsNPC = is
+
+    -- NextBot
+    do
+
+        metatable = findMetaTable( "NextBot" )
+
+        is = ( any ) ->
+            return getmetatable( any ) == metatable
+
+        ENTITY.IsNextBot = is
+        environment.IsNextBot = is
+
+    -- Vehicle
+    do
+
+        metatable = findMetaTable( "Vehicle" )
+
+        is = ( any ) ->
+            return getmetatable( any ) == metatable
+
+        ENTITY.IsVehicle = is
+        environment.IsVehicle = is
+
+    -- CSEnt
+    if CLIENT
+
+        metatable = findMetaTable( "CSEnt" )
+
+        is = ( any ) ->
+            return getmetatable( any ) == metatable
+
+        ENTITY.IsClientEntity = is
+        environment.IsClientEntity = is
+
+    -- Panel
+    if CLIENT or MENU_DLL
+
+        metatable = findMetaTable( "Panel" )
+
+        environment.ispanel = ( any ) ->
             return getmetatable( any ) == metatable
 
 -- my cool math '^'
