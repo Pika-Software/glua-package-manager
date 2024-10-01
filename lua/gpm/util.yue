@@ -1246,6 +1246,13 @@ do
 
     import debug from _G
 
+    do
+
+        name, func = debug.getupvalue( _G.Material, 1 )
+        if name == "C_Material"
+            environment.CMaterial = func
+
+
     getmetatabled = debug.getmetatable or getmetatable
     setmetatabled = debug.setmetatable or setmetatable
 
@@ -1368,6 +1375,42 @@ math = setmetatable( _G.include( "gpm/libs/math.lua" ), table.SandboxMetatable( 
 import debug from environment
 import clamp, lerp from math
 environment.math = math
+
+do
+
+    import CMaterial from environment
+    import decimal2binary from math
+
+    environment.MPAR_VERTEXLITGENERIC = 0x80
+    environment.MPAR_NOCULL = 0x40
+    environment.MPAR_ALPHATEST = 0x20
+    environment.MPAR_MIPS = 0x10
+    environment.MPAR_NOCLAMP = 0x8
+    environment.MPAR_SMOOTH = 0x4
+    environment.MPAR_IGNOREZ = 0x2
+
+    environment.Material = ( name, parameters, flags ) ->
+        if parameters
+            argument( name, 1, "number", "string" )
+
+            if isstring( parameters )
+                if parameters == ""
+                    return CMaterial( name )
+
+                return CMaterial( name,
+                    ( find( parameters, "vertexlitgeneric", 1, true ) and "1" or "0" ) ..
+                    ( find( parameters, "nocull", 1, true ) and "1" or "0" ) ..
+                    ( find( parameters, "alphatest", 1, true ) and "1" or "0" ) ..
+                    ( find( parameters, "mips", 1, true ) and "1" or "0" ) ..
+                    ( find( parameters, "noclamp", 1, true ) and "1" or "0" ) ..
+                    ( find( parameters, "smooth", 1, true ) and "1" or "0" ) ..
+                    ( find( parameters, "ignorez", 1, true ) and "1" or "0" )
+                )
+
+            if parameters > 0
+                return CMaterial( name, decimal2binary( parameters, true ) )
+
+        return CMaterial( name )
 
 math.type = ( number ) ->
     if isnumber( number )
