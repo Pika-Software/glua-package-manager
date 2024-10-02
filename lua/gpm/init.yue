@@ -33,7 +33,6 @@ gpm.StartTime = SysTime!
 do
 
     username = cvars and cvars.String( SERVER and "hostname" or "name", "unknown user" ) or "unknown"
-    gpm.UserName = username
 
     splashes = {
         "eW91dHViZS5jb20vd2F0Y2g/dj1kUXc0dzlXZ1hjUQ=="
@@ -61,6 +60,7 @@ do
         "v" .. gpm.VERSION
         "Blazing fast ☄"
         "Here For You ♪"
+        "Good Enough ♪"
         "Hello World!"
         "Star Glide ♪"
         "Once Again ♪"
