@@ -1,0 +1,12 @@
+### Release to-do list
+- [ ] Finish custom Lua transport implementation
+- [ ] Packages auto-reload
+- [ ] Server-side CLI commands ( install, remove, reload and etc. )
+- [ ] BitStream ( like ByteStream but for bits )
+- [ ] Write a new NetTransfer class to transfer large amounts of data over `net`
+- [ ] NetTables - synchronizable tables, support only basic Lua types ( strings, numbers, booleans, tables, maybe vectors, colors and angles )
+- [ ] Write more `net.` functions like `net.WriteSteamID` and etc.
+- [ ] Write tests for all functionality ( we will die trying )
+
+### Know issues
+- [ ] For some unknown reason server packages for some people go into an infinite dependency wait without any errors
