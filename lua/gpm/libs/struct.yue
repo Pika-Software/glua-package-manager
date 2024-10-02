@@ -236,13 +236,13 @@ do
             value = endianness.value = "little"
             return value
 
+        isBig = byte( string.dump( environment.debug.fempty ), 7 ) == 0x00
+
         host = ->
             if isBig
                 return big!
 
             return little!
-
-        isBig = byte( string.dump( environment.debug.fempty ), 7 ) == 0x00
 
         endianness = {
             value: nil
@@ -256,8 +256,8 @@ do
             Get: ->
                 return value
 
-            Set: ( value ) ->
-                return switch value
+            Set: ( str ) ->
+                return switch str
                     when "big"
                         big!
 
@@ -344,7 +344,7 @@ do
             Write: read
         } )
 
-    local readUInt, writeUInt
+    local readUInt, writeUInt, readUIntBits, writeUIntBits
     do
 
         -- https://github.com/ToxicFrog/vstruct/blob/master/io/u.lua
@@ -381,15 +381,15 @@ do
 
             return concat( buffer, "", 1, bytes )
 
-        readUIntBits = ( readBit, size ) ->
+        readUIntBits = ( readBit, count ) ->
             bits = 0
-            for _ = 1, ( size or 4 )
+            for _ = 1, ( count or 4 )
                 bits = bits * 2 + readBit!
 
             return bits
 
-        writeUIntBits = ( writeBit, data, size ) ->
-            for index = ( size or 4 ) - 1, 0, -1
+        writeUIntBits = ( writeBit, data, count ) ->
+            for index = ( count or 4 ) - 1, 0, -1
                 writeBit( mod2[ floor( data / pow2[ index ] ) ] )
 
         size = ( number = 4 ) ->
@@ -441,18 +441,18 @@ do
 
             return writeUInt( nil, number, bytes )
 
-        readIntBits = ( readBit, size = 4 ) ->
-            number = readUIntBits( readBit, size )
-            if number < pow2[ size - 1 ]
+        readIntBits = ( readBit, count = 4 ) ->
+            number = readUIntBits( readBit, count )
+            if number < pow2[ count - 1 ]
                 return number
 
-            return number - pow2[ size ]
+            return number - pow2[ count ]
 
-        writeIntBits = ( writeBit, number, size = 4 ) ->
+        writeIntBits = ( writeBit, number, count = 4 ) ->
             if number < 0
-                number += pow2[ size ]
+                number += pow2[ count ]
 
-            return writeUIntBits( writeBit, number, size )
+            return writeUIntBits( writeBit, number, count )
 
         -- https://github.com/ToxicFrog/vstruct/blob/master/io/i.lua
         -- signed integers
@@ -545,21 +545,21 @@ do
         -- format is pTOTAL_SIZE,FRACTIONAL_SIZE
         -- Fractional size is in bits, total size in bytes.
         registerIO( "p", {
-            Size: ( size, fraction ) ->
-                assert( size, "format requires a size" )
+            Size: ( count, fraction ) ->
+                assert( count, "format requires a bit count" )
                 assert( fraction, "format requires a fractional-part size" )
 
-                if tonumber( size, 10 ) and tonumber( fraction, 10 )
+                if tonumber( count, 10 ) and tonumber( fraction, 10 )
                     -- Check only possible if both values were specified at compile time
-                    assert( size * 8 >= fraction, "fixed point number has more fractional bits than total bits" )
+                    assert( count * 8 >= fraction, "fixed point number has more fractional bits than total bits" )
 
-                return size
+                return count
 
-            Read: ( _, binary, size, fraction ) ->
-                return readInt( nil, binary, size ) / pow2[ fraction ]
+            Read: ( _, binary, count, fraction ) ->
+                return readInt( nil, binary, count ) / pow2[ fraction ]
 
-            Write: ( _, number, size, fraction ) ->
-                return writeInt( nil, number * pow2[ fraction ], size )
+            Write: ( _, number, count, fraction ) ->
+                return writeInt( nil, number * pow2[ fraction ], count )
 
         }, true )
 
@@ -568,21 +568,21 @@ do
         -- format is pTOTAL_SIZE,FRACTIONAL_SIZE
         -- Fractional size is in bits, total size in bytes.
         registerIO( "pu", {
-            Size: ( size, fraction ) ->
-                assert( size, "format requires a size" )
+            Size: ( count, fraction ) ->
+                assert( count, "format requires a bit count" )
                 assert( fraction, "format requires a fractional-part size" )
 
-                if tonumber( size, 10 ) and tonumber( fraction, 10 )
+                if tonumber( count, 10 ) and tonumber( fraction, 10 )
                     -- Check only possible if both values were specified at compile time
-                    assert( size * 8 >= fraction, "fixed point number has more fractional bits than total bits" )
+                    assert( count * 8 >= fraction, "fixed point number has more fractional bits than total bits" )
 
-                return size
+                return count
 
-            Read: ( _, binary, size, fraction ) ->
-                return readUInt( nil, binary, size ) / pow2[ fraction ]
+            Read: ( _, binary, count, fraction ) ->
+                return readUInt( nil, binary, count ) / pow2[ fraction ]
 
-            Write: ( _, number, size, fraction ) ->
-                return writeUInt( nil, number * pow2[ fraction ], size )
+            Write: ( _, number, count, fraction ) ->
+                return writeUInt( nil, number * pow2[ fraction ], count )
 
         }, true )
 
@@ -659,6 +659,7 @@ do
 
         return sub( data, 1, size )
 
+    local readString
     do
 
         readString = ( fileDescriptor, binary, size ) ->
@@ -719,7 +720,7 @@ do
 
             return fileDescriptor\Read( length )
 
-        Write: ( fileDescriptor, data, size ) ->
+        Write: ( _, data, size ) ->
             return writeUInt( nil, len( data ), size or 1 ) .. writeString( nil, data )
 
     }, true )
@@ -1128,8 +1129,8 @@ do
             return format( "character %d ('%s')", index, sub( source, 1, 4 ) )
 
         find_match = ->
-            for index = 1, length
-                data = lexis[ index ]
+            for j = 1, length
+                data = lexis[ j ]
                 if match( source, data.pattern )
                     _, endPos, text = find( source, data.pattern )
                     return data, endPos, text
@@ -1526,7 +1527,7 @@ do
 
             return nil
 
-        WriteBits: ( bits, context ) =>
+        WriteBits: ( fileDescriptor, bits, context ) =>
             buffer = io[ @name ].WriteBits( bits, context.data, @GetArgvContext( context ) )
             if buffer
                 fileDescriptor\Write( buffer )
@@ -1577,7 +1578,7 @@ do
         ast_next_until = ast.next_until = ( lex, typeName ) ->
             return ->
                 tokType = lex.peek!.type
-                if tokType == 'EOF'
+                if tokType == "EOF"
                     ast_error( lex, typeName )
                     return nil
 
@@ -1786,7 +1787,7 @@ do
         obj.ast\Write( fileDescriptor, data )
         return unwrapFileDescriptor( fileDescriptor )
 
-    api.Records = ( ast, fileDescriptor, unpacked ) ->
+    api.Records = ( rast, fileDescriptor, unpacked ) ->
         fileDescriptor = wrapFileDescriptor( fileDescriptor or "" )
 
         unless IsCursor( fileDescriptor )
@@ -1798,9 +1799,9 @@ do
         return ->
             if fileDescriptor\Read( 0 )
                 if unpacked
-                    return unpack( ast\Read( fileDescriptor ) )
+                    return unpack( rast\Read( fileDescriptor ) )
 
-                return ast\Read( fileDescriptor )
+                return rast\Read( fileDescriptor )
 
     api.SizeOf = ( obj ) ->
         return obj.ast.size
@@ -1811,25 +1812,25 @@ do
 
         cache = {}
 
-        api.Compile = ( name, format ) ->
+        api.Compile = ( name, fmt ) ->
             local obj, root
 
-            obj = cache[ format ]
+            obj = cache[ fmt ]
             if obj
                 root = obj.ast
             else
-                root = parse( format )
+                root = parse( fmt )
 
                 obj = {
                     ast: root
-                    source: format
+                    source: fmt
                     Read: api.Read
                     Write: api.Write
                     Records: api.Records
                     SizeOf: api.SizeOf
                 }
 
-                cache[ format ] = obj
+                cache[ fmt ] = obj
 
             if name
                 registry[ name ] = root
