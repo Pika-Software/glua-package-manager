@@ -35,6 +35,11 @@ jobs:
           rm yue
           find . -type f -name '*.yue' -delete
 
+      - name: Override autorun
+        run: |
+          rm lua/autorun/!gpm.lua
+          echo "if SERVER then AddCSLuaFile \"gpm/init.lua\" end; include \"gpm/init.lua\"" > lua/autorun/!gpm.lua
+
       - name: Push to lua branch
         run: |
           git config user.name github-actions
