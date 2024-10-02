@@ -795,7 +795,7 @@ do
 string.IsBytecode = ( str ) ->
     return byte( str, 1 ) == 0x1B --[[ byte code marker ]]
 
-local argument, findMetaTable, registerMetaTable
+local argument, findMetaTable, registerMetaTable, CLIENT_SERVER
 do
 
     import FindMetaTable, RegisterMetaTable, TypeID, rawset, type from _G
@@ -871,6 +871,7 @@ do
     }
 
     metatables = {}
+    environment.inext = _G.ipairs( metatables )
 
     findMetaTable = util.FindMetaTable = ( name ) ->
         argument( name, 1, "string" )
@@ -1553,14 +1554,30 @@ do
 
     -- CSEnt
     if CLIENT
+        do
 
-        metatable = findMetaTable( "CSEnt" )
+            metatable = findMetaTable( "CSEnt" )
 
-        is = ( any ) ->
-            return getmetatable( any ) == metatable
+            is = ( any ) ->
+                return getmetatable( any ) == metatable
 
-        ENTITY.IsClientEntity = is
-        environment.IsClientEntity = is
+            ENTITY.IsClientEntity = is
+            environment.IsClientEntity = is
+
+        import LocalPlayer, NULL from _G
+        import IsValid from ENTITY
+        local player
+
+        environment.LocalPlayer = ->
+            if player == nil
+                entity = LocalPlayer!
+                if IsValid( entity )
+                    player = entity
+                    return entity
+
+                return NULL
+
+            return player
 
     -- Panel
     if CLIENT or MENU_DLL
@@ -2251,235 +2268,342 @@ do
 
     import hook from _G
 
-    -- just in case
-    if hook
+    lib = environment.hook = setmetatable( rawget( environment, "hook" ) or {}, { __index: hook } )
+    import Add, Remove, GetTable from hook
+    import IsEmpty from table
 
-        lib = environment.hook = setmetatable( rawget( environment, "hook" ) or {}, { __index: hook } )
-        import Add, Remove, GetTable from hook
-        import IsEmpty from table
-        hooksMeta = {
-            __index: ( tbl, key ) ->
-                new = {}
-                rawset( tbl, key, new )
-                return new
-        }
+    if CLIENT_SERVER
+        import inext from environment
+        local entities, players
 
-        lib.Add = ( eventName, identifier, func, priority ) ->
-            argument( eventName, 1, "string" )
-            argument( identifier, 2, "string" )
-            argument( func, 3, "function" )
+        do
 
-            if fenv := getfenv( 2 )
-                if pkg := fenv.__package
-                    hooks = pkg.__hooks
-                    unless hooks
-                        hooks = {}
-                        setmetatable( hooks, hooksMeta )
-                        pkg.__hooks = hooks
+            import GetAll from _G.player
 
-                    hooks[ eventName ][ identifier ] = func
-                    return Add( eventName, pkg.__prefix .. identifier, func, priority )
+            getAll = ->
+                if players == nil
+                    players = GetAll!
 
-            return Add( eventName, identifier, func, priority )
+                return players
 
-        lib.Remove = ( eventName, identifier ) ->
-            argument( eventName, 1, "string" )
-            argument( identifier, 2, "string" )
+            environment.player.GetAll = getAll
 
-            if fenv := getfenv( 2 )
-                if pkg := fenv.__package
-                    hooks = pkg.__hooks
-                    unless hooks
-                        hooks = {}
-                        setmetatable( hooks, hooksMeta )
-                        pkg.__hooks = hooks
+            iterator = ->
+                return inext, getAll!, 0
 
-                    event = hooks[ eventName ]
-                    event[ identifier ] = nil
+            environment.player.Iterator = iterator
 
-                    if IsEmpty( event )
-                        hooks[ eventName ] = nil
+            if SERVER
+                isDedicatedServer = _G.game.IsDedicated!
+                import NULL from _G
 
-                    return Remove( eventName, pkg.__prefix .. identifier )
+                environment.game.IsDedicated = ->
+                    return isDedicatedServer
 
-            return Remove( eventName, identifier )
+                if isDedicatedServer
+                    environment.LocalPlayer = ->
+                        return NULL
+                else
+                    import IsListenServerHost from findMetaTable( "Player" )
+                    local player
 
-        lib.GetTable = ->
-            if fenv := getfenv( 2 )
-                if pkg := fenv.__package
-                    hooks = pkg.__hooks
-                    unless hooks
-                        hooks = {}
-                        setmetatable( hooks, hooksMeta )
-                        pkg.__hooks = hooks
+                    environment.LocalPlayer = ->
+                        if player == nil
+                            for _, ply in iterator!
+                                if IsListenServerHost( ply )
+                                    player = ply
+                                    return ply
 
-                    return hooks
+                            return NULL
 
-            return GetTable!
+                        return player
+
+
+        do
+
+            import GetAll from _G.ents
+
+            getAll = ->
+                if entities == nil
+                    entities = GetAll!
+
+                return entities
+
+            environment.ents.GetAll = getAll
+
+            environment.ents.Iterator = ->
+                return inext, getAll!, 0
+
+        import IsPlayer from environment
+
+        invalidateCache = ( entity ) ->
+            entities = nil
+
+            if IsPlayer( entity )
+                players = nil
+
+            return nil
+
+        Add( "OnEntityCreated", "gLua Package Manager::Iterators", invalidateCache, environment.PRE_HOOK )
+        Add( "EntityRemoved", "gLua Package Manager::Iterators", invalidateCache, environment.PRE_HOOK )
+
+    -- GM:PlayerInitialized( Player ply )
+    if CLIENT_SERVER
+        import Run from hook
+
+        if SERVER
+            import IsForced from findMetaTable( "CUserCmd" )
+
+            Add(
+                "SetupMove"
+                "gLua Package Manager::PlayerInitialized"
+                ( ply, _, cmd ) ->
+                    if ply.__initialized or not ( IsForced( cmd ) or ply\IsBot! )
+                        return nil
+
+                    ply.__initialized = true
+                    Run( "PlayerInitialized", ply )
+                    return nil
+                environment.PRE_HOOK
+            )
+
+        if CLIENT
+            Add(
+                "RenderScene"
+                "gLua Package Manager::PlayerInitialized"
+                ->
+                    Remove( "RenderScene", "gLua Package Manager::PlayerInitialized" )
+
+                    ply = environment.LocalPlayer!
+                    if not ply\IsValid! or ply.__initialized
+                        return nil
+
+                    ply.__initialized = true
+                    Run( "PlayerInitialized", ply )
+                    return nil
+                environment.PRE_HOOK
+            )
+
+    hooksMeta = {
+        __index: ( tbl, key ) ->
+            new = {}
+            rawset( tbl, key, new )
+            return new
+    }
+
+    lib.Add = ( eventName, identifier, func, priority ) ->
+        argument( eventName, 1, "string" )
+        argument( identifier, 2, "string" )
+        argument( func, 3, "function" )
+
+        if fenv := getfenv( 2 )
+            if pkg := fenv.__package
+                hooks = pkg.__hooks
+                unless hooks
+                    hooks = {}
+                    setmetatable( hooks, hooksMeta )
+                    pkg.__hooks = hooks
+
+                hooks[ eventName ][ identifier ] = func
+                return Add( eventName, pkg.__prefix .. identifier, func, priority )
+
+        return Add( eventName, identifier, func, priority )
+
+    lib.Remove = ( eventName, identifier ) ->
+        argument( eventName, 1, "string" )
+        argument( identifier, 2, "string" )
+
+        if fenv := getfenv( 2 )
+            if pkg := fenv.__package
+                hooks = pkg.__hooks
+                unless hooks
+                    hooks = {}
+                    setmetatable( hooks, hooksMeta )
+                    pkg.__hooks = hooks
+
+                event = hooks[ eventName ]
+                event[ identifier ] = nil
+
+                if IsEmpty( event )
+                    hooks[ eventName ] = nil
+
+                return Remove( eventName, pkg.__prefix .. identifier )
+
+        return Remove( eventName, identifier )
+
+    lib.GetTable = ->
+        if fenv := getfenv( 2 )
+            if pkg := fenv.__package
+                hooks = pkg.__hooks
+                unless hooks
+                    hooks = {}
+                    setmetatable( hooks, hooksMeta )
+                    pkg.__hooks = hooks
+
+                return hooks
+
+        return GetTable!
 
 -- Garry's Mod timers
 do
 
     import timer from _G
 
-    -- just in case
-    if timer
+    import Adjust, Create, Exists, Pause, Remove, RepsLeft, Start, Stop, Simple, TimeLeft, Toggle, UnPause from timer
+    lib = environment.timer = setmetatable( rawget( environment, "timer" ) or {}, { __index: timer } )
+    import unpack from table
 
-        import Adjust, Create, Exists, Pause, Remove, RepsLeft, Start, Stop, Simple, TimeLeft, Toggle, UnPause from timer
-        lib = environment.timer = setmetatable( rawget( environment, "timer" ) or {}, { __index: timer } )
-        import unpack from table
+    lib.Adjust = ( identifier, delay, repetitions, func ) ->
+        argument( identifier, 1, "string" )
+        argument( delay, 2, "number" )
 
-        lib.Adjust = ( identifier, delay, repetitions, func ) ->
-            argument( identifier, 1, "string" )
-            argument( delay, 2, "number" )
+        if fenv := getfenv( 2 )
+            if pkg := fenv.__package
+                timers = pkg.__timers
+                unless timers
+                    timers = pkg.__timers = {}
 
-            if fenv := getfenv( 2 )
-                if pkg := fenv.__package
-                    timers = pkg.__timers
-                    unless timers
-                        timers = pkg.__timers = {}
+                data = timers[ identifier ]
+                unless data
+                    return nil
 
-                    data = timers[ identifier ]
-                    unless data
-                        return nil
+                delay = data.delay = delay or data.delay
+                repetitions = data.repetitions = repetitions or data.repetitions
+                func = data.func = func or data.func
 
-                    delay = data.delay = delay or data.delay
-                    repetitions = data.repetitions = repetitions or data.repetitions
-                    func = data.func = func or data.func
+                return Adjust( pkg.__prefix .. identifier, delay, repetitions, func)
 
-                    return Adjust( pkg.__prefix .. identifier, delay, repetitions, func)
+        return Adjust( identifier, delay, repetitions, func )
 
-            return Adjust( identifier, delay, repetitions, func )
+    lib.Create = ( identifier, delay, repetitions, func ) ->
+        argument( identifier, 1, "string" )
+        argument( delay, 2, "number" )
+        argument( repetitions, 3, "number" )
+        argument( func, 4, "function" )
 
-        lib.Create = ( identifier, delay, repetitions, func ) ->
-            argument( identifier, 1, "string" )
-            argument( delay, 2, "number" )
-            argument( repetitions, 3, "number" )
-            argument( func, 4, "function" )
+        if fenv := getfenv( 2 )
+            if pkg := fenv.__package
+                timers = pkg.__timers
+                unless timers
+                    timers = pkg.__timers = {}
 
-            if fenv := getfenv( 2 )
-                if pkg := fenv.__package
-                    timers = pkg.__timers
-                    unless timers
-                        timers = pkg.__timers = {}
+                data = timers[ identifier ]
+                if data
+                    data.delay = delay
+                    data.repetitions = repetitions
+                    data.func = func
+                else
+                    timers[ identifier ] = { :delay, :repetitions, :func }
 
-                    data = timers[ identifier ]
-                    if data
-                        data.delay = delay
-                        data.repetitions = repetitions
-                        data.func = func
-                    else
-                        timers[ identifier ] = { :delay, :repetitions, :func }
+                return Create( pkg.__prefix .. identifier, delay, repetitions, func )
 
-                    return Create( pkg.__prefix .. identifier, delay, repetitions, func )
+        return Create( identifier, delay, repetitions, func )
 
-            return Create( identifier, delay, repetitions, func )
+    lib.Exists = ( identifier ) ->
+        argument( identifier, 1, "string" )
 
-        lib.Exists = ( identifier ) ->
-            argument( identifier, 1, "string" )
+        if fenv := getfenv( 2 )
+            if pkg := fenv.__package
+                return Exists( pkg.__prefix .. identifier )
 
-            if fenv := getfenv( 2 )
-                if pkg := fenv.__package
-                    return Exists( pkg.__prefix .. identifier )
+        return Exists( identifier )
 
-            return Exists( identifier )
+    lib.Pause = ( identifier ) ->
+        argument( identifier, 1, "string" )
 
-        lib.Pause = ( identifier ) ->
-            argument( identifier, 1, "string" )
+        if fenv := getfenv( 2 )
+            if pkg := fenv.__package
+                return Pause( pkg.__prefix .. identifier )
 
-            if fenv := getfenv( 2 )
-                if pkg := fenv.__package
-                    return Pause( pkg.__prefix .. identifier )
+        return Pause( identifier )
 
-            return Pause( identifier )
+    lib.Remove = ( identifier ) ->
+        argument( identifier, 1, "string" )
 
-        lib.Remove = ( identifier ) ->
-            argument( identifier, 1, "string" )
+        if fenv := getfenv( 2 )
+            if pkg := fenv.__package
+                timers = pkg.__timers
+                unless timers
+                    timers = pkg.__timers = {}
 
-            if fenv := getfenv( 2 )
-                if pkg := fenv.__package
-                    timers = pkg.__timers
-                    unless timers
-                        timers = pkg.__timers = {}
+                timers[ identifier ] = nil
+                return Remove( pkg.__prefix .. identifier )
 
-                    timers[ identifier ] = nil
-                    return Remove( pkg.__prefix .. identifier )
+        return Remove( identifier )
 
-            return Remove( identifier )
+    lib.RepsLeft = ( identifier ) ->
+        argument( identifier, 1, "string" )
 
-        lib.RepsLeft = ( identifier ) ->
-            argument( identifier, 1, "string" )
+        if fenv := getfenv( 2 )
+            if pkg := fenv.__package
+                return RepsLeft( pkg.__prefix .. identifier )
 
-            if fenv := getfenv( 2 )
-                if pkg := fenv.__package
-                    return RepsLeft( pkg.__prefix .. identifier )
+        return RepsLeft( identifier )
 
-            return RepsLeft( identifier )
+    lib.Start = ( identifier ) ->
+        argument( identifier, 1, "string" )
 
-        lib.Start = ( identifier ) ->
-            argument( identifier, 1, "string" )
+        if fenv := getfenv( 2 )
+            if pkg := fenv.__package
+                return Start( pkg.__prefix .. identifier )
 
-            if fenv := getfenv( 2 )
-                if pkg := fenv.__package
-                    return Start( pkg.__prefix .. identifier )
+        return Start( identifier )
 
-            return Start( identifier )
+    lib.Stop = ( identifier ) ->
+        argument( identifier, 1, "string" )
 
-        lib.Stop = ( identifier ) ->
-            argument( identifier, 1, "string" )
+        if fenv := getfenv( 2 )
+            if pkg := fenv.__package
+                return Stop( pkg.__prefix .. identifier )
 
-            if fenv := getfenv( 2 )
-                if pkg := fenv.__package
-                    return Stop( pkg.__prefix .. identifier )
+        return Stop( identifier )
 
-            return Stop( identifier )
+    lib.TimeLeft = ( identifier ) ->
+        argument( identifier, 1, "string" )
 
-        lib.TimeLeft = ( identifier ) ->
-            argument( identifier, 1, "string" )
+        if fenv := getfenv( 2 )
+            if pkg := fenv.__package
+                return TimeLeft( pkg.__prefix .. identifier )
 
-            if fenv := getfenv( 2 )
-                if pkg := fenv.__package
-                    return TimeLeft( pkg.__prefix .. identifier )
+        return TimeLeft( identifier )
 
-            return TimeLeft( identifier )
+    lib.Toggle = ( identifier ) ->
+        argument( identifier, 1, "string" )
 
-        lib.Toggle = ( identifier ) ->
-            argument( identifier, 1, "string" )
+        if fenv := getfenv( 2 )
+            if pkg := fenv.__package
+                return Toggle( pkg.__prefix .. identifier )
 
-            if fenv := getfenv( 2 )
-                if pkg := fenv.__package
-                    return Toggle( pkg.__prefix .. identifier )
+        return Toggle( identifier )
 
-            return Toggle( identifier )
+    lib.UnPause = ( identifier ) ->
+        argument( identifier, 1, "string" )
 
-        lib.UnPause = ( identifier ) ->
-            argument( identifier, 1, "string" )
+        if fenv := getfenv( 2 )
+            if pkg := fenv.__package
+                return UnPause( pkg.__prefix .. identifier )
 
-            if fenv := getfenv( 2 )
-                if pkg := fenv.__package
-                    return UnPause( pkg.__prefix .. identifier )
+        return UnPause( identifier )
 
-            return UnPause( identifier )
+    lib.GetTable = ->
+        if fenv := getfenv( 2 )
+            if pkg := fenv.__package
+                timers = pkg.__timers
+                unless timers
+                    timers = pkg.__timers = {}
 
-        lib.GetTable = ->
-            if fenv := getfenv( 2 )
-                if pkg := fenv.__package
-                    timers = pkg.__timers
-                    unless timers
-                        timers = pkg.__timers = {}
+                return timers
 
-                    return timers
+        return nil
 
+    lib.Tick = ( func, ... ) ->
+        args = { ... }
+
+        Simple 0, ->
+            func( unpack( args ) )
             return nil
 
-        lib.Tick = ( func, ... ) ->
-            args = { ... }
-
-            Simple 0, ->
-                func( unpack( args ) )
-                return nil
-
-            return nil
+        return nil
 
 do
 
@@ -2502,7 +2626,7 @@ do
 
     developer = getConVar( "developer" )
 
-    if _G.game.IsDedicated!
+    if not MENU_DLL and environment.game.IsDedicated!
         isInDebug = developer\GetInt! > 1
 
         _G.cvars.AddChangeCallback( "developer", ( _, __, str ) ->
