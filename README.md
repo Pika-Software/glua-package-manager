@@ -1,15 +1,16 @@
-## Import protocols
-- `file:` files from `/` directory
-- `lua:` files from `/lua/` directory
-- `http:`, `https:` fetch from internet
-- `dll:` hostname is binary module name `/lua/bin/`
-- `github:` same as `https:` but uses GitHub Rest API
+# gLua Package Manager
 
-### Examples
-- `github://apiKey@user/repository/branch` (download and mount branch to file system)
-- `github://apiKey@user/repository/branch/path/to/my/file.lua` (lua, yue, moon will be compiled, json will returned as table, other formats will be returned as string)
+⚠ **ATTENTION THE PROJECT IS STILL IN DEVELOPMENT, EXPECT A STABLE RELEASE. UNSTABLE OPERATION, BUGS AND UNPREDICTABLE EXECUTION OF FUNCTIONS ARE POSSIBLE.**
 
-### TODO
-* concommands
-* send in packages
-* client package sending
+## Description
+Garry's Mod Lua project aimed at expanding the game's functionality and improving performance.
+
+The package manager will allow asynchronous loading of Lua packages, introduces support for many really cool third-party APIs and significantly expands functionality for the developer.
+
+Now I can finally say that we have created a powerful tool for skilled developers ;>
+
+## Bugs and Suggestions
+If you have any ideas or found a bug or error, please report it to us, we will try to fix it or explain what the problem is.
+
+## Documentation
+Documentation is in development, release time is not available.
