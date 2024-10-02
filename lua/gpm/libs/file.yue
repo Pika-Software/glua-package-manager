@@ -465,7 +465,7 @@ do
 
     do
 
-        import ReadULong, WriteULong, ReadByte, WriteByte, Seek, Skip, Tell from legacy
+        import ReadULong, WriteULong, ReadByte, Seek, Size, Skip, Tell from legacy
 
         base.IsValid = ( fileHandle ) ->
             return tostring( fileHandle ) ~= "File [NULL]"
@@ -473,12 +473,8 @@ do
         base.SeekToBegin = ( fileHandle ) ->
             return Seek( fileHandle, 0 )
 
-        do
-
-            import Size from legacy
-
-            base.SeekToEnd = ( fileHandle ) ->
-                return Seek( fileHandle, Size( fileHandle ) )
+        base.SeekToEnd = ( fileHandle ) ->
+            return Seek( fileHandle, Size( fileHandle ) )
 
         base.SkipEmpty = ( fileHandle ) ->
             while not EndOfFile( fileHandle )
@@ -724,6 +720,7 @@ do
                 "Fetch": -> IsBinaryModuleInstalled( "asyncio" )
                 "Install": ->
                     require( "asyncio" )
+                    asyncio = _G.asyncio
 
                     return {
                         "Append": asyncio.AsyncAppend
@@ -938,7 +935,7 @@ do
 
 do
 
-    import stripDirectory, getFileName, getExtension, stripExtension from path
+    import getExtension, stripExtension from path
     import load from environment
     import CompileFile from _G
 
@@ -954,13 +951,11 @@ do
         mt: "moonscript"
         yt: "yuescript"
         bt: "bytecode"
-        bt: "bytecode"
         t: "lua"
     }
 
     asyncCompile = async ( filePath, gamePath, env, config, verifyHash ) ->
-        filePath, extension = stripExtension( filePath )
-        filePath ..= "."
+        filePath = stripExtension( filePath ) .. "."
 
         extensions = {}
         for fileName in *Find( filePath .. "*", gamePath )
@@ -1031,13 +1026,13 @@ do
         unless skipNormalize
             filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
-        filePath, extension = stripExtension( filePath )
-        filePath ..= "."
+        filePath = stripExtension( filePath ) .. "."
 
         extensions = {}
         for fileName in *Find( filePath .. "*", gamePath )
             extensions[ getExtension( fileName, false ) ] = true
 
+        local extension
         if extensions.yue
             extension = "yue"
 
@@ -1097,10 +1092,10 @@ do
         if CLIENT and luaGamePaths[ gamePath ] and not isFileMounted( filePath, gamePath, true ) and getExtension( filePath, false ) == "lua"
             ok, result = pcall( CompileFile, filePath )
             unless ok
-                error CodeCompileError "Failed to compile '" .. chunkName .. "', " .. result
+                error CodeCompileError "Failed to compile '" .. absoluteGamePath( filePath, gamePath, true ) .. "', " .. result
 
             unless result
-                error CodeCompileError "Could not compile '" .. chunkName .. "'"
+                error CodeCompileError "Could not compile '" .. absoluteGamePath( filePath, gamePath, true ) .. "'"
 
             if env
                 setfenv( result, env )
@@ -1210,14 +1205,14 @@ do
 
         return await gma\AsyncMount( false )
 
-    mountZIPData = lib.MountZIPData = async ( data, uniqueName ) ->
+    mountZIPData = lib.MountZIPData = async ( binary, uniqueName ) ->
         gma = GMA!
         gma\SetTitle( uniqueName )
 
         local isInFolder, last
         temp = {}
 
-        for data in iterateZipFiles( ByteStream( data ), true )
+        for data in iterateZipFiles( ByteStream( binary ), true )
             :content = data
             if content and content ~= ""
                 filePath = data.path
