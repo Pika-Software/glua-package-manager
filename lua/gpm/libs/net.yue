@@ -1,0 +1,798 @@
+_G = _G
+
+gmod_net = _G.net
+unless gmod_net
+    return nil
+
+import environment from _G.gpm
+import NULL, FindMetaTable, pairs, xpcall, SERVER from _G
+import net, util, istable, Entity, TypeID, ErrorNoHaltWithStack from environment
+import ReadUInt, WriteUInt from gmod_net
+import lower from environment.string
+
+ENTITY = FindMetaTable( "Entity" )
+import EntIndex, IsValid from ENTITY
+
+types = rawget( net, "Types" )
+unless istable( types )
+    types = net.Types = {}
+
+-- C
+types[ environment.TYPE_STRING ] = { net.ReadString, net.WriteString }
+types[ environment.TYPE_NUMBER ] = { net.ReadDouble, net.WriteDouble }
+types[ environment.TYPE_MATRIX ] = { net.ReadMatrix, net.WriteMatrix }
+types[ environment.TYPE_VECTOR ] = { net.ReadVector, net.WriteVector }
+types[ environment.TYPE_ANGLE ] = { net.ReadAngle, net.WriteAngle }
+
+do
+
+    import isnumber from environment
+
+    net.WriteType = ( value, index ) ->
+        unless isnumber( index )
+            index = TypeID( value )
+            if index < 0
+                throw "invalid type '" .. index .. "'", 2
+                return nil
+
+        data = types[ index ]
+        if data
+            if func := data[ 2 ]
+                WriteUInt( index, 16 )
+                return func( value )
+
+        throw "missing type '" .. index .. "' writer", 2
+        return nil
+
+do
+
+    import TYPE_NIL from _G
+
+	net.ReadType = ( index = ReadUInt( 16 ) ) ->
+		if index == TYPE_NIL
+            return nil
+
+		data = types[ index ]
+        if data
+            if func := data[ 1 ]
+        		return func!
+
+        throw "missing type '" .. index .. "' reader", 2
+        return nil
+
+-- Really cool net.Start
+if SERVER
+	import NetworkStringToID, AddNetworkString from util
+    import Start from gmod_net
+
+	net.Start = ( networkString ) ->
+        networkString = lower( networkString )
+
+        if fenv := getfenv( 2 )
+            if pkg := fenv.__package
+                networkString = pkg.__prefix .. networkString
+
+		if NetworkStringToID( networkString ) == 0
+			AddNetworkString( networkString )
+
+		Start( networkString )
+        return nil
+
+-- Network string callback registration
+do
+
+	import remove from environment.table
+	import isstring from environment
+
+    external = rawget( net, "Receivers" )
+    unless istable( external )
+        external = net.Receivers = {}
+
+	length = 0
+
+	net.Receive = ( networkString, func, identifier ) ->
+		networkString = lower( networkString )
+
+		unless isstring( identifier )
+			identifier = "unknown"
+
+        networks = external
+        if fenv := getfenv( 2 )
+            if pkg := fenv.__package
+                prefix = pkg.__prefix
+                identifier = prefix .. identifier
+                networkString = prefix .. networkString
+
+                networks = pkg.__networks
+                unless networks
+                    networks = pkg.__networks = {}
+
+		functions = networks[ networkString ]
+		unless functions
+            functions = external[ networkString ] = {}
+
+		length = #functions
+		for index = 1, length
+			if functions[ index ][ 1 ] == identifier
+				remove( functions, index )
+				length -= 1
+				break
+
+		functions[ length + 1 ] = {
+            [ 1 ]: identifier
+            [ 2 ]: func
+        }
+
+    -- Network string callback performing
+    import NetworkIDToString from util
+    import ReadHeader from net
+    import Run from _G.hook
+
+    gmod_receivers = gmod_net.Receivers
+
+    gmod_net.Incoming = ( length = 16, client = NULL ) ->
+        networkString = NetworkIDToString( ReadHeader! )
+        if networkString == nil
+            return nil
+
+        networkString = lower( networkString )
+        length -= 16
+
+        if Run( "IncomingNetworkMessage", networkString, length, client ) == false
+            return nil
+
+        if func := gmod_receivers[ networkString ]
+            xpcall( func, ErrorNoHaltWithStack, length, client )
+
+        if functions := external[ networkString ]
+            for data in *functions
+                xpcall( data[ 2 ], ErrorNoHaltWithStack, length, client )
+
+        return nil
+
+-- Boolean
+do
+
+	import ReadBit, WriteBit from gmod_net
+
+	read = ->
+	    return ReadBit! == 1
+
+    -- bool must be an alias of bit ( because yeah... )
+	net.ReadBool, net.WriteBool = read, WriteBit
+    net.ReadBit = read
+
+    types[ environment.TYPE_BOOL ] = { read, WriteBit }
+
+-- Entity
+do
+
+	write = ( entity ) ->
+		if entity and IsValid( entity )
+            WriteUInt( EntIndex( entity ), 16 )
+            return entity
+
+		WriteUInt( 0, 16 )
+		return entity
+
+	read = ->
+		index = ReadUInt( 16 )
+		if index == nil or index == 0
+			return NULL
+
+		return Entity( index )
+
+	net.ReadEntity, net.WriteEntity = read, write
+    types[ environment.TYPE_ENTITY ] = { read, write }
+
+-- Player
+net.ReadPlayer = ->
+    index = ReadUInt( 8 )
+    if index == nil or index == 0
+        return NULL
+
+    return Entity( index )
+
+net.WritePlayer = ( ply ) ->
+    if ply and ply\IsValid! and ply\IsPlayer!
+        WriteUInt( EntIndex( ply ), 8 )
+        return ply
+
+    WriteUInt( 0, 8 )
+    return ply
+
+-- Color
+do
+
+    metatable = FindMetaTable( "Color" )
+
+	read = ( readAlpha ) ->
+		if readAlpha == false
+            return setmetatable( { r: ReadUInt( 8 ), g: ReadUInt( 8 ), b: ReadUInt( 8 ), a: 255 }, metatable )
+
+        return setmetatable( { r: ReadUInt( 8 ), g: ReadUInt( 8 ), b: ReadUInt( 8 ), a: ReadUInt( 8 ) }, metatable )
+
+	write = ( color, writeAlpha ) ->
+		WriteUInt( color.r or 255, 8 )
+		WriteUInt( color.g or 255, 8 )
+		WriteUInt( color.b or 255, 8 )
+
+		if writeAlpha == false
+			return color
+
+		WriteUInt( color.a or 255, 8 )
+		return color
+
+	net.ReadColor, net.WriteColor = read, write
+    types[ environment.TYPE_COLOR ] = { read, write }
+
+-- Table
+do
+
+    import ReadType, WriteType from net
+
+	read = ( isSequential ) ->
+		result = {}
+		if isSequential
+			for index = 1, ReadUInt( 32 )
+				result[ index ] = ReadType!
+
+			return result
+
+		::read::
+
+		key = ReadType!
+		if key == nil
+			return result
+
+		result[ key ] = ReadType!
+		goto read
+
+        return result
+
+	length = 0
+
+	write = ( tbl, isSequential ) ->
+		if isSequential
+			length = #tbl
+			WriteUInt( length, 32 )
+
+			for index = 1, length
+				WriteType( tbl[ index ] )
+
+			return tbl, length
+
+        length = 0
+
+		for key, value in pairs( tbl )
+			WriteType( key )
+			WriteType( value )
+            length += 1
+
+		WriteUInt( 0, 16 )
+        return tbl, length
+
+	net.ReadTable, net.WriteTable = read, write
+    types[ environment.TYPE_TABLE ] = { read, write }
+
+--[[        !!!! BELOW RE-WRITE REQUIRED !!!!       ]]--
+-- TODO: !!!!
+
+do
+    return nil
+
+-- TODO: Think about it
+import abs, ceil, log from environment.math
+
+
+import Broadcast, Send, SendToServer, ReadBool, WriteBool, ReadData, WriteData, ReadString, WriteString from net
+import Compress, Decompress, CompressedSize from util
+
+if SERVER
+    util.AddNetworkString( "gLua Package Manager::NetTable" )
+    util.AddNetworkString( "gLua Package Manager::NetTransfer" )
+
+local isPlayerAllowed
+do
+
+    import SteamID from FindMetaTable( "Player" )
+    import TestPVS from ENTITY
+
+    isPlayerAllowed = ( netTransfer, filter, ply ) ->
+        unless filter
+            return true
+
+        -- https://wiki.facepunch.com/gmod/Enums/TYPE
+        switch type( filter )
+            when "boolean"
+                return filter
+
+            when "number"
+                return EntIndex( ply ) == filter
+
+            when "string"
+                return SteamID( ply ) == filter
+
+            when "table"
+                for value in *filter
+                    if isPlayerAllowed( netTransfer, value, ply )
+                        return true
+
+                return false
+
+            when "function"
+                return filter( netTransfer, ply )
+
+            when "Entity"
+                return ply == filter
+
+            when "Vector"
+                return TestPVS( ply, filter )
+
+            when "RecipientFilter"
+                return isPlayerAllowed( netTransfer, filter\GetPlayers!, ply )
+
+        return false
+
+do
+
+    registry = {}
+
+    net.Receive "gLua Package Manager::NetTransfer", ( bits, ply ) ->
+        tbl = registry[ ReadString! ]
+        unless tbl
+            return nil
+
+        metatable = getmetatable( tbl )
+        if metatable and metatable.__receive and isPlayerAllowed( tbl, metatable.__filter, ply )
+            print "new data"
+
+        return nil
+
+    import insert, remove, sort, Empty from table
+    import ipairs from _G
+
+    call = ( tbl, cmd, ... ) ->
+        metatable = getmetatable( tbl )
+
+        if cmd == "len" or cmd == "length"
+            return metatable.__length
+        elseif cmd == "sort"
+            sort( metatable.__data, ... )
+            return nil
+        elseif cmd == "clear"
+            Empty( metatable.__data )
+            metatable.__length = 0
+            return nil
+        elseif cmd == "insert"
+            return insert( metatable.__data, ... )
+        elseif cmd == "remove"
+            return remove( metatable.__data, ... )
+        elseif cmd == "ipairs"
+            return ipairs( metatable.__data )
+        elseif cmd == "pairs"
+            return pairs( metatable.__data )
+        elseif cmd == "send"
+            ply = ...
+            argument( ply, 1, "Player" )
+
+            unless ply\IsValid!
+                throw "Invalid player", 2
+
+            if ply\IsBot!
+                return nil
+
+            Start( "gLua Package Manager::NetTable", false )
+
+            for key, value in pairs( metatable.__data )
+
+                bytes, bits = net.BytesLeft!
+
+            return nil
+
+        return nil
+
+    net.Table = ( name, mode = "r", filter ) ->
+        argument( name, 1, "string" )
+        argument( mode, 2, "string" )
+
+        -- obj = registry[ name ]
+        -- if obj
+        --     return obj
+
+        modes = {}
+        for byte0 in *{ byte( mode, 1, len( mode ) ) }
+            modes[ byte0 ] = true
+
+        receive, send = modes[ 0x72 --[[ r ]] ] or false, modes[ 0x73 --[[ s ]] ] or false
+
+        data = {}
+        length = 0
+
+        local metatable
+
+        newindex = ( key, value ) =>
+            if rawget( data, key ) ~= nil
+                if value == nil
+                    metatable.__length -= 1
+                else
+                    metatable.__length += 1
+
+            data[ key ] = value
+
+        if send
+            -- test
+
+        metatable = {
+            __call: call
+            __data: data
+            __length: 0
+
+            __name: name
+            __filter: filter
+
+            __send: send
+            __receive: receive
+
+            __index: ( _, key ) ->
+                return data[ key ]
+
+            __newindex: newindex
+        }
+
+        tbl = {}
+
+        str = format( "NetTable: %p [%s][%s]", tbl, name, ( receive and "r" or "" ) .. ( send and "s" or "" ) )
+
+        metatable.__tostring = ->
+            return str
+
+        setmetatable( tbl, metatable )
+
+        registry[ name ] = tbl
+        return tbl
+
+    tbl = net.Table( "test", "rs" )
+    print tbl
+
+registry = {}
+
+net.Receive "gLua Package Manager::NetTransfer", ( bits, ply ) ->
+    obj = registry[ ReadString! ]
+    if obj
+        obj\Incoming( bits, ply )
+
+    return nil
+
+net.Transfer = environment.class(
+    "NetTransfer",
+    {
+        __tostring: =>
+            return format( "NetTransfer: %p [%s]", @, @name )
+
+        new: ( name, doCRC = false, unreliable = false ) =>
+            argument( name, 1, "string" )
+
+            transfer = registry[ name ]
+            if transfer
+                transfer\SetVerifyChecksums( doCRC )
+                transfer\SetUnreliable( unreliable )
+                return true, transfer
+
+            registry[ name ] = @
+
+            @name = name
+            @timeout = 10
+            @compressed = false
+            @name_bytes = len( name ) + 1
+
+            @receiving_name = format( "[R] NetTransfer: %p", @ )
+            @receiving = false
+
+            @sending_name = format( "[S] NetTransfer: %p", @ )
+            @sending = false
+
+            @SetTransmissionSpeed( 1.2, true )
+            @SetVerifyChecksums( doCRC )
+            @SetUnreliable( unreliable )
+
+            return false, nil
+
+        -- Receive timeout
+        GetTimeout: =>
+            return @timeout
+
+        SetTimeout: ( seconds ) =>
+            argument( seconds, 1, "number" )
+            @timeout = abs( seconds )
+            return @
+
+        -- Transmission speed ( Message per second )
+        --[[
+
+            Maximum speed is available at value 4,
+            values higher than this do not guarantee
+            speed increase, 0.8 guarantees synchronization
+            between receiving and sending.
+
+            High speed may interfere with
+            normal net library operations.
+
+        ]]
+
+        GetTransmissionSpeed: =>
+            return 1 / @transmission_speed
+
+        SetTransmissionSpeed: ( mps, noCeil ) =>
+            argument( mps, 1, "number" )
+            @transmission_speed = 1 / ( noCeil and mps or ceil( mps ) )
+            return @
+
+        -- Unreliable networking
+        IsUnreliable: =>
+            return @unreliable
+
+        SetUnreliable: ( value ) =>
+            @unreliable = value == true
+            return @
+
+        -- Checksums verify
+        IsVerifyChecksums: =>
+            return @do_verify
+
+        SetVerifyChecksums: ( value ) =>
+            @do_verify = value == true
+            return @
+
+        -- Player filter
+        GetPlayerFilter: =>
+            return @player_filter
+
+        SetPlayerFilter: ( value ) =>
+            @player_filter = value
+            return @
+
+        IsAllowedPlayer: ( ply ) =>
+            return isPlayerAllowed( @, @player_filter, ply )
+
+        -- LZMA data compression
+        IsCompressedData: =>
+            return @compressed
+
+        CompressData: =>
+            if @compressed
+                return @transmitted_data
+
+            data = Compress( @transmitted_data )
+            @transmitted_data = data
+            @compressed = true
+            return data
+
+        DecompressData: =>
+            unless @compressed
+                return @transmitted_data
+
+            data = Decompress( @transmitted_data )
+            @transmitted_data = data
+            @compressed = false
+            return data
+
+        -- Transmitted data
+        GetTransmittedData: =>
+            return @transmitted_data
+
+        GetTransmittedDataSize: =>
+            if @compressed
+                return CompressedSize( @transmitted_data )
+
+            return len( @transmitted_data )
+
+        SetTransmittedData: ( str, compress, decompress ) =>
+            argument( str, 1, "string" )
+            @transmitted_data = str
+
+            if compress
+                return @CompressData!
+
+            if decompress
+                return @DecompressData!
+
+            return str
+
+        -- Networking
+        StartTransmission: =>
+            Start( "gLua Package Manager::NetTransfer", @unreliable )
+            WriteString( @name )
+            return @
+
+        EndTransmission: ( target ) =>
+            if SERVER
+                if target
+                    Send( target )
+                else
+                    Broadcast!
+            else
+                SendToServer!
+
+            return @
+
+        -- Aborting
+        AbortSending: =>
+            Remove( @sending_name )
+            @sending = false
+            return @
+
+        AbortReceiving: =>
+            Remove( @receiving_name )
+
+            unless @permanent_receive
+                @receive_fn = nil
+
+            @compressed = false
+            @receiving = false
+            @data = nil
+            return @
+
+        Abort: =>
+            @AbortReceiving!
+            @AbortSending!
+            return @
+
+        -- Sending
+        IsSending: =>
+            return @sending
+
+        Send: ( ply ) =>
+            if @sending
+                return nil
+
+            if SERVER and not @IsAllowedPlayer( ply )
+                return nil
+
+            transmitted_data = @transmitted_data
+            bytes = len( transmitted_data )
+
+            -- TODO: Think ukdev think
+            total = ceil( bytes / 0xFC00 )
+            uint_bits = ceil( log( total + 1, 2 ) )
+            uint_bits = uint_bits < 1 and 1 or uint_bits
+            @sending = true
+
+            @StartTransmission!
+
+            WriteUInt( uint_bits - 1, 5 )
+            WriteUInt( total, uint_bits )
+            WriteBool( @compressed )
+
+            if @do_verify
+                WriteUInt( tonumber( CRC( transmitted_data ), 10 ), 32 )
+
+            @EndTransmission( ply )
+
+            pointer, index = 0, 0
+            Create @sending_name, @transmission_speed, total, ->
+                unless @sending
+                    return nil
+
+                index += 1
+
+                size = bytes > 0xFC00 and 0xFC00 or bytes
+                bytes -= size
+
+                @StartTransmission!
+
+                WriteData( sub( transmitted_data, pointer + 1, pointer + size ), size )
+                pointer += size
+
+                @EndTransmission( ply )
+
+                progress_fn = @progress_fn
+                if progress_fn
+                    xpcall( progress_fn, ErrorNoHaltWithStack, @, index / total, size )
+
+                if index == total
+                    @AbortSending!
+
+                return nil
+
+            return nil
+
+        -- Receiving
+        IsReceiving: =>
+            return @receiving
+
+        Receive: ( func, permanent ) =>
+            argument( func, 1, "function" )
+            @receive_fn = func
+            @permanent_receive = permanent == true
+            return @
+
+        Incoming: ( bits, ply ) =>
+            receive_fn = @receive_fn
+            unless receive_fn
+                return nil
+
+            if SERVER and not @IsAllowedPlayer( ply )
+                return nil
+
+            Create @receiving_name, @timeout, 1, ->
+                @Error( format( "Timeout, no response for %d seconds.", @timeout ) )
+                return nil
+
+            unless @receiving
+                @total = ReadUInt( ReadUInt( 5 ) + 1 )
+                @compressed = ReadBool!
+
+                if @do_verify
+                    @checksum = tostring( ReadUInt( 32 ) )
+
+                @receiving = true
+                @received = 0
+                @data = {}
+                return nil
+
+            received, total = @received + 1, @total
+            bytes = ( bits / 8 ) - @name_bytes
+
+            @data[ received ] = ReadData( bytes )
+            @received = received
+
+            progress_fn = @progress_fn
+            if progress_fn
+                xpcall( progress_fn, ErrorNoHaltWithStack, @, received / total, bytes )
+
+            if received == total
+                data = concat( @data, "", 1, received )
+                @AbortReceiving!
+
+                if @do_verify and CRC( data ) ~= @checksum
+                    @Error( "Checksum does not match expected, failure." )
+                    return nil
+
+                if @compressed
+                    data = Decompress( data )
+
+                @transmitted_data = data
+
+                xpcall( receive_fn, ErrorNoHaltWithStack, @, data, ply )
+
+            return nil
+
+        -- Other
+        OnProgress: ( func ) =>
+            argument( func, 1, "function" )
+            @progress_fn = func
+            return @
+
+        Error: ( message, ... ) =>
+            @Abort!
+
+            error_fn = @__error
+            if error_fn
+                xpcall( error_fn, ErrorNoHaltWithStack, @, message, ... )
+
+            throw( "#{@} error: " .. message )
+            return nil
+
+        OnError: ( func ) =>
+            argument( func, 1, "function" )
+            @__error = func
+            return @
+
+        Register: =>
+            name = @name
+
+            obj = registry[ name ]
+            if obj
+                return obj
+
+            registry[ name ] = @
+            return @
+
+        Remove: =>
+            @Abort!
+            registry[ @name ] = nil
+            return @
+
+    }
+)

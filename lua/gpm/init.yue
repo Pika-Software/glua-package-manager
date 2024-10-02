@@ -172,6 +172,7 @@ gpm.sql.migrate( "initial file table" )
 
 include( "gpm/libs/file.lua" )
 include( "gpm/libs/http.lua" )
+include( "gpm/libs/net.lua" )
 
 -- Github API
 environment.github = include( "gpm/libs/github.lua" )
