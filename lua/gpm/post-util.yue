@@ -200,6 +200,7 @@ do
         uint = io.I
         readUInt, writeUInt = uint.Read, uint.Write
 
+    local SteamID
     do
 
         import IsSteamID from string
@@ -273,9 +274,9 @@ do
                 return format( "[U:1:%d]", @ToAccountID! )
 
             ToBinary: ( isBigEndian ) =>
-                x, y, z = @ToXYZ!
                 setEndianness( isBigEndian )
-                return writeUInt( nil, tonumber( x, 10 ), tonumber( y, 10 ), tonumber( z, 10 ), 4 )
+                y, z = match( @steamid, "^STEAM_[0-5]:([01]):(%d+)$" )
+                return writeUInt( nil, ( tonumber( z, 10 ) * 2 ) + tonumber( y, 10 ), 4 )
 
             GetUniverse: =>
                 return tonumber( match( @steamid, "^STEAM_([0-5]):[01]:%d+$" ) or 0, 10 )
@@ -290,7 +291,7 @@ do
 
         }
 
-        environment.SteamID = newClass( "SteamID", metatable, {
+        SteamID = newClass( "SteamID", metatable, {
             IsValid: ( steamid ) ->
                 argument( steamid, 1, "string" )
                 return IsSteamID( steamid )
@@ -350,6 +351,8 @@ do
                     steamid: format( "STEAM_0:%s:%d", ( accountid % 2 == 0 ) and "0" or "1", fdiv( accountid, 2 ) )
                 }, metatable )
         } )
+
+        environment.SteamID = SteamID
 
     -- lua 5.3 string features
     do
@@ -845,7 +848,17 @@ do
             WriteDate: ( date ) =>
                 return @Write( date\ToBinary! )
 
-            -- TODO: SteamID
+            -- SteamID
+            ReadSteamID: =>
+                return SteamID.FromBinary( @Read( 4 ) )
+
+            WriteSteamID: ( steamid ) =>
+                if isstring( steamid )
+                    steamid = SteamID( steamid )
+
+                argument( steamid, 1, "SteamID" )
+                return @Write( steamid\ToBinary! )
+
         },
         {
             CompressionMethods: compressionMethods
