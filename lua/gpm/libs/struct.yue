@@ -41,12 +41,12 @@ do
 
     base = {
         __tostring: =>
-            return format( "Cursor: %p [%d/%d]", @, @position, @size )
+            return format( "Cursor: %p [%d/%d]", @, @pointer, @size )
 
         new: ( @data = "" ) =>
             assert( isstring( data ), "data must be a string" )
             @size = len( data )
-            @position = 0
+            @pointer = 0
             @buffer = {}
 
         Flush: =>
@@ -54,12 +54,12 @@ do
 
             length = #buffer
             if length == 0
-                return
+                return @data
 
-            :data, :position, :size = @
+            :data, :pointer, :size = @
 
-            if position > size
-                data ..= rep( "\0", position - size )
+            if pointer > size
+                data ..= rep( "\0", pointer - size )
                 size = len( data )
 
             content = concat( buffer, "", 1, length )
@@ -68,31 +68,33 @@ do
                 buffer[ index ] = nil
 
             length = len( content )
-            data = sub( data, 1, position ) .. content .. sub( data, position + length + 1, size )
-            @position = position + length
+            data = sub( data, 1, pointer ) .. content .. sub( data, pointer + length + 1, size )
             @data, @size = data, len( data )
+            @pointer = pointer + length
+            return data
 
         Seek: ( whence = "cur", offset = 0 ) =>
             @Flush!
 
-            :position, :size = @
+            :pointer, :size = @
 
             switch whence
                 when "cur"
-                    position += offset
+                    pointer += offset
 
                 when "end"
-                    position = size + offset
+                    pointer = size + offset
 
                 when "set"
-                    position = offset
+                    pointer = offset
 
                 else
                     error "bad argument #1 to 'Seek' (invalid option)", 2
                     return nil
 
-            position = @position = min( max( position, 0 ), size )
-            return position
+            pointer = min( max( pointer, 0 ), size )
+            @pointer = pointer
+            return pointer
 
         Write: ( str ) =>
             @buffer[] = str
@@ -100,16 +102,16 @@ do
         Read: ( length = 1 ) =>
             @Flush!
 
-            :position, :size = @
+            :pointer, :size = @
 
-            if position > size
+            if pointer > size
                 return nil, "eof"
 
             if length == "*a"
                 length = size
 
-            @position = min( position + length, size )
-            return sub( @data, position + 1, position + length )
+            @pointer = min( pointer + length, size )
+            return sub( @data, pointer + 1, pointer + length )
     }
 
     _module_0.Cursor = environment.class( "Cursor", base )
@@ -333,7 +335,7 @@ do
     do
 
         read = ( fileDescriptor, _, align ) ->
-            mod = fileDescriptor.position % align
+            mod = fileDescriptor.pointer % align
             if mod ~= 0
                 fileDescriptor\Seek( "cur", align - mod )
 
@@ -1757,8 +1759,7 @@ do
 
     unwrapFileDescriptor = api.UnwrapFileDescriptor = ( fileDescriptor ) ->
         if IsCursor( fileDescriptor )
-            fileDescriptor\Flush!
-            return fileDescriptor.data
+            return fileDescriptor\Flush!
 
         return fileDescriptor
 
