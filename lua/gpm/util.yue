@@ -486,6 +486,15 @@ do
 string.slice = sub
 string.gmatch or= string.gfind
 
+string.cut = ( str, index ) ->
+    return sub( str, 1, index - 1 ), sub( str, index, len( str ) )
+
+string.insert = ( str, index, value ) ->
+    if value == nil
+        return str .. index
+
+    return sub( str, 1, index - 1 ) .. value .. sub( str, index, len( str ) )
+
 string.StartsWith = ( str, startStr ) ->
 	return str == startStr or sub( str, 1, len( startStr ) ) == startStr
 
