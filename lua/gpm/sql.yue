@@ -112,7 +112,8 @@ if SERVER
         unless repositoryId
             throw SQLError "invalid repository '#{repository}' was given as #1 argument"
 
-        if pkg := queryOne( "select * from 'gpm.packages' where name=? and repositoryId=?", name, repositoryId )
+        pkg = queryOne( "select * from 'gpm.packages' where name=? and repositoryId=?", name, repositoryId )
+        if pkg
             pkg.versions = query( "select version, metadata from 'gpm.package_versions' where packageId=?", pkg.id )
             return pkg
 
@@ -165,6 +166,8 @@ if SERVER
 -- files
 do
 
+    import tonumber from _G
+
     files = sql.files = {}
 
     files.save = ( path, size, seconds, hash ) ->
@@ -178,11 +181,14 @@ do
 
     files.get = ( path ) ->
         argument( path, 1, "string" )
-        if result := sql.queryOne( "select * from 'gpm.files' where path=?", path )
+
+        result = queryOne( "select * from 'gpm.files' where path=?", path )
+        if result
             result.size = tonumber( result.size, 10 ) or -1
             result.time = tonumber( result.time, 10 )
             return result
 
+        return nil
 
 -- optimize sqlite database
 unless sql.__optimized
@@ -331,3 +337,5 @@ sql.migrate = ( name ) ->
 
         if migration.name == name -- this is our last migration
             break
+
+    return nil

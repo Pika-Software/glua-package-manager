@@ -154,11 +154,11 @@ environment.async = futures.async = ( fn ) ->
     return ( ... ) ->
         thread = coroCreate( asyncThread )
 
-        unless ok, err := coroResume( thread, fn, ... )
-            return throw err
+        ok, err = coroResume( thread, fn, ... )
+        if ok
+            return thread
 
-        return thread
-
+        return throw err
 
 futures.run = ( thread, callback ) ->
     unless isthread( thread )

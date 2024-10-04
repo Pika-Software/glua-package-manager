@@ -54,7 +54,9 @@ class GithubSource extends gpm.loader.Source
 
     FindPackageInfo = ( user, repository, tree_sha ) ->
         filePath = CACHE_DIR .. user .. "/" .. repository .. "/" .. tree_sha .. "/package.entry.json"
-        if entry := JSONToTable( Read( filePath, nil, nil, nil, true ) or "", true, true )
+
+        entry = JSONToTable( Read( filePath, nil, nil, nil, true ) or "", true, true )
+        if entry
             return entry
 
         Logger\Debug( "Fetching file tree from Github repository '%s/%s/%s'...", user, repository, tree_sha )
@@ -93,7 +95,9 @@ class GithubSource extends gpm.loader.Source
 
     FetchPackageFile = ( user, repository, branch, entry ) ->
         filePath = CACHE_DIR .. user .. "/" .. repository .. "/" .. branch .. "/package.txt"
-        if package := Read( filePath, nil, nil, nil, true )
+
+        package = Read( filePath, nil, nil, nil, true )
+        if package
             return package
 
         Logger\Debug( "Fetching package file from Github repository '%s/%s/%s'... (sha = '%s')", user, repository, branch, entry.sha )
@@ -104,7 +108,9 @@ class GithubSource extends gpm.loader.Source
 
     DownloadRepository = ( user, repository, branch ) ->
         filePath = CACHE_DIR .. user .. "/" .. repository .. "/" .. branch .. "/files.zip.dat"
-        if data := Read( filePath, nil, nil, nil, true )
+
+        data = Read( filePath, nil, nil, nil, true )
+        if data
             return ByteStream( data )
 
         Logger\Debug( "Downloading repository '%s/%s/%s'...", user, repository, branch )
@@ -117,7 +123,9 @@ class GithubSource extends gpm.loader.Source
     FetchInfo: async ( url ) =>
         -- Parse user, repo and branch from the given url
         segments = ByteSplit( url.pathname, 0x2F --[[ / ]] )
-        if hostname := url.hostname
+
+        :hostname = url
+        if hostname
             insert( segments, 1, hostname )
 
         user = lower( segments[ 1 ] )
@@ -132,7 +140,8 @@ class GithubSource extends gpm.loader.Source
             error SourceError "Failed to find package file in #{user}/#{repository} (#{branch})."
 
         -- Check if repository already was installed locally
-        if pkg := await Package.read( url )
+        pkg = await Package.read( url )
+        if pkg
             return {
                 package: pkg
                 url: url

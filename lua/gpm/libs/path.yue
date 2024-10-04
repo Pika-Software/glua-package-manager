@@ -117,8 +117,10 @@ export fix = ( path ) ->
 
 export getCurrentFile = ( func = getfmain! ) ->
     if func
-        if fenv := getfenv( func )
-            if filePath := rawget( fenv, "__filename" )
+        fenv = getfenv( func )
+        if fenv
+            filePath = rawget( fenv, "__filename" )
+            if filePath
                 return filePath
 
         fpath = getfpath( func )
@@ -129,8 +131,10 @@ export getCurrentFile = ( func = getfmain! ) ->
 
 export getCurrentDirectory = ( func = getfmain!, withTrailingSlash = true ) ->
     if func
-        if fenv := getfenv( func )
-            if dirPath := rawget( fenv, "__dirname" )
+        fenv = getfenv( func )
+        if fenv
+            dirPath = rawget( fenv, "__dirname" )
+            if dirPath
                 if withTrailingSlash
                     dirPath ..= "/"
 

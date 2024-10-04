@@ -37,7 +37,8 @@ do
 
         data = types[ index ]
         if data
-            if func := data[ 2 ]
+            func = data[ 2 ]
+            if func
                 WriteUInt( index, 16 )
                 return func( value )
 
@@ -54,7 +55,8 @@ do
 
 		data = types[ index ]
         if data
-            if func := data[ 1 ]
+            func = data[ 1 ]
+            if func
         		return func!
 
         throw "missing type '" .. index .. "' reader", 2
@@ -68,8 +70,10 @@ if SERVER
 	net.Start = ( networkString ) ->
         networkString = lower( networkString )
 
-        if fenv := getfenv( 2 )
-            if pkg := fenv.__package
+        fenv = getfenv( 2 )
+        if fenv
+            pkg = fenv.__package
+            if pkg
                 networkString = pkg.__prefix .. networkString
 
 		if NetworkStringToID( networkString ) == 0
@@ -97,8 +101,10 @@ do
 			identifier = "unknown"
 
         networks = external
-        if fenv := getfenv( 2 )
-            if pkg := fenv.__package
+        fenv = getfenv( 2 )
+        if fenv
+            pkg = fenv.__package
+            if pkg
                 prefix = pkg.__prefix
                 identifier = prefix .. identifier
                 networkString = prefix .. networkString
@@ -141,10 +147,12 @@ do
         if Run( "IncomingNetworkMessage", networkString, length, client ) == false
             return nil
 
-        if func := gmod_receivers[ networkString ]
+        func = gmod_receivers[ networkString ]
+        if func
             xpcall( func, ErrorNoHaltWithStack, length, client )
 
-        if functions := external[ networkString ]
+        functions = external[ networkString ]
+        if functions
             for data in *functions
                 xpcall( data[ 2 ], ErrorNoHaltWithStack, length, client )
 

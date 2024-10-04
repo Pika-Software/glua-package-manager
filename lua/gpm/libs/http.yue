@@ -142,7 +142,8 @@ do
 
             :success = parameters
             parameters.success = ( status, body, headers ) ->
-                if cacheControl := headers["cache-control"]
+                cacheControl = headers["cache-control"]
+                if cacheControl
                     options = {}
                     for key, value in gmatch( cacheControl, "([%w_-]+)=?([%w_-]*)" )
                         options[ key ] = tonumber( value, 10 ) or true

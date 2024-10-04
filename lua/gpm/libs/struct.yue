@@ -97,7 +97,9 @@ do
             return pointer
 
         Write: ( str ) =>
-            @buffer[] = str
+            :buffer = @
+            buffer[] = str
+            return nil
 
         Read: ( length = 1 ) =>
             @Flush!
@@ -1268,7 +1270,8 @@ do
             -- cannot resolve it yet. If it holds a backreference and data is not-nil but
             -- also does not contain an appropriate field, it throws.
             Get: ( data ) =>
-                if value := @value
+                value = @value
+                if value
                     return value
 
                 if data
@@ -1494,15 +1497,17 @@ do
                     if arg == ""
                         argv[ n ] = nil
 
-                    elseif number := tonumber( arg, 10 )
-                        argv[ n ] = number
-
-                    elseif match( arg, "^#[%a_][%w_.]*$" )
-                        argv.has_backrefs = true
-                        argv[ n ] = numberClass( arg )
-
                     else
-                        argv[ n ] = arg
+                        number = tonumber( arg, 10 )
+                        if number
+                            argv[ n ] = number
+
+                        elseif match( arg, "^#[%a_][%w_.]*$" )
+                            argv.has_backrefs = true
+                            argv[ n ] = numberClass( arg )
+
+                        else
+                            argv[ n ] = arg
 
             @size = io[ name ].Size( argv[ 1 ] )
             @hasvalue = io[ name ].HasValue!

@@ -798,7 +798,9 @@ do
 
     string.SQLSafe = ( str, noQuotes ) ->
         str = replace( tostring( str ), "'", "''", false )
-        if null_chr := find( str, "\0" )
+
+        null_chr = find( str, "\0" )
+        if null_chr
             str = sub( str, 1, null_chr - 1 )
 
         if noQuotes
@@ -2413,8 +2415,10 @@ do
         argument( identifier, 2, "string" )
         argument( func, 3, "function" )
 
-        if fenv := getfenv( 2 )
-            if pkg := fenv.__package
+        fenv = getfenv( 2 )
+        if fenv
+            pkg = fenv.__package
+            if pkg
                 hooks = pkg.__hooks
                 unless hooks
                     hooks = {}
@@ -2430,8 +2434,10 @@ do
         argument( eventName, 1, "string" )
         argument( identifier, 2, "string" )
 
-        if fenv := getfenv( 2 )
-            if pkg := fenv.__package
+        fenv = getfenv( 2 )
+        if fenv
+            pkg = fenv.__package
+            if pkg
                 hooks = pkg.__hooks
                 unless hooks
                     hooks = {}
@@ -2449,8 +2455,10 @@ do
         return Remove( eventName, identifier )
 
     lib.GetTable = ->
-        if fenv := getfenv( 2 )
-            if pkg := fenv.__package
+        fenv = getfenv( 2 )
+        if fenv
+            pkg = fenv.__package
+            if pkg
                 hooks = pkg.__hooks
                 unless hooks
                     hooks = {}
@@ -2474,8 +2482,10 @@ do
         argument( identifier, 1, "string" )
         argument( delay, 2, "number" )
 
-        if fenv := getfenv( 2 )
-            if pkg := fenv.__package
+        fenv = getfenv( 2 )
+        if fenv
+            pkg = fenv.__package
+            if pkg
                 timers = pkg.__timers
                 unless timers
                     timers = pkg.__timers = {}
@@ -2498,8 +2508,10 @@ do
         argument( repetitions, 3, "number" )
         argument( func, 4, "function" )
 
-        if fenv := getfenv( 2 )
-            if pkg := fenv.__package
+        fenv = getfenv( 2 )
+        if fenv
+            pkg = fenv.__package
+            if pkg
                 timers = pkg.__timers
                 unless timers
                     timers = pkg.__timers = {}
@@ -2519,8 +2531,10 @@ do
     lib.Exists = ( identifier ) ->
         argument( identifier, 1, "string" )
 
-        if fenv := getfenv( 2 )
-            if pkg := fenv.__package
+        fenv = getfenv( 2 )
+        if fenv
+            pkg = fenv.__package
+            if pkg
                 return Exists( pkg.__prefix .. identifier )
 
         return Exists( identifier )
@@ -2528,8 +2542,10 @@ do
     lib.Pause = ( identifier ) ->
         argument( identifier, 1, "string" )
 
-        if fenv := getfenv( 2 )
-            if pkg := fenv.__package
+        fenv = getfenv( 2 )
+        if fenv
+            pkg = fenv.__package
+            if pkg
                 return Pause( pkg.__prefix .. identifier )
 
         return Pause( identifier )
@@ -2537,8 +2553,10 @@ do
     lib.Remove = ( identifier ) ->
         argument( identifier, 1, "string" )
 
-        if fenv := getfenv( 2 )
-            if pkg := fenv.__package
+        fenv = getfenv( 2 )
+        if fenv
+            pkg = fenv.__package
+            if pkg
                 timers = pkg.__timers
                 unless timers
                     timers = pkg.__timers = {}
@@ -2551,8 +2569,10 @@ do
     lib.RepsLeft = ( identifier ) ->
         argument( identifier, 1, "string" )
 
-        if fenv := getfenv( 2 )
-            if pkg := fenv.__package
+        fenv = getfenv( 2 )
+        if fenv
+            pkg = fenv.__package
+            if pkg
                 return RepsLeft( pkg.__prefix .. identifier )
 
         return RepsLeft( identifier )
@@ -2560,8 +2580,10 @@ do
     lib.Start = ( identifier ) ->
         argument( identifier, 1, "string" )
 
-        if fenv := getfenv( 2 )
-            if pkg := fenv.__package
+        fenv = getfenv( 2 )
+        if fenv
+            pkg = fenv.__package
+            if pkg
                 return Start( pkg.__prefix .. identifier )
 
         return Start( identifier )
@@ -2569,8 +2591,10 @@ do
     lib.Stop = ( identifier ) ->
         argument( identifier, 1, "string" )
 
-        if fenv := getfenv( 2 )
-            if pkg := fenv.__package
+        fenv = getfenv( 2 )
+        if fenv
+            pkg = fenv.__package
+            if pkg
                 return Stop( pkg.__prefix .. identifier )
 
         return Stop( identifier )
@@ -2578,8 +2602,10 @@ do
     lib.TimeLeft = ( identifier ) ->
         argument( identifier, 1, "string" )
 
-        if fenv := getfenv( 2 )
-            if pkg := fenv.__package
+        fenv = getfenv( 2 )
+        if fenv
+            pkg = fenv.__package
+            if pkg
                 return TimeLeft( pkg.__prefix .. identifier )
 
         return TimeLeft( identifier )
@@ -2587,8 +2613,10 @@ do
     lib.Toggle = ( identifier ) ->
         argument( identifier, 1, "string" )
 
-        if fenv := getfenv( 2 )
-            if pkg := fenv.__package
+        fenv = getfenv( 2 )
+        if fenv
+            pkg = fenv.__package
+            if pkg
                 return Toggle( pkg.__prefix .. identifier )
 
         return Toggle( identifier )
@@ -2596,15 +2624,19 @@ do
     lib.UnPause = ( identifier ) ->
         argument( identifier, 1, "string" )
 
-        if fenv := getfenv( 2 )
-            if pkg := fenv.__package
+        fenv = getfenv( 2 )
+        if fenv
+            pkg = fenv.__package
+            if pkg
                 return UnPause( pkg.__prefix .. identifier )
 
         return UnPause( identifier )
 
     lib.GetTable = ->
-        if fenv := getfenv( 2 )
-            if pkg := fenv.__package
+        fenv = getfenv( 2 )
+        if fenv
+            pkg = fenv.__package
+            if pkg
                 timers = pkg.__timers
                 unless timers
                     timers = pkg.__timers = {}
@@ -2631,7 +2663,8 @@ do
         cache = {}
 
         getConVar = environment.GetConVar = ( name ) ->
-            if convar := cache[ name ]
+            convar = cache[ name ]
+            if convar
                 return convar
 
             convar = GetConVar_Internal( name )

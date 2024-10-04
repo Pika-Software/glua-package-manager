@@ -146,7 +146,8 @@ errorClass = environment.class(
             @stack = stack = captureStack( stackPos )
             mergeStack( stack )
 
-            if first := stack[ 1 ]
+            first = stack[ 1 ]
+            if first
                 @fileName or= first.short_src
                 @lineNumber or= first.currentline
 
@@ -194,14 +195,16 @@ errorClass = environment.class(
             lines, length = { "\n[ERROR] " .. tostring( @ ) }, 1
 
             -- Add stack trace
-            if stack := @stack
+            stack = @stack
+            if stack
                 for i = 1, #stack
                     info = stack[ i ]
                     length += 1
                     lines[ length ] = format( "%s %d. %s - %s:%d", rep( " ", i ), i, info.name or "unknown", info.short_src, info.currentline or -1 )
 
             -- Add locals
-            if locals := @locals
+            locals = @locals
+            if locals
                 length += 1
                 lines[ length ] = "\n=== Locals ==="
 
@@ -210,7 +213,8 @@ errorClass = environment.class(
                     lines[ length ] = format( "  - %s = %s", entry.name, entry.value )
 
             -- Add upvalues
-            if upvalues := @upvalues
+            upvalues = @upvalues
+            if upvalues
                 length += 1
                 lines[ length ] = "\n=== Upvalues ==="
 

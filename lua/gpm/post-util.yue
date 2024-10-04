@@ -1455,7 +1455,8 @@ if _G.sql
         return result
 
     queryRow = lib.queryRow = lib.QueryRow = ( str, row = 1, ... ) ->
-        if result := query( str, ... )
+        result = query( str, ... )
+        if result
             return result[ row ]
 
         return nil
@@ -1464,7 +1465,8 @@ if _G.sql
         return queryRow( str, 1, ... )
 
     lib.queryValue = lib.QueryValue = ( str, ... ) ->
-        if result := queryOne( str, ... )
+        result = queryOne( str, ... )
+        if result
             return next( result )
 
         return nil

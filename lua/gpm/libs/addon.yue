@@ -261,7 +261,8 @@ _module_0.GMA = environment.class( "GMA", {
         if version > @FormatVersion
             error AddonError "gma version is unsupported"
 
-        if steam_id := handler\ReadUInt64!
+        steam_id = handler\ReadUInt64!
+        if steam_id
             if isstring( steam_id )
                 @steam_id = steam_id
             else
@@ -276,7 +277,8 @@ _module_0.GMA = environment.class( "GMA", {
             handler\Skip( -1 )
 
             while not handler\EndOfFile!
-                if value := handler\ReadString!
+                value = handler\ReadString!
+                if value
                     required_content[ value ] = true
                 else
                     break
