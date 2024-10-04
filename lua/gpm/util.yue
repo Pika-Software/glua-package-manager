@@ -74,8 +74,22 @@ do
             return result, length
 
 table.move = ( source, first, last, offset, destination = source ) ->
-    for index = 0, last - first
-        destination[ offset + index ] = source[ first + index ]
+    for i = 0, last - first
+        destination[ offset + i ] = source[ first + i ]
+
+    return destination
+
+table.Insert = ( source, first, last, offset, destination = source ) ->
+    while offset < 0
+        offset += #destination + 2
+
+    steps = last - first
+
+    for i = #destination, offset, -1
+        destination[ steps + i + 1 ] = destination[ i ]
+
+    for i = 0, steps
+        destination[ offset + i ] = source[ first + i ]
 
     return destination
 
