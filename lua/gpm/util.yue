@@ -1233,8 +1233,11 @@ do
                     if rawget( cls, "__name" ) ~= className
                         error "external type name mismatch '" .. ( rawget( cls, "__name" ) or "nil" ) .. " ~= " .. className .. "'"
 
-                @external = classes
+                classes[ name ] = @
+            else
+                classes = { [ name ]: @ }
 
+            @external = classes
             @name = name
 
             required, length = {}, 0
