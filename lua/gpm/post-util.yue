@@ -424,30 +424,30 @@ do
         else
             position = 0
 
-        @position = position
+        @pointer = position
         return position
 
     util.ByteStream = newClass(
         "ByteStream",
         {
             __tostring: =>
-                return format( "ByteStream: %p [%d/%d]", @, @position, @size )
+                return format( "ByteStream: %p [%d/%d]", @, @pointer, @size )
 
             IsValid: =>
                 return @data ~= nil
 
             EndOfFile: =>
-                return @position >= @size
+                return @pointer >= @size
 
             Size: =>
                 return @size
 
             Tell: =>
-                return @position
+                return @pointer
 
             Close: =>
                 @Flush!
-                @position = 0
+                @pointer = 0
 
             Seek: seek
             SeekTo: seek
@@ -456,7 +456,7 @@ do
                 return @Seek( 0 )
 
             SeekToEnd: =>
-                return @Seek( @size - @position )
+                return @Seek( @size - @pointer )
 
             SkipEmpty: =>
                 while not @EndOfFile!
@@ -470,28 +470,27 @@ do
                 else
                     bytes = 1
 
-                return @Seek( @position + bytes )
+                return @Seek( @pointer + bytes )
 
             -- Byte read
             Read: ( bytes ) =>
-                :position, :size = @
-
+                :pointer, :size = @
                 if bytes == "*a" or bytes == nil
                     bytes = size
 
                 argument( bytes, 2, "number" )
 
                 if bytes > 0
-                    if position >= size
+                    if pointer >= size
                         return nil, "eof"
 
-                    return sub( @data, position + 1, @Skip( bytes ) )
+                    return sub( @data, pointer + 1, @Skip( bytes ) )
 
                 if bytes < 0
-                    if position <= 0
+                    if pointer <= 0
                         return nil, "sof"
 
-                    return reverse( sub( @data, position + 1, @Skip( bytes ) ) )
+                    return reverse( sub( @data, pointer + 1, @Skip( bytes ) ) )
 
             ReadAll: =>
                 @SeekToBegin!
@@ -499,12 +498,12 @@ do
 
             -- String
             ReadString: =>
-                :position, :size = @
-                if position >= size
+                :pointer, :size = @
+                if pointer >= size
                     return nil, "eof"
 
                 bytes, data = 0, @data
-                for index = position, size
+                for index = pointer, size
                     if byte( data, index + 1 ) == 0
                         break
 
@@ -524,12 +523,12 @@ do
 
             -- Line
             ReadLine: =>
-                :position, :size = @
-                if position >= size
+                :pointer, :size = @
+                if pointer >= size
                     return nil, "eof"
 
                 bytes, data = 0, @data
-                for index = position, size
+                for index = pointer, size
                     if byte( data, index + 1 ) == 0xA --[[ \n ]]
                         break
 
@@ -846,6 +845,10 @@ do
                 return Date.FromBinary( @Read( 12 ) )
 
             WriteDate: ( date ) =>
+                if isstring( date )
+                    date = Date( date )
+
+                argument( date, 1, "Date" )
                 return @Write( date\ToBinary! )
 
             -- SteamID
