@@ -4,11 +4,12 @@ gmod_net = _G.net
 unless gmod_net
     return nil
 
-import environment from _G.gpm
-import NULL, FindMetaTable, pairs, xpcall, SERVER from _G
-import net, util, istable, isnumber, isstring, Entity, TypeID, ErrorNoHaltWithStack from environment
+import NULL, FindMetaTable, pairs, xpcall, SERVER, gpm from _G
+import environment from gpm
+
+import string, net, util, istable, isnumber, isstring, Entity, TypeID, ErrorNoHaltWithStack, argument from environment
 import ReadUInt, WriteUInt, ReadData, WriteData from gmod_net
-import byte, char, lower from environment.string
+import byte, char, lower from string
 
 ENTITY = FindMetaTable( "Entity" )
 import EntIndex, IsValid from ENTITY
@@ -100,7 +101,7 @@ do
         if fenv
             pkg = fenv.__package
             if pkg
-                prefix = pkg.__prefix
+                prefix = pkg.prefix
                 identifier = prefix .. identifier
                 networkString = prefix .. networkString
 
