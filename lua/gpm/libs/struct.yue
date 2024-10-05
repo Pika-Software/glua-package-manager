@@ -46,14 +46,14 @@ do
         new: ( @data = "" ) =>
             assert( isstring( data ), "data must be a string" )
             @size = len( data )
+            @buffer_size = 0
             @pointer = 0
             @buffer = {}
+            return nil
 
         Flush: =>
-            :buffer = @
-
-            length = #buffer
-            if length == 0
+            :buffer_size = @
+            if buffer_size == 0
                 return @data
 
             :data, :pointer, :size = @
@@ -62,15 +62,15 @@ do
                 data ..= rep( "\0", pointer - size )
                 size = len( data )
 
-            content = concat( buffer, "", 1, length )
+            content = concat( @buffer, "", 1, buffer_size  )
 
-            for index = 1, length
-                buffer[ index ] = nil
+            @buffer_size = 0
+            @buffer = {}
 
-            length = len( content )
-            data = sub( data, 1, pointer ) .. content .. sub( data, pointer + length + 1, size )
+            buffer_size = len( content )
+            data = sub( data, 1, pointer ) .. content .. sub( data, pointer + buffer_size + 1, size )
             @data, @size = data, len( data )
-            @pointer = pointer + length
+            @pointer = pointer + buffer_size
             return data
 
         Seek: ( whence = "cur", offset = 0 ) =>
@@ -97,8 +97,9 @@ do
             return pointer
 
         Write: ( str ) =>
-            :buffer = @
-            buffer[] = str
+            buffer_size = @buffer_size + 1
+            @buffer[ buffer_size ] = str
+            @buffer_size = buffer_size
             return nil
 
         Read: ( length = 1 ) =>
