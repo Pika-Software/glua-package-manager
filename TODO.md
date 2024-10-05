@@ -4,7 +4,6 @@
 - [ ] Server-side CLI commands ( install, remove, reload and etc. )
 - [ ] Write a new NetTransfer class to transfer large amounts of data over `net`
 - [ ] NetTables - synchronizable tables, support only basic Lua types ( strings, numbers, booleans, tables, maybe vectors, colors and angles )
-- [ ] Write more `net.` functions like `net.WriteSteamID` and etc.
 - [ ] Write tests for all functionality ( we will die trying )
 - [ ] Write documentation
 

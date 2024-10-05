@@ -859,7 +859,7 @@ do
         import Insert from table
         import band from bit
 
-        util.BitStream = environment.extend( util.ByteStream, "BitStream", {
+        metatable = {
             __tostring: =>
                 return format( "BitStream: %p [%d/%d]", @, @pointer, @size )
 
@@ -978,13 +978,13 @@ do
                 return nil
 
             -- Boolean
-            ReadBool: =>
+            ReadBit: =>
                 if @EndOfFile!
                     return nil, "eof"
 
                 return @bits[ @Skip( 1 ) ] == true
 
-            WriteBool: ( bool ) =>
+            WriteBit: ( bool ) =>
                 buffer_size = @buffer_size + 1
                 @buffer[ buffer_size ] = bool == true
                 @buffer_size = buffer_size
@@ -1295,7 +1295,13 @@ do
                 @WriteByte( color.b )
                 return @WriteByte( color.a )
 
-        } )
+        }
+
+        -- Yep, in bitstream bool is a bit
+        metatable.ReadBool = metatable.ReadBit
+        metatable.WriteBool = metatable.WriteBit
+
+        util.BitStream = environment.extend( util.ByteStream, "BitStream", metatable )
 
 -- Version
 do

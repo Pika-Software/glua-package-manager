@@ -6,9 +6,9 @@ unless gmod_net
 
 import environment from _G.gpm
 import NULL, FindMetaTable, pairs, xpcall, SERVER from _G
-import net, util, istable, Entity, TypeID, ErrorNoHaltWithStack from environment
-import ReadUInt, WriteUInt from gmod_net
-import lower from environment.string
+import net, util, istable, isnumber, isstring, Entity, TypeID, ErrorNoHaltWithStack from environment
+import ReadUInt, WriteUInt, ReadData, WriteData from gmod_net
+import byte, char, lower from environment.string
 
 ENTITY = FindMetaTable( "Entity" )
 import EntIndex, IsValid from ENTITY
@@ -24,26 +24,22 @@ types[ environment.TYPE_MATRIX ] = { net.ReadMatrix, net.WriteMatrix }
 types[ environment.TYPE_VECTOR ] = { net.ReadVector, net.WriteVector }
 types[ environment.TYPE_ANGLE ] = { net.ReadAngle, net.WriteAngle }
 
-do
+net.WriteType = ( value, index ) ->
+    unless isnumber( index )
+        index = TypeID( value )
+        if index < 0
+            throw "invalid type '" .. index .. "'", 2
+            return nil
 
-    import isnumber from environment
+    data = types[ index ]
+    if data
+        func = data[ 2 ]
+        if func
+            WriteUInt( index, 16 )
+            return func( value )
 
-    net.WriteType = ( value, index ) ->
-        unless isnumber( index )
-            index = TypeID( value )
-            if index < 0
-                throw "invalid type '" .. index .. "'", 2
-                return nil
-
-        data = types[ index ]
-        if data
-            func = data[ 2 ]
-            if func
-                WriteUInt( index, 16 )
-                return func( value )
-
-        throw "missing type '" .. index .. "' writer", 2
-        return nil
+    throw "missing type '" .. index .. "' writer", 2
+    return nil
 
 do
 
@@ -86,7 +82,6 @@ if SERVER
 do
 
 	import remove from environment.table
-	import isstring from environment
 
     external = rawget( net, "Receivers" )
     unless istable( external )
@@ -216,23 +211,64 @@ do
 
 	read = ( readAlpha ) ->
 		if readAlpha == false
-            return setmetatable( { r: ReadUInt( 8 ), g: ReadUInt( 8 ), b: ReadUInt( 8 ), a: 255 }, metatable )
+            r, g, b = byte( ReadData( 3 ), 1, 3 )
+            return setmetatable( { :r, :g, :b, a: 255 }, metatable )
 
-        return setmetatable( { r: ReadUInt( 8 ), g: ReadUInt( 8 ), b: ReadUInt( 8 ), a: ReadUInt( 8 ) }, metatable )
+        r, g, b, a = byte( ReadData( 4 ), 1, 4 )
+        return setmetatable( { :r, :g, :b, :a }, metatable )
 
 	write = ( color, writeAlpha ) ->
-		WriteUInt( color.r or 255, 8 )
-		WriteUInt( color.g or 255, 8 )
-		WriteUInt( color.b or 255, 8 )
-
 		if writeAlpha == false
+            WriteData( char( color.r or 255, color.g or 255, color.b or 255 ) )
 			return color
 
-		WriteUInt( color.a or 255, 8 )
+        WriteData( char( color.r or 255, color.g or 255, color.b or 255, color.a or 255 ) )
 		return color
 
 	net.ReadColor, net.WriteColor = read, write
     types[ environment.TYPE_COLOR ] = { read, write }
+
+do
+
+    local readAll
+    do
+
+        import BytesLeft from gmod_net
+
+        readAll = ->
+            return ReadData( BytesLeft!, nil )
+
+        net.ReadAll = readAll
+
+    -- ByteStream
+    do
+
+        import ByteStream from util
+
+        net.ReadByteStream = ( length ) ->
+            return ByteStream( length or readAll! )
+
+        net.WriteByteStream = ( byteStream ) ->
+            if isstring( byteStream )
+                WriteData( byteStream )
+                return nil
+
+            argument( byteStream, 1, "ByteStream" )
+            return WriteData( byteStream\ReadAll! )
+
+    import BitStream from util
+
+    -- BitStream
+    net.ReadBitStream = ( length ) ->
+        return BitStream( length or readAll! )
+
+    net.WriteBitStream = ( bitStream ) ->
+        if isstring( bitStream )
+            WriteData( bitStream )
+            return nil
+
+        argument( bitStream, 1, "BitStream" )
+        return WriteData( bitStream\ReadAll! )
 
 -- Table
 do
@@ -283,6 +319,138 @@ do
 	net.ReadTable, net.WriteTable = read, write
     types[ environment.TYPE_TABLE ] = { read, write }
 
+-- SteamID
+do
+
+    import SteamID from util
+
+    net.ReadSteamID = ->
+        return SteamID.FromBinary( ReadData( 4 ) )
+
+    net.WriteSteamID = ( steamID ) ->
+        if isstring( steamID )
+            steamID = SteamID( steamID )
+
+        argument( steamID, 1, "SteamID" )
+        return WriteData( steamID\ToBinary! )
+
+-- Date
+do
+
+    import Date from util
+
+    net.ReadDate = ->
+        return Date.FromBinary( ReadData( 12 ) )
+
+    net.WriteDate = ( date ) ->
+        if isstring( date )
+            date = Date( date )
+
+        argument( date, 1, "Date" )
+        return WriteData( date\ToBinary! )
+
+-- Time
+do
+
+    import dos2unix, unix2dos from environment.os
+
+    net.ReadTime = ->
+        return dos2unix( ReadUInt( 16 ), ReadUInt( 16 ) )
+
+    net.WriteTime = ( u ) ->
+        t, d = unix2dos( u )
+        WriteUInt( t, 16 )
+        return WriteUInt( d, 16 )
+
+-- 64bit
+do
+
+    import BInt from environment
+    import FromBytes, ToBytes, ToNumber, CastSigned from BInt
+    import io from environment.struct
+    import Little from io.endianness
+
+    -- Int64
+    do
+
+        local readInt, writeInt
+        do
+            int = io.i
+            readInt, writeInt = int.Read, int.Write
+
+        net.ReadInt64 = ->
+            binary = ReadData( 8 )
+            if byte( binary, 7 ) == 0 and byte( binary, 8 ) == 0
+                Little!
+                return readInt( nil, binary, 6 )
+
+            return CastSigned( FromBytes( binary, true ), 8 )
+
+        net.WriteInt64 = ( number ) ->
+            local isBint
+            if isnumber( number )
+                isBint = false
+            else
+                number = BInt( number )
+                isBint = true
+
+            if isBint or number > 0xFFFFFFFFFFFF
+                Little!
+
+                WriteData( ToBytes( number, 8, true ) )
+                return nil
+
+            Little!
+
+            if isBint
+                WriteData( writeInt( nil, ToNumber( number ), 6 ) )
+            else
+                WriteData( writeInt( nil, number, 6 ) )
+
+            WriteData( "\0\0" )
+            return nil
+
+    -- UInt64
+    do
+
+        local readUInt, writeUInt
+        do
+            uint = io.I
+            readUInt, writeUInt = uint.Read, uint.Write
+
+        net.ReadUInt64 = ->
+            binary = ReadData( 8 )
+            Little!
+
+            if byte( binary, 7 ) == 0 and byte( binary, 8 ) == 0
+                return readUInt( nil, binary, 6 )
+
+            return FromBytes( binary, true )
+
+        net.WriteUInt64 = ( number ) ->
+            local isBint
+            if isnumber( number )
+                isBint = false
+            else
+                number = BInt( number )
+                isBint = true
+
+            if isBint or number > 0xFFFFFFFFFFFF
+                Little!
+
+                WriteData( ToBytes( number, 8, true ) )
+                return nil
+
+            Little!
+
+            if isBint
+                WriteData( writeUInt( nil, ToNumber( number ), 6 ) )
+            else
+                WriteData( writeUInt( nil, number, 6 ) )
+
+            WriteData( "\0\0" )
+            return nil
+
 --[[        !!!! BELOW RE-WRITE REQUIRED !!!!       ]]--
 -- TODO: !!!!
 
@@ -293,7 +461,7 @@ do
 import abs, ceil, log from environment.math
 
 
-import Broadcast, Send, SendToServer, ReadBool, WriteBool, ReadData, WriteData, ReadString, WriteString from net
+import Broadcast, Send, SendToServer, ReadBool, WriteBool, ReadString, WriteString from net
 import Compress, Decompress, CompressedSize from util
 
 if SERVER
