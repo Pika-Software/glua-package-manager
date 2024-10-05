@@ -12,7 +12,7 @@ import Version from util
 
 file.CreateDir( "/data/gpm/vfs", true )
 
-_G.hook.Add "ShutDown", "gLua Package Manager::VFS", ->
+_G.hook.Add "ShutDown", gpm.PREFIX .. "::VFS", ->
     file.Delete( "/data/gpm/vfs" )
     return nil
 
@@ -373,17 +373,19 @@ do
 
             @logger = logger
 
+            prefix = name .. "@" .. version\__tostring!
+
             local packageLogger
             if logger
                 if logger.disabled
                     packageLogger = nil
                 else
-                    packageLogger = Logger( name .. "@" .. version\__tostring!, logger.color, logger.interpolation )
+                    packageLogger = Logger( prefix, logger.color, logger.interpolation )
             else
-                packageLogger = Logger( name .. "@" .. version\__tostring! )
+                packageLogger = Logger( prefix )
 
-            @__prefix = @__tostring! .. "::"
-            @__dependencies = {}
+            @prefix = prefix .. "::"
+            @dependencies = {}
 
             -- package environment
             @env = setmetatable( { __package: @, Logger: packageLogger }, environmentMetatable )
@@ -865,7 +867,7 @@ do
                 env = package.env or env
 
                 -- if package has dependencies, wait until they are resolved
-                if dependencies := package.__dependencies
+                if dependencies := package.dependencies
                     for name, dep in pairs( dependencies )
                         if isawaitable( dep )
                             await dep
@@ -976,8 +978,8 @@ do
                 return task
 
             dependencies[ ref ] = task = Task( installDependency( pkg, name, target, true ) )
-            unless pkg.__dependencies[ name ]
-                pkg.__dependencies[ name ] = task
+            unless pkg.dependencies[ name ]
+                pkg.dependencies[ name ] = task
 
             return task
 
@@ -1010,7 +1012,7 @@ do
             await source\Install( info, workdir )
             Logger\Info( "Installed dependency '%s' [%s] for '%s'", name, target, pkg.name )
 
-        pkg.__dependencies[ name ] = info.package
+        pkg.dependencies[ name ] = info.package
 
         -- resolve dependencies of the dependency
         await resolveDependencies( info.package )

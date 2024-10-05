@@ -53,11 +53,11 @@ do
 
         AddChangeCallback( "http_timeout", ( _, __, new ) ->
             defaultTimeout = tonumber( new, 10 )
-        "gLua Package Manager::HTTP" )
+        gpm.PREFIX .. "::HTTP" )
 
         AddChangeCallback( "gpm_http_cache_lifetime", ( _, __, new ) ->
             globalCacheLifetime = tonumber( new, 10 ) * 60
-        "gLua Package Manager::HTTP" )
+        gpm.PREFIX .. "::HTTP" )
 
     requestCache = {
         ["GET"]: {},
@@ -77,7 +77,7 @@ do
         methods = { "GET", "POST", "HEAD", "PUT", "DELETE", "PATCH", "OPTIONS" }
         import pairs from _G
 
-        _G.timer.Create "gLua Package Manager::HTTP", 60, 0, ->
+        _G.timer.Create gpm.PREFIX .. "::HTTP", 60, 0, ->
             for method in *methods
                 requests = requestCache[ method ]
                 for href, cache in pairs( requests )

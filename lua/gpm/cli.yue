@@ -171,4 +171,4 @@ Add( "gpm", ( ply, _, args ) ->
                 return func( args )
 
         return nil,
-"gLua Package Manager" )
+gpm.PREFIX )

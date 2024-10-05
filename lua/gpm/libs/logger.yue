@@ -9,7 +9,7 @@ dateScheme = _G.CreateConVar( "gpm_logger_date", "0", _G.FCVAR_ARCHIVE, "Allows 
 
 _G.cvars.AddChangeCallback( "gpm_logger_date", ( _, __, new ) ->
     dateScheme = ( new == "1" and "%d-%m-%Y %H:%M:%S " or "%H:%M:%S " )
-"gLua Package Manager::Logger")
+gpm.PREFIX .. "::Logger")
 
 primaryTextColor = Color( 200, 200, 200 )
 secondaryTextColor = Color( 150, 150, 150 )
@@ -107,6 +107,6 @@ loggerClass = environment.class( "Logger", {
 
 environment.util.Logger = loggerClass
 
-logger = loggerClass( "gpm@" .. gpm.VERSION, environment.Color( 180, 180, 255 ), false )
+logger = loggerClass( gpm.PREFIX, environment.Color( 180, 180, 255 ), false )
 gpm.Logger = logger
 return logger

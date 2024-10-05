@@ -2372,8 +2372,8 @@ do
 
             return nil
 
-        Add( "OnEntityCreated", "gLua Package Manager::Iterators", invalidateCache, environment.PRE_HOOK )
-        Add( "EntityRemoved", "gLua Package Manager::Iterators", invalidateCache, environment.PRE_HOOK )
+        Add( "OnEntityCreated", gpm.PREFIX .. "::Iterators", invalidateCache, environment.PRE_HOOK )
+        Add( "EntityRemoved", gpm.PREFIX .. "::Iterators", invalidateCache, environment.PRE_HOOK )
 
     -- GM:PlayerInitialized( Player ply )
     if CLIENT_SERVER
@@ -2384,7 +2384,7 @@ do
 
             Add(
                 "SetupMove"
-                "gLua Package Manager::PlayerInitialized"
+                gpm.PREFIX .. "::PlayerInitialized"
                 ( ply, _, cmd ) ->
                     if ply.__initialized or not ( IsForced( cmd ) or ply\IsBot! )
                         return nil
@@ -2398,9 +2398,9 @@ do
         if CLIENT
             Add(
                 "RenderScene"
-                "gLua Package Manager::PlayerInitialized"
+                gpm.PREFIX .. "::PlayerInitialized"
                 ->
-                    Remove( "RenderScene", "gLua Package Manager::PlayerInitialized" )
+                    Remove( "RenderScene", gpm.PREFIX .. "::PlayerInitialized" )
 
                     ply = environment.LocalPlayer!
                     if not ply\IsValid! or ply.__initialized
@@ -2435,7 +2435,7 @@ do
                     pkg.__hooks = hooks
 
                 hooks[ eventName ][ identifier ] = func
-                return Add( eventName, pkg.__prefix .. identifier, func, priority )
+                return Add( eventName, pkg.prefix .. identifier, func, priority )
 
         return Add( eventName, identifier, func, priority )
 
@@ -2459,7 +2459,7 @@ do
                 if IsEmpty( event )
                     hooks[ eventName ] = nil
 
-                return Remove( eventName, pkg.__prefix .. identifier )
+                return Remove( eventName, pkg.prefix .. identifier )
 
         return Remove( eventName, identifier )
 
@@ -2507,7 +2507,7 @@ do
                 repetitions = data.repetitions = repetitions or data.repetitions
                 func = data.func = func or data.func
 
-                return Adjust( pkg.__prefix .. identifier, delay, repetitions, func)
+                return Adjust( pkg.prefix .. identifier, delay, repetitions, func)
 
         return Adjust( identifier, delay, repetitions, func )
 
@@ -2533,7 +2533,7 @@ do
                 else
                     timers[ identifier ] = { :delay, :repetitions, :func }
 
-                return Create( pkg.__prefix .. identifier, delay, repetitions, func )
+                return Create( pkg.prefix .. identifier, delay, repetitions, func )
 
         return Create( identifier, delay, repetitions, func )
 
@@ -2544,7 +2544,7 @@ do
         if fenv
             pkg = fenv.__package
             if pkg
-                return Exists( pkg.__prefix .. identifier )
+                return Exists( pkg.prefix .. identifier )
 
         return Exists( identifier )
 
@@ -2555,7 +2555,7 @@ do
         if fenv
             pkg = fenv.__package
             if pkg
-                return Pause( pkg.__prefix .. identifier )
+                return Pause( pkg.prefix .. identifier )
 
         return Pause( identifier )
 
@@ -2571,7 +2571,7 @@ do
                     timers = pkg.__timers = {}
 
                 timers[ identifier ] = nil
-                return Remove( pkg.__prefix .. identifier )
+                return Remove( pkg.prefix .. identifier )
 
         return Remove( identifier )
 
@@ -2582,7 +2582,7 @@ do
         if fenv
             pkg = fenv.__package
             if pkg
-                return RepsLeft( pkg.__prefix .. identifier )
+                return RepsLeft( pkg.prefix .. identifier )
 
         return RepsLeft( identifier )
 
@@ -2593,7 +2593,7 @@ do
         if fenv
             pkg = fenv.__package
             if pkg
-                return Start( pkg.__prefix .. identifier )
+                return Start( pkg.prefix .. identifier )
 
         return Start( identifier )
 
@@ -2604,7 +2604,7 @@ do
         if fenv
             pkg = fenv.__package
             if pkg
-                return Stop( pkg.__prefix .. identifier )
+                return Stop( pkg.prefix .. identifier )
 
         return Stop( identifier )
 
@@ -2615,7 +2615,7 @@ do
         if fenv
             pkg = fenv.__package
             if pkg
-                return TimeLeft( pkg.__prefix .. identifier )
+                return TimeLeft( pkg.prefix .. identifier )
 
         return TimeLeft( identifier )
 
@@ -2626,7 +2626,7 @@ do
         if fenv
             pkg = fenv.__package
             if pkg
-                return Toggle( pkg.__prefix .. identifier )
+                return Toggle( pkg.prefix .. identifier )
 
         return Toggle( identifier )
 
@@ -2637,7 +2637,7 @@ do
         if fenv
             pkg = fenv.__package
             if pkg
-                return UnPause( pkg.__prefix .. identifier )
+                return UnPause( pkg.prefix .. identifier )
 
         return UnPause( identifier )
 
@@ -2690,7 +2690,7 @@ do
 
         _G.cvars.AddChangeCallback( "developer", ( _, __, str ) ->
             isInDebug = ( tonumber( str, 10 ) or 0 ) > 1
-        "gLua Package Manager::Debug" )
+        gpm.PREFIX .. "::Debug" )
 
         gpm.IsInDebug = ->
             return isInDebug

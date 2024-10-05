@@ -63,16 +63,16 @@ if SERVER
 	import NetworkStringToID, AddNetworkString from util
     import Start from gmod_net
 
-	net.Start = ( networkString ) ->
+	net.Start = ( networkString, ignoreString ) ->
         networkString = lower( networkString )
 
         fenv = getfenv( 2 )
         if fenv
             pkg = fenv.__package
             if pkg
-                networkString = pkg.__prefix .. networkString
+                networkString = pkg.prefix .. networkString
 
-		if NetworkStringToID( networkString ) == 0
+        if not ignoreString and NetworkStringToID( networkString ) == 0
 			AddNetworkString( networkString )
 
 		Start( networkString )

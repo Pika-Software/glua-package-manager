@@ -4,7 +4,8 @@ import Find from _G.file
 
 :gpm = _G
 unless istable( gpm )
-    gpm = { VERSION: "2.0.0" }
+    VERSION = "2.0.0"
+    gpm = { :VERSION, PREFIX: "gpm@" .. VERSION }
     _G.gpm = gpm
 
 if SERVER
