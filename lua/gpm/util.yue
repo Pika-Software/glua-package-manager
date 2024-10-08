@@ -806,6 +806,12 @@ do
 
         string.IsNumber = isNumber
 
+    string.IsSteamID64 = ( str ) ->
+        if len( str ) == 17 and sub( str, 1, 3 ) == "765"
+            return isNumber( str, 4, 17 )
+
+        return false
+
 string.Extract = ( str, pattern, default ) ->
     startPos, endPos, matched = find( str, pattern, 1, false )
     if startPos
