@@ -325,15 +325,15 @@ do
 
     import SteamID from util
 
-    net.ReadSteamID = ->
-        return SteamID.FromBinary( ReadData( 4 ) )
+    net.ReadSteamID = ( withUniverse ) ->
+        return SteamID.FromBinary( ReadData( withUniverse and 5 or 4 ), false, withUniverse )
 
-    net.WriteSteamID = ( steamID ) ->
+    net.WriteSteamID = ( steamID, withUniverse ) ->
         if isstring( steamID )
             steamID = SteamID( steamID )
 
         argument( steamID, 1, "SteamID" )
-        return WriteData( steamID\ToBinary! )
+        return WriteData( steamID\ToBinary( withUniverse ) )
 
 -- Date
 do

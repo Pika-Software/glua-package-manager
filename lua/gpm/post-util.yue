@@ -313,9 +313,13 @@ do
             ToSteamID3: =>
                 return "[U:" .. @universe .. ":" .. @account_id .. "]"
 
-            ToBinary: ( isBigEndian ) =>
+            ToBinary: ( isBigEndian, withUniverse ) =>
                 setEndianness( isBigEndian )
-                return char( @universe ) .. writeUInt( nil, @account_id, 4 )
+
+                if withUniverse
+                    return char( @universe ) .. writeUInt( nil, @account_id, 4 )
+
+                return writeUInt( nil, @account_id, 4 )
 
             GetUniverse: =>
                 return @universe
@@ -397,15 +401,15 @@ do
                     account_id: ( account_number * 2 ) + ( id and 1 or 0 )
                 }, metatable )
 
-            FromBinary: ( binary, isBigEndian ) ->
+            FromBinary: ( binary, isBigEndian, withUniverse ) ->
                 setEndianness( isBigEndian )
 
-                account_id = readUInt( nil, sub( binary, 2 ), 4 ) or -1
+                account_id = readUInt( nil, withUniverse and sub( binary, 2 ) or binary, 4 ) or -1
                 if account_id < 0
                     throw( "Invalid binary SteamID", 2 )
 
                 return setmetatable( {
-                    universe: clamp( byte( binary, 1 ), 0, 5 )
+                    universe: withUniverse and clamp( byte( binary, 1 ), 0, 5 ) or 1
                     id: account_id % 2 ~= 0
                     account_number: fdiv( account_id, 2 )
                     account_id: account_id
@@ -921,15 +925,15 @@ do
                 return @Write( date\ToBinary! )
 
             -- SteamID
-            ReadSteamID: =>
-                return SteamID.FromBinary( @Read( 4 ) )
+            ReadSteamID: ( isBigEndian, withUniverse ) =>
+                return SteamID.FromBinary( @Read( withUniverse and 5 or 4 ), setEndianness( isBigEndian ), withUniverse )
 
-            WriteSteamID: ( steamid ) =>
+            WriteSteamID: ( steamid, withUniverse ) =>
                 if isstring( steamid )
                     steamid = SteamID( steamid )
 
                 argument( steamid, 1, "SteamID" )
-                return @Write( steamid\ToBinary! )
+                return @Write( steamid\ToBinary( withUniverse ) )
 
         },
         {
