@@ -3,11 +3,12 @@ import gpm, SERVER from _G
 import environment, Logger from gpm
 import istable, pcall, require, tonumber, tostring from _G
 import bit, math, string, table, os, util, argument, isstring, isnumber, isfunction, throw, type from environment
-import byte, sub, gsub, len, find, format, match from string
+import char, byte, sub, gsub, len, find, format, match from string
 import Create, Remove, Simple from environment.timer
 import CRC, IsBinaryModuleInstalled from util
 import concat, unpack from table
 newClass = environment.class
+import clamp from math
 import time from os
 
 do
@@ -203,93 +204,136 @@ do
     local SteamID
     do
 
-        import IsSteamID from string
-        import ToDec from BInt
+        import IsSteamID, IsSteamID64 from string
         import fdiv from math
 
-        base = BInt( "76561197960265728" )
+        -- https://developer.valvesoftware.com/wiki/SteamID
 
-        unless util.SteamIDTo64
-            util.SteamIDTo64 = ( sid ) ->
-                y, z = match( sid, "^STEAM_[0-5]:([01]):(%d+)$" )
+        universes = {
+            -- 4503603922337792
+            [ 0 ]: { "450", 3603922337792, 3 }
+            -- 76561197960265728
+            [ 1 ]: { "765", 61197960265728, 3 }
+            -- 148618791998193664
+            [ 2 ]: { "1486", 18791998193664, 4 }
+            -- 220676386036121600
+            [ 3 ]: { "2206", 76386036121600, 4 }
+            -- 292733980074049536
+            [ 4 ]: { "2927", 33980074049536, 4 }
+            -- 364791574111977472
+            [ 5 ]: { "3647", 91574111977472, 4 }
+        }
 
-                sid64 = tonumber( z, 10 ) * 2
-                if y == "1"
-                    sid64 += 1
+        util.SteamIDTo64 = ( str, fullUniverse ) ->
+            x, y, z = match( str, "^STEAM_([0-5]):([01]):(%d+)$" )
 
-                return ToDec( base + sid64 )
+            universe = tonumber( x, 10 )
+            if not fullUniverse and universe == 0
+                universe = 1
 
-        unless util.SteamIDFrom64
-            zero = BInt.Zero
-            two = BInt.Two
+            data = universes[ universe ]
+            return data[ 1 ] .. ( ( tonumber( z, 10 ) * 2 ) + data[ 2 ] ) + ( y == "1" and 1 or 0 )
 
-            util.SteamIDFrom64 = ( sid ) ->
-                y = BInt( sid ) - base
-                return "STEAM_0:" .. ( ( y % two == zero ) and "0" or "1" ) .. ":" .. ToDec( y / two )
+        util.SteamIDFrom64 = ( str, skipUniverse ) ->
+            local account_id, universe
+            if skipUniverse == false
+                for i = 0, 5
+                    data = universes[ i ]
+                    if data[ 1 ] == sub( str, 1, data[ 3 ] )
+                        account_id = tonumber( sub( str, data[ 3 ] + 1 ), 10 ) - data[ 2 ]
+                        universe = i
+                        break
 
-        import SteamIDTo64, SteamIDFrom64 from util
+                unless universe
+                    universe = 1
+            else
+                universe = 0
+                account_id = tonumber( sub( str, 4 ), 10 ) - 61197960265728
+
+            return "STEAM_"  .. ( universe or 0 ) .. ":" .. ( account_id % 2 == 0 and "0" or "1" ) .. ":" .. fdiv( account_id, 2 )
 
         metatable = {
-            __tostring: =>
-                return @steamid
-
-            __eq: ( other ) =>
-                return @steamid == tostring( other )
-
-            new: ( str ) =>
+            new: ( str, fullUniverse ) =>
                 argument( str, 1, "string" )
 
-                if IsSteamID( str )
-                    @steamid = str
-                else
-                    str = SteamIDFrom64( str )
-                    if str and byte( str, 11 ) ~= 0x2D --[[ - ]]
-                        @steamid = str
-                    else
-                        throw "Invalid SteamID64", 3
+                if IsSteamID64( str )
+                    local account_id, universe
+                    if fullUniverse
+                        for i = 0, 5
+                            data = universes[ i ]
+                            if data[ 1 ] == sub( str, 1, data[ 3 ] )
+                                account_id = tonumber( sub( str, data[ 3 ] + 1 ), 10 ) - data[ 2 ]
+                                universe = i
+                                break
 
-                return false, nil
+                        unless universe
+                            universe = 1
+                    else
+                        universe = 1
+                        account_id = tonumber( sub( str, 4 ), 10 ) - 61197960265728
+
+                    @universe, @id, @account_number, @account_id = universe, account_id % 2 ~= 0, fdiv( account_id, 2 ), account_id
+                    return nil
+
+                if IsSteamID( str )
+                    x, y, z = match( str, "^STEAM_([0-5]):([01]):(%d+)$" )
+                    universe, id, account_number = tonumber( x, 10 ), y == "1", tonumber( z, 10 )
+
+                    if not fullUniverse and universe == 0
+                        universe = 1
+
+                    @universe, @id, @account_number, @account_id = universe, id, account_number, ( account_number * 2 ) + ( id and 1 or 0 )
+                    return nil
+
+                throw "Invalid SteamID", 3
+                return nil
 
             ToXYZ: =>
-                return match( @steamid, "^STEAM_([0-5]):([01]):(%d+)$" )
+                return @universe, @id, @account_number
 
             ToIntegers: =>
-                x, y, z = @ToXYZ!
-                return tonumber( x, 10 ), tonumber( y, 10 ), tonumber( z, 10 )
+                return @universe, @id and 1 or 0, @account_number
 
             ToSteamID: =>
-                return @steamid
+                return "STEAM_" .. @universe .. ":" .. ( @id and "1" or "0" ) .. ":" .. @account_number
 
             ToSteamID64: =>
-                return SteamIDTo64( @steamid )
+                data = universes[ @universe ]
+                return data[ 1 ] .. ( @account_id + data[ 2 ] )
+
+            GetProfileURL: =>
+                return "https://steamcommunity.com/profiles/" .. @ToSteamID64!
 
             ToAccountID: =>
-                y, z = match( @steamid, "^STEAM_[0-5]:([01]):(%d+)$" )
-                return ( tonumber( z, 10 ) * 2 ) + tonumber( y, 10 )
+                return @account_id
 
             ToHex: =>
-                return format("0x%x", @ToAccountID! )
+                return format( "0x%x", @account_id )
 
             ToSteamID3: =>
-                return format( "[U:1:%d]", @ToAccountID! )
+                return "[U:" .. @universe .. ":" .. @account_id .. "]"
 
             ToBinary: ( isBigEndian ) =>
                 setEndianness( isBigEndian )
-                y, z = match( @steamid, "^STEAM_[0-5]:([01]):(%d+)$" )
-                return writeUInt( nil, ( tonumber( z, 10 ) * 2 ) + tonumber( y, 10 ), 4 )
+                return char( @universe ) .. writeUInt( nil, @account_id, 4 )
 
             GetUniverse: =>
-                return tonumber( match( @steamid, "^STEAM_([0-5]):[01]:%d+$" ) or 0, 10 )
+                return @universe
 
             SetUniverse: ( universe ) =>
                 argument( universe, 1, "number" )
                 if universe < 0 or universe > 5
                     throw( "Invalid SteamID universe", 2 )
 
-                @steamid = "STEAM_" .. universe .. match( @steamid, "^STEAM_[0-5](:[01]:%d+)$" )
+                @universe = universe
                 return @
 
         }
+
+        metatable.__tostring = metatable.ToSteamID
+
+        metatable.__eq = ( other ) =>
+            return getmetatable( other ) == metatable and @universe == other.universe and @id == other.id and @account_number == other.account_number
 
         SteamID = newClass( "SteamID", metatable, {
             IsValid: ( steamid ) ->
@@ -302,33 +346,69 @@ do
                 unless IsSteamID( steamid )
                     throw( "Invalid SteamID", 2 )
 
-                return setmetatable( { :steamid }, metatable )
-
-            FromSteamID64: ( steamid64 ) ->
-                steamid = SteamIDFrom64( tostring( steamid64 ) )
-                if not steamid or byte( str, 11 ) == 0x2D --[[ - ]]
-                    throw( "Invalid SteamID64", 2 )
-
-                return setmetatable( { :steamid }, metatable )
-
-            FromSteamID3: ( sid3 ) ->
-                z = tonumber( match( sid3, "^%[U:%d:(%d+)%]$" ) or -1, 10 )
-                if z < 0
-                    throw( "Invalid SteamID3", 2 )
+                x, y, z = match( steamid, "^STEAM_([0-5]):([01]):(%d+)$" )
+                id, account_number = y == "1", tonumber( z, 10 )
 
                 return setmetatable( {
-                    steamid: format( "STEAM_0:%s:%d", ( z % 2 == 0 ) and "0" or "1", z / 2 )
+                    universe: tonumber( x, 10 )
+                    id: id
+                    account_number: account_number
+                    account_id: ( account_number * 2 ) + ( id and 1 or 0 )
+                }, metatable )
+
+            FromSteamID64: ( steamid64, fullUniverse ) ->
+                steamid64 = tostring( steamid64 )
+
+                local account_id, universe
+                if fullUniverse
+                    for i = 0, 5
+                        data = universes[ i ]
+                        if data[ 1 ] == sub( steamid64, 1, data[ 3 ] )
+                            account_id = tonumber( sub( steamid64, data[ 3 ] + 1 ), 10 ) - data[ 2 ]
+                            universe = i
+                            break
+
+                    unless universe
+                        universe = 1
+                else
+                    universe = 1
+                    account_id = tonumber( sub( steamid64, 4 ), 10 ) - 61197960265728
+
+                return setmetatable( {
+                    universe: universe
+                    id: account_id % 2 ~= 0
+                    account_number: fdiv( account_id, 2 )
+                    account_id: account_id
+                }, metatable )
+
+            FromSteamID3: ( sid3 ) ->
+                x, z = match( sid3, "^%[?U:(%d):(%d+)%]?$" )
+
+                account_number = tonumber( z, 10 ) or -1
+                if account_number < 0
+                    throw( "Invalid SteamID3", 2 )
+
+                account_number, id = fdiv( account_number, 2 ), z % 2 ~= 0
+
+                return setmetatable( {
+                    universe: tonumber( x, 10 )
+                    id: id
+                    account_number: account_number
+                    account_id: ( account_number * 2 ) + ( id and 1 or 0 )
                 }, metatable )
 
             FromBinary: ( binary, isBigEndian ) ->
                 setEndianness( isBigEndian )
 
-                z = readUInt( nil, binary, 4 )
-                if z < 0
+                account_id = readUInt( nil, sub( binary, 2 ), 4 ) or -1
+                if account_id < 0
                     throw( "Invalid binary SteamID", 2 )
 
                 return setmetatable( {
-                    steamid: format( "STEAM_0:%s:%d", ( z % 2 == 0 ) and "0" or "1", z / 2 )
+                    universe: clamp( byte( binary, 1 ), 0, 5 )
+                    id: account_id % 2 ~= 0
+                    account_number: fdiv( account_id, 2 )
+                    account_id: account_id
                 }, metatable )
 
             FromHex: ( hex ) ->
@@ -341,14 +421,20 @@ do
                     throw( "Invalid hex", 2 )
 
                 return setmetatable( {
-                    steamid: format( "STEAM_0:%s:%d", ( hex % 2 == 0 ) and "0" or "1", fdiv( hex, 2 ) )
+                    universe: 1
+                    id: hex % 2 ~= 0
+                    account_number: fdiv( hex, 2 )
+                    account_id: hex
                 }, metatable )
 
-            FromAccountID: ( accountid ) ->
-                argument( accountid, 1, "number" )
+            FromAccountID: ( account_id ) ->
+                argument( account_id, 1, "number" )
 
                 return setmetatable( {
-                    steamid: format( "STEAM_0:%s:%d", ( accountid % 2 == 0 ) and "0" or "1", fdiv( accountid, 2 ) )
+                    universe: 1
+                    id: account_id % 2 ~= 0
+                    account_number: fdiv( account_id, 2 )
+                    account_id: account_id
                 }, metatable )
         } )
 
@@ -373,8 +459,7 @@ do
     -- Byte Stream
     import deflate, Color from environment
     import unix2dos, dos2unix from os
-    import char, reverse from string
-    import clamp from math
+    import reverse from string
     import Date from util
 
     local readInt, writeInt
