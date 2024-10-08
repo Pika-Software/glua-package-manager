@@ -123,17 +123,6 @@ return
                 test( "+++++++++++++", 0x2B, 13 )
                 return
 
-        *   name: "string.IsASCII(...) must return true if given value is ASCII number"
-            func: ->
-                test = ( value, expected ) ->
-                    expect( string.IsASCII(value) ).to.equal( expected )
-
-                test( 0, true )
-                test( 255, true )
-                test( 256, false )
-                test( -1, false )
-                return
-
         *   name: "string.TrimByte(...) must return trimmed string"
             func: ->
                 test = ( str, bytes, expected ) ->

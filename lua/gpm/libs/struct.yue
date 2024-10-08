@@ -376,13 +376,13 @@ do
             if endianness.value == "big"
                 for index = bytes, 1, -1
                     buffer[ index ] = char( number % 0x100 )
-                    number = trunc( number / 0x100 )
+                    number = trunc( number * 0.00390625 )
 
                 return concat( buffer, "", 1, bytes )
 
             for index = 1, bytes, 1
                 buffer[ index ] = char( number % 0x100 )
-                number = trunc( number / 0x100 )
+                number = trunc( number * 0.00390625 )
 
             return concat( buffer, "", 1, bytes )
 
