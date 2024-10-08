@@ -779,6 +779,33 @@ do
     string.IsSteamID = ( str ) ->
         return match( str, "^STEAM_[0-5]:[01]:%d+$" ) ~= nil
 
+do
+
+    local isNumber
+    do
+
+        ascii_numbers = {
+            [ 0x30 ]: true -- 0
+            [ 0x31 ]: true -- 1
+            [ 0x32 ]: true -- 2
+            [ 0x33 ]: true -- 3
+            [ 0x34 ]: true -- 4
+            [ 0x35 ]: true -- 5
+            [ 0x36 ]: true -- 6
+            [ 0x37 ]: true -- 7
+            [ 0x38 ]: true -- 8
+            [ 0x39 ]: true -- 9
+        }
+
+        isNumber = ( str, start, finish ) ->
+            for index = start or 1, finish or len( str )
+                if ascii_numbers[ byte( str, index, index ) ] == nil
+                    return false
+
+            return true
+
+        string.IsNumber = isNumber
+
 string.Extract = ( str, pattern, default ) ->
     startPos, endPos, matched = find( str, pattern, 1, false )
     if startPos
