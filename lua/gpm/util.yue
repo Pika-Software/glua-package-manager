@@ -622,59 +622,54 @@ string.ByteCount = ( str, byte0 ) ->
 
     return count
 
-do
+string.TrimByte = ( str, byte0, dir = 0 ) ->
+    startPos, endPos = 1, len( str )
 
-    isASCII = string.IsASCII = ( byte0 ) ->
-        return byte0 >= 0 and byte0 <= 255
+    if dir ~= -1
+        while byte( str, startPos ) == byte0
+            startPos += 1
 
-    string.TrimByte = ( str, byte0, dir = 0 ) ->
-        startPos, endPos = 1, len( str )
+            if startPos == endPos
+                return "", 0
 
-        if dir ~= -1
-            while byte( str, startPos ) == byte0
-                startPos += 1
+    if dir ~= 1
+        while byte( str, endPos ) == byte0
+            endPos -= 1
 
-                if startPos == endPos
-                    return "", 0
+            if endPos == 0
+                return "", 0
 
-        if dir ~= 1
-            while byte( str, endPos ) == byte0
-                endPos -= 1
+    return sub( str, startPos, endPos ), endPos - startPos + 1
 
-                if endPos == 0
-                    return "", 0
+string.TrimBytes = ( str, bytes, dir = 0 ) ->
+    startPos, endPos = 1, len( str )
 
-        return sub( str, startPos, endPos ), endPos - startPos + 1
+    for key, value in pairs( bytes )
+        if isnumber( value )
+            bytes[ value ] = true
+            bytes[ key ] = nil
 
-    string.TrimBytes = ( str, bytes, dir = 0 ) ->
-        startPos, endPos = 1, len( str )
-
-        for key, value in pairs( bytes )
-            if isnumber( value )
-                bytes[ value ] = true
-                bytes[ key ] = nil
-
-            elseif isbool( value )
-                unless isnumber( key )
-                    error "invalid bytes", 2
-            else
+        elseif isbool( value )
+            unless isnumber( key )
                 error "invalid bytes", 2
+        else
+            error "invalid bytes", 2
 
-        if dir ~= -1
-            while bytes[ byte( str, startPos ) ]
-                startPos += 1
+    if dir ~= -1
+        while bytes[ byte( str, startPos ) ]
+            startPos += 1
 
-                if startPos == endPos
-                    return "", 0
+            if startPos == endPos
+                return "", 0
 
-        if dir ~= 1
-            while bytes[ byte( str, endPos ) ]
-                endPos -= 1
+    if dir ~= 1
+        while bytes[ byte( str, endPos ) ]
+            endPos -= 1
 
-                if endPos == 0
-                    return "", 0
+            if endPos == 0
+                return "", 0
 
-        return sub( str, startPos, endPos ), endPos - startPos + 1
+    return sub( str, startPos, endPos ), endPos - startPos + 1
 
 do
 
