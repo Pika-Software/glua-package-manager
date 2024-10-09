@@ -5,7 +5,6 @@ import environment from gpm
 import string, table, util from environment
 import byte, sub, gsub, format, len, find, match from string
 import concat, remove from table
-import rshift, band from _G.bit
 import min, max from _G.math
 import getinfo from _G.debug
 
@@ -28,6 +27,22 @@ do
 -- table
 unless table.unpack
     table.unpack = _G.unpack
+
+import bit from environment
+
+do
+
+    import lshift, rshift from _G.bit
+
+    -- https://github.com/Nak2/NikNaks/blob/c6b7d2ea5fade5a59b05801efb654e27f8dd25f2/lua/niknaks/modules/sh_bitbuffer.lua#L28-L39
+
+    bit.lshift = ( number, shift ) ->
+        return shift > 31 and 0x0 or lshift( number, shift )
+
+    bit.rshift = ( number, shift ) ->
+        return shift > 31 and 0x0 or rshift( number, shift )
+
+import rshift, band from bit
 
 do
 
@@ -2295,7 +2310,7 @@ do
 
     do
 
-        import lshift, bor from _G.bit
+        import lshift, bor from bit
         import fdiv from math
         import date from os
 

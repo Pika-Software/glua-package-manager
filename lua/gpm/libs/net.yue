@@ -7,7 +7,7 @@ unless gmod_net
 import NULL, FindMetaTable, pairs, xpcall, SERVER, gpm from _G
 import environment from gpm
 
-import string, net, util, istable, isnumber, isstring, Entity, TypeID, ErrorNoHaltWithStack, argument from environment
+import string, net, util, istable, isnumber, isstring, Entity, TypeID, ErrorNoHaltWithStack, argument, throw from environment
 import ReadUInt, WriteUInt, ReadData, WriteData from gmod_net
 import byte, char, lower from string
 
