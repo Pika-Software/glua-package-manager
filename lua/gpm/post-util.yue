@@ -573,7 +573,7 @@ do
                     if pointer <= 0
                         return nil, "sof"
 
-                    return reverse( sub( @data, pointer + 1, @Skip( length ) ) )
+                    return sub( @data, @Skip( length ), pointer + 1 )
 
                 return nil, "no data"
 
@@ -944,7 +944,7 @@ do
 
     do
 
-        import ceil, min, pow2 from math
+        import ceil, max, pow2, trunc from math
         import Insert from table
         import band from bit
 
@@ -1140,24 +1140,56 @@ do
 
             -- Bytes
             Read: ( length ) =>
-                length = min( length or 0, ceil( @size / 8 ) )
-                if length == 0
+                :pointer, :size = @
+
+                local reverseMode
+
+                if length == nil
+                    length = ceil( ( size - pointer ) / 8 )
+                elseif length == 0
                     return nil, "no data"
+                else
+                    reverseMode = length < 0
+                    if reverseMode
+                        if pointer <= 0
+                            return nil, "sof"
+
+                        length = max( -length, ceil( pointer / 8 ) )
+                    elseif pointer >= size
+                        return nil, "eof"
+                    else
+                        length = max( length, ceil( ( size - pointer ) / 8 ) )
 
                 bytes = {}
                 :bits = @
 
-                for i = 1, length
-                    start = ( ( i - 1 ) * 8 ) + 1
-                    uint = 0
+                if reverseMode
+                    for i = length, 1, -1
+                        uint = 0
 
-                    for j = start, start + 7, 1
-                        if bits[ j ]
-                            uint += pow2[ j - start ]
+                        for j = 7, 0, -1
+                            if bits[ pointer - 7 + j ] == true
+                                uint += pow2[ j ]
 
-                    bytes[ i ] = char( uint )
+                        pointer -= 8
 
-                @Skip( length * 8 )
+                        bytes[ i ] = char( uint )
+                else
+                    for i = 1, length, 1
+                        uint = 0
+
+                        pointer += 1
+
+                        for j = 0, 7, 1
+                            if bits[ pointer + j ] == true
+                                uint += pow2[ j ]
+
+                        pointer += 7
+
+                        bytes[ i ] = char( uint )
+
+                @pointer = pointer
+
                 return concat( bytes, "", 1, length )
 
             Write: ( str ) =>
