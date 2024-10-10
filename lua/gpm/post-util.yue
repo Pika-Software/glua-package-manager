@@ -639,6 +639,13 @@ do
             WriteByte: ( number ) =>
                 return @Write( char( number ) )
 
+            -- Signed Byte
+            ReadSignedByte: =>
+                return @ReadByte! - 0x80
+
+            WriteSignedByte: ( number ) =>
+                return @WriteByte( number + 0x80 )
+
             -- Boolean
             ReadBool: =>
                 switch @ReadByte!
@@ -944,8 +951,8 @@ do
 
     do
 
-        import ceil, max, pow2, trunc from math
-        import Insert from table
+        import ceil, min, max, pow2, trunc, isuint from math
+        import Insert, Reverse from table
         import band from bit
 
         metatable = {
@@ -961,22 +968,22 @@ do
                 if str
                     argument( str, 1, "string" )
                     length = len( str )
-                    bit_count = 0
+                    bitCount = 0
                     bits = {}
 
                     for i = 1, length
                         uint = byte( str, i )
 
-                        bits[ bit_count + 1 ] = band( uint, 1 ) ~= 0
-                        bits[ bit_count + 2 ] = band( uint, 2 ) ~= 0
-                        bits[ bit_count + 3 ] = band( uint, 4 ) ~= 0
-                        bits[ bit_count + 4 ] = band( uint, 8 ) ~= 0
-                        bits[ bit_count + 5 ] = band( uint, 16 ) ~= 0
-                        bits[ bit_count + 6 ] = band( uint, 32 ) ~= 0
-                        bits[ bit_count + 7 ] = band( uint, 64 ) ~= 0
-                        bits[ bit_count + 8 ] = band( uint, 128 ) ~= 0
+                        bits[ bitCount + 1 ] = band( uint, 1 ) ~= 0
+                        bits[ bitCount + 2 ] = band( uint, 2 ) ~= 0
+                        bits[ bitCount + 3 ] = band( uint, 4 ) ~= 0
+                        bits[ bitCount + 4 ] = band( uint, 8 ) ~= 0
+                        bits[ bitCount + 5 ] = band( uint, 16 ) ~= 0
+                        bits[ bitCount + 6 ] = band( uint, 32 ) ~= 0
+                        bits[ bitCount + 7 ] = band( uint, 64 ) ~= 0
+                        bits[ bitCount + 8 ] = band( uint, 128 ) ~= 0
 
-                        bit_count += 8
+                        bitCount += 8
 
                     @size = max( length, 1 ) * 8
                 else
@@ -1048,7 +1055,7 @@ do
                         return nil, "sof"
 
                     start, finish = pointer + 1, pointer + length
-                    return unpack( table.Reverse( { unpack( @bits, start, finish ) } ), start, finish )
+                    return unpack( Reverse( { unpack( @bits, start, finish ) }, false ), start, finish )
 
                 return nil
 
@@ -1138,17 +1145,19 @@ do
 
             -- Bytes
             Read: ( length ) =>
+                @Flush!
+
                 :pointer, :size = @
 
-                local reverseMode
-
+                local isNegative
                 if length == nil
                     length = ceil( ( size - pointer ) / 8 )
+                    isNegative = false
                 elseif length == 0
                     return nil, "no data"
                 else
-                    reverseMode = length < 0
-                    if reverseMode
+                    isNegative = length < 0
+                    if isNegative
                         if pointer <= 0
                             return nil, "sof"
 
@@ -1161,30 +1170,20 @@ do
                 bytes = {}
                 :bits = @
 
-                if reverseMode
-                    for i = length, 1, -1
-                        uint = 0
+                if isNegative
+                    @Skip( -length * 8 )
+                    return @Read( length )
 
-                        for j = 7, 0, -1
-                            if bits[ pointer - 7 + j ] == true
-                                uint += pow2[ j ]
+                for i = 1, length, 1
+                    pointer += 1
+                    uint = 0
 
-                        pointer -= 8
+                    for j = 0, 7, 1
+                        if bits[ pointer + j ] == true
+                            uint += pow2[ j ]
 
-                        bytes[ i ] = char( uint )
-                else
-                    for i = 1, length, 1
-                        uint = 0
-
-                        pointer += 1
-
-                        for j = 0, 7, 1
-                            if bits[ pointer + j ] == true
-                                uint += pow2[ j ]
-
-                        pointer += 7
-
-                        bytes[ i ] = char( uint )
+                    pointer += 7
+                    bytes[ i ] = char( uint )
 
                 @pointer = pointer
 
@@ -1259,6 +1258,114 @@ do
 
                 @Seek( pointer )
                 return @Read( length )
+
+            -- UInt
+            ReadUInt: ( bitCount, isBigEndian ) =>
+                argument( bitCount, 1, "number" )
+
+                isNegative = bitCount < 0
+                if isNegative
+                    bitCount = abs( bitCount )
+
+                unless isuint( bitCount )
+                    bitCount = ceil( bitCount )
+
+                if isNegative
+                    @Skip( -bitCount )
+                    return @ReadUInt( bitCount, isBigEndian )
+
+                @Flush!
+
+                :pointer = @
+                if pointer >= @size
+                    return nil, "eof"
+
+                bits = @bits
+                number = 0
+
+                if bitCount <= 8
+                    bitCount -= 1
+                    pointer += 1
+                    power = 0
+
+                    for index = pointer + bitCount, pointer, -1
+                        if bits[ index ] == true
+                            number += pow2[ power ]
+
+                        power += 1
+
+                    @pointer = pointer + bitCount
+                    return number
+
+                @pointer = pointer + bitCount
+
+                local start, finish, increment
+                if isBigEndian
+                    start, finish, increment = 1, ceil( bitCount / 8 ), 1
+                    pointer += 1
+                else
+                    start, finish, increment = ceil( bitCount / 8 ), 1, -1
+                    pointer += bitCount
+
+                current, power = 0, 0
+
+                for i = start, finish, increment
+                    toRead = min( 8, bitCount )
+                    bitCount -= toRead
+
+                    if isBigEndian
+                        for index = pointer + ( toRead - 1 ), pointer, -1
+                            if bits[ index ] == true
+                                current += pow2[ power ]
+
+                            power += 1
+
+                        pointer += toRead
+                    else
+                        for index = pointer, pointer - ( toRead - 1 ), -1
+                            if bits[ index ] == true
+                                current += pow2[ power ]
+
+                            power += 1
+
+                        pointer -= toRead
+
+                    power = 0
+
+                    if i ~= start
+                        number *= 0x100
+
+                    number += current
+                    current = 0
+
+                return number
+
+            WriteUInt: ( uint, bitCount, isBigEndian ) =>
+                argument( uint, 1, "number" )
+                argument( bitCount, 2, "number" )
+
+                bitCount = max( isuint( bitCount ) and bitCount or ceil( bitCount ), 0 )
+                if bitCount == 0
+                    return @
+
+                if uint > ( pow2[ bitCount ] - 1 )
+                    throw bitCount .. " bit uint overflow, max: " .. pow2[ bitCount ] - 1, 2
+
+                :buffer, :buffer_size = @
+
+                if bitCount <= 8
+                    power = 0
+
+                    for i = bitCount, 1, -1
+                        buffer[ buffer_size + i ] = band( uint, pow2[ power ] ) ~= 0
+                        power += 1
+
+                    @buffer_size = buffer_size + bitCount
+                    return @
+
+                -- TODO: Write byte writer here :>
+
+                return @
 
             -- UInt64
             ReadUInt64: ( isBigEndian ) =>
