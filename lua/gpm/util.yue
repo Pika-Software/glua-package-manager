@@ -829,6 +829,10 @@ string.Extract = ( str, pattern, default ) ->
 
     return str, default
 
+string.ToBytes = ( str ) ->
+    length = len( str )
+    return { byte( str, 1, length ) }, length
+
 string.Left = ( str, num ) ->
     return sub( str, 1, num )
 
