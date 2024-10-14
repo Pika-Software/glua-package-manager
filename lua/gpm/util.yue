@@ -2257,7 +2257,7 @@ do
 
     do
 
-        import ceil, log from math
+        import ceil, log, ln2 from math
 
         util.BitToBytes = ( number ) ->
             return ceil( number / 8 )
@@ -2267,7 +2267,7 @@ do
 
         util.BitCount = ( value ) ->
             if isnumber( value )
-                return max( 1, ceil( log( value + 1, 2 ) ) )
+                return ceil( log( value + 1 ) / ln2 )
 
             if isstring( value )
                 return len( value ) * 8
@@ -2279,7 +2279,7 @@ do
 
         util.ByteCount = ( value ) ->
             if isnumber( value )
-                return max( 1, ceil( log( value + 1, 2 ) / 8 ) )
+                return ceil( ceil( log( value + 1 ) / ln2 ) / 8 )
 
             if isstring( value )
                 return len( value )

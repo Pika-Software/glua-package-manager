@@ -8,7 +8,7 @@ import NULL, FindMetaTable, pairs, xpcall, SERVER, gpm from _G
 import environment from gpm
 
 import string, net, util, istable, isnumber, isstring, Entity, TypeID, ErrorNoHaltWithStack, argument, throw from environment
-import ReadUInt, WriteUInt, ReadData, WriteData from gmod_net
+import ReadUInt, WriteUInt, ReadData, WriteData, Start from gmod_net
 import byte, char, lower from string
 
 ENTITY = FindMetaTable( "Entity" )
@@ -62,7 +62,6 @@ do
 -- Really cool net.Start
 if SERVER
 	import NetworkStringToID, AddNetworkString from util
-    import Start from gmod_net
 
 	net.Start = ( networkString, ignoreString ) ->
         networkString = lower( networkString )
@@ -190,20 +189,24 @@ do
     types[ environment.TYPE_ENTITY ] = { read, write }
 
 -- Player
-net.ReadPlayer = ->
-    index = ReadUInt( 8 )
-    if index == nil or index == 0
-        return NULL
+do
 
-    return Entity( index )
+    maxplayers_bits = util.BitCount( _G.game.MaxPlayers! )
 
-net.WritePlayer = ( ply ) ->
-    if ply and ply\IsValid! and ply\IsPlayer!
-        WriteUInt( EntIndex( ply ), 8 )
+    net.ReadPlayer = ->
+        index = ReadUInt( maxplayers_bits )
+        if index == nil or index == 0
+            return NULL
+
+        return Entity( index )
+
+    net.WritePlayer = ( ply ) ->
+        if ply and IsValid( ply ) and ply\IsPlayer!
+            WriteUInt( EntIndex( ply ), maxplayers_bits )
+            return ply
+
+        WriteUInt( 0, maxplayers_bits )
         return ply
-
-    WriteUInt( 0, 8 )
-    return ply
 
 -- Color
 do
