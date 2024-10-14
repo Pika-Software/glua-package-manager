@@ -949,557 +949,582 @@ do
         struct.Cursor
     )
 
-    do
+do
 
-        import ceil, min, max, pow2, trunc, isuint from math
-        import Insert, Reverse from table
-        import band from bit
+    import ceil, min, max, pow2, trunc, isuint from math
+    import Insert, Reverse from table
+    import ToBytes from string
+    import band from bit
 
-        metatable = {
-            __tostring: =>
-                return format( "BitStream: %p [%d/%d]", @, @pointer, @size )
+    metatable = {
+        __tostring: =>
+            return format( "BitStream: %p [%d/%d]", @, @pointer, @size )
 
-            new: ( str ) =>
-                @buffer_size = 0
-                @pointer = 0
-                @buffer = {}
+        new: ( binary ) =>
+            @buffer_size = 0
+            @pointer = 0
+            @buffer = {}
 
-                local bits
-                if str
-                    argument( str, 1, "string" )
-                    length = len( str )
-                    bitCount = 0
-                    bits = {}
+            if binary
+                argument( binary, 1, "string" )
+                bits, size = {}, 0
 
-                    for i = 1, length
-                        uint = byte( str, i )
+                for uint in *{ byte( binary, 1, len( binary ) ) }
+                    for i = 0, 7, 1
+                        size += 1
+                        bits[ size ] = band( uint, pow2[ i ] ) ~= 0
 
-                        bits[ bitCount + 1 ] = band( uint, 1 ) ~= 0
-                        bits[ bitCount + 2 ] = band( uint, 2 ) ~= 0
-                        bits[ bitCount + 3 ] = band( uint, 4 ) ~= 0
-                        bits[ bitCount + 4 ] = band( uint, 8 ) ~= 0
-                        bits[ bitCount + 5 ] = band( uint, 16 ) ~= 0
-                        bits[ bitCount + 6 ] = band( uint, 32 ) ~= 0
-                        bits[ bitCount + 7 ] = band( uint, 64 ) ~= 0
-                        bits[ bitCount + 8 ] = band( uint, 128 ) ~= 0
-
-                        bitCount += 8
-
-                    @size = max( length, 1 ) * 8
-                else
-                    bits = { false, false, false, false, false, false, false, false }
-                    @size = 0
-
-                @bits = bits
-
-            Flush: =>
-                :buffer_size = @
-                if buffer_size == 0
-                    return @bits
-
-                :bits, :pointer, :size = @
-
-                if pointer > size
-                    for index = size, pointer
-                        bits[ index ] = false
-
-                    size = pointer
-
-                Insert( @buffer, pointer, buffer_size, pointer, bits )
-
-                @pointer = pointer + buffer_size
-                @size = size + buffer_size
-
-                @buffer_size = 0
-                @buffer = {}
-                return bits
-
-            Size: ( inBytes ) =>
-                if inBytes
-                    return ceil( @size * 0.125 )
-
-                return @size
-
-            SkipZeros: =>
-                pointer = @pointer + 1
-                :bits, :size = @
-
-                while pointer <= size
-                    pointer += 1
-
-                    if bits[ pointer ]
-                        pointer -= 1
-                        break
-
-                @pointer = pointer
-                return pointer
-
-            -- Bits
-            ReadBits: ( length ) =>
-                @Flush!
-
-                :pointer, :size = @
-                if length == "*a" or length == nil
-                    length = size
-
-                argument( length, 2, "number" )
-
-                if length > 0
-                    if pointer >= size
-                        return nil, "eof"
-
-                    return unpack( @bits, pointer + 1, pointer + length )
-
-                if length < 0
-                    if pointer <= 0
-                        return nil, "sof"
-
-                    start, finish = pointer + 1, pointer + length
-                    return unpack( Reverse( { unpack( @bits, start, finish ) }, false ), start, finish )
-
+                @bits, @size = bits, size
                 return nil
 
-            WriteBits: ( ... ) =>
-                args = { ... }
-                arg_count = #args
+            @bits, @size = {}, 0
+            return nil
 
-                buffer = @buffer
-                buffer_size = @buffer_size
+        Flush: =>
+            :buffer_size = @
+            if buffer_size == 0
+                return @bits
 
-                for index = 1, arg_count
-                    buffer_size += 1
-                    buffer[ buffer_size ] = args[ index ] == true
+            :bits, :pointer, :size = @
 
-                @buffer_size = buffer_size
-                return nil
+            if pointer > size
+                for index = size, pointer
+                    bits[ index ] = false
 
-            -- Boolean
-            ReadBit: =>
-                if @EndOfFile!
-                    return nil, "eof"
+                size = pointer
 
-                return @bits[ @Skip( 1 ) ] == true
+            Insert( @buffer, pointer, buffer_size, pointer, bits )
 
-            WriteBit: ( bool ) =>
-                buffer_size = @buffer_size + 1
-                @buffer[ buffer_size ] = bool == true
-                @buffer_size = buffer_size
-                return nil
+            @pointer = pointer + buffer_size
+            @size = size + buffer_size
 
-            -- Byte
-            ReadByte: ( ignoreSize ) =>
-                :pointer = @
+            @buffer_size = 0
+            @buffer = {}
+            return bits
 
-                unless ignoreSize
-                    if pointer >= @size
-                        return nil, "eof"
+        Size: ( inBytes ) =>
+            if inBytes
+                return ceil( @size * 0.125 )
 
-                    if ( @Skip( 8 ) - pointer ) ~= 8
-                        return nil, "eof"
+            return @size
 
-                :bits = @
+        SkipZeros: =>
+            pointer = @pointer + 1
+            :bits, :size = @
 
-                return ( bits[ pointer + 1 ] and 1 or 0 ) +
-                    ( bits[ pointer + 2 ] and 2 or 0 ) +
-                    ( bits[ pointer + 3 ] and 4 or 0 ) +
-                    ( bits[ pointer + 4 ] and 8 or 0 ) +
-                    ( bits[ pointer + 5 ] and 16 or 0 ) +
-                    ( bits[ pointer + 6 ] and 32 or 0 ) +
-                    ( bits[ pointer + 7 ] and 64 or 0 ) +
-                    ( bits[ pointer + 8 ] and 128 or 0 )
+            while pointer <= size
+                pointer += 1
 
-            WriteByte: ( uint ) =>
-                argument( uint, 1, "number" )
+                if bits[ pointer ]
+                    pointer -= 1
+                    break
 
-                if uint < 0 or uint > 255
-                    throw "uint must be between 0 and 255", 2
+            return @Seek( pointer )
 
-                :buffer, :buffer_size = @
+        -- Bits
+        ReadBits: ( length ) =>
+            @Flush!
 
-                buffer[ buffer_size + 1 ] = band( uint, 1 ) ~= 0
-                buffer[ buffer_size + 2 ] = band( uint, 2 ) ~= 0
-                buffer[ buffer_size + 3 ] = band( uint, 4 ) ~= 0
-                buffer[ buffer_size + 4 ] = band( uint, 8 ) ~= 0
-                buffer[ buffer_size + 5 ] = band( uint, 16 ) ~= 0
-                buffer[ buffer_size + 6 ] = band( uint, 32 ) ~= 0
-                buffer[ buffer_size + 7 ] = band( uint, 64 ) ~= 0
-                buffer[ buffer_size + 8 ] = band( uint, 128 ) ~= 0
+            :pointer, :size = @
+            if length == "*a" or length == nil
+                length = size
 
-                @buffer_size = buffer_size + 8
-                return @
+            argument( length, 2, "number" )
 
-            WriteNull: =>
-                :buffer, :buffer_size = @
-
-                buffer[ buffer_size + 1 ] = false
-                buffer[ buffer_size + 2 ] = false
-                buffer[ buffer_size + 3 ] = false
-                buffer[ buffer_size + 4 ] = false
-                buffer[ buffer_size + 5 ] = false
-                buffer[ buffer_size + 6 ] = false
-                buffer[ buffer_size + 7 ] = false
-                buffer[ buffer_size + 8 ] = false
-
-                @buffer_size = buffer_size + 8
-                return @
-
-            -- Bytes
-            Read: ( length ) =>
-                @Flush!
-
-                :pointer, :size = @
-
-                local isNegative
-                if length == nil
-                    length = ceil( ( size - pointer ) / 8 )
-                    isNegative = false
-                elseif length == 0
-                    return nil, "no data"
-                else
-                    isNegative = length < 0
-                    if isNegative
-                        if pointer <= 0
-                            return nil, "sof"
-
-                        length = max( -length, ceil( pointer / 8 ) )
-                    elseif pointer >= size
-                        return nil, "eof"
-                    else
-                        length = max( length, ceil( ( size - pointer ) / 8 ) )
-
-                bytes = {}
-                :bits = @
-
-                if isNegative
-                    @Skip( -length * 8 )
-                    return @Read( length )
-
-                for i = 1, length, 1
-                    pointer += 1
-                    uint = 0
-
-                    for j = 0, 7, 1
-                        if bits[ pointer + j ] == true
-                            uint += pow2[ j ]
-
-                    pointer += 7
-                    bytes[ i ] = char( uint )
-
-                @pointer = pointer
-
-                return concat( bytes, "", 1, length )
-
-            Write: ( str ) =>
-                argument( str, 1, "string" )
-
-                buffer = @buffer
-                buffer_size = @buffer_size
-
-                for i = 1, len( str )
-                    uint = byte( str, i )
-
-                    buffer[ buffer_size + 1 ] = band( uint, 1 ) ~= 0
-                    buffer[ buffer_size + 2 ] = band( uint, 2 ) ~= 0
-                    buffer[ buffer_size + 3 ] = band( uint, 4 ) ~= 0
-                    buffer[ buffer_size + 4 ] = band( uint, 8 ) ~= 0
-                    buffer[ buffer_size + 5 ] = band( uint, 16 ) ~= 0
-                    buffer[ buffer_size + 6 ] = band( uint, 32 ) ~= 0
-                    buffer[ buffer_size + 7 ] = band( uint, 64 ) ~= 0
-                    buffer[ buffer_size + 8 ] = band( uint, 128 ) ~= 0
-
-                    buffer_size += 8
-
-                @buffer_size = buffer_size
-                return @
-
-            -- String
-            ReadString: =>
-                :pointer = @
-                if pointer >= @size
-                    return nil, "eof"
-
-                parts, length = {}, 0
-
-                uint = @ReadByte!
-                while uint ~= 0
-                    length += 1
-                    parts[ length ] = char( uint )
-                    uint = @ReadByte!
-
-                if length == 0
-                    return nil, "no data"
-
-                return concat( parts, "", 1, length )
-
-            WriteString: ( str ) =>
-                argument( str, 1, "string" )
-                @Write( str )
-                @WriteNull!
-                return @
-
-            ReadLine: =>
-                :pointer, :size = @
+            if length > 0
                 if pointer >= size
                     return nil, "eof"
 
-                length = 0
-                for index = pointer, size
-                    uint = @ReadByte!
-                    unless uint
-                        return nil, "eof"
+                return unpack( @bits, pointer + 1, pointer + length )
 
-                    if uint == 0xA --[[ \n ]] or uint == 0
-                        break
+            if length < 0
+                if pointer <= 0
+                    return nil, "sof"
 
-                    length += 1
+                start, finish = pointer + 1, pointer + length
+                return unpack( Reverse( { unpack( @bits, start, finish ) }, false ), start, finish )
 
-                if length == 0
-                    return nil
+            return nil
 
-                @Seek( pointer )
+        WriteBits: ( ... ) =>
+            :buffer, :buffer_size = @
+
+            for value in *{ ... }
+                buffer_size += 1
+                buffer[ buffer_size ] = value == true
+
+            @buffer_size = buffer_size
+            return nil
+
+        -- Boolean
+        ReadBit: =>
+            if @EndOfFile!
+                return nil, "eof"
+
+            return @bits[ @Skip( 1 ) ] == true
+
+        WriteBit: ( bool ) =>
+            buffer_size = @buffer_size + 1
+            @buffer[ buffer_size ] = bool == true
+            @buffer_size = buffer_size
+            return nil
+
+        -- Byte
+        ReadByte: =>
+            :pointer = @
+            if pointer >= @size
+                return nil, "eof"
+
+            @pointer = pointer + 8
+            :bits = @
+
+            return ( bits[ pointer + 1 ] and 1 or 0 ) +
+                ( bits[ pointer + 2 ] and 2 or 0 ) +
+                ( bits[ pointer + 3 ] and 4 or 0 ) +
+                ( bits[ pointer + 4 ] and 8 or 0 ) +
+                ( bits[ pointer + 5 ] and 16 or 0 ) +
+                ( bits[ pointer + 6 ] and 32 or 0 ) +
+                ( bits[ pointer + 7 ] and 64 or 0 ) +
+                ( bits[ pointer + 8 ] and 128 or 0 )
+
+        WriteByte: ( uint ) =>
+            argument( uint, 1, "number" )
+
+            if uint < 0 or uint > 255
+                throw "Invalid byte value", 2
+
+            :buffer, :buffer_size = @
+
+            for i = 0, 7
+                buffer_size += 1
+                buffer[ buffer_size ] = band( uint, pow2[ i ] ) ~= 0
+
+            @buffer_size = buffer_size
+            return @
+
+        WriteNull: =>
+            :buffer, :buffer_size = @
+
+            for i = 1, 8
+                buffer_size += 1
+                buffer[ buffer_size ] = false
+
+            @buffer_size = buffer_size
+            return @
+
+        -- Bytes
+        Read: ( length ) =>
+            @Flush!
+
+            :pointer, :size = @
+
+            local isNegative
+            if length == nil
+                length = ceil( ( size - pointer ) / 8 )
+                isNegative = false
+            elseif length == 0
+                return nil, "no data"
+            else
+                isNegative = length < 0
+                if isNegative
+                    if pointer <= 0
+                        return nil, "sof"
+
+                    length = max( -length, ceil( pointer / 8 ) )
+                elseif pointer >= size
+                    return nil, "eof"
+                else
+                    length = max( length, ceil( ( size - pointer ) / 8 ) )
+
+            bytes = {}
+            :bits = @
+
+            if isNegative
+                @Skip( -length * 8 )
                 return @Read( length )
 
-            -- UInt
-            ReadUInt: ( bitCount, isBigEndian ) =>
-                argument( bitCount, 1, "number" )
+            for i = 1, length, 1
+                pointer += 1
+                uint = 0
 
-                isNegative = bitCount < 0
-                if isNegative
-                    bitCount = abs( bitCount )
+                for j = 0, 7, 1
+                    if bits[ pointer + j ] == true
+                        uint += pow2[ j ]
 
-                unless isuint( bitCount )
-                    bitCount = ceil( bitCount )
+                pointer += 7
+                bytes[ i ] = char( uint )
 
-                if isNegative
-                    @Skip( -bitCount )
-                    return @ReadUInt( bitCount, isBigEndian )
+            @pointer = pointer
 
-                @Flush!
+            return concat( bytes, "", 1, length )
 
-                :pointer = @
-                if pointer >= @size
+        Write: ( str ) =>
+            argument( str, 1, "string" )
+            :buffer, :buffer_size = @
+
+            for uint in *{ byte( str, 1, len( str ) ) }
+                for j = 0, 7, 1
+                    buffer_size += 1
+                    buffer[ buffer_size ] = band( uint, pow2[ j ] ) ~= 0
+
+            @buffer_size = buffer_size
+            return @
+
+        -- String
+        ReadString: =>
+            :pointer = @
+            if pointer >= @size
+                return nil, "eof"
+
+            parts, length = {}, 0
+
+            uint = @ReadByte!
+            while uint ~= 0
+                length += 1
+                parts[ length ] = char( uint )
+                uint = @ReadByte!
+
+            if length == 0
+                return nil, "no data"
+
+            return concat( parts, "", 1, length )
+
+        WriteString: ( str ) =>
+            argument( str, 1, "string" )
+            @Write( str .. "\0" )
+            return @
+
+        ReadLine: =>
+            :pointer, :size = @
+            if pointer >= size
+                return nil, "eof"
+
+            length = 0
+            for index = pointer, size
+                uint = @ReadByte!
+                unless uint
                     return nil, "eof"
 
-                bits = @bits
-                number = 0
+                if uint == 0xA --[[ \n ]] or uint == 0
+                    break
 
-                if bitCount <= 8
-                    bitCount -= 1
-                    pointer += 1
-                    power = 0
+                length += 1
 
-                    for index = pointer + bitCount, pointer, -1
-                        if bits[ index ] == true
-                            number += pow2[ power ]
+            if length == 0
+                return nil
 
-                        power += 1
+            @Seek( pointer )
+            return @Read( length )
 
-                    @pointer = pointer + bitCount
-                    return number
+        -- Binary String
+        ReadBinaryString: =>
+            :pointer, :size, :bits = @
+            chars, count = {}, 0
+
+            for index = pointer + 1, size, 1
+                count += 1
+                chars[ count ] = bits[ index ] and "1" or "0"
+
+            @pointer = size
+
+            return concat( chars, "", 1, count )
+
+        WriteBinaryString: ( str ) =>
+            argument( str, 1, "string" )
+
+            :buffer, :buffer_size = @
+
+            bytes, length = ToBytes( str )
+            for i = 1, length
+                buffer_size += 1
+                buffer[ buffer_size ] = bytes[ i ] == 0x31
+
+            @buffer_size = buffer_size
+            return @
+
+        -- UInt ( WIP, NOT WORKING ) TODO: !!!
+        ReadUInt: ( bitCount, isBigEndian ) =>
+            argument( bitCount, 1, "number" )
+
+            isNegative = bitCount < 0
+            if isNegative
+                bitCount = abs( bitCount )
+
+            unless isuint( bitCount )
+                bitCount = ceil( bitCount )
+
+            if isNegative
+                @Skip( -bitCount )
+                return @ReadUInt( bitCount, isBigEndian )
+
+            @Flush!
+
+            :pointer = @
+            if pointer >= @size
+                return nil, "eof"
+
+            bits = @bits
+            number = 0
+
+            if bitCount <= 8
+                bitCount -= 1
+                pointer += 1
+                power = 0
+
+                for index = pointer + bitCount, pointer, -1
+                    if bits[ index ] == true
+                        number += pow2[ power ]
+
+                    power += 1
 
                 @pointer = pointer + bitCount
-
-                local start, finish, increment
-                if isBigEndian
-                    start, finish, increment = 1, ceil( bitCount / 8 ), 1
-                    pointer += 1
-                else
-                    start, finish, increment = ceil( bitCount / 8 ), 1, -1
-                    pointer += bitCount
-
-                current, power = 0, 0
-
-                for i = start, finish, increment
-                    toRead = min( 8, bitCount )
-                    bitCount -= toRead
-
-                    if isBigEndian
-                        for index = pointer + ( toRead - 1 ), pointer, -1
-                            if bits[ index ] == true
-                                current += pow2[ power ]
-
-                            power += 1
-
-                        pointer += toRead
-                    else
-                        for index = pointer, pointer - ( toRead - 1 ), -1
-                            if bits[ index ] == true
-                                current += pow2[ power ]
-
-                            power += 1
-
-                        pointer -= toRead
-
-                    power = 0
-
-                    if i ~= start
-                        number *= 0x100
-
-                    number += current
-                    current = 0
-
                 return number
 
-            WriteUInt: ( uint, bitCount, isBigEndian ) =>
-                argument( uint, 1, "number" )
-                argument( bitCount, 2, "number" )
+            @pointer = pointer + bitCount
 
-                bitCount = max( isuint( bitCount ) and bitCount or ceil( bitCount ), 0 )
-                if bitCount == 0
-                    return @
+            local start, finish, increment
+            if isBigEndian
+                start, finish, increment = 1, ceil( bitCount / 8 ), 1
+                pointer += 1
+            else
+                start, finish, increment = ceil( bitCount / 8 ), 1, -1
+                pointer += bitCount
 
-                if uint > ( pow2[ bitCount ] - 1 )
-                    throw bitCount .. " bit uint overflow, max: " .. pow2[ bitCount ] - 1, 2
+            current, power, toRead = 0, 0, 0
 
-                :buffer, :buffer_size = @
+            for i = start, finish, increment
+                toRead = min( 8, bitCount )
+                bitCount -= toRead
 
-                if bitCount <= 8
-                    power = 0
+                if isBigEndian
+                    for index = pointer + ( toRead - 1 ), pointer, -1
+                        if bits[ index ] == true
+                            current += pow2[ power ]
 
-                    for i = bitCount, 1, -1
-                        buffer[ buffer_size + i ] = band( uint, pow2[ power ] ) ~= 0
                         power += 1
 
-                    @buffer_size = buffer_size + bitCount
-                    return @
+                    pointer += toRead
+                else
+                    for index = pointer, pointer - ( toRead - 1 ), -1
+                        print index
+                        if bits[ index ] == true
+                            current += pow2[ power ]
 
-                -- TODO: Write byte writer here :>
+                        power += 1
 
+                    pointer -= toRead
+
+                power = 0
+
+                if i ~= start
+                    number *= 0x100
+
+                number += current
+                current = 0
+
+            return number
+
+        WriteUInt: ( uint, bitCount, isBigEndian ) =>
+            argument( uint, 1, "number" )
+            argument( bitCount, 2, "number" )
+
+            bitCount = max( isuint( bitCount ) and bitCount or ceil( bitCount ), 0 )
+            if bitCount == 0
                 return @
 
-            -- UInt64
-            ReadUInt64: ( isBigEndian ) =>
-                binary = @Read( 8 )
-                unless binary
-                    return nil, "eof"
+            if uint > ( pow2[ bitCount ] - 1 )
+                throw bitCount .. " bit uint overflow, max: " .. pow2[ bitCount ] - 1, 2
 
-                if setEndianness( isBigEndian )
-                    if byte( binary, 1 ) == 0 and byte( binary, 2 ) == 0
-                        return readUInt( nil, sub( binary, 3 ), 6 )
+            :buffer, :buffer_size = @
 
-                    return FromBytes( binary, false )
+            if bitCount <= 8
+                power = 0
 
-                if byte( binary, 7 ) == 0 and byte( binary, 8 ) == 0
-                    return readUInt( nil, binary, 6 )
+                for i = bitCount, 1, -1
+                    buffer[ buffer_size + i ] = band( uint, pow2[ power ] ) ~= 0
+                    power += 1
 
-                return FromBytes( binary, true )
+                @buffer_size = buffer_size + bitCount
+                return @
 
-            WriteUInt64: ( number, isBigEndian ) =>
-                local isBint
-                if isnumber( number )
-                    isBint = false
+            @buffer_size = buffer_size + bitCount
+
+            local start, finish, increment
+            if isBigEndian
+                start, finish, increment = 1, ceil( bitCount / 8 ), 1
+                buffer_size += 1
+            else
+                start, finish, increment = ceil( bitCount / 8 ), 1, -1
+                buffer_size += bitCount
+
+            power, toWrite = 0, 0
+
+            for i = start, finish, increment
+                toWrite = min( 8, bitCount )
+                bitCount -= toWrite
+
+                if isBigEndian
+                    for index = buffer_size + ( toWrite - 1 ), buffer_size, -1
+                        buffer[ index ] = band( uint, pow2[ power ] ) ~= 0
+                        power += 1
+
+                    buffer_size += toWrite
                 else
-                    number = BInt( number )
-                    isBint = true
+                    for index = buffer_size, buffer_size - ( toWrite - 1 ), -1
+                        buffer[ index ] = band( uint, pow2[ power ] ) ~= 0
+                        power += 1
 
-                if isBint or number > 0xFFFFFFFFFFFF
-                    if setEndianness( isBigEndian )
-                        return @Write( ToBytes( number, 8, false ) )
+                    buffer_size -= toWrite
 
-                    return @Write( ToBytes( number, 8, true ) )
+                uint = trunc( uint * 0.00390625 )
+                power = 0
 
+            print "-----------------------"
+            PrintTable buffer
+            print "-----------------------"
+
+            return @
+
+        -- Int
+        ReadInt: ( bitCount, isBigEndian ) =>
+            return @ReadUInt( bitCount, isBigEndian ) - pow2[ bitCount ]
+
+        WriteInt: ( int, bitCount, isBigEndian ) =>
+            return @WriteUInt( int + pow2[ bitCount ], bitCount, isBigEndian )
+
+        -- UInt64
+        ReadUInt64: ( isBigEndian ) =>
+            binary = @Read( 8 )
+            unless binary
+                return nil, "eof"
+
+            if setEndianness( isBigEndian )
+                if byte( binary, 1 ) == 0 and byte( binary, 2 ) == 0
+                    return readUInt( nil, sub( binary, 3 ), 6 )
+
+                return FromBytes( binary, false )
+
+            if byte( binary, 7 ) == 0 and byte( binary, 8 ) == 0
+                return readUInt( nil, binary, 6 )
+
+            return FromBytes( binary, true )
+
+        WriteUInt64: ( number, isBigEndian ) =>
+            local isBint
+            if isnumber( number )
+                isBint = false
+            else
+                number = BInt( number )
+                isBint = true
+
+            if isBint or number > 0xFFFFFFFFFFFF
                 if setEndianness( isBigEndian )
-                    @WriteNull!
-                    @WriteNull!
+                    return @Write( ToBytes( number, 8, false ) )
 
-                    if isBint
-                        return @Write( writeUInt( nil, ToNumber( number ), 6 ) )
+                return @Write( ToBytes( number, 8, true ) )
 
-                    return @Write( writeUInt( nil, number, 6 ) )
+            if setEndianness( isBigEndian )
+                @WriteNull!
+                @WriteNull!
 
                 if isBint
-                    @Write( writeUInt( nil, ToNumber( number ), 6 ) )
-                else
-                    @Write( writeUInt( nil, number, 6 ) )
+                    return @Write( writeUInt( nil, ToNumber( number ), 6 ) )
 
+                return @Write( writeUInt( nil, number, 6 ) )
+
+            if isBint
+                @Write( writeUInt( nil, ToNumber( number ), 6 ) )
+            else
+                @Write( writeUInt( nil, number, 6 ) )
+
+            @WriteNull!
+            return @WriteNull!
+
+        -- Int64
+        ReadInt64: ( isBigEndian ) =>
+            binary = @Read( 8 )
+            unless binary
+                return nil, "eof"
+
+            if setEndianness( isBigEndian )
+                if byte( binary, 1 ) == 0 and byte( binary, 2 ) == 0
+                    return readInt( nil, sub( binary, 3 ), 6 )
+
+                return CastSigned( FromBytes( binary, false ), 8 )
+
+            if byte( binary, 7 ) == 0 and byte( binary, 8 ) == 0
+                return readInt( nil, binary, 6 )
+
+            return CastSigned( FromBytes( binary, true ), 8 )
+
+        WriteInt64: ( number, isBigEndian ) =>
+            local isBint
+            if isnumber( number )
+                isBint = false
+            else
+                number = BInt( number )
+                isBint = true
+
+            if isBint or number > 0xFFFFFFFFFFFF
+                if setEndianness( isBigEndian )
+                    return @Write( ToBytes( number, 8, false ) )
+
+                return @Write( ToBytes( number, 8, true ) )
+
+            if setEndianness( isBigEndian )
                 @WriteNull!
-                return @WriteNull!
-
-            -- Int64
-            ReadInt64: ( isBigEndian ) =>
-                binary = @Read( 8 )
-                unless binary
-                    return nil, "eof"
-
-                if setEndianness( isBigEndian )
-                    if byte( binary, 1 ) == 0 and byte( binary, 2 ) == 0
-                        return readInt( nil, sub( binary, 3 ), 6 )
-
-                    return CastSigned( FromBytes( binary, false ), 8 )
-
-                if byte( binary, 7 ) == 0 and byte( binary, 8 ) == 0
-                    return readInt( nil, binary, 6 )
-
-                return CastSigned( FromBytes( binary, true ), 8 )
-
-            WriteInt64: ( number, isBigEndian ) =>
-                local isBint
-                if isnumber( number )
-                    isBint = false
-                else
-                    number = BInt( number )
-                    isBint = true
-
-                if isBint or number > 0xFFFFFFFFFFFF
-                    if setEndianness( isBigEndian )
-                        return @Write( ToBytes( number, 8, false ) )
-
-                    return @Write( ToBytes( number, 8, true ) )
-
-                if setEndianness( isBigEndian )
-                    @WriteNull!
-                    @WriteNull!
-
-                    if isBint
-                        return @Write( writeInt( nil, ToNumber( number ), 6 ) )
-
-                    return @Write( writeInt( nil, number, 6 ) )
+                @WriteNull!
 
                 if isBint
-                    @Write( writeInt( nil, ToNumber( number ), 6 ) )
-                else
-                    @Write( writeInt( nil, number, 6 ) )
+                    return @Write( writeInt( nil, ToNumber( number ), 6 ) )
 
-                @WriteNull!
-                return @WriteNull!
+                return @Write( writeInt( nil, number, 6 ) )
 
-            -- Float
-            ReadFloat: ( isBigEndian ) =>
-                setEndianness( isBigEndian )
-                return readFloat( nil, @Read( 4 ), 4 )
+            if isBint
+                @Write( writeInt( nil, ToNumber( number ), 6 ) )
+            else
+                @Write( writeInt( nil, number, 6 ) )
 
-            WriteFloat: ( number, isBigEndian ) =>
-                argument( number, 2, "number" )
-                setEndianness( isBigEndian )
-                return @Write( writeFloat( nil, number, 4 ) )
+            @WriteNull!
+            return @WriteNull!
 
-            -- Double
-            ReadDouble: ( isBigEndian ) =>
-                setEndianness( isBigEndian )
-                return readDouble( nil, @Read( 8 ), 8 )
+        -- Float
+        ReadFloat: ( isBigEndian ) =>
+            setEndianness( isBigEndian )
+            return readFloat( nil, @Read( 4 ), 4 )
 
-            WriteDouble: ( number, isBigEndian ) =>
-                argument( number, 2, "number" )
-                setEndianness( isBigEndian )
-                return @Write( writeDouble( nil, number, 8 ) )
+        WriteFloat: ( number, isBigEndian ) =>
+            argument( number, 2, "number" )
+            setEndianness( isBigEndian )
+            return @Write( writeFloat( nil, number, 4 ) )
 
-            -- Color
-            ReadColor: =>
-                return Color( @ReadByte!, @ReadByte!, @ReadByte!, @ReadByte! )
+        -- Double
+        ReadDouble: ( isBigEndian ) =>
+            setEndianness( isBigEndian )
+            return readDouble( nil, @Read( 8 ), 8 )
 
-            WriteColor: ( color ) =>
-                @WriteByte( color.r )
-                @WriteByte( color.g )
-                @WriteByte( color.b )
-                return @WriteByte( color.a )
+        WriteDouble: ( number, isBigEndian ) =>
+            argument( number, 2, "number" )
+            setEndianness( isBigEndian )
+            return @Write( writeDouble( nil, number, 8 ) )
 
-        }
+        -- Color
+        ReadColor: =>
+            return Color( @ReadByte!, @ReadByte!, @ReadByte!, @ReadByte! )
 
-        -- Yep, in bitstream bool is a bit
-        metatable.ReadBool = metatable.ReadBit
-        metatable.WriteBool = metatable.WriteBit
+        WriteColor: ( color ) =>
+            @WriteByte( color.r )
+            @WriteByte( color.g )
+            @WriteByte( color.b )
+            return @WriteByte( color.a )
 
-        util.BitStream = environment.extend( util.ByteStream, "BitStream", metatable )
+    }
+
+    -- Yep, in bitstream bool is a bit
+    metatable.ReadBool = metatable.ReadBit
+    metatable.WriteBool = metatable.WriteBit
+
+    util.BitStream = environment.extend( util.ByteStream, "BitStream", metatable )
 
 -- Version
 do
@@ -1956,6 +1981,7 @@ do
 
     util.Version = versionClass
 
+-- TODO: Move to separate package ( remove from gpm )
 do
 
     import GetValue, SetValue from table
