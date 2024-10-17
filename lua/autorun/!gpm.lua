@@ -1,9 +1,1 @@
-if SERVER then
-    if util.IsBinaryModuleInstalled( "moonloader" ) then
-        require( "moonloader" )
-    end
-
-    AddCSLuaFile( "gpm/init.lua" )
-end
-
-include( "gpm/init.lua" )
+if SERVER then AddCSLuaFile "gpm/init.lua" end; include "gpm/init.lua"
