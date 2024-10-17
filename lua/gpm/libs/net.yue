@@ -366,6 +366,14 @@ do
         WriteUInt( t, 16 )
         return WriteUInt( d, 16 )
 
+-- Byte
+net.ReadByte = ->
+    return byte( ReadData( 1 ), 1 )
+
+net.WriteByte = ( number ) ->
+    WriteData( char( number ), 1 )
+    return nil
+
 -- 64bit
 do
 
@@ -381,6 +389,24 @@ do
         do
             int = io.i
             readInt, writeInt = int.Read, int.Write
+
+        net.ReadShort = ->
+            Little!
+            return readInt( nil, ReadData( 2 ), 2 )
+
+        net.WriteShort = ( number ) ->
+            Little!
+            WriteData( writeInt( nil, number, 2 ), 2 )
+            return nil
+
+        net.ReadLong = ->
+            Little!
+            return readInt( nil, ReadData( 4 ), 4 )
+
+        net.WriteLong = ( number ) ->
+            Little!
+            WriteData( writeInt( nil, number, 4 ), 4 )
+            return nil
 
         net.ReadInt64 = ->
             binary = ReadData( 8 )
@@ -421,6 +447,24 @@ do
         do
             uint = io.I
             readUInt, writeUInt = uint.Read, uint.Write
+
+        net.ReadUShort = ->
+            Little!
+            return readUInt( nil, ReadData( 2 ), 2 )
+
+        net.WriteUShort = ( number ) ->
+            Little!
+            WriteData( writeUInt( nil, number, 2 ), 2 )
+            return nil
+
+        net.ReadULong = ->
+            Little!
+            return readUInt( nil, ReadData( 4 ), 4 )
+
+        net.WriteULong = ( number ) ->
+            Little!
+            WriteData( writeUInt( nil, number, 4 ), 4 )
+            return nil
 
         net.ReadUInt64 = ->
             binary = ReadData( 8 )
