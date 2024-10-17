@@ -4,10 +4,10 @@ gmod_net = _G.net
 unless gmod_net
     return nil
 
-import NULL, FindMetaTable, pairs, xpcall, SERVER, gpm from _G
-import environment from gpm
+import NULL, pairs, getfenv, setmetatable, xpcall from _G
+import environment from _G.gpm
 
-import string, net, util, istable, isnumber, isstring, Entity, TypeID, ErrorNoHaltWithStack, argument, throw from environment
+import string, net, util, isnumber, isstring, Entity, TypeID, ErrorNoHaltWithStack, argument, throw, SERVER from environment
 import ReadUInt, WriteUInt, ReadData, WriteData, Start from gmod_net
 import byte, char, lower from string
 
@@ -59,24 +59,47 @@ do
         throw "missing type '" .. index .. "' reader", 2
         return nil
 
--- Really cool net.Start
 if SERVER
 	import NetworkStringToID, AddNetworkString from util
+    import rawset from _G
 
-	net.Start = ( networkString, ignoreString ) ->
-        networkString = lower( networkString )
+    networkStrings = rawget( net, "NetworkStrings" )
+    unless istable( networkStrings )
+        networkStrings = setmetatable( {}, {
+            __newindex: environment.debug.fempty
+            __index: ( tbl, key ) ->
+                value = NetworkStringToID( key )
+                rawset( tbl, key, value )
+                return value
+        } )
 
+        rawset( net, "NetworkStrings", networkStrings )
+
+    net.Register = ( networkString ) ->
         fenv = getfenv( 2 )
         if fenv
             pkg = fenv.__package
             if pkg
                 networkString = pkg.prefix .. networkString
 
-        if not ignoreString and NetworkStringToID( networkString ) == 0
-			AddNetworkString( networkString )
+        networkString = lower( networkString )
 
-		Start( networkString )
-        return nil
+        value = networkStrings[ networkString ]
+        if not value or value == 0
+            value = AddNetworkString( networkString )
+            rawset( networkStrings, networkString, value )
+
+        return value
+
+net.Start = ( networkString ) ->
+    fenv = getfenv( 2 )
+    if fenv
+        pkg = fenv.__package
+        if pkg
+            networkString = pkg.prefix .. networkString
+
+    Start( lower( networkString ) )
+    return nil
 
 -- Network string callback registration
 do
