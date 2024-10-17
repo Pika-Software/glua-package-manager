@@ -178,6 +178,13 @@ export decimal2hex = ( n ) -> format( "%X", n )
 export hex2binary = ( s ) -> decimal2binary( hex2decimal( s ) )
 export binary2hex = ( s ) -> decimal2hex( binary2decimal( s ) )
 
+export add = ( a, b ) -> a + b
+export sub = ( a, b ) -> a - b
+export mul = ( a, b ) -> a * b
+export div = ( a, b ) -> a / b
+
+export split = ( a ) -> floor( a ), a % 1
+
 -- Clamp
 export clamp = ( n, a, b ) -> min( max( n, a ), b )
 export clamp01 = ( n ) -> clamp( n, 0, 1 )
