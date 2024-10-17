@@ -6,9 +6,12 @@ dependencies = {
     ["units"] = "github:Pika-Software/units"
 }
 
-exports = "./init.lua"
-
-send = {
-    "init.lua",
-    "submodule.lua"
+-- exports = "./init.lua"
+exports = {
+    server = "./init.lua"
 }
+
+-- send = {
+--     "init.lua",
+--     "submodule.lua"
+-- }
