@@ -91,6 +91,15 @@ if SERVER
 
         return value
 
+    net.Exists = ( networkString ) ->
+        fenv = getfenv( 2 )
+        if fenv
+            pkg = fenv.__package
+            if pkg
+                networkString = pkg.prefix .. networkString
+
+        return networkStrings[ lower( networkString ) ] > 0
+
 net.Start = ( networkString ) ->
     fenv = getfenv( 2 )
     if fenv
