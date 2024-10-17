@@ -952,7 +952,7 @@ do
                     bits = readBitmask( nil, binary, 8 )
                     fraction = implode( bits, 52 )
                     exponent = implode( bits, 11, 52 )
-                    sign = bits[ 32 ] and -1 or 1
+                    sign = bits[ 64 ] and -1 or 1
 
                     if exponent == c0
                         if fraction == 0 or sign == -1
@@ -967,30 +967,30 @@ do
 
                     return sign * ldexp( fraction, exponent + c3 )
 
-                Write: ( _, float ) ->
+                Write: ( _, double ) ->
                     local sign
-                    if isnegative( float )
+                    if isnegative( double )
                         sign = true
-                        float = -float
+                        double = -double
                     else
                         sign = false
 
                     local exponent, fraction
 
-                    if float == inf
+                    if double == inf
                         exponent = c5
                         fraction = 0
 
-                    elseif float ~= float
+                    elseif double ~= double
                         exponent = c5
                         fraction = c4
 
-                    elseif float == 0
+                    elseif double == 0
                         exponent = -bias
                         fraction = 0
 
                     else
-                        fraction, exponent = frexp( float )
+                        fraction, exponent = frexp( double )
 
                         ebs = exponent + bias
                         if ebs <= 1
@@ -1009,7 +1009,7 @@ do
                     for index = 1, 11
                         bits[ 52 + index ] = exponentBits[ index ]
 
-                    bits[ 32 ] = sign
+                    bits[ 64 ] = sign
 
                     return writeBitmask( nil, bits, 8 )
 
@@ -1038,7 +1038,7 @@ do
                     bits = readBitmask( nil, binary, 16 )
                     fraction = implode( bits, 112 )
                     exponent = implode( bits, 15, 112 )
-                    sign = bits[ 32 ] and -1 or 1
+                    sign = bits[ 128 ] and -1 or 1
 
                     if exponent == c1
                         if fraction == 0 or sign == -1
@@ -1053,30 +1053,30 @@ do
 
                     return sign * ldexp( fraction, exponent + c4 )
 
-                Write: ( _, float ) ->
+                Write: ( _, quad ) ->
                     local sign
-                    if isnegative( float )
+                    if isnegative( quad )
                         sign = true
-                        float = -float
+                        quad = -quad
                     else
                         sign = false
 
                     local exponent, fraction
 
-                    if float == inf
+                    if quad == inf
                         exponent = c5
                         fraction = 0
 
-                    elseif float ~= float
+                    elseif quad ~= quad
                         exponent = c5
                         fraction = c2
 
-                    elseif float == 0
+                    elseif quad == 0
                         exponent = -bias
                         fraction = 0
 
                     else
-                        fraction, exponent = frexp( float )
+                        fraction, exponent = frexp( quad )
 
                         ebs = exponent + bias
                         if ebs <= 1
@@ -1095,7 +1095,7 @@ do
                     for index = 1, 15
                         bits[ 112 + index ] = exponentBits[ index ]
 
-                    bits[ 32 ] = sign
+                    bits[ 128 ] = sign
 
                     return writeBitmask( nil, bits, 16 )
 
