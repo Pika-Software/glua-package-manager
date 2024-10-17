@@ -1221,7 +1221,7 @@ do
             :pointer, :size, :bits = @
             chars, count = {}, 0
 
-            for index = pointer + 1, size, 1
+            for index = pointer + 1, size - 1, 1
                 count += 1
                 chars[ count ] = bits[ index ] and "1" or "0"
 
