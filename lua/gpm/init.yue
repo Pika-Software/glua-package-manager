@@ -165,7 +165,6 @@ do
     http.EncodeURI = url.encodeURI
     http.DecodeURI = url.decodeURI
 
-include( "gpm/libs/yaml.lua" )
 include( "gpm/post-util.lua" )
 include( "gpm/sql.lua" )
 

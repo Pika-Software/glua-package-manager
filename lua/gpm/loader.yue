@@ -1,8 +1,8 @@
 _G = _G
-import CLIENT, SERVER, gpm, pcall from _G
+import CLIENT, SERVER, gpm, pcall, getfenv from _G
 import environment, SendFile from gpm
 
-import async, await, debug, string, path, file, util, pairs, isurl, isstring, argument, URL, ModuleError, error, PackageError, Future, Task from environment
+import async, await, debug, string, path, file, util, pairs, isurl, isstring, argument, URL, ModuleError, error, PackageError, Task from environment
 import NormalizeGamePath, AbsoluteGamePath, Find, LuaPath from file
 import getDirectory, getExtension, replaceExtension from path
 import concat, IsEmpty, Merge from environment.table
@@ -79,6 +79,11 @@ unless istable( loader )
 packages = loader.Packages = {}
 modules = loader.Modules = {}
 
+-- Resolves specifier as it is package specifier
+-- See https://nodejs.org/api/esm.html#resolution-algorithm-specification PACKAGE_RESOLVE
+import find, match, gsub, format, StartsWith, IsURL, PathFromURL from string
+import AsyncCompile, IsFile from file
+
 sources = loader.Sources
 unless istable( sources )
     sources = loader.Sources = {}
@@ -91,11 +96,6 @@ getSource = ( protocol ) ->
 
     return sources[ protocol ]
 
--- Resolves specifier as it is package specifier
--- See https://nodejs.org/api/esm.html#resolution-algorithm-specification PACKAGE_RESOLVE
-import find, match, gsub, format, StartsWith, IsURL, PathFromURL from string
-import AsyncCompile, IsFile from file
-
 local moduleClass, packageClass, packageRead
 do
 
@@ -103,16 +103,16 @@ do
 
     do
 
-        import AsyncWrite, Time from file
-        import stripExtension from path
+        -- import AsyncWrite, Time from file
+        -- import stripExtension from path
         -- startTime = environment.os.time! - ( gpm.StartTime or 0 )
 
         -- cache files have different paths for client and server
-        getCachePath = ( url ) ->
-            if CLIENT
-                return "/lua/gpm/vfs/" .. stripExtension( PathFromURL( url ) ) .. ".lua"
+        -- getCachePath = ( url ) ->
+        --     if CLIENT
+        --         return "/lua/gpm/vfs/" .. stripExtension( PathFromURL( url ) ) .. ".lua"
 
-            return "/data/gpm/vfs/" .. stripExtension( PathFromURL( url ) ) .. ".txt"
+        --     return "/data/gpm/vfs/" .. stripExtension( PathFromURL( url ) ) .. ".txt"
 
         moduleClass = newClass(
             "Module",
@@ -193,9 +193,9 @@ do
 
         loader.Module = moduleClass
 
-    import rawset, tobool from _G
     import getFileName from path
     import Logger from util
+    import tobool from _G
 
     default = environment.Color( 50, 100, 200 )\DoCorrection!
     environmentMetatable = { __index: environment }
@@ -544,7 +544,7 @@ do
 
             packageURL = URL( "file:///lua/gpm/vfs/packages/" .. name .. "/" .. tostring( version ) .. "/" )
             unless IsDir( packageURL.pathname )
-                error PackageError "#{packagePath} should exists but it does not :? (#{name} with target #{target})"
+                error PackageError "#{packageURL.pathname} should exists but it does not :? (#{name} with target #{target})"
 
         pjson = @pjson = await packageRead( packageURL )
         if pjson and pjson.exports
@@ -709,6 +709,9 @@ do
 
         return nil
 
+    asyncRequire = ( modname, base ) ->
+        return await esmResolve( modname, base )
+
     requireClass = newClass(
         "Require",
         {
@@ -732,7 +735,8 @@ do
                 if filePath == "gpm" or filePath == "gmod"
                     filePath ..= ":///"
 
-                success, resolved = try await esmResolve( isOpaque and filePath or modname, base )
+                -- success, resolved = try await esmResolve( isOpaque and filePath or modname, base )
+                success, resolved = pcall( asyncRequire, isOpaque and filePath or modname, base )
                 if success
                     return resolved
 
@@ -882,8 +886,8 @@ do
     local getImportMeta
     do
 
-        import getfenv, rawget from _G
         import getfmain from debug
+        import rawget from _G
 
         getModule = loader.GetModule = ( func = getfmain! ) ->
             if fenv := func and getfenv( func )

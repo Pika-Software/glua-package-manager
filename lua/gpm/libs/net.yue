@@ -372,20 +372,6 @@ net.WriteByte = ( number ) ->
     WriteUInt( number, 8 )
     return nil
 
-net.ReadShort = ->
-    return ReadInt( 16 )
-
-net.WriteShort = ( number ) ->
-    WriteInt( number, 16 )
-    return nil
-
-net.ReadLong = ->
-    return ReadInt( 32 )
-
-net.WriteLong = ( number ) ->
-    WriteInt( number, 32 )
-    return nil
-
 net.ReadUShort = ->
     return ReadUInt( 16 )
 
@@ -399,3 +385,28 @@ net.ReadULong = ->
 net.WriteULong = ( number ) ->
     WriteUInt( number, 32 )
     return nil
+
+do
+
+    import ReadInt, WriteInt from gmod_net
+
+    net.ReadSignedByte = ->
+        return ReadInt( 8 )
+
+    net.WriteSignedByte = ( number ) ->
+        WriteInt( number, 8 )
+        return nil
+
+    net.ReadShort = ->
+        return ReadInt( 16 )
+
+    net.WriteShort = ( number ) ->
+        WriteInt( number, 16 )
+        return nil
+
+    net.ReadLong = ->
+        return ReadInt( 32 )
+
+    net.WriteLong = ( number ) ->
+        WriteInt( number, 32 )
+        return nil

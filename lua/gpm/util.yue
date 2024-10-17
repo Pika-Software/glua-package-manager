@@ -1265,7 +1265,7 @@ do
             if find( username, "%p%p" )
                 return false, "too many periods in username"
 
-            if byte( username, 1 ) == 0x22 --[[ " ]] and not byte( username, len( username ) ) == 0x22 --[[ " ]]
+            if byte( username, 1 ) == 0x22 --[[ " ]] and byte( username, len( username ) ) ~= 0x22 --[[ " ]]
                 return nil, "invalid usage of quotes"
 
             return isDomain( sub( str, lastAt, len( str ) ) )
@@ -1748,8 +1748,8 @@ do
 
 do
 
-    import abs, floor from math
     import char from string
+    import abs from math
 
     -- color correction credits goes to 0x00000ED (https://github.com/0x00000ED)
     colorCorrection = {
@@ -1806,7 +1806,7 @@ do
             __tostring: =>
                 return format( "%d %d %d %d", @r, @g, @b, @a )
 
-            __eq: =>
+            __eq: ( other ) =>
                 return @r == other.r and @g == other.g and @b == other.b and @a == other.a
 
             __unm: =>
@@ -2733,7 +2733,7 @@ do
     developer = getConVar( "developer" )
 
     if not MENU_DLL and environment.game.IsDedicated!
-        isInDebug = developer\GetInt! > 1
+        isInDebug = developer and developer\GetInt! > 1 or false
 
         _G.cvars.AddChangeCallback( "developer", ( _, __, str ) ->
             isInDebug = ( tonumber( str, 10 ) or 0 ) > 1

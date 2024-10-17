@@ -4,7 +4,6 @@ import environment, Logger from gpm
 import istable, pcall, require, tonumber, tostring from _G
 import bit, math, string, table, os, util, argument, isstring, isnumber, isfunction, throw, type from environment
 import char, byte, sub, gsub, len, find, format, match from string
-import Create, Remove, Simple from environment.timer
 import CRC, IsBinaryModuleInstalled from util
 import concat, unpack from table
 newClass = environment.class
@@ -18,8 +17,8 @@ do
     installed, filePath = IsBinaryModuleInstalled( "moonloader" )
     if installed
         ok, msg = pcall( require, "moonloader" )
-        if ok and istable( moonloader )
-            Logger\Info( "gm_moonloader v%s loaded.", moonloader._VERSION )
+        if ok and istable( _G.moonloader )
+            Logger\Info( "gm_moonloader v%s loaded.", _G.moonloader._VERSION )
             installed = true
         else
             Logger\Error( "gm_moonloader startup error: %s", msg or "unknown error" )
@@ -169,7 +168,7 @@ do
 
 do
 
-    import BInt, IsBInt, struct from environment
+    import BInt, struct from environment
     import FromBytes, ToBytes, ToNumber, CastSigned from BInt
     import io from struct
 
@@ -463,7 +462,6 @@ do
     -- Byte Stream
     import deflate, Color from environment
     import unix2dos, dos2unix from os
-    import reverse from string
     import Date from util
 
     local readInt, writeInt
@@ -951,7 +949,7 @@ do
 
     do
 
-        import ceil, min, max, pow2, floor, isuint from math
+        import ceil, max, pow2, floor, isuint from math
         import Insert, Reverse from table
         string_ToBytes = string.ToBytes
         import band from bit
@@ -1745,7 +1743,7 @@ do
         unless preRelease and build
             switch byte( str, 1 )
                 when 0x2d --[[ - ]]
-                    preRelease = parsePrerelease( str )
+                    preRelease = parsePreRelease( str )
 
                 when 0x2b --[[ + ]]
                     build = parseBuild( str )
@@ -1811,7 +1809,7 @@ do
 
             major, minor, patch, extra = match( tostring( major ), "^(%d+)%.?(%d*)%.?(%d*)(.-)$" )
             unless major
-                throw "the major version of '#{str}' is missing", 2
+                throw "the major version is missing", 2
                 return nil
 
             major = tonumber( major, 10 )
@@ -2089,11 +2087,11 @@ do
             fromNumber: ( uint ) ->
                 return versionClass( band( uint, 0x3ff ), band( rshift( uint, 10 ), 0x7ff ), band( rshift( uint, 21 ), 0x7ff ) )
 
-            select: ( target, versions ) ->
-                sort( versions, sort_fn )
+            select: ( target, tbl ) ->
+                sort( tbl, sort_fn )
 
-                for index = 1, #versions
-                    version = versionClass( versions[ index ] )
+                for index = 1, #tbl
+                    version = versionClass( tbl[ index ] )
                     if version % target
                         return version, index
 
@@ -2102,72 +2100,6 @@ do
     )
 
     util.Version = versionClass
-
--- TODO: Move to separate package ( remove from gpm )
-do
-
-    import GetValue, SetValue from table
-    import serialize, deserialize from environment.yaml
-    import IsFile, AsyncWrite, Read, Write from environment.file
-
-    environment.Config = newClass( "Config", {
-        new: ( name, defaults, @config_type = "yaml" ) =>
-            argument( name, 1, "string" )
-            @name = name
-
-            filePath = "/data/config/" .. name .. ".txt"
-            @timer = "GPM::Config - " .. name
-            @filepath = filePath
-
-            if IsFile( filePath )
-                @data = @Deserialize( Read( filePath ) )
-
-            elseif defaults
-                argument( defaults, 2, "table" )
-                @data = defaults
-                Write( filePath, @Serialize! )
-
-            else
-                @data = {}
-
-            return nil
-
-        GetAll: =>
-            return @data
-
-        Get: ( key ) =>
-            return GetValue( @data, key )
-
-        Set: ( key, value ) =>
-            argument( key, 1, "string" )
-            SetValue( @data, key, value )
-            Create @timer, 1, 1, ->
-                @Write!
-
-            return nil
-
-        Write: =>
-            AsyncWrite( @filepath, @Serialize! )
-            Remove( @timer )
-            return nil
-
-        Read: =>
-            @data = @Deserialize( Read( @filepath ) )
-            return nil
-
-        Serialize: =>
-            if @config_type == "yaml"
-                return serialize( @data )
-
-            return TableToJSON( @data, true )
-
-        Deserialize: ( str ) =>
-            if @config_type == "yaml"
-                return deserialize( str )
-
-            return JSONToTable( str, true, true )
-
-    } )
 
 --[[
 

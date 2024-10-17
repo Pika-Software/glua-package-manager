@@ -265,7 +265,7 @@ fetchRepository = repositories.FetchRepository = async ( repository, name, versi
     :packages = repository
 
     unless name or version
-        if offline
+        if offlineMode
             return packages
 
         success, response = pawait CachedFetch( repository.url )
@@ -280,7 +280,7 @@ fetchRepository = repositories.FetchRepository = async ( repository, name, versi
         await updateRepository( repository, map, nil, false )
         return packages
 
-    if offline
+    if offlineMode
         return searchPackages( repository, name, version, withPattern )
 
     success, response = pawait CachedFetch( repository.url )
