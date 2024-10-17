@@ -954,9 +954,9 @@ do
 -- packages autorun
 do
 
+    import all, allSettled from environment.futures
     import display from environment.Error
     import Logger, repositories from gpm
-    import all, allSettled from gpm.futures
 
     -- this one has [name@version or url] = Promise
     dependencies = loader.Dependencies = {}
@@ -1061,7 +1061,33 @@ do
 
         Logger\Info( "Executing '%s@%s' package...", pkg.name, pkg.version )
         await asyncImport( pkg.name, esmResolve, nil, pkg.url, pkg.env )
+
+        if SERVER
+            file.Watch( getDirectory( pkg.url.pathname, false ) )
+
         return nil
+
+    base = URL( "file:///lua/packages/" )
+
+    packageReload = async ( name ) ->
+        await initializePackage( await packageRead( URL( name .. "/", base ) ) )
+        return nil
+
+    hook.Add(
+        "FileWatchEvent"
+        gpm.PREFIX .. "EFSW"
+        ( action, watchID, filePath ) ->
+            name = match( filePath, "^addons/[^/]*/lua/packages/([^/]*)/.*$" )
+            if action ~= 3 or not name
+                return nil
+
+            timer.Create "gpm.filewatch" .. name, 1, 1, ->
+                environment.futures.run( packageReload( name ) )
+                return nil
+
+            return nil
+        environment.PRE_HOOK
+    )
 
     loader.InitializePackage = initializePackage
 
@@ -1071,7 +1097,6 @@ do
 
         Logger\Info( "Parsing `packages/` directory..." )
         _, folders = Find( "packages/*", LuaPath, true )
-        base = URL( "file:///lua/packages/" )
 
         readTasks, taskCount = {}, 0
         for folderName in *folders
