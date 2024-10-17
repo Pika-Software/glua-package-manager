@@ -257,45 +257,12 @@ do
 
 do
 
-    local readAll
-    do
+    import BytesLeft from gmod_net
 
-        import BytesLeft from gmod_net
+    readAll = ->
+        return ReadData( BytesLeft!, nil )
 
-        readAll = ->
-            return ReadData( BytesLeft!, nil )
-
-        net.ReadAll = readAll
-
-    -- ByteStream
-    do
-
-        import ByteStream from util
-
-        net.ReadByteStream = ( length ) ->
-            return ByteStream( length or readAll! )
-
-        net.WriteByteStream = ( byteStream ) ->
-            if isstring( byteStream )
-                WriteData( byteStream )
-                return nil
-
-            argument( byteStream, 1, "ByteStream" )
-            return WriteData( byteStream\ReadAll! )
-
-    import BitStream from util
-
-    -- BitStream
-    net.ReadBitStream = ( length ) ->
-        return BitStream( length or readAll! )
-
-    net.WriteBitStream = ( bitStream ) ->
-        if isstring( bitStream )
-            WriteData( bitStream )
-            return nil
-
-        argument( bitStream, 1, "BitStream" )
-        return WriteData( bitStream\ReadAll! )
+    net.ReadAll = readAll
 
 -- Table
 do
@@ -389,141 +356,40 @@ do
         WriteUInt( t, 16 )
         return WriteUInt( d, 16 )
 
--- Byte
 net.ReadByte = ->
-    return byte( ReadData( 1 ), 1 )
+    return ReadUInt( 8 )
 
 net.WriteByte = ( number ) ->
-    WriteData( char( number ), 1 )
+    WriteUInt( number, 8 )
     return nil
 
--- 64bit
-do
+net.ReadShort = ->
+    return ReadInt( 16 )
 
-    import BInt from environment
-    import FromBytes, ToBytes, ToNumber, CastSigned from BInt
-    import io from environment.struct
-    import Little from io.endianness
+net.WriteShort = ( number ) ->
+    WriteInt( number, 16 )
+    return nil
 
-    -- Int64
-    do
+net.ReadLong = ->
+    return ReadInt( 32 )
 
-        local readInt, writeInt
-        do
-            int = io.i
-            readInt, writeInt = int.Read, int.Write
+net.WriteLong = ( number ) ->
+    WriteInt( number, 32 )
+    return nil
 
-        net.ReadShort = ->
-            Little!
-            return readInt( nil, ReadData( 2 ), 2 )
+net.ReadUShort = ->
+    return ReadUInt( 16 )
 
-        net.WriteShort = ( number ) ->
-            Little!
-            WriteData( writeInt( nil, number, 2 ), 2 )
-            return nil
+net.WriteUShort = ( number ) ->
+    WriteUInt( number, 16 )
+    return nil
 
-        net.ReadLong = ->
-            Little!
-            return readInt( nil, ReadData( 4 ), 4 )
+net.ReadULong = ->
+    return ReadUInt( 32 )
 
-        net.WriteLong = ( number ) ->
-            Little!
-            WriteData( writeInt( nil, number, 4 ), 4 )
-            return nil
-
-        net.ReadInt64 = ->
-            binary = ReadData( 8 )
-            if byte( binary, 7 ) == 0 and byte( binary, 8 ) == 0
-                Little!
-                return readInt( nil, binary, 6 )
-
-            return CastSigned( FromBytes( binary, true ), 8 )
-
-        net.WriteInt64 = ( number ) ->
-            local isBint
-            if isnumber( number )
-                isBint = false
-            else
-                number = BInt( number )
-                isBint = true
-
-            if isBint or number > 0xFFFFFFFFFFFF
-                Little!
-
-                WriteData( ToBytes( number, 8, true ) )
-                return nil
-
-            Little!
-
-            if isBint
-                WriteData( writeInt( nil, ToNumber( number ), 6 ) )
-            else
-                WriteData( writeInt( nil, number, 6 ) )
-
-            WriteData( "\0\0" )
-            return nil
-
-    -- UInt64
-    do
-
-        local readUInt, writeUInt
-        do
-            uint = io.I
-            readUInt, writeUInt = uint.Read, uint.Write
-
-        net.ReadUShort = ->
-            Little!
-            return readUInt( nil, ReadData( 2 ), 2 )
-
-        net.WriteUShort = ( number ) ->
-            Little!
-            WriteData( writeUInt( nil, number, 2 ), 2 )
-            return nil
-
-        net.ReadULong = ->
-            Little!
-            return readUInt( nil, ReadData( 4 ), 4 )
-
-        net.WriteULong = ( number ) ->
-            Little!
-            WriteData( writeUInt( nil, number, 4 ), 4 )
-            return nil
-
-        net.ReadUInt64 = ->
-            binary = ReadData( 8 )
-            Little!
-
-            if byte( binary, 7 ) == 0 and byte( binary, 8 ) == 0
-                return readUInt( nil, binary, 6 )
-
-            return FromBytes( binary, true )
-
-        net.WriteUInt64 = ( number ) ->
-            local isBint
-            if isnumber( number )
-                isBint = false
-            else
-                number = BInt( number )
-                isBint = true
-
-            if isBint or number > 0xFFFFFFFFFFFF
-                Little!
-
-                WriteData( ToBytes( number, 8, true ) )
-                return nil
-
-            Little!
-
-            if isBint
-                WriteData( writeUInt( nil, ToNumber( number ), 6 ) )
-            else
-                WriteData( writeUInt( nil, number, 6 ) )
-
-            WriteData( "\0\0" )
-            return nil
-
---[[        !!!! BELOW RE-WRITE REQUIRED !!!!       ]]--
--- TODO: !!!!
+net.WriteULong = ( number ) ->
+    WriteUInt( number, 32 )
+    return nil
 
 do
     return nil
