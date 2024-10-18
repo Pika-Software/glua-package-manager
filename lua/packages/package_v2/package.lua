@@ -8,7 +8,9 @@ dependencies = {
 
 -- exports = "./init.lua"
 exports = {
-    server = "./init.lua"
+    ["."] = {
+        ["server"] = "./init.lua"
+    }
 }
 
 -- send = {

@@ -520,8 +520,7 @@ do
             if resolved := packageImportsExportsResolve( @, subpath, exports, packageURL, false )
                 return resolved
 
-        -- TODO: If no exports are found then ignore package
-        -- error PackageError "no exports found for '#{subpath}' in '#{packageURL}'"
+        error PackageError "no exports found for '#{subpath}' in '#{packageURL}'"
         return nil
 
     packageDependencyResolve = ( name, target, subpath ) =>
