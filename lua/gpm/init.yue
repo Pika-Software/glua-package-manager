@@ -137,7 +137,6 @@ for key, value in _G.pairs( include( "gpm/libs/error.lua" ) )
 environment.utf8 = setmetatable( include( "gpm/libs/utf8.lua" ), sandboxMetatable( _G.utf8 ) )
 environment.struct = include( "gpm/libs/struct.lua" )
 include( "gpm/libs/3rd-party/bigint.lua" )
-include( "gpm/libs/date.lua" )
 
 -- LibDeflate
 deflate = include( "gpm/libs/3rd-party/deflate.lua" )

@@ -337,21 +337,6 @@ do
         argument( steamID, 1, "SteamID" )
         return WriteData( steamID\ToBinary( withUniverse ) )
 
--- Date
-do
-
-    import Date from util
-
-    net.ReadDate = ->
-        return Date.FromBinary( ReadData( 12 ) )
-
-    net.WriteDate = ( date ) ->
-        if isstring( date )
-            date = Date( date )
-
-        argument( date, 1, "Date" )
-        return WriteData( date\ToBinary! )
-
 -- Time
 do
 

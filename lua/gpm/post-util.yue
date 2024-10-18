@@ -462,7 +462,6 @@ do
     -- Byte Stream
     import deflate, Color from environment
     import unix2dos, dos2unix from os
-    import Date from util
 
     local readInt, writeInt
     do
@@ -917,17 +916,6 @@ do
 
             WriteColor: ( color ) =>
                 return @Write( char( color.r, color.g, color.b, color.a ) )
-
-            -- Date
-            ReadDate: =>
-                return Date.FromBinary( @Read( 12 ) )
-
-            WriteDate: ( date ) =>
-                if isstring( date )
-                    date = Date( date )
-
-                argument( date, 1, "Date" )
-                return @Write( date\ToBinary! )
 
             -- SteamID
             ReadSteamID: ( isBigEndian, withUniverse ) =>
