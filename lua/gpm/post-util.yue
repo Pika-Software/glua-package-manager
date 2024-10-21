@@ -61,13 +61,37 @@ do
         Logger\Warn( "Binary module '" .. filePath .. "' is missing, support for moon and yue scripts is unavailable." )
 
 -- https://github.com/WilliamVenner/gmsv_workshop
-if SERVER and not ( istable( steamworks ) and isfunction( steamworks.DownloadUGC ) )
+if SERVER and not ( istable( _G.steamworks ) and isfunction( _G.steamworks.DownloadUGC ) )
     installed, filePath = IsBinaryModuleInstalled( "workshop" )
     if installed
         unless pcall( require, "workshop" )
             Logger\Error( "Binary module '" .. filePath .. "' was corrupted!" )
     else
         Logger\Warn( "Binary module '" .. filePath .. "' is missing, Steam workshop downloads is unavailable." )
+
+if _G.steamworks
+    import DownloadUGC from _G.steamworks
+    import setmetatable from debug
+    import Future from environment
+
+    metatable = util.File.__class.__base
+
+    environment.steamworks.DownloadUGC = ( workshopID ) ->
+        argument( workshopID, 1, "string" )
+        fut = Future!
+
+        DownloadUGC workshopID, ( filePath, fileObject ) ->
+            if filePath
+                if fileObject
+                    setmetatable( fileObject, metatable )
+
+                fut\setResult( { path: filePath, file: fileObject } )
+                return nil
+
+            fut\setError( "Steam workshop download failed." )
+            return nil
+
+        return fut
 
 do
 
@@ -204,6 +228,7 @@ do
     do
 
         import IsSteamID, IsSteamID64 from string
+        import setmetatable from _G
         import fdiv from math
 
         -- https://developer.valvesoftware.com/wiki/SteamID

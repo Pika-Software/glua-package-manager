@@ -685,7 +685,7 @@ do
 
     sleep = futures.sleep = ( seconds, result ) ->
         fut = Future()
-        Simple( seconds, -> fut\setResult(result) )
+        Simple( seconds, -> fut\setResult( result ) )
         return fut
 
     environment.sleep = ( ... ) -> return await sleep( ... )
