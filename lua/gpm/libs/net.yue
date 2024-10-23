@@ -18,13 +18,6 @@ types = rawget( net, "Types" )
 unless istable( types )
     types = net.Types = {}
 
--- C
-types[ environment.TYPE_STRING ] = { net.ReadString, net.WriteString }
-types[ environment.TYPE_NUMBER ] = { net.ReadDouble, net.WriteDouble }
-types[ environment.TYPE_MATRIX ] = { net.ReadMatrix, net.WriteMatrix }
-types[ environment.TYPE_VECTOR ] = { net.ReadVector, net.WriteVector }
-types[ environment.TYPE_ANGLE ] = { net.ReadAngle, net.WriteAngle }
-
 net.WriteType = ( value, index ) ->
     unless isnumber( index )
         index = TypeID( value )
@@ -32,32 +25,32 @@ net.WriteType = ( value, index ) ->
             throw "invalid type '" .. index .. "'", 2
             return nil
 
+    if index == 0
+        WriteUInt( 0, 14 )
+        return nil
+
     data = types[ index ]
     if data
         func = data[ 2 ]
         if func
-            WriteUInt( index, 16 )
+            WriteUInt( index, 14 )
             return func( value )
 
     throw "missing type '" .. index .. "' writer", 2
     return nil
 
-do
-
-    import TYPE_NIL from _G
-
-	net.ReadType = ( index = ReadUInt( 16 ) ) ->
-		if index == TYPE_NIL
-            return nil
-
-		data = types[ index ]
-        if data
-            func = data[ 1 ]
-            if func
-        		return func!
-
-        throw "missing type '" .. index .. "' reader", 2
+net.ReadType = ( index = ReadUInt( 14 ) ) ->
+    if index == 0
         return nil
+
+    data = types[ index ]
+    if data
+        func = data[ 1 ]
+        if func
+            return func!
+
+    throw "missing type '" .. index .. "' reader", 2
+    return nil
 
 if SERVER
 	import NetworkStringToID, AddNetworkString from util
@@ -185,95 +178,31 @@ do
 
         return nil
 
--- Boolean
+-- Boolean ( 1 )
 do
 
-	import ReadBit, WriteBit from gmod_net
+    import ReadBit, WriteBit from gmod_net
 
-	read = ->
-	    return ReadBit! == 1
+    read = ->
+        return ReadBit! == 1
 
     -- bool must be an alias of bit ( because yeah... )
-	net.ReadBool, net.WriteBool = read, WriteBit
+    net.ReadBool, net.WriteBool = read, WriteBit
     net.ReadBit = read
 
-    types[ environment.TYPE_BOOL ] = { read, WriteBit }
+    types[ 1 ] = { read, WriteBit }
 
--- Entity
-do
+-- light userdata ( 2 ) - not supported
 
-	write = ( entity ) ->
-		if entity and IsValid( entity )
-            WriteUInt( EntIndex( entity ), 16 )
-            return entity
+-- Number ( 3 )
+import ReadDouble, WriteDouble from gmod_net
+types[ 3 ] = { ReadDouble, WriteDouble }
 
-		WriteUInt( 0, 16 )
-		return entity
+-- String ( 4 )
+import ReadString, WriteString from gmod_net
+types[ 4 ] = { ReadString, WriteString }
 
-	read = ->
-		index = ReadUInt( 16 )
-		if index == nil or index == 0
-			return NULL
-
-		return Entity( index )
-
-	net.ReadEntity, net.WriteEntity = read, write
-    types[ environment.TYPE_ENTITY ] = { read, write }
-
--- Player
-do
-
-    maxplayers_bits = util.BitCount( _G.game.MaxPlayers! )
-
-    net.ReadPlayer = ->
-        index = ReadUInt( maxplayers_bits )
-        if index == nil or index == 0
-            return NULL
-
-        return Entity( index )
-
-    net.WritePlayer = ( ply ) ->
-        if ply and IsValid( ply ) and ply\IsPlayer!
-            WriteUInt( EntIndex( ply ), maxplayers_bits )
-            return ply
-
-        WriteUInt( 0, maxplayers_bits )
-        return ply
-
--- Color
-do
-
-    metatable = FindMetaTable( "Color" )
-
-	read = ( readAlpha ) ->
-		if readAlpha == false
-            r, g, b = byte( ReadData( 3 ), 1, 3 )
-            return setmetatable( { :r, :g, :b, a: 255 }, metatable )
-
-        r, g, b, a = byte( ReadData( 4 ), 1, 4 )
-        return setmetatable( { :r, :g, :b, :a }, metatable )
-
-	write = ( color, writeAlpha ) ->
-		if writeAlpha == false
-            WriteData( char( color.r or 255, color.g or 255, color.b or 255 ) )
-			return color
-
-        WriteData( char( color.r or 255, color.g or 255, color.b or 255, color.a or 255 ) )
-		return color
-
-	net.ReadColor, net.WriteColor = read, write
-    types[ environment.TYPE_COLOR ] = { read, write }
-
-do
-
-    import BytesLeft from gmod_net
-
-    readAll = ->
-        return ReadData( BytesLeft!, nil )
-
-    net.ReadAll = readAll
-
--- Table
+-- Table ( 5 )
 do
 
     import ReadType, WriteType from net
@@ -316,11 +245,148 @@ do
 			WriteType( value )
             length += 1
 
-		WriteUInt( 0, 16 )
+        WriteType( nil, 0 )
         return tbl, length
 
 	net.ReadTable, net.WriteTable = read, write
-    types[ environment.TYPE_TABLE ] = { read, write }
+    types[ 5 ] = { read, write }
+
+-- function ( 6 )
+do
+
+    import Compress, Decompress from util
+    import dump, len from string
+    import load from environment
+
+    read = ->
+        binary = Decompress( ReadString! )
+        if binary == nil or len( binary ) < 2
+            return nil
+
+        return load( binary, nil, "b", getfenv( 2 ) )
+
+    write = ( func, stripDebugInfo = true ) ->
+        argument( func, 1, "function" )
+        WriteString( Compress( dump( func, stripDebugInfo ) ) )
+        return nil
+
+    net.ReadFunction, net.WriteFunction = read, write
+    types[ 6 ] = { read, write }
+
+-- userdata ( 7 ) - not supported
+-- thread ( 8 ) - not supported
+
+-- Entity ( 9 )
+local ReadEntity, WriteEntity
+do
+
+	WriteEntity = ( entity ) ->
+		if entity and IsValid( entity )
+            WriteUInt( EntIndex( entity ), 14 )
+            return entity
+
+		WriteUInt( 0, 14 )
+		return entity
+
+	ReadEntity = ->
+		index = ReadUInt( 14 )
+		if index == nil or index == 0
+			return NULL
+
+		return Entity( index )
+
+	net.ReadEntity, net.WriteEntity = ReadEntity, WriteEntity
+    types[ 9 ] = { ReadEntity, WriteEntity }
+
+-- Player ( 9 )
+do
+
+    maxplayers_bits = util.BitCount( _G.game.MaxPlayers! )
+
+    net.ReadPlayer = ->
+        index = ReadUInt( maxplayers_bits )
+        if index == nil or index == 0
+            return NULL
+
+        return Entity( index )
+
+    net.WritePlayer = ( ply ) ->
+        if ply and IsValid( ply ) and ply\IsPlayer!
+            WriteUInt( EntIndex( ply ), maxplayers_bits )
+            return ply
+
+        WriteUInt( 0, maxplayers_bits )
+        return ply
+
+-- Vector ( 10 )
+import ReadVector, WriteVector from gmod_net
+types[ 10 ] = { ReadVector, WriteVector }
+
+-- Angle ( 11 )
+import ReadAngle, WriteAngle from gmod_net
+types[ 11 ] = { ReadAngle, WriteAngle }
+
+-- PhysObj ( 12 )
+do
+
+    import GetEntity, GetPhysicsObjectCount, GetPhysicsObjectNum from ENTITY
+
+    read = ->
+        entity = ReadEntity!
+        if IsValid( entity )
+            return GetPhysicsObjectNum( entity, ReadUInt( 8 ) )
+
+        return NULL
+
+    write = ( phys ) ->
+        entity = GetEntity( phys )
+        WriteEntity( entity )
+
+        for i = 0, GetPhysicsObjectCount( entity ) - 1
+            if GetPhysicsObjectNum( entity, i ) == phys
+                WriteUInt( i, 8 )
+                break
+
+        return nil
+
+    net.ReadPhysObj, net.WritePhysObj = read, write
+    types[ 12 ] = { read, write }
+
+-- VMatrix ( 29 )
+types[ 29 ] = { gmod_net.ReadMatrix, gmod_net.WriteMatrix }
+
+-- Color ( 255 )
+do
+
+    metatable = FindMetaTable( "Color" )
+
+	read = ( readAlpha ) ->
+		if readAlpha == false
+            r, g, b = byte( ReadData( 3 ), 1, 3 )
+            return setmetatable( { :r, :g, :b, a: 255 }, metatable )
+
+        r, g, b, a = byte( ReadData( 4 ), 1, 4 )
+        return setmetatable( { :r, :g, :b, :a }, metatable )
+
+	write = ( color, writeAlpha ) ->
+		if writeAlpha == false
+            WriteData( char( color.r or 255, color.g or 255, color.b or 255 ) )
+			return color
+
+        WriteData( char( color.r or 255, color.g or 255, color.b or 255, color.a or 255 ) )
+		return color
+
+	net.ReadColor, net.WriteColor = read, write
+    types[ 255 ] = { read, write }
+
+do
+
+    import BytesLeft from gmod_net
+
+    readAll = ->
+        return ReadData( BytesLeft!, nil )
+
+    net.ReadAll = readAll
 
 -- SteamID
 do
@@ -328,14 +394,23 @@ do
     import SteamID from util
 
     net.ReadSteamID = ( withUniverse ) ->
-        return SteamID.FromBinary( ReadData( withUniverse and 5 or 4 ), false, withUniverse )
+        sid = SteamID.FromBinary( ReadData( 4 ), false )
+        if withUniverse
+            sid\SetUniverse( ReadUInt( 3 ) )
 
-    net.WriteSteamID = ( steamID, withUniverse ) ->
-        if isstring( steamID )
-            steamID = SteamID( steamID )
+        return sid
 
-        argument( steamID, 1, "SteamID" )
-        return WriteData( steamID\ToBinary( withUniverse ) )
+    net.WriteSteamID = ( sid, withUniverse ) ->
+        if isstring( sid )
+            sid = SteamID( sid )
+
+        argument( sid, 1, "SteamID" )
+        WriteData( SteamID.ToBinary( sid, false ) )
+
+        if withUniverse
+            WriteUInt( sid.universe, 3 )
+
+        return nil
 
 -- Time
 do
@@ -348,7 +423,8 @@ do
     net.WriteTime = ( u ) ->
         t, d = unix2dos( u )
         WriteUInt( t, 16 )
-        return WriteUInt( d, 16 )
+        WriteUInt( d, 16 )
+        return nil
 
 net.ReadByte = ->
     return ReadUInt( 8 )
