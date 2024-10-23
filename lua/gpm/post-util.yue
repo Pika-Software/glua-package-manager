@@ -125,8 +125,6 @@ do
         return CompileString( code, identifier, handleError )
 
     load = ( chunk, chunkName, mode = "bt", env = getfenv( 2 ), config, handleError = true ) ->
-        argument( chunkName, 2, "string" )
-
         switch type( chunk )
             when "string"
                 modes = {}
@@ -156,6 +154,7 @@ do
                     chunk = moon.ToLua( chunk )
 
                 if modes[ 0x74 --[[ t ]] ]
+                    argument( chunkName, 2, "string" )
                     func = CompileString( chunk, chunkName, handleError )
 
                 if func
@@ -172,6 +171,7 @@ do
                 return msg
 
             when "function"
+                argument( chunkName, 2, "string" )
                 result, length = {}, 0
 
                 str = chunk!
@@ -337,12 +337,8 @@ do
             ToSteamID3: =>
                 return "[U:" .. @universe .. ":" .. @account_id .. "]"
 
-            ToBinary: ( isBigEndian, withUniverse ) =>
+            ToBinary: ( isBigEndian ) =>
                 setEndianness( isBigEndian )
-
-                if withUniverse
-                    return char( @universe ) .. writeUInt( nil, @account_id, 4 )
-
                 return writeUInt( nil, @account_id, 4 )
 
             GetUniverse: =>
@@ -425,15 +421,15 @@ do
                     account_id: ( account_number * 2 ) + ( id and 1 or 0 )
                 }, metatable )
 
-            FromBinary: ( binary, isBigEndian, withUniverse ) ->
+            FromBinary: ( binary, isBigEndian ) ->
                 setEndianness( isBigEndian )
 
-                account_id = readUInt( nil, withUniverse and sub( binary, 2 ) or binary, 4 ) or -1
+                account_id = readUInt( nil, binary, 4 ) or -1
                 if account_id < 0
                     throw( "Invalid binary SteamID", 2 )
 
                 return setmetatable( {
-                    universe: withUniverse and clamp( byte( binary, 1 ), 0, 5 ) or 1
+                    universe: 1
                     id: account_id % 2 ~= 0
                     account_number: fdiv( account_id, 2 )
                     account_id: account_id
@@ -829,22 +825,22 @@ do
             -- Float
             ReadFloat: ( isBigEndian ) =>
                 setEndianness( isBigEndian )
-                return readFloat( nil, @Read( 4 ), 4 )
+                return readFloat( nil, @Read( 4 ) )
 
             WriteFloat: ( number, isBigEndian ) =>
                 argument( number, 2, "number" )
                 setEndianness( isBigEndian )
-                return @Write( writeFloat( nil, number, 4 ) )
+                return @Write( writeFloat( nil, number ) )
 
             -- Double
             ReadDouble: ( isBigEndian ) =>
                 setEndianness( isBigEndian )
-                return readDouble( nil, @Read( 8 ), 8 )
+                return readDouble( nil, @Read( 8 ) )
 
             WriteDouble: ( number, isBigEndian ) =>
                 argument( number, 2, "number" )
                 setEndianness( isBigEndian )
-                return @Write( writeDouble( nil, number, 8 ) )
+                return @Write( writeDouble( nil, number ) )
 
             -- Time
             ReadTime: =>
