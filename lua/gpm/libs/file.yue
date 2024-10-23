@@ -461,6 +461,25 @@ do
         lib.Open = ( filePath, fileMode, gamePath, skipNormalize ) ->
             return fileClass( filePath, fileMode, gamePath, skipNormalize )
 
+        downloadUGC = _G.steamworks and _G.steamworks.DownloadUGC or nil
+        if downloadUGC
+            environment.steamworks.DownloadUGC = ( workshopID ) ->
+                argument( workshopID, 1, "string" )
+                fut = Future!
+
+                downloadUGC workshopID, ( filePath, fileObject ) ->
+                    if filePath
+                        if fileObject
+                            setmetatable( fileObject, base )
+
+                        fut\setResult( { path: filePath, file: fileObject } )
+                        return nil
+
+                    fut\setError( "Steam workshop download failed." )
+                    return nil
+
+                return fut
+
     import Close, Read, Write, EndOfFile from legacy
 
     do
@@ -1244,3 +1263,4 @@ do
             filePath, gamePath = normalizeGamePath( filePath, gamePath )
 
         return await asyncMount( filePath, gamePath )
+

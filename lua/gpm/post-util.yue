@@ -69,30 +69,6 @@ if SERVER and not ( istable( _G.steamworks ) and isfunction( _G.steamworks.Downl
     else
         Logger\Warn( "Binary module '" .. filePath .. "' is missing, Steam workshop downloads is unavailable." )
 
-if _G.steamworks
-    import DownloadUGC from _G.steamworks
-    import setmetatable from debug
-    import Future from environment
-
-    metatable = util.File.__class.__base
-
-    environment.steamworks.DownloadUGC = ( workshopID ) ->
-        argument( workshopID, 1, "string" )
-        fut = Future!
-
-        DownloadUGC workshopID, ( filePath, fileObject ) ->
-            if filePath
-                if fileObject
-                    setmetatable( fileObject, metatable )
-
-                fut\setResult( { path: filePath, file: fileObject } )
-                return nil
-
-            fut\setError( "Steam workshop download failed." )
-            return nil
-
-        return fut
-
 do
 
     local byteCodeSupported
