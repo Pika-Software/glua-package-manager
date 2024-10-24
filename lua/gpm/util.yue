@@ -867,19 +867,19 @@ do
 string.IsBytecode = ( str ) ->
     return byte( str, 1 ) == 0x1B --[[ byte code marker ]]
 
-local argument, findMetaTable, registerMetaTable, CLIENT_SERVER
+-- client/server
+CLIENT_SERVER = CLIENT or SERVER
+environment.CLIENT_SERVER = CLIENT_SERVER
+
+-- client/menu
+CLIENT_MENU = CLIENT or MENU_DLL
+environment.CLIENT_MENU = CLIENT_MENU
+
+local argument, findMetaTable, registerMetaTable
 do
 
     import FindMetaTable, RegisterMetaTable, TypeID, rawset, type from _G
     import Count from table
-
-    -- client/server
-    CLIENT_SERVER = CLIENT or SERVER
-    environment.CLIENT_SERVER = CLIENT_SERVER
-
-    -- client/menu
-    CLIENT_MENU = CLIENT and MENU_DLL
-    environment.CLIENT_MENU = CLIENT_MENU
 
     static = {
         "unknown": -1
@@ -1548,7 +1548,7 @@ do
             return getmetatable( any ) == metatable
 
     -- IMesh
-    if CLIENT or MENU_DLL
+    if CLIENT_MENU
         metatable = findMetaTable( "IMesh" )
         if metatable == nil
             environment.ismesh = ( any ) ->
@@ -1655,11 +1655,17 @@ do
             return player
 
     -- Panel
-    if CLIENT or MENU_DLL
-
+    if CLIENT_MENU
         metatable = findMetaTable( "Panel" )
 
         environment.ispanel = ( any ) ->
+            return getmetatable( any ) == metatable
+
+    -- PhysObj
+    if CLIENT_SERVER
+        metatable = findMetaTable( "PhysObj" )
+
+        environment.isphysobj = ( any ) ->
             return getmetatable( any ) == metatable
 
 -- my cool math '^'
@@ -1888,16 +1894,16 @@ do
                 m = max( @r, @g, @b )
                 return ( m - @r ) / m * 100, ( m - @g ) / m * 100, ( m - @b ) / m * 100, min( @r, @g, @b ) / 2.55
 
-            Lerp: ( color, frac ) =>
+            Lerp: ( color, frac, ignoreAlpha ) =>
                 frac = clamp( frac, 0, 1 )
-                return colorClass( lerp( frac, @r, color.r ), lerp( frac, @g, color.g ), lerp( frac, @b, color.b ), lerp( frac, @a, color.a ) )
 
-            LerpTo: ( color, frac ) =>
-                frac = clamp( frac, 0, 1 )
                 @r = lerp( frac, @r, color.r )
                 @g = lerp( frac, @g, color.g )
                 @b = lerp( frac, @b, color.b )
-                @a = lerp( frac, @a, color.a )
+
+                unless ignoreAlpha
+                    @a = lerp( frac, @a, color.a )
+
                 return @
 
             Invert: =>
@@ -1911,10 +1917,6 @@ do
     )
 
     internal.__index = internal
-
-    -- i really hate this
-    environment.ColorAlpha = ( color, alpha ) ->
-        return colorClass( color.r, color.g, color.b, alpha )
 
     environment.IsColor = ( any ) ->
         return getmetatable( any ) == internal
@@ -1973,6 +1975,10 @@ do
 
         FromTable: ( tbl ) ->
             return colorClass( tbl )
+
+        Lerp: ( frac, a, b, ignoreAlpha ) ->
+            frac = clamp( frac, 0, 1 )
+            return colorClass( lerp( frac, a.r, b.r ), lerp( frac, a.g, b.g ), lerp( frac, a.b, b.b ), ignoreAlpha and 255 or lerp( frac, a.a, b.a ) )
 
     } )
 
