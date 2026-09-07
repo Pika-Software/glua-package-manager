@@ -1,0 +1,14 @@
+-- TODO:
+--
+-- ref: https://github.com/RiskoZS/lua-unit-converter/blob/master/unit-converter.lua
+--
+-- https://github.com/LLNL/units
+--
+-- https://pint.readthedocs.io/en/0.6/numpy.html
+--
+-- https://www.npmjs.com/package/convert-units
+--
+-- https://github.com/RiskoZS/penlight/blob/master/lua/pl/utils.lua
+--
+-- https://gitlab.com/DBotThePony/DLib/-/blob/develop/lua_src/dlib/modules/i18n/sh_units.lua?ref_type=heads
+--

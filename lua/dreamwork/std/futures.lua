@@ -827,7 +827,7 @@ do
 
     --- [SHARED AND MENU]
     ---
-    --- Future class.
+    --- The class used to create new `Future` instances.
     ---
     ---@class dreamwork.std.futures.FutureClass : dreamwork.std.Future
     ---@field __base dreamwork.std.Future
@@ -870,6 +870,8 @@ do
     end
 
     --- [SHARED AND MENU]
+    ---
+    --- The class used to create new `Task` instances.
     ---
     --- Task is a Future wrapper around futures.run(...) to retrieve result of async function
     --- when task is created, it will immediately run given function.
@@ -1059,6 +1061,8 @@ do
     end
 
     --- [SHARED AND MENU]
+    ---
+    --- The class used to create new `Channel` instances.
     ---
     --- A channel is a queue-type class that can be used by multiple coroutines.
     ---

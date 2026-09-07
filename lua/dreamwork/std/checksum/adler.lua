@@ -553,7 +553,7 @@ end
 
 --- [SHARED AND MENU]
 ---
---- The Adler-32 checksum calculation class.
+--- The class used to create new Adler-32 checksum calculation instances.
 ---
 --- See [RFC1950](https://tools.ietf.org/html/rfc1950) for the definition of the Adler-32 checksum.
 ---

@@ -217,3 +217,6 @@ do
     end
 
 end
+
+
+-- TODO: rewrite this crap into normat push/pop scissor call https://gitlab.com/DBotThePony/DLib/-/blob/develop/lua_src/dlib/extensions/render.lua?ref_type=heads

@@ -32,6 +32,10 @@ do
 
 end
 
+--- [SHARED AND MENU]
+---
+--- The class used to create new `Quaternion` instances.
+---
 ---@class dreamwork.std.QuaternionClass : dreamwork.std.Quaternion
 ---@overload fun(r: number, i: number, j: number, k: number): Quaternion
 local QuaternionClass = class.create( Quaternion )

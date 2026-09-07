@@ -108,6 +108,8 @@ std.getmetatable = getmetatable
 ---@type fun(tbl: table<K,V>, metatable: dreamwork.std.Metatable<K,V>): table<K,V>
 std.setmetatable = setmetatable
 
+local setmetatable = std.setmetatable
+
 std.xpcall = xpcall
 
 local pcall = pcall
@@ -588,7 +590,6 @@ sendfile( "dreamwork/std/math.lua" )
 
 ---@class dreamwork.std.math
 local math = std.math
-local math_relative = math.relative
 local math_min, math_max = math.min, math.max
 
 --- [SHARED AND MENU]
@@ -636,7 +637,7 @@ sendfile( "dreamwork/std/string.lua" )
 
 ---@class dreamwork.std.string
 local string = std.string
-
+local string_match = string.match
 local string_format = string.format
 local string_sub, string_len = string.sub, string.len
 local string_char, string_byte = string.char, string.byte
@@ -663,148 +664,9 @@ do
 
 end
 
-do
-
-    --- [SHARED AND MENU]
-    ---
-    --- Returns the value of the given key path.
-    ---
-    --- If the key path does not exist, returns `nil`.
-    ---
-    --- Example:
-    ---
-    --- ```lua
-    ---     local t = { a = { b = { c = { d = { e = "e value!" } } } } }
-    ---     print( table.get( t, "a.b.c.d.e" ) ) -- e value!
-    --- ```
-    ---
-    ---@param tbl table The table to get the value from.
-    ---@param str string The key path to get.
-    ---@param separator? integer The separator of the key path, default is `0x2E`.
-    ---@param str_length? integer The length of the key path, default is `string.len( str )`.
-    ---@return any value The value of the key path.
-    function table.get( tbl, str, separator, start_position, end_position, str_length )
-        if separator == nil then
-            separator = 0x2E --[[ "." ]]
-        end
-
-        if str_length == nil then
-            str_length = string_len( str )
-        end
-
-        if start_position == nil then
-            start_position = 1
-        elseif start_position < 0 then
-            start_position = math_relative( start_position, str_length )
-        else
-            start_position = math_min( start_position, str_length )
-        end
-
-        if end_position == nil then
-            end_position = str_length
-        elseif end_position < 0 then
-            end_position = math_relative( end_position, str_length )
-        else
-            end_position = math_min( end_position, str_length )
-        end
-
-        if start_position > end_position then
-            return nil
-        end
-
-        local split_position = start_position - 1
-
-        ::table_lookup_loop::
-
-        if string_byte( str, start_position, start_position ) == separator then
-            if split_position ~= start_position then
-                tbl = tbl[ string_sub( str, split_position + 1, start_position - 1 ) ]
-                if tbl == nil then return nil end
-            end
-
-            split_position = start_position
-        end
-
-        if start_position ~= end_position then
-            start_position = start_position + 1
-            goto table_lookup_loop
-        end
-
-        if split_position ~= start_position then
-            tbl = tbl[ string_sub( str, split_position + 1, start_position ) ]
-        end
-
-        return tbl
-    end
-
-    --- [SHARED AND MENU]
-    ---
-    --- Sets the value of the given key path.
-    ---
-    --- Tables are created if they do not exist.
-    ---
-    --- Example:
-    ---
-    --- ```lua
-    ---     local t = {}
-    ---     table.set( t, "a.b.c.d.e", "e value!" )
-    ---     print( t.a.b.c.d.e ) -- e value!
-    --- ```
-    ---
-    ---@param tbl table The table to set the value in.
-    ---@param str string The key path.
-    ---@param value any The value to set.
-    ---@param separator? integer The separator of the key path, default is `0x2E`.
-    ---@param str_length? integer The length of the key path, default is `string.len( str )`.
-    function table.set( tbl, str, value, separator, str_length )
-        if separator == nil then
-            separator = 0x2E --[[ "." ]]
-        end
-
-        if str_length == nil then
-            str_length = string_len( str )
-        end
-
-        local split_position = 0
-        local position = 1
-
-        while true do
-            local uint8 = string_byte( str, position, position )
-            if uint8 == separator then
-                if split_position ~= position then
-                    local key = string_sub( str, split_position + 1, position - 1 )
-
-                    if position == str_length then
-                        tbl[ key ] = value
-                        return
-                    end
-
-                    local tbl_value = tbl[ key ]
-                    if tbl_value ~= nil and isTable( tbl_value ) then
-                        tbl = tbl_value
-                    else
-                        local new_tbl = {}
-                        tbl[ key ] = new_tbl
-                        tbl = new_tbl
-                    end
-                end
-
-                split_position = position
-            end
-
-            if position == str_length then
-                break
-            else
-                position = position + 1
-            end
-        end
-
-        if split_position ~= position then
-            tbl[ string_sub( str, split_position + 1, position ) ] = value
-        end
-    end
-
-end
+-- table library ( extension )
+dofile( "dreamwork/std/table.ext.lua" )
+sendfile( "dreamwork/std/table.ext.lua" )
 
 -- bit library
 dofile( "dreamwork/std/bit.lua" )
@@ -1264,7 +1126,7 @@ do
         Integer.__type = "integer"
         std.Integer = Integer
 
-        std.setmetatable( Integer, {
+        setmetatable( Integer, {
             ---@param value number
             __eq = function( _, value )
                 return (value % 1) == 0
@@ -1309,6 +1171,7 @@ do
         end
 
         String.__tonumber = raw.tonumber
+        String.__div = string.divide
         String.__len = string.len
 
         --- [SHARED AND MENU]
@@ -1396,6 +1259,7 @@ do
 
 end
 
+local isFunction = std.isFunction
 local isString = std.isString
 local isNumber = std.isNumber
 
@@ -1457,7 +1321,7 @@ do
     do
 
         local Scheme = std.getmetatable( color_scheme ) or {}
-        std.setmetatable( color_scheme, Scheme )
+        setmetatable( color_scheme, Scheme )
 
         ---@protected
         function Scheme:__tostring()
@@ -1675,8 +1539,6 @@ do
 
     do
 
-        local string_match = string.match
-
         engine.hookCatch( "dreamwork.lua.error", "console.display", function( error_value, stack_level )
             if isError( error_value ) then
                 ---@cast error_value dreamwork.std.Error
@@ -1848,8 +1710,6 @@ end
 
 do
 
-    local isFunction = std.isFunction
-
     ---@generic F: function
     ---@class dreamwork.OverloadInput<F>
     ---@field match string[] | string
@@ -2010,7 +1870,7 @@ do
 
     local empty_env = {}
 
-    std.setmetatable( empty_env, {
+    setmetatable( empty_env, {
         __index = debug_fempty,
         __newindex = debug_fempty
     } )
@@ -2871,3 +2731,7 @@ local cleanup_memory = gc.getMemory()
 logger:info( "Clean-up finished, took %.2f ms, cleaned up %.02f MB of garbage, total memory used by LuaJIT: %.02f MB.", time.tick( "ms" ), (total_memory - cleanup_memory) / 1024, cleanup_memory / 1024 )
 
 -- TODO: Globally replace all versions, steamids, url, etc. with their classes in dreamwork, e.g. std.URL, steam.Identifier
+
+-- TODO: few ideas from https://gitlab.com/DBotThePony/DLib/-/blob/develop/lua_src/dlib/extensions/extensions.lua?ref_type=heads
+
+-- TODO: enums https://gitlab.com/DBotThePony/DLib/-/blob/develop/lua_src/dlib/enums/sdk.lua?ref_type=heads maybe maybe https://gitlab.com/DBotThePony/DLib/-/blob/develop/lua_src/dlib/enums/gmod.lua?ref_type=heads

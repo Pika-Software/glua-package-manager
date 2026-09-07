@@ -6,13 +6,8 @@ local std = dreamwork.std
 
 local debug = std.debug
 local debug_Stack = debug.Stack
-local debug_getmetatable = debug.getmetatable
-
-local table = std.table
-local table_concat = table.concat
 
 local string = std.string
-local string_indent = string.indent
 local string_format = string.format
 
 local utf8 = std.utf8
@@ -268,7 +263,7 @@ end
 
 --- [SHARED AND MENU]
 ---
---- The class used to create new `dreamwork.std.Error` instances.
+--- The class used to create new `Error` instances.
 ---
 ---@class dreamwork.std.ErrorClass : dreamwork.std.Error
 ---@field __base dreamwork.std.Error
@@ -299,7 +294,7 @@ local RuntimeError = class.base( "RuntimeError", false, ErrorClass )
 
 --- [SHARED AND MENU]
 ---
---- The object type of the `RuntimeError` class.
+--- The class used to create new `RuntimeError` instances.
 ---
 ---@class dreamwork.std.RuntimeErrorClass : dreamwork.std.RuntimeError
 ---@field __base dreamwork.std.RuntimeError
@@ -351,7 +346,7 @@ end
 
 --- [SHARED AND MENU]
 ---
---- The object type of the `NotImplementedError` class.
+--- The class used to create new `NotImplementedError` instances.
 ---
 ---@class dreamwork.std.NotImplementedErrorClass : dreamwork.std.NotImplementedError
 ---@field __base dreamwork.std.NotImplementedError
@@ -401,7 +396,7 @@ end
 
 --- [SHARED AND MENU]
 ---
---- The object type of the `AsyncError` class.
+--- The class used to create new `AsyncError` instances.
 ---
 ---@class dreamwork.std.AsyncErrorClass : dreamwork.std.AsyncError
 ---@field __base dreamwork.std.AsyncError
@@ -479,7 +474,7 @@ end
 
 --- [SHARED AND MENU]
 ---
---- The object type of the `TypeError` class.
+--- The class used to create new `TypeError` instances.
 ---
 ---@class dreamwork.std.TypeErrorClass : dreamwork.std.TypeError
 ---@field __base dreamwork.std.TypeError
@@ -524,7 +519,7 @@ end
 
 --- [SHARED AND MENU]
 ---
---- The object type of the `ValueError` class.
+--- The class used to create new `ValueError` instances.
 ---
 ---@class dreamwork.std.ValueErrorClass : dreamwork.std.ValueError
 ---@field __base dreamwork.std.ValueError
@@ -567,7 +562,7 @@ end
 
 --- [SHARED AND MENU]
 ---
---- The object type of the `EndOfFileError` class.
+--- The class used to create new `EndOfFileError` instances.
 ---
 ---@class dreamwork.std.EndOfFileErrorClass : dreamwork.std.EndOfFileError
 ---@field __base dreamwork.std.EndOfFileError

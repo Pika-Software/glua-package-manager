@@ -42,7 +42,7 @@ local VMatrix = class.base( "VMatrix" )
 
 --- [SHARED AND MENU]
 ---
---- A 4x4 matrix class.
+--- The class used to create new `VMatrix` instances.
 ---
 ---@class dreamwork.std.VMatrixClass : dreamwork.std.VMatrix
 ---@field __base dreamwork.std.VMatrix

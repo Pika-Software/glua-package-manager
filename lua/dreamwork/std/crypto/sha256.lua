@@ -14,7 +14,7 @@ local SHA256 = std.class.base( "SHA256" )
 
 --- [SHARED AND MENU]
 ---
---- SHA256 class that computes a cryptographic 256-bit crypto value.
+--- The class used to create new `SHA256` hash calculation instances.
 ---
 --- Secure Hash Algorithm 256-bit, part of the SHA-2 family.
 ---

@@ -1,0 +1,6 @@
+--- TODO
+---
+--- ref: https://github.com/thegrb93/StarfallEx/blob/master/lua/starfall/libs_cl/socket.lua
+---
+--- https://w3.impa.br/~diego/software/luasocket/socket.html
+---

@@ -32,7 +32,9 @@ local SHA1 = std.class.base( "SHA1" )
 
 --- [SHARED AND MENU]
 ---
---- SHA1 class that computes a cryptographic 160-bit hash value.
+--- The class used to create new `SHA1` hash calculation instances.
+---
+--- Computes a cryptographic 160-bit hash value.
 ---
 --- Like other hash classes, it takes input data ( string )
 --- and produces a digest ( string ) — a

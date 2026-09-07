@@ -30,6 +30,8 @@ local raw_get, raw_set = raw.get, raw.set
 
         ref: https://github.com/excessive/cpml/blob/master/modules/intersect.lua
 
+        mb mb mb https://gitlab.com/DBotThePony/DLib/-/blob/develop/lua_src/dlib/modules/luavector.lua?ref_type=heads
+
 ]]
 
 --- [SHARED AND MENU]
@@ -69,7 +71,7 @@ end
 
 --- [SHARED AND MENU]
 ---
---- A 3D vector class.
+--- The class used to create new `Vector3` instances.
 ---
 ---@class dreamwork.std.Vector3Class: dreamwork.std.Vector3
 ---@field __base dreamwork.std.Vector3

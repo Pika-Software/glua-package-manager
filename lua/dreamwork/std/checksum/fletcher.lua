@@ -66,7 +66,7 @@ end
 
 --- [SHARED AND MENU]
 ---
---- The Fletcher-16 checksum calculation class.
+--- The class used to create new Fletcher-16 checksum calculation instances.
 ---
 --- See [Fletcher's checksum](https://en.wikipedia.org/wiki/Fletcher%27s_checksum) for the definition of the Fletcher-16 checksum.
 ---
@@ -141,7 +141,7 @@ end
 
 --- [SHARED AND MENU]
 ---
---- The Fletcher-32 checksum calculation class.
+--- The class used to create new Fletcher-32 checksum calculation instances.
 ---
 --- See [Fletcher's checksum](https://en.wikipedia.org/wiki/Fletcher%27s_checksum) for the definition of the Fletcher-32 checksum.
 ---

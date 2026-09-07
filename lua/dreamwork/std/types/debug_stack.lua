@@ -137,7 +137,7 @@ end
 
 --- [SHARED AND MENU]
 ---
---- The class used to create new `dreamwork.std.debug.Stack` instances.
+--- The class used to create new `debug.Stack` instances.
 ---
 ---@class dreamwork.std.debug.StackClass : dreamwork.std.Stack
 ---@field __parent dreamwork.std.StackClass

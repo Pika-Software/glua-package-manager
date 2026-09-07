@@ -75,6 +75,8 @@ local BigInteger = class.base( "BigInteger", false, nil )
 
 --- [SHARED AND MENU]
 ---
+--- The class used to create new `BigInteger` instances.
+---
 --- Arbitrary-precision signed integer type.
 ---
 --- Unlike Lua's built-in integers, `BigInteger` values are limited only by

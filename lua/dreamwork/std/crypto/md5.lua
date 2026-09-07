@@ -35,11 +35,13 @@ local MD5 = class.base( "MD5" )
 
 --- [SHARED AND MENU]
 ---
---- MD5 class that computes a cryptographic 128-bit hash value.
+--- The class used to create new `MD5` hash calculation instances.
 ---
---- Like other hash classes, it takes input data ( string )
---- and produces a digest ( string ) — a
---- fixed-size output string that represents that data.
+--- Computes a cryptographic 128-bit hash value.
+---
+--- Like other hash classes, it takes input data ( string ) and
+--- produces a digest ( string ) — a fixed-size output string that
+--- represents that data.
 ---
 --- **MD5 is insecure**
 ---

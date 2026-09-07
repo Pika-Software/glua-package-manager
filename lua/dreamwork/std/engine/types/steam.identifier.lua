@@ -101,7 +101,7 @@ local Identifier = std.class.base( "Identifier" )
 
 --- [SHARED AND MENU]
 ---
---- The Steam ID class.
+--- The class used to create new `steam.Identifier` instances.
 ---
 ---@class dreamwork.std.steam.IdentifierClass : dreamwork.std.steam.Identifier
 ---@field __base dreamwork.std.steam.Identifier

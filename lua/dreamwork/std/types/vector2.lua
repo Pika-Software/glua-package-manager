@@ -55,7 +55,7 @@ end
 
 --- [SHARED AND MENU]
 ---
---- A 2D vector class.
+--- The class used to create new `Vector2` instances.
 ---
 ---@class dreamwork.std.Vector2Class: dreamwork.std.Vector2
 ---@field __base dreamwork.std.Vector2

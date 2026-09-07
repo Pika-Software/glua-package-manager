@@ -38,11 +38,11 @@ local CRC8 = class.base( "CRC8", false )
 
 CRC8.DigestSize = 1
 
----@param poly? integer The polynomial is used to calculate the checksum.
----@param init? integer The initial value of checksum.
----@param ref_in? boolean `true` if input checksum is reversed, otherwise `false`.
----@param ref_out? boolean `true` if output checksum is reversed, otherwise `false`.
----@param xor_out? integer The value to be XORed with the output checksum.
+---@param poly? integer
+---@param init? integer
+---@param ref_in? boolean
+---@param ref_out? boolean
+---@param xor_out? integer
 ---@protected
 function CRC8:__init( poly, init, ref_in, ref_out, xor_out )
     if poly == nil then
@@ -153,7 +153,7 @@ end
 
 --- [SHARED AND MENU]
 ---
---- The CRC-8 checksum calculation class.
+--- The class used to create new CRC-8 checksum calculation instances.
 ---
 --- See https://en.wikipedia.org/wiki/Cyclic_redundancy_check for the definition of the CRC-8 checksum.
 ---
@@ -209,7 +209,7 @@ end
 
 --- [SHARED AND MENU]
 ---
---- The CRC-16 checksum calculation object.
+--- The class used to create new CRC-16 checksum calculation instances.
 ---
 ---@class dreamwork.std.checksum.CRC16 : dreamwork.std.checksum.CRC8
 ---@field __parent dreamwork.std.checksum.CRC8
@@ -220,11 +220,11 @@ local CRC16 = class.base( "CRC16", false, CRC8Class )
 
 CRC16.DigestSize = 2
 
----@param poly? integer The polynomial is used to calculate the CRC-8 checksum.
----@param init? integer The initial value of the CRC-8 checksum.
----@param ref_in? boolean `true` if the input CRC-8 checksum is reversed, otherwise `false`.
----@param ref_out? boolean `true` if the output CRC-8 checksum is reversed, otherwise `false`.
----@param xor_out? integer The value to be XORed with the output CRC-8 checksum.
+---@param poly? integer
+---@param init? integer
+---@param ref_in? boolean
+---@param ref_out? boolean
+---@param xor_out? integer
 ---@protected
 function CRC16:__init( poly, init, ref_in, ref_out, xor_out )
     if poly == nil then
@@ -345,7 +345,7 @@ end
 
 --- [SHARED AND MENU]
 ---
---- The CRC-16 checksum calculation class.
+--- The class used to create new CRC-16 checksum calculation instances.
 ---
 --- See https://en.wikipedia.org/wiki/Cyclic_redundancy_check for the definition of the CRC-16 checksum.
 ---
@@ -412,11 +412,11 @@ local CRC32 = class.base( "CRC32", false, CRC16Class )
 
 CRC32.DigestSize = 4
 
----@param poly? integer The polynomial is used to calculate the CRC-8 checksum.
----@param init? integer The initial value of the CRC-8 checksum.
----@param ref_in? boolean `true` if the input CRC-8 checksum is reversed, otherwise `false`.
----@param ref_out? boolean `true` if the output CRC-8 checksum is reversed, otherwise `false`.
----@param xor_out? integer The value to be XORed with the output CRC-8 checksum.
+---@param poly? integer
+---@param init? integer
+---@param ref_in? boolean
+---@param ref_out? boolean
+---@param xor_out? integer
 ---@protected
 function CRC32:__init( poly, init, ref_in, ref_out, xor_out )
     if poly == nil then
@@ -525,7 +525,7 @@ end
 
 --- [SHARED AND MENU]
 ---
---- The CRC-32 checksum calculation class.
+--- The class used to create new CRC-32 checksum calculation instances.
 ---
 --- See https://en.wikipedia.org/wiki/Cyclic_redundancy_check for the definition of the CRC-32 checksum.
 ---

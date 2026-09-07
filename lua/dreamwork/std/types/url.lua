@@ -72,7 +72,7 @@ local URL = class.base( "URL" )
 
 --- [SHARED AND MENU]
 ---
---- The URL class.
+--- The class used to create new `URL` instances.
 ---
 --- Parses given URL string and returns a new URL object
 --- using URL object with tostring(...) will result in getting `.href`
@@ -117,7 +117,7 @@ local SearchParams = class.base( "URLSearchParams" )
 
 --- [SHARED AND MENU]
 ---
---- The URL search parameters class.
+--- The class used to create new `URL.SearchParams` instances.
 ---
 --- Parses given `init` and returns a new `URLSearchParams` object
 --- if `init` is table, then it must be a list that consists of tables
