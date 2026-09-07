@@ -592,6 +592,67 @@ sendfile( "dreamwork/std/math.lua" )
 local math = std.math
 local math_min, math_max = math.min, math.max
 
+do
+
+    ---@alias dreamwork.std.RangeIterator fun( break_point: integer, index: integer ): integer | nil
+
+    ---@type table<integer, dreamwork.std.RangeIterator>
+    local range_iterators = {
+        [ 0 ] = debug_fempty
+    }
+
+    setmetatable( range_iterators, {
+        ---@param self table<integer, dreamwork.std.RangeIterator>
+        ---@param step_size integer
+        ---@return dreamwork.std.RangeIterator
+        __index = function( self, step_size )
+            local fn
+
+            if step_size < 0 then
+                fn = function( break_point, index )
+                    local next_index = math_max( index + step_size, break_point )
+                    if next_index == break_point then
+                        return nil
+                    end
+
+                    return next_index
+                end
+            else
+                fn = function( break_point, index )
+                    local next_index = math_min( index + step_size, break_point )
+                    if next_index == break_point then
+                        return nil
+                    end
+
+                    return next_index
+                end
+            end
+
+            self[ step_size ] = fn
+            return fn
+        end
+    } )
+
+    --- [SHARED AND MENU]
+    ---
+    --- Creates a stateless numeric `for`-loop iterator that steps from `from` to `to`
+    --- (inclusive), incrementing (or decrementing) by `step` each iteration.
+    ---
+    --- Intended to be used directly in a generic `for` loop,
+    --- e.g. `for i in range( 1, 10, 2 ) do ... end`.
+    ---
+    ---@param from integer The starting value of the range.
+    ---@param to integer The ending value of the range (inclusive).
+    ---@param step? integer The amount to step by each iteration. Defaults to `1`. Can be negative to count down.
+    ---@return dreamwork.std.RangeIterator iterator The iterator function to be used with a generic `for` loop.
+    ---@return integer to The final value, passed through as the loop's invariant state.
+    ---@return integer start The initial value, passed to the iterator on the first call.
+    function std.range( from, to, step )
+        return range_iterators[ step or 1 ], to, from - (step or 1)
+    end
+
+end
+
 --- [SHARED AND MENU]
 ---
 --- The global environment table (outside of DreamWork).
