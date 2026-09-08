@@ -3,3 +3,6 @@
 -- ref: https://github.com/FredyH/GWSockets
 --
 -- ref: https://github.com/shockpast/gm_tungstenite
+--
+-- ref: https://github.com/thegrb93/StarfallEx/blob/master/lua/starfall/libs_cl/websocket.lua
+--
