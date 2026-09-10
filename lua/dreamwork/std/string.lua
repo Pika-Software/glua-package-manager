@@ -130,12 +130,9 @@ end
 ---@param searchable_byte integer The byte to search for.
 ---@param start_position? integer The start position of the search.
 ---@param end_position? integer The end position of the search.
----@param str_length? integer The length of the string. Optionally, it should be used to speed up calculations.
 ---@return integer | nil index The index of the byte if found, `nil` otherwise.
-function string.findByte( str, searchable_byte, start_position, end_position, str_length )
-    if str_length == nil then
-        str_length = string_len( str )
-    end
+function string.findByte( str, searchable_byte, start_position, end_position )
+    local str_length = string_len( str )
 
     if start_position == nil then
         start_position = 1
@@ -178,13 +175,10 @@ end
 ---
 ---@param str string The string to split.
 ---@param size? integer The size of the segments.
----@param str_length? integer The length of the string. Optionally, it should be used to speed up calculations.
 ---@return string[] segments The array of segments.
 ---@return integer segment_count The number of segments.
-function string.divide( str, size, str_length )
-    if str_length == nil then
-        str_length = string_len( str )
-    end
+function string.divide( str, size )
+    local str_length = string_len( str )
 
     if size == nil then
         size = 1
@@ -218,9 +212,9 @@ function string.extract( str, searchable, start_position, default, with_pattern 
     local extraction_start, extraction_end, str_matched = string_find( str, searchable, start_position or 1, with_pattern ~= true )
     if extraction_start == nil then
         return str, default
-    else
-        return string_sub( str, 1, extraction_start - 1 ) .. string_sub( str, extraction_end + 1 ), str_matched or default
     end
+
+    return string_sub( str, 1, extraction_start - 1 ) .. string_sub( str, extraction_end + 1 ), str_matched or default
 end
 
 --- [SHARED AND MENU]
@@ -230,17 +224,14 @@ end
 ---@param str string
 ---@param index integer The string insertion index.
 ---@param value string The string value to insert.
----@param str_length? integer The length of the string. Optionally, it should be used to speed up calculations.
 ---@return string result
 ---@overload fun( str: string, value: string ): string
-function string.insert( str, index, value, str_length )
+function string.insert( str, index, value )
     if value == nil then
         return str .. index
     end
 
-    if str_length == nil then
-        str_length = string_len( str )
-    end
+    local str_length = string_len( str )
 
     if index == nil then
         index = str_length + 1
@@ -266,12 +257,9 @@ end
 ---@param str string The string to remove from.
 ---@param start_position integer The start position of the removal interval.
 ---@param end_position integer The end position of the removal interval.
----@param str_length? integer The length of the string. Optionally, it should be used to speed up calculations.
 ---@return string new_string A string without a specified byte interval.
-function string.remove( str, start_position, end_position, str_length )
-    if str_length == nil then
-        str_length = string_len( str )
-    end
+function string.remove( str, start_position, end_position )
+    local str_length = string_len( str )
 
     if start_position == nil then
         start_position = 1
@@ -291,9 +279,9 @@ function string.remove( str, start_position, end_position, str_length )
 
     if start_position == 1 and end_position == str_length then
         return ""
-    else
-        return string_sub( str, 1, start_position - 1 ) .. string_sub( str, end_position + 1, str_length )
     end
+
+    return string_sub( str, 1, start_position - 1 ) .. string_sub( str, end_position + 1, str_length )
 end
 
 --- [SHARED AND MENU]
@@ -315,13 +303,11 @@ end
 ---
 ---@param str string The string to check.
 ---@param suffix string The suffix to check for.
----@param str_length? integer The length of the string to check for. Optionally, it should be used to speed up calculations.
----@param suffix_length? integer The length of the suffix to check for. Optionally, it should be used to speed up calculations.
 ---@return boolean has_suffix `true` if the string ends with the suffix, `false` otherwise.
-function string.hasSuffix( str, suffix, str_length, suffix_length )
+function string.hasSuffix( str, suffix )
     return string_byte( suffix, 1, 1 ) == nil or -- suffix is empty
         str == suffix or                         -- suffix is the same as the string
-        string_sub( str, -((suffix_length or string_len( suffix ))), (str_length or string_len( str )) ) == suffix
+        string_sub( str, -string_len( suffix ), string_len( str ) ) == suffix
 end
 
 --- [SHARED AND MENU]
@@ -332,16 +318,13 @@ end
 ---@param searchable    string  The substring or pattern to search for.
 ---@param position?     integer The position to start from.
 ---@param with_pattern? boolean When `true`, `searchable` is interpreted as a Lua pattern. Defaults to `false` (plain match).
----@param str_length?   integer The length of the string. Optionally, it should be used to speed up calculations.
 ---@return integer index The index of the searchable string, otherwise `-1`.
-function string.indexOf( str, searchable, position, with_pattern, str_length )
+function string.indexOf( str, searchable, position, with_pattern )
     if searchable == nil or string_byte( searchable, 1, 1 ) == nil then
         return 0
     end
 
-    if str_length == nil then
-        str_length = string_len( str )
-    end
+    local str_length = string_len( str )
 
     if position == nil then
         position = 1
@@ -356,40 +339,76 @@ end
 
 --- [SHARED AND MENU]
 ---
---- Pads the string to a desired length.
+--- Pads the string to a desired length on the left or right.
 ---
 ---@param str string The string to pad.
 ---@param desired_length integer The desired length of the string.
----@param char? string The padding compensation symbol. Space by default.
----@param direction boolean | nil The compensation direction, `true` for right, `false` for left, `nil` for both.
----@param str_length? integer The length of the string. Optionally, it should be used to speed up calculations.
+---@param padding? string The padding compensation symbol. Space by default.
+---@param left? boolean Whether to pad on the left.
+---@param right? boolean Whether to pad on the right.
 ---@return string padded_str The padded string.
-function string.pad( str, desired_length, char, direction, str_length )
-    if str_length == nil then
-        str_length = string_len( str )
+function string.pad( str, desired_length, padding, left, right )
+    if not (left or right) then
+        return str
     end
 
-    local missing_length = math_max( 0, desired_length - str_length )
+    local char_length
+    if padding == nil then
+        char_length = 1
+        padding = " "
+    else
+        char_length = string_len( padding )
+    end
 
+    local missing_length = math_max( 0, desired_length - string_len( str ) )
     if missing_length == 0 then
         return str
     end
 
-    if char == nil then
-        char = " "
-    elseif string_byte( char, 2, 2 ) ~= nil then
-        error( "char must be a single character", 2 )
+    if left and right then
+        local half_reps = math_floor( (missing_length / char_length) * 0.5 )
+        local padding_str = string_rep( padding, half_reps )
+
+        local remainder = missing_length - ((half_reps * 2) * char_length)
+        if remainder == 0 then
+            return padding_str .. str .. padding_str
+        end
+
+        local half_remainder = math_floor( remainder * 0.5 )
+        padding_str          = padding_str .. string_sub( padding, 1, half_remainder )
+        remainder            = remainder - (half_remainder * 2)
+
+        if remainder == 0 then
+            return padding_str .. str .. padding_str
+        end
+
+        return padding_str .. str .. padding_str .. string_sub( padding, 1, remainder )
     end
 
-    if direction == nil then
-        missing_length = missing_length * 0.5
-        local missing_length_floored = math_floor( missing_length )
-        return string_rep( char, missing_length_floored ) .. str .. string_rep( char, missing_length_floored + ((missing_length % 1 == 0) and 0 or 1) )
-    elseif direction then
-        return str .. string_rep( char, missing_length )
-    else
-        return string_rep( char, missing_length ) .. str
+    local full_reps = math_floor( missing_length / char_length )
+    local remainder = missing_length - (full_reps * char_length)
+
+    if left then
+        local result = string_rep( padding, full_reps )
+
+        if remainder ~= 0 then
+            result = result .. string_sub( padding, 1, remainder )
+        end
+
+        return result .. str
     end
+
+    if right then
+        local result = str .. string_rep( padding, full_reps )
+
+        if remainder ~= 0 then
+            result = result .. string_sub( padding, 1, remainder )
+        end
+
+        return result
+    end
+
+    return str
 end
 
 do
@@ -403,16 +422,13 @@ do
     ---@param with_pattern?   boolean When `true`, `searchable` is interpreted as a Lua pattern. Defaults to `false` (plain match).
     ---@param start_position? integer The start position to split from.
     ---@param end_position?   integer The end position to split to.
-    ---@param str_length?     integer The length of the string. Optionally, it should be used to speed up calculations.
     ---@return string[] segments The string array.
     ---@return integer segment_count The length of the array.
-    local function split( str, searchable, with_pattern, start_position, end_position, str_length )
+    local function split( str, searchable, with_pattern, start_position, end_position )
+        local str_length = string_len( str )
+
         ---@type string[]
         local segments = {}
-
-        if str_length == nil then
-            str_length = string_len( str )
-        end
 
         if searchable == nil or string_byte( searchable, 1, 1 ) == nil then
             for index = 1, str_length, 1 do
@@ -482,19 +498,25 @@ do
     ---@param with_pattern?   boolean When `true`, `searchable` is interpreted as a Lua pattern. Defaults to `false` (plain match).
     ---@param start_position? integer The start position to replace from.
     ---@param end_position?   integer The end position to replace to.
-    ---@param str_length?     integer The length of the string. Optionally, it should be used to speed up calculations.
     ---@return string str_replaced The new string with the occurrences replaced.
-    function string.replace( str, searchable, replaceable, with_pattern, start_position, end_position, str_length )
-        local segments, segment_count = split( str, searchable, with_pattern, start_position, end_position, str_length )
+    function string.replace( str, searchable, replaceable, with_pattern, start_position, end_position )
+        local segments, segment_count = split( str, searchable, with_pattern, start_position, end_position )
+
         if segment_count == 0 then
             return str
         elseif segment_count == 1 then
             return segments[ 1 ]
-        elseif segment_count == 2 then
-            return segments[ 1 ] .. (replaceable or "") .. segments[ 2 ]
-        else
-            return table_concat( segments, replaceable or "", 1, segment_count )
         end
+
+        if replaceable == nil then
+            replaceable = ""
+        end
+
+        if segment_count == 2 then
+            return segments[ 1 ] .. replaceable .. segments[ 2 ]
+        end
+
+        return table_concat( segments, replaceable, 1, segment_count )
     end
 
 end
@@ -506,13 +528,9 @@ end
 ---@param str           string  The string to count.
 ---@param searchable    string  The substring or pattern to count by.
 ---@param with_pattern? boolean When `true`, `searchable` is interpreted as a Lua pattern. Defaults to `false` (plain match).
----@param str_length?   integer The length of the string. Optionally, it should be used to speed up calculations.
 ---@return integer match_count The number of matches.
-function string.count( str, searchable, with_pattern, str_length )
-    if str_length == nil then
-        str_length = string_len( str )
-    end
-
+function string.count( str, searchable, with_pattern )
+    local str_length = string_len( str )
     if searchable == nil or string_byte( searchable, 1, 1 ) == nil then
         return str_length
     end
@@ -543,16 +561,13 @@ end
 ---@param direction? boolean If `true`, the direction will be from left to right. If `false`, the direction will be from right to left.
 ---@param start_position? integer The start position to count from.
 ---@param end_position? integer The end position to count to.
----@param str_length? integer The length of the string. Optionally, it should be used to speed up calculations.
 ---@return integer byte_count The number of occurrences.
-function string.countByte( str, counted_byte, direction, start_position, end_position, str_length )
+function string.countByte( str, counted_byte, direction, start_position, end_position )
     if counted_byte == nil or string_byte( str, 1, 1 ) == nil then
         return 0
     end
 
-    if str_length == nil then
-        str_length = string_len( str )
-    end
+    local str_length = string_len( str )
 
     if start_position == nil then
         if direction then
@@ -617,16 +632,13 @@ end
 ---@param direction? boolean If `true`, the direction will be from left to right. If `false`, the direction will be from right to left.
 ---@param start_position? integer The start position to count from.
 ---@param end_position? integer The end position to count to.
----@param str_length? integer The length of the string. Optionally, it should be used to speed up calculations.
 ---@return integer byte_count The number of occurrences.
-function string.countConsecutiveByte( str, counted_byte, direction, start_position, end_position, str_length )
+function string.countConsecutiveByte( str, counted_byte, direction, start_position, end_position )
     if counted_byte == nil or string_byte( str, 1, 1 ) == nil then
         return 0
     end
 
-    if str_length == nil then
-        str_length = string_len( str )
-    end
+    local str_length = string_len( str )
 
     if start_position == nil then
         if direction then
@@ -693,13 +705,10 @@ end
 ---@param direction boolean | nil The trim direction, `true` for right, `false` for left, `nil` for both.
 ---@param start_position? integer The start position to trim from.
 ---@param end_position? integer The end position to trim to.
----@param str_length? integer The length of the string. Optionally, it should be used to speed up calculations.
 ---@return string trimmed_str The trimmed string.
 ---@return integer trimmed_length The length of the trimmed string.
-function string.trimByte( str, trailing_byte, direction, start_position, end_position, str_length )
-    if str_length == nil then
-        str_length = string_len( str )
-    end
+function string.trimByte( str, trailing_byte, direction, start_position, end_position )
+    local str_length = string_len( str )
 
     if start_position == nil then
         start_position = 1
@@ -754,13 +763,10 @@ end
 ---@param direction boolean | nil The trim direction, `true` for right, `false` for left, `nil` for both.
 ---@param start_position? integer The start position to trim from.
 ---@param end_position? integer The end position to trim to.
----@param str_length? integer The length of the string. Optionally, it should be used to speed up calculations.
 ---@return string trimmed_str The trimmed string.
 ---@return integer trimmed_length The length of the trimmed string.
-function string.trimSpaces( str, direction, start_position, end_position, str_length )
-    if str_length == nil then
-        str_length = string_len( str )
-    end
+function string.trimSpaces( str, direction, start_position, end_position )
+    local str_length = string_len( str )
 
     if start_position == nil then
         start_position = 1
@@ -811,17 +817,14 @@ end
 ---@param searchable_byte? integer The byte to split by.
 ---@param start_position? integer The start position to split from.
 ---@param end_position? integer The end position to split to.
----@param str_length? integer The length of the string. Optionally, it should be used to speed up calculations.
 ---@return string[] segments The string array.
 ---@return integer segment_count The length of the array.
-local function byte_split( str, searchable_byte, start_position, end_position, str_length )
+local function byte_split( str, searchable_byte, start_position, end_position )
     if searchable_byte == nil then
         searchable_byte = 0x20 --[[ Space ]]
     end
 
-    if str_length == nil then
-        str_length = string_len( str )
-    end
+    local str_length = string_len( str )
 
     if start_position == nil then
         start_position = 1
@@ -880,19 +883,25 @@ string.byteSplit = byte_split
 ---@param replaceable?  string  What to replace it with. If `nil`, occurrences are removed.
 ---@param start_position? integer The start position to replace from.
 ---@param end_position?   integer The end position to replace to.
----@param str_length?     integer The length of the string. Optionally, it should be used to speed up calculations.
 ---@return string str_replaced The new string with the occurrences replaced.
-function string.byteReplace( str, searchable_byte, replaceable, start_position, end_position, str_length )
-    local segments, segment_count = byte_split( str, searchable_byte, start_position, end_position, str_length )
+function string.byteReplace( str, searchable_byte, replaceable, start_position, end_position )
+    local segments, segment_count = byte_split( str, searchable_byte, start_position, end_position )
+
     if segment_count == 0 then
         return str
     elseif segment_count == 1 then
         return segments[ 1 ]
-    elseif segment_count == 2 then
-        return segments[ 1 ] .. (replaceable or "") .. segments[ 2 ]
-    else
-        return table_concat( segments, replaceable or "", 1, segment_count )
     end
+
+    if replaceable == nil then
+        replaceable = ""
+    end
+
+    if segment_count == 2 then
+        return segments[ 1 ] .. replaceable .. segments[ 2 ]
+    end
+
+    return table_concat( segments, replaceable, 1, segment_count )
 end
 
 --- [SHARED AND MENU]
@@ -921,12 +930,9 @@ end
 ---@param byte integer The byte to check for.
 ---@param start_position? integer The start position to check from.
 ---@param end_position? integer The end position to check to.
----@param str_length? integer The length of the string. Optionally, it should be used to speed up calculations.
 ---@return boolean has_byte `true` if the string contains the byte, `false` otherwise.
-function string.containsByte( str, byte, start_position, end_position, str_length )
-    if str_length == nil then
-        str_length = string_len( str )
-    end
+function string.containsByte( str, byte, start_position, end_position )
+    local str_length = string_len( str )
 
     if start_position == nil then
         start_position = 1
@@ -947,9 +953,7 @@ function string.containsByte( str, byte, start_position, end_position, str_lengt
     local step = (start_position < end_position) and 1 or -1
 
     for index = start_position, end_position, step do
-        if string_byte( str, index, index ) == byte then
-            return true
-        end
+        if string_byte( str, index, index ) == byte then return true end
     end
 
     return false
@@ -963,12 +967,9 @@ end
 ---@param byte_map table<integer, boolean> The bytes array to check in.
 ---@param start_position? integer The start position to check from.
 ---@param end_position? integer The end position to check to.
----@param str_length? integer The length of the string. Optionally, it should be used to speed up calculations.
 ---@return boolean has_byte `true` if the string contains the byte, `false` otherwise.
-function string.containsBytes( str, byte_map, start_position, end_position, str_length )
-    if str_length == nil then
-        str_length = string_len( str )
-    end
+function string.containsBytes( str, byte_map, start_position, end_position )
+    local str_length = string_len( str )
 
     if start_position == nil then
         start_position = 1
@@ -1003,10 +1004,9 @@ end
 ---@param byte integer The byte to purge.
 ---@param start_position? integer The start position in the string.
 ---@param end_position? integer The end position in the string.
----@param str_length? integer The length of the string. Optionally, it should be used to speed up calculations.
 ---@return string str_purged The purged string.
-function string.purge( str, byte, start_position, end_position, str_length )
-    local segments, segment_count = byte_split( str, byte, start_position, end_position, str_length )
+function string.purge( str, byte, start_position, end_position )
+    local segments, segment_count = byte_split( str, byte, start_position, end_position )
     return table_concat( segments, "", 1, segment_count )
 end
 
@@ -1027,9 +1027,9 @@ do
             if uint8_1 == 0x30 --[[ 0 ]] and (uint8_2 == 0x78 --[[ x ]] or uint8_2 == 0x58 --[[ X ]]) then
                 if uint8_3 == nil then
                     return 0
-                else
-                    base = 16
                 end
+
+                base = 16
             elseif uint8_1 == 0x30 --[[ 0 ]] and uint8_2 ~= nil then
                 base = 8
             else
@@ -1044,9 +1044,9 @@ do
 
         if start_position == nil and end_position == nil then
             return raw_tonumber( str, base )
-        else
-            return raw_tonumber( string_sub( str, start_position or 1, end_position ), base )
         end
+
+        return raw_tonumber( string_sub( str, start_position or 1, end_position ), base )
     end
 
     string.toNumber = toNumber
@@ -1076,27 +1076,23 @@ function string.isURL( str )
     return string_match( str, "^%l[%l+-.]+%:[^%z\x01-\x20\x7F-\xFF\"<>^`:{-}]*$" ) ~= nil
 end
 
-do
-
-    --- [SHARED AND MENU]
-    ---
-    --- Checks if a string is bytecode.
-    ---
-    --- The string should be a LuaJIT bytecode chunk.
-    ---
-    ---@param str string The string to check.
-    ---@param jit_version `0x01` | `0x02` | integer The JIT version to check for. (Basically `jit.version_byte`)
-    ---@param start_position? integer The start position of the string.
-    ---@return boolean result `true` if the string is bytecode, otherwise `false`.
-    function string.isBytecode( str, jit_version, start_position )
-        if start_position == nil then
-            start_position = 1
-        end
-
-        local uint8_1, uint8_2, uint8_3, uint8_4 = string_byte( str, start_position, start_position + 3 )
-        return uint8_1 == 0x1B and uint8_2 == 0x4C and uint8_3 == 0x4A and uint8_4 == jit_version
+--- [SHARED AND MENU]
+---
+--- Checks if a string is bytecode.
+---
+--- The string should be a LuaJIT bytecode chunk.
+---
+---@param str string The string to check.
+---@param jit_version `0x01` | `0x02` | integer The JIT version to check for. (Basically `jit.version_byte`)
+---@param start_position? integer The start position of the string.
+---@return boolean result `true` if the string is bytecode, otherwise `false`.
+function string.isBytecode( str, jit_version, start_position )
+    if start_position == nil then
+        start_position = 1
     end
 
+    local uint8_1, uint8_2, uint8_3, uint8_4 = string_byte( str, start_position, start_position + 3 )
+    return uint8_1 == 0x1B and uint8_2 == 0x4C and uint8_3 == 0x4A and uint8_4 == jit_version
 end
 
 --- [SHARED AND MENU]
@@ -1106,12 +1102,9 @@ end
 ---@param str string The string to escape.
 ---@param start_position? integer The start position to escape from.
 ---@param end_position? integer The end position to escape to.
----@param str_length? integer The length of the string. Optionally, it should be used to speed up calculations.
 ---@return string escaped_str The escaped string.
-function string.escapePattern( str, start_position, end_position, str_length )
-    if str_length == nil then
-        str_length = string_len( str )
-    end
+function string.escapePattern( str, start_position, end_position )
+    local str_length = string_len( str )
 
     if start_position == nil then
         start_position = 1
@@ -1166,9 +1159,9 @@ function string.escapePattern( str, start_position, end_position, str_length )
         return str
     elseif segment_count == 1 then
         return segments[ 1 ]
-    else
-        return table_concat( segments, "", 1, segment_count )
     end
+
+    return table_concat( segments, "", 1, segment_count )
 end
 
 --- [SHARED AND MENU]
@@ -1198,73 +1191,18 @@ function string.trim( str, pattern_str, direction )
         return string_match( str, "^(.-)" .. pattern_str .. "*$" ) or str
     elseif direction == false then
         return string_match( str, "^" .. pattern_str .. "*(.+)$" ) or str
-    else
-        return string_match( str, "^" .. pattern_str .. "*(.-)" .. pattern_str .. "*$" ) or str
     end
+
+    return string_match( str, "^" .. pattern_str .. "*(.-)" .. pattern_str .. "*$" ) or str
 end
 
 do
 
-    local extended_ascii_alphabet = {}
-    local lowercase_alphabet = {}
-    local uppercase_alphabet = {}
-    local numberic_alphabet = {}
-    local symbol_alphabet = {}
-
-    do
-
-        local extended_ascii_alphabet_size = 0
-        local lowercase_alphabet_size = 0
-        local uppercase_alphabet_size = 0
-        local numberic_alphabet_size = 0
-        local symbol_alphabet_size = 0
-
-        for i = 33, 47, 1 do
-            symbol_alphabet_size = symbol_alphabet_size + 1
-            symbol_alphabet[ symbol_alphabet_size ] = i
-        end
-
-        for i = 48, 57, 1 do
-            numberic_alphabet_size = numberic_alphabet_size + 1
-            numberic_alphabet[ numberic_alphabet_size ] = i
-        end
-
-        for i = 58, 64, 1 do
-            symbol_alphabet_size = symbol_alphabet_size + 1
-            symbol_alphabet[ symbol_alphabet_size ] = i
-        end
-
-        for i = 65, 90, 1 do
-            uppercase_alphabet_size = uppercase_alphabet_size + 1
-            uppercase_alphabet[ uppercase_alphabet_size ] = i
-        end
-
-        for i = 91, 96, 1 do
-            symbol_alphabet_size = symbol_alphabet_size + 1
-            symbol_alphabet[ symbol_alphabet_size ] = i
-        end
-
-        for i = 97, 122, 1 do
-            lowercase_alphabet_size = lowercase_alphabet_size + 1
-            lowercase_alphabet[ lowercase_alphabet_size ] = i
-        end
-
-        for i = 123, 126, 1 do
-            symbol_alphabet_size = symbol_alphabet_size + 1
-            symbol_alphabet[ symbol_alphabet_size ] = i
-        end
-
-        for i = 128, 255, 1 do
-            extended_ascii_alphabet_size = extended_ascii_alphabet_size + 1
-            extended_ascii_alphabet[ extended_ascii_alphabet_size ] = i
-        end
-
-        lowercase_alphabet[ 0 ] = lowercase_alphabet_size
-        uppercase_alphabet[ 0 ] = uppercase_alphabet_size
-        numberic_alphabet[ 0 ] = numberic_alphabet_size
-        symbol_alphabet[ 0 ] = symbol_alphabet_size
-
-    end
+    local numberic_alphabet = { [ 0 ] = 10, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39 }
+    local lowercase_alphabet = { [ 0 ] = 26, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6A, 0x6B, 0x6C, 0x6D, 0x6E, 0x6F, 0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77, 0x78, 0x79, 0x7A }
+    local uppercase_alphabet = { [ 0 ] = 26, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A, 0x4B, 0x4C, 0x4D, 0x4E, 0x4F, 0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5A }
+    local symbol_alphabet = { [ 0 ] = 32, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x2E, 0x2F, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F, 0x40, 0x5B, 0x5C, 0x5D, 0x5E, 0x5F, 0x60, 0x7B, 0x7C, 0x7D, 0x7E }
+    local extended_alphabet = { [ 0 ] = 128, 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87, 0x88, 0x89, 0x8A, 0x8B, 0x8C, 0x8D, 0x8E, 0x8F, 0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0x9A, 0x9B, 0x9C, 0x9D, 0x9E, 0x9F, 0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6, 0xA7, 0xA8, 0xA9, 0xAA, 0xAB, 0xAC, 0xAD, 0xAE, 0xAF, 0xB0, 0xB1, 0xB2, 0xB3, 0xB4, 0xB5, 0xB6, 0xB7, 0xB8, 0xB9, 0xBA, 0xBB, 0xBC, 0xBD, 0xBE, 0xBF, 0xC0, 0xC1, 0xC2, 0xC3, 0xC4, 0xC5, 0xC6, 0xC7, 0xC8, 0xC9, 0xCA, 0xCB, 0xCC, 0xCD, 0xCE, 0xCF, 0xD0, 0xD1, 0xD2, 0xD3, 0xD4, 0xD5, 0xD6, 0xD7, 0xD8, 0xD9, 0xDA, 0xDB, 0xDC, 0xDD, 0xDE, 0xDF, 0xE0, 0xE1, 0xE2, 0xE3, 0xE4, 0xE5, 0xE6, 0xE7, 0xE8, 0xE9, 0xEA, 0xEB, 0xEC, 0xED, 0xEE, 0xEF, 0xF0, 0xF1, 0xF2, 0xF3, 0xF4, 0xF5, 0xF6, 0xF7, 0xF8, 0xF9, 0xFA, 0xFB, 0xFC, 0xFD, 0xFE, 0xFF }
 
     --- [SHARED AND MENU]
     ---
@@ -1288,7 +1226,11 @@ do
             return ""
         end
 
-        local alphabets, alphabet_count = {}, 0
+        ---@type integer[][]
+        local alphabets = {}
+
+        ---@type integer
+        local alphabet_count = 0
 
         if lowercase ~= false then
             alphabet_count = alphabet_count + 1
@@ -1312,9 +1254,10 @@ do
 
         if extended_ascii then
             alphabet_count = alphabet_count + 1
-            alphabets[ alphabet_count ] = extended_ascii_alphabet
+            alphabets[ alphabet_count ] = extended_alphabet
         end
 
+        ---@type integer[]
         local chars = {}
 
         for index = 1, length, 1 do
@@ -1339,18 +1282,15 @@ end
 ---
 --- `{key}`, `{my_val}`, `{something}` and etc.
 ---
+---@see string.format
+---
 ---@param str string The string to interpolate.
 ---@param variables string[] | table<string, string> The variables to interpolate into the string.
 ---@param start_position? integer The start position to interpolate from.
 ---@param end_position? integer The end position to interpolate to.
----@param str_length? integer The length of the string.
----@return string
----
----@see string.format
-function string.interpolate( str, variables, start_position, end_position, str_length )
-    if str_length == nil then
-        str_length = string_len( str )
-    end
+---@return string str The interpolated string.
+function string.interpolate( str, variables, start_position, end_position )
+    local str_length = string_len( str )
 
     if start_position == nil then
         start_position = 1
@@ -1366,11 +1306,6 @@ function string.interpolate( str, variables, start_position, end_position, str_l
         end_position = math_relative( end_position, str_length )
     else
         end_position = math_min( end_position, str_length )
-    end
-
-    for i = 1, len( variables ), 1 do
-        variables[ represent( i ) ] = variables[ i ]
-        variables[ i ] = nil
     end
 
     ---@type integer
@@ -1476,12 +1411,9 @@ end
 ---@param variable_count? integer The size of the map. Optionally, it should be used to speed up calculations.
 ---@param start_position? integer The start position to interpolate from.
 ---@param end_position? integer The end position to interpolate to.
----@param str_length? integer The length of the string. Optionally, it should be used to speed up calculations.
-function string.interpolateByte( str, interpolate_byte, variables, variable_count, start_position, end_position, str_length )
-    if str_length == nil then
-        str_length = string_len( str )
-    end
-
+---@return string str The interpolated string.
+function string.interpolateByte( str, interpolate_byte, variables, variable_count, start_position, end_position )
+    local str_length = string_len( str )
     if str_length == 0 then
         return str
     end
@@ -1615,14 +1547,10 @@ end
 ---@param str string The string to unpack.
 ---@param start_position? integer The start position of the string, default is `1`.
 ---@param end_position? integer The end position of the string, default is `len( str )`.
----@param str_length? integer The length of the string, default is `len( str )`.
 ---@return integer[] bytes The unpacked bytes.
 ---@return integer byte_count The number of bytes unpacked.
-function string.unpack( str, start_position, end_position, str_length )
-    if str_length == nil then
-        str_length = string_len( str )
-    end
-
+function string.unpack( str, start_position, end_position )
+    local str_length = string_len( str )
     if str_length == 0 then
         return {}, 0
     end
@@ -1688,16 +1616,10 @@ end
 ---@param str string The string to format.
 ---@param separator? string The separator to use, default is `,`.
 ---@param offset? integer The offset to use, default is `3`.
----@param str_length? integer The length of the string, default is `len( str )`.
 ---@return string str The formatted string.
-function string.comma( str, separator, offset, str_length )
-    if str_length == nil then
-        str_length = string_len( str )
-    end
-
-    if str_length == 0 then
-        return str
-    end
+function string.comma( str, separator, offset )
+    local str_length = string_len( str )
+    if str_length == 0 then return str end
 
     if separator == nil then
         separator = ","
@@ -1747,6 +1669,7 @@ function string.repByte( rep_byte, repetitions )
         return string_char( rep_byte, rep_byte, rep_byte, rep_byte, rep_byte, rep_byte, rep_byte, rep_byte )
     end
 
+    ---@type integer[]
     local bytes = {}
 
     for i = 1, repetitions, 1 do
@@ -1770,9 +1693,9 @@ do
     function string.quote( str, use_single )
         if use_single then
             return "'" .. string_replace( str, "'", "\\'" ) .. "'"
-        else
-            return '"' .. string_replace( str, '"', '\\"' ) .. '"'
         end
+
+        return '"' .. string_replace( str, '"', '\\"' ) .. '"'
     end
 
     --- [SHARED AND MENU]
@@ -1785,9 +1708,9 @@ do
     function string.unQuote( str, use_single )
         if use_single then
             return string_replace( string_match( str, "^'(.*)'$" ) or str, "\\'", "'" )
-        else
-            return string_replace( string_match( str, "^\"(.*)\"$" ) or str, '\\"', '"' )
         end
+
+        return string_replace( string_match( str, "^\"(.*)\"$" ) or str, '\\"', '"' )
     end
 
 end
@@ -1799,13 +1722,48 @@ do
 
     --- [SHARED AND MENU]
     ---
+    --- Pads a string with a byte on the left or right.
+    ---
+    ---@param str string The string to pad.
+    ---@param desired_length integer The desired length of the padded string.
+    ---@param padding_byte? integer The byte value to use for padding. (Default: `0x20`)
+    ---@param left? boolean Whether to pad on the left (`true`) or right (`false`).
+    ---@param right? boolean Whether to pad on the right (`true`) or left (`false`).
+    ---@return string padded_str The padded string.
+    function string.bytePad( str, desired_length, padding_byte, left, right )
+        local missing_length = math_max( 0, desired_length - string_len( str ) )
+        if missing_length == 0 then
+            return str
+        end
+
+        if padding_byte == nil then
+            padding_byte = 0x20 --[[ space ]]
+        end
+
+        if left then
+            if right then
+                local missing_length_half = math_floor( missing_length * 0.5 )
+                return string_repByte( padding_byte, missing_length_half ) .. str .. string_repByte( padding_byte, missing_length_half + (missing_length - (missing_length_half * 2)) )
+            end
+
+            return string_repByte( padding_byte, missing_length ) .. str
+        end
+
+        if right then
+            return str .. string_repByte( padding_byte, missing_length )
+        end
+
+        return str
+    end
+
+    --- [SHARED AND MENU]
+    ---
     --- Unindents a string by removing leading spaces.
     ---
     ---@param str string The string to unindent.
-    ---@param str_length? integer The length of the string. Optionally, it should be used to speed up calculations.
     ---@return string unindented The unindented string.
-    local function unIndent( str, str_length )
-        return (string_trimSpaces( str, false, nil, nil, str_length ))
+    local function unIndent( str )
+        return (string_trimSpaces( str, false ))
     end
 
     string.unIndent = unIndent
@@ -1816,10 +1774,9 @@ do
     ---
     ---@param str string The string to indent.
     ---@param size integer The number of spaces to indent.
-    ---@param str_length? integer The length of the string. Optionally, it should be used to speed up calculations.
     ---@return string indented The indented string.
-    function string_indent( str, size, str_length )
-        return string_repByte( 0x20, size ) .. unIndent( str, str_length )
+    function string_indent( str, size )
+        return string_repByte( 0x20, size ) .. unIndent( str )
     end
 
     string.indent = string_indent
@@ -1830,22 +1787,21 @@ do
     ---
     ---@param str string The string to indent.
     ---@param size integer The number of spaces to indent.
-    ---@param str_length? integer The length of the string. Optionally, it should be used to speed up calculations.
     ---@return string indented The indented string.
-    function string.indentLines( str, size, str_length )
-        local lines, line_count = byte_split( str, 0x0A, nil, nil, str_length )
+    function string.indentLines( str, size )
+        local lines, line_count = byte_split( str, 0x0A )
 
         if line_count == 0 then
             return ""
         elseif line_count == 1 then
-            return string_indent( str, size, str_length )
+            return string_indent( str, size )
         end
 
         ---@type string[]
         local output = {}
 
         for i = 1, line_count, 1 do
-            output[ i ] = string_indent( lines[ i ], size, str_length )
+            output[ i ] = string_indent( lines[ i ], size )
         end
 
         return table_concat( output, "\n", 1, line_count )
@@ -1856,22 +1812,21 @@ do
     --- Unindents a string by removing leading spaces on each line.
     ---
     ---@param str string The string to unindent.
-    ---@param str_length? integer The length of the string. Optionally, it should be used to speed up calculations.
     ---@return string unindented The unindented string.
-    function string.unIndentLines( str, str_length )
-        local lines, line_count = byte_split( str, 0x0A, nil, nil, str_length )
+    function string.unindentLines( str )
+        local lines, line_count = byte_split( str, 0x0A )
 
         if line_count == 0 then
             return ""
         elseif line_count == 1 then
-            return unIndent( str, str_length )
+            return unIndent( str )
         end
 
         ---@type string[]
         local output = {}
 
         for i = 1, line_count, 1 do
-            output[ i ] = unIndent( lines[ i ], str_length )
+            output[ i ] = unIndent( lines[ i ] )
         end
 
         return table_concat( output, "\n", 1, line_count )
