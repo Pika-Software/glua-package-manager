@@ -1646,7 +1646,7 @@ end
 ---@param rep_byte integer The byte to repeat.
 ---@param repetitions? integer The number of times to repeat the byte. Defaults to 1.
 ---@return string rep_str The repeated byte as a string.
-function string.repByte( rep_byte, repetitions )
+function string.byteRep( rep_byte, repetitions )
     if repetitions == nil then
         repetitions = 1
     end
@@ -1718,7 +1718,7 @@ end
 do
 
     local string_trimSpaces = string.trimSpaces
-    local string_repByte = string.repByte
+    local string_byteRep = string.byteRep
 
     --- [SHARED AND MENU]
     ---
@@ -1743,14 +1743,14 @@ do
         if left then
             if right then
                 local missing_length_half = math_floor( missing_length * 0.5 )
-                return string_repByte( padding_byte, missing_length_half ) .. str .. string_repByte( padding_byte, missing_length_half + (missing_length - (missing_length_half * 2)) )
+                return string_byteRep( padding_byte, missing_length_half ) .. str .. string_byteRep( padding_byte, missing_length_half + (missing_length - (missing_length_half * 2)) )
             end
 
-            return string_repByte( padding_byte, missing_length ) .. str
+            return string_byteRep( padding_byte, missing_length ) .. str
         end
 
         if right then
-            return str .. string_repByte( padding_byte, missing_length )
+            return str .. string_byteRep( padding_byte, missing_length )
         end
 
         return str
@@ -1776,7 +1776,7 @@ do
     ---@param size integer The number of spaces to indent.
     ---@return string indented The indented string.
     function string_indent( str, size )
-        return string_repByte( 0x20, size ) .. unIndent( str )
+        return string_byteRep( 0x20, size ) .. unIndent( str )
     end
 
     string.indent = string_indent
