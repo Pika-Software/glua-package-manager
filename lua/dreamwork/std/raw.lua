@@ -1,49 +1,65 @@
-local ipairs = ipairs
-local pairs = pairs
-
 ---@class dreamwork.std
 local std = dreamwork.std
 
 --- [SHARED AND MENU]
 ---
 --- Library containing functions for working with raw data. (ignoring metatables)
+---
 ---@class dreamwork.std.raw
-local raw = {}
-std.raw = raw
+local raw = std.raw
 
-raw.assert = assert
-raw.print = print
+if raw == nil then
+    ---@class dreamwork.std.raw
+    raw = {
+        assert = assert,
+        error = error,
 
-raw.tostring = tostring
-raw.tonumber = tonumber
-raw.error = error
+        tostring = tostring,
+        tonumber = tonumber,
 
-raw.ipairs = ipairs
-raw.pairs = pairs
+        ipairs = ipairs,
+        pairs = pairs,
 
-raw.equal = rawequal
+        equal = rawequal,
 
-raw.get = rawget
-raw.set = rawset
-raw.len = rawlen
+        get = rawget,
+        set = rawset,
+        len = rawlen,
+
+        print = print
+    }
+
+    std.raw = raw
+end
 
 if raw.len == nil then
 
+    --- [SHARED AND MENU]
+    ---
+    --- Returns the length of the object `value`, without invoking the `__len` metamethod.
+    ---
+    --- [View documents](http://www.lua.org/manual/5.1/manual.html#pdf-rawlen)
+    ---
+    ---@param value table | string | any
+    ---@return integer length
     function raw.len( value )
         return #value
     end
 
 end
 
-do
-
+if raw.inext == nil or raw.next == nil then
     local dummy_table = {}
 
-    raw.inext = ipairs( dummy_table )
-    raw.next = next or pairs( dummy_table )
+    if raw.inext == nil then
+        raw.inext = raw.ipairs( dummy_table )
+    end
+
+    if raw.next == nil then
+        raw.next = next or raw.pairs( dummy_table )
+    end
 
     dummy_table = nil
-
 end
 
 --- [SHARED AND MENU]
@@ -58,4 +74,4 @@ end
 ---
 ---@overload fun( parameter: "#", ...: any ): integer
 ---@overload fun( parameter: integer, ...: any ): ...: any
-raw.select = select
+raw.select = raw.select or select
