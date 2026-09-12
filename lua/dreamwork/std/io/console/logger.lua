@@ -24,10 +24,10 @@ local class         = std.class
 local represent = std.represent
 
 local realm_text = ({
-    menu = string.pad( "[ Menu ]", 11, " ", true ),
-    client = string.pad( "[ Client ]", 11, " ", true ),
-    server = string.pad( "[ Server ]", 11, " ", true ),
-    unknown = string.pad( "[ N/A ]", 11, " ", true ),
+    menu = string.bytePad( "[ Menu ]", 11, 0x20, false, true ),
+    client = string.bytePad( "[ Client ]", 11, 0x20, false, true ),
+    server = string.bytePad( "[ Server ]", 11, 0x20, false, true ),
+    unknown = string.bytePad( "[ N/A ]", 11, 0x20, false, true ),
 })[ std.LUA_REALM ]
 
 ---@class dreamwork.std.console
