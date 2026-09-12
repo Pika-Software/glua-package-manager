@@ -92,7 +92,7 @@ end
 
 --- [SHARED AND MENU]
 ---
---- A 3D angle class.
+--- The class used to create new `Angle3` instances.
 ---
 ---@class dreamwork.std.Angle3Class : dreamwork.std.Angle3
 ---@field __base dreamwork.std.Angle3

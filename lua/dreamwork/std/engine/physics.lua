@@ -1,8 +1,11 @@
-local _G = _G
 local std = dreamwork.std
-local isString = std.isString
+
+local physenv = physenv
+local util = util
+
 local setmetatable = std.setmetatable
-local physenv, util = _G.physenv, _G.util
+local isString = std.isString
+local error = std.error
 
 -- TODO: rewrite this crap
 

@@ -1,3 +1,5 @@
+local error = error
+
 ---@diagnostic disable-next-line: undefined-global
 local dofile = dofile or include
 if dofile == nil then
@@ -24,7 +26,7 @@ dreamwork.dofile = dofile
 ---@class dreamwork.std
 ---@field _G table The global environment of Lua.
 ---@field _R table The registry of Lua.
----@field LUA_VERSION string The version of the Lua interpreter.
+---@field LUA_VERSION integer The version of the Lua interpreter.
 ---@field GAME_VERSION integer Contains the version number of the Garrys Mod. For example: `201211` = `01.01.2012`
 ---@field GAME_BRANCH "x86-64" | "dev" | "prerelease" | "unknown" | string The branch the Garry's Mod is running on. This will be `unknown` on main branch.
 ---@field LUA_REALM "server" | "client" | "menu" | "unknown" The realm the code is running on.
@@ -37,8 +39,6 @@ dreamwork.dofile = dofile
 ---@field FRAME_TIME number The time it takes to run one frame in seconds. **Client-only**
 ---@field FPS number The number of frames per second. **Client-only**
 local std = dreamwork.std
-
-std.LUA_VERSION = _VERSION or "unknown"
 
 ---@diagnostic disable-next-line: assign-type-mismatch, undefined-global
 std.GAME_VERSION = VERSION or 0
@@ -124,6 +124,18 @@ local raw_get = raw.get
 local raw_pairs = raw.pairs
 local raw_select = raw.select
 
+--- [SHARED AND MENU]
+---
+--- Throws an error with the specified message and level.
+---
+---@param value? any The error value to throw.
+---@param stack_level? integer The stack level to throw the error.
+---@param dont_break? boolean If `true`, the error will not break the current stack.
+function std.error( value, stack_level, dont_break )
+    ---@diagnostic disable-next-line: redundant-parameter
+    return error( value, stack_level, dont_break )
+end
+
 -- debug library
 dofile( "dreamwork/std/debug.lua" )
 
@@ -152,12 +164,7 @@ do
     ---@param value any The value to convert to a string.
     ---@return string str The string representation of `value`.
     function std.tostring( value )
-        local name = debug_getmetavalue( value, "__name" )
-        if name == nil then
-            return raw_tostring( value )
-        else
-            return name
-        end
+        return debug_getmetavalue( value, "__name" ) or raw_tostring( value )
     end
 
 end
@@ -219,6 +226,7 @@ if std.getfenv == nil then
             return _G
         end
 
+        ---@type integer
         local index = 1
 
         ::fenv_search_loop::
@@ -263,9 +271,7 @@ if std.setfenv == nil then
         if location == nil or raw_type( location ) == "number" then
             func = debug_getf( (location or 1) + 1 )
             if func == nil then
-                std.error( "environment was corrupted; setfenv failed", 2 )
-                ---@diagnostic disable-next-line: missing-return-value
-                return
+                error( "environment was corrupted; setfenv failed", 2 )
             end
         end
 
@@ -328,6 +334,16 @@ function std.len( value )
     end
 end
 
+--
+-- ONLY REASON WHY CODE BELOW EXISTS
+-- IS THAT FACEPUNCH IS BUNCH
+-- OF MOTHERF1CKERS
+--
+-- 🤡 issue exists more than 10 years 🤡
+--
+-- -DLUAJIT_ENABLE_LUA52COMPAT
+--
+
 --- [SHARED AND MENU]
 ---
 --- Compares two values for equality.
@@ -339,19 +355,75 @@ end
 ---@param a any The first value to compare.
 ---@param b any The second value to compare.
 ---@return boolean is_equal `true` if the values are considered equal; otherwise `false`.
-function std.eq( a, b )
+function std.equal( a, b )
     ---@type nil | fun( a: any, b: any ): boolean
     local a__eq = debug_getmetavalue( a, "__eq" )
     if a__eq == nil then
-        ---@type nil | fun( a: any, b: any ): boolean
+        ---@type nil | fun( b: any, a: any ): boolean
         local b__eq = debug_getmetavalue( b, "__eq" )
         if b__eq == nil then
             return a == b
         else
             return b__eq( b, a )
         end
+
+        return b__eq( b, a )
+    end
+
+    return a__eq( a, b )
+end
+
+--- [SHARED AND MENU]
+---
+--- Compares two values, returning whether the first is less than the second.
+---
+--- Unlike Lua's `<` operator, this function invokes the `__lt` metamethod
+--- from either operand if one is available. If neither operand defines
+--- `__lt`, it falls back to the built-in less-than operator.
+---
+---@param a any The first value to compare.
+---@param b any The second value to compare.
+---@return boolean is_less_than `true` if `a` is less than `b`; otherwise `false`.
+function std.lessThan( a, b )
+    ---@type nil | fun( a: any, b: any ): boolean
+    local a__lt = debug_getmetavalue( a, "__lt" )
+    if a__lt == nil then
+        ---@type nil | fun( b: any, a: any ): boolean
+        local b__le = debug_getmetavalue( b, "__le" )
+        if b__le == nil then
+            return a < b
+        end
+
+        return not b__le( b, a )
+    end
+
+    return a__lt( a, b )
+end
+
+--- [SHARED AND MENU]
+---
+--- Compares two values, returning whether the first is less than or equal to the second.
+---
+--- Unlike Lua's `<=` operator, this function invokes the `__le` metamethod
+--- from either operand if one is available. If neither operand defines
+--- `__le`, it falls back to the built-in less-than-or-equal operator.
+---
+---@param a any The first value to compare.
+---@param b any The second value to compare.
+---@return boolean is_less_equal `true` if `a` is less than or equal to `b`; otherwise `false`.
+function std.lessEqual( a, b )
+    ---@type nil | fun( a: any, b: any ): boolean
+    local a__le = debug_getmetavalue( a, "__le" )
+    if a__le == nil then
+        ---@type nil | fun( b: any, a: any ): boolean
+        local b__lt = debug_getmetavalue( b, "__lt" )
+        if b__lt == nil then
+            return a <= b
+        end
+
+        return not b__lt( b, a )
     else
-        return a__eq( a, b )
+        return a__le( a, b )
     end
 end
 
@@ -703,6 +775,8 @@ local string_format = string.format
 local string_sub, string_len = string.sub, string.len
 local string_char, string_byte = string.char, string.byte
 
+std.LUA_VERSION = raw.tonumber( string_match( _VERSION or "0", "Lua ([%d.]+)" ) or 0, 10 ) or 0
+
 do
 
     local string_toNumber = string.toNumber
@@ -718,9 +792,9 @@ do
         local fn = debug_getmetavalue( value, "__hash" )
         if fn == nil then
             return string_toNumber( string_format( "%p", value ), 16 ) or 0
-        else
-            return fn( value )
         end
+
+        return fn( value )
     end
 
 end
@@ -1461,7 +1535,7 @@ do
                 ---@cast name integer
                 color = color_fromRGB( name, name, name )
             else
-                std.error( "color name must be string or integer to resolve color.", 3 )
+                error( "color name must be string or integer to resolve color.", 3 )
             end
 
             self[ name ] = color
@@ -1611,6 +1685,8 @@ do
         return fn( value, stack_level )
     end, error )
 
+    local glua_error = dreamwork.detour.shadow( error ) or error
+
     local debug_ispcall = debug.ispcall
     local isError = std.isError
 
@@ -1618,36 +1694,32 @@ do
     local runtime_stack = debug.Stack()
     runtime_error.stack = runtime_stack
 
-    do
+    engine.hookCatch( "dreamwork.lua.error", "console.display", function( error_value, stack_level )
+        if isError( error_value ) then
+            ---@cast error_value dreamwork.std.Error
 
-        engine.hookCatch( "dreamwork.lua.error", "console.display", function( error_value, stack_level )
-            if isError( error_value ) then
-                ---@cast error_value dreamwork.std.Error
-
-                for i = stack_level + 2, 2, -1 do
-                    error_value:capture( i )
-                    if not error_value:isEmpty() then break end
-                end
-
-                error_value:display()
-            else
-                error_value = tostring( error_value )
-                ---@cast error_value string
-
-                for i = stack_level + 2, 2, -1 do
-                    runtime_stack:capture( i )
-                    if not runtime_stack:isEmpty() then break end
-                end
-
-                runtime_error.message = string_match( error_value, "^[^:]+:%d+: ([^\n]+)" ) or error_value
-                runtime_error:display()
-                runtime_stack:clear()
+            for i = stack_level + 2, 2, -1 do
+                error_value:capture( i )
+                if not error_value:isEmpty() then break end
             end
 
-            return "The original error message was caught by dreamwork, see above for details about the error.", 2
-        end, 1000 )
+            error_value:display()
+        else
+            error_value = tostring( error_value )
+            ---@cast error_value string
 
-    end
+            for i = stack_level + 2, 2, -1 do
+                runtime_stack:capture( i )
+                if not runtime_stack:isEmpty() then break end
+            end
+
+            runtime_error.message = string_match( error_value, "^[^:]+:%d+: ([^\n]+)" ) or error_value
+            runtime_error:display()
+            runtime_stack:clear()
+        end
+
+        return "The original error message was caught by dreamwork, see above for details about the error.", 2
+    end, 1000 )
 
     --- [SHARED AND MENU]
     ---
@@ -1673,7 +1745,7 @@ do
             end
 
             required_stack_level = stack_level
-            return error( value, stack_level )
+            return glua_error( value, stack_level )
         end
 
         if dont_break then
@@ -1695,10 +1767,11 @@ do
         ---@cast value string
 
         required_stack_level = stack_level
-        return error( value, stack_level )
+        return glua_error( value, stack_level )
     end
 
     std.error = std_error
+    error = std_error
 
     --- [SHARED AND MENU]
     ---
@@ -1728,15 +1801,14 @@ do
 end
 
 local TypeError = std.TypeError
-local error = std.error
 
 do
 
     local debug_getlocal = debug.getlocal
     local debug_getinfo = debug.getinfo
 
+    local equal = std.equal
     local is = std.is
-    local eq = std.eq
 
     --- [SHARED AND MENU]
     ---
@@ -1757,7 +1829,7 @@ do
             local expected = raw_select( i, ... )
             if isString( expected ) then
                 if expected == value_type then return end
-            elseif eq( expected, value ) then
+            elseif equal( expected, value ) then
                 return
             elseif is( value, expected ) then
                 return
@@ -1984,7 +2056,7 @@ do
                 out_args[ i ] = math_floor( value )
                 in_arg_count = math_max( in_arg_count, value )
             else
-                std.error( TypeError( i, value, "integer", "1", "junction" ), 2 )
+                error( TypeError( i, value, "integer", "1", "junction" ), 2 )
             end
         end
 
@@ -2026,17 +2098,22 @@ do
         local arg_count = raw_select( "#", ... )
         if arg_count == 0 then
             engine_consoleMessage( "\n" )
-        elseif arg_count == 1 then
-            engine_consoleMessage( represent( ... ) .. "\n" )
-        else
-            local args = { ... }
-
-            for arg_num = 1, arg_count, 1 do
-                args[ arg_num ] = represent( args[ arg_num ] )
-            end
-
-            engine_consoleMessage( table_concat( args, "\t", 1, arg_count ) .. "\n" )
+            return
         end
+
+        if arg_count == 1 then
+            engine_consoleMessage( represent( ... ) .. "\n" )
+            return
+        end
+
+        ---@type string[]
+        local values = {}
+
+        for i = 1, arg_count, 1 do
+            values[ i ] = represent( raw_select( i, ... ) )
+        end
+
+        engine_consoleMessage( table_concat( values, "\t", 1, arg_count ) .. "\n" )
     end
 
     --- [SHARED AND MENU]
@@ -2044,6 +2121,7 @@ do
     --- Prints a formatted string to the console.
     ---
     --- Basically the same as `print( string.format( fmt, ... ) )`
+    ---
     ---@param fmt string The format string.
     ---@param ... any The arguments to format/interpolate.
     function std.printf( fmt, ... )
@@ -2457,10 +2535,6 @@ local logger = console.Logger( {
     title = dreamwork.Prefix,
     interpolation = false
 } )
-
-if std.LUA_VERSION ~= "Lua 5.1" then
-    logger:warn( "Lua version changed, possible unpredictable behavior. (" .. std.LUA_VERSION .. ")" )
-end
 
 dreamwork.Logger = logger
 

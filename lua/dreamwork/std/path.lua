@@ -1,17 +1,25 @@
 ---@class dreamwork.std
 local std = dreamwork.std
 
-local string = std.string
+local debug = std.debug
+local debug_getfmain = debug.getfmain
+local debug_getfsource = debug.getfsource
 
+local string = std.string
 local string_len = string.len
+local string_trimByte = string.trimByte
+local pattern_bytes = string.PatternBytes
 local string_byteSplit = string.byteSplit
 local string_sub, string_gsub = string.sub, string.gsub
 local string_char, string_byte = string.char, string.byte
 
 local table = std.table
-
 local table_concat = table.concat
 local table_insert, table_remove = table.insert, table.remove
+
+local len = std.len
+local getfenv = std.getfenv
+local isFunction = std.isFunction
 
 --- [SHARED AND MENU]
 ---
@@ -117,9 +125,9 @@ function path.getFile( file_path, keep_extension )
 
     if dot_position == nil then
         return file_path
-    else
-        return string_sub( file_path, 1, dot_position - 1 )
     end
+
+    return string_sub( file_path, 1, dot_position - 1 )
 end
 
 --- [SHARED AND MENU]
@@ -139,6 +147,8 @@ local function getDirectory( file_path, keep_trailing_slash )
             return string_sub( file_path, 1, index )
         end
     end
+
+    return nil
 end
 
 path.getDirectory = getDirectory
@@ -337,7 +347,6 @@ end
 ---@return string new_file_path The normalized file path.
 local function normalize( file_path, keep_trailing_slash )
     local file_path_length = string_len( file_path )
-
     if file_path_length == 0 then
         return "."
     end
@@ -345,7 +354,7 @@ local function normalize( file_path, keep_trailing_slash )
     local has_trailing_slash = string_byte( file_path, file_path_length ) == 0x2F --[[ / ]]
     local is_abs = string_byte( file_path, 1 ) == 0x2F --[[ / ]]
 
-    local segments, segment_count = string_byteSplit( file_path, 0x2F --[[ / ]], is_abs and 2 or 1, has_trailing_slash and (file_path_length - 1) or file_path_length, file_path_length )
+    local segments, segment_count = string_byteSplit( file_path, 0x2F --[[ / ]], is_abs and 2 or 1, has_trailing_slash and (file_path_length - 1) or file_path_length )
     local skip = 0
 
     for index = segment_count, 1, -1 do
@@ -401,13 +410,6 @@ path.normalize = normalize
 
 do
 
-    local isFunction = std.isFunction
-    local getfenv = std.getfenv
-
-    local debug = std.debug
-    local debug_getfmain = debug.getfmain
-    local debug_getfpath = debug.getfpath
-
     local function get( f )
         local fn
         if not isFunction( f ) then
@@ -431,7 +433,7 @@ do
         end
 
         if fn ~= nil then
-            local file_path = debug_getfpath( fn )
+            local file_path = debug_getfsource( fn )
             if file_path ~= nil then
                 return file_path
             end
@@ -526,40 +528,31 @@ do
 
 end
 
-do
-
-    local string_trimByte = string.trimByte
-    local len = std.len
-
-    --- [SHARED AND MENU]
-    ---
-    --- Join the file paths into a single file path and normalize it.
-    ---
-    ---@param segments string[] The file paths to join.
-    ---@param segment_count? integer The number of file paths to join.
-    ---@return string file_path The joined file path.
-    function path.join( segments, segment_count )
-        if segment_count == nil then
-            segment_count = len( segments )
-        end
-
-        for index = 1, segment_count, 1 do
-            local segment = string_trimByte( segments[ index ], 0x2F --[[ / ]] )
-            if string_byte( segment, 1, 1 ) == nil then
-                segments[ index ] = "."
-            else
-                segments[ index ] = segment
-            end
-        end
-
-        return normalize( table_concat( segments, "/", 1, segment_count ) )
+--- [SHARED AND MENU]
+---
+--- Join the file paths into a single file path and normalize it.
+---
+---@param segments string[] The file paths to join.
+---@param segment_count? integer The number of file paths to join.
+---@return string file_path The joined file path.
+function path.join( segments, segment_count )
+    if segment_count == nil then
+        segment_count = len( segments )
     end
 
+    for index = 1, segment_count, 1 do
+        local segment = string_trimByte( segments[ index ], 0x2F --[[ / ]] )
+        if string_byte( segment, 1, 1 ) == nil then
+            segments[ index ] = "."
+        else
+            segments[ index ] = segment
+        end
+    end
+
+    return normalize( table_concat( segments, "/", 1, segment_count ) )
 end
 
 do
-
-    local pattern_bytes = string.PatternBytes
 
     ---@type table<integer, fun( str: string, position: integer, str_length: integer ): string, integer, boolean>
     local wildcard_handlers = {

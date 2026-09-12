@@ -1,9 +1,6 @@
 ---@class dreamwork.std
 local std = dreamwork.std
 
-local raw = std.raw
-local raw_error = raw.error
-
 local debug = std.debug
 local debug_fempty = debug.fempty
 
@@ -18,9 +15,11 @@ local string_format = string.format
 local class = std.class
 
 local pcall = std.pcall
+local error = std.error
 local is = std.is
 
 local Future = std.Future
+
 
 --- [SHARED AND MENU]
 ---
@@ -214,7 +213,7 @@ function Hook:detach( type, handler )
         return detach_type( self, self.mixin_handlers, self.mixin_priorities, handler )
     end
 
-    raw_error( "attempt to detach unknown hook type", 2 )
+    error( "attempt to detach unknown hook type", 2 )
     return false
 end
 
@@ -287,7 +286,7 @@ end
 function Hook:attach( type, handler, priority )
     if is( handler, Hook ) and ---@cast handler dreamwork.std.Hook<any>
         contains_parent( handler, self ) then
-        raw_error( "attempt to create circular hook reference", 2 )
+        error( "attempt to create circular hook reference", 2 )
     end
 
     if type == nil or type == "provide" then
@@ -300,7 +299,7 @@ function Hook:attach( type, handler, priority )
         return attach_type( self, self.mixin_handlers, self.mixin_priorities, handler, priority )
     end
 
-    raw_error( "attempt to attach unknown hook type", 2 )
+    error( "attempt to attach unknown hook type", 2 )
 end
 
 ---@generic T
@@ -419,7 +418,7 @@ end
 ---@return T | nil result The final value produced by `peek`/`provide` and possibly transformed by `mixin` handlers; `nil` if no handler produced a value.
 function Hook:call( ... )
     if self.running then
-        raw_error( "hook is already running, please wait until it finish", 2 )
+        error( "hook is already running, please wait until it finish", 2 )
     end
 
     self.running = true
@@ -436,7 +435,7 @@ function Hook:call( ... )
             end
         else
             hook_cancel( self )
-            raw_error( peek_result, 2 )
+            error( peek_result, 2 )
         end
     end
 
@@ -454,7 +453,7 @@ function Hook:call( ... )
                 end
             else
                 hook_cancel( self )
-                raw_error( provide_result, 2 )
+                error( provide_result, 2 )
             end
         end
     else
@@ -472,7 +471,7 @@ function Hook:call( ... )
                 mixin_value, provide_value = provide_value, mixin_result
             else
                 hook_cancel( self )
-                raw_error( mixin_result, 2 )
+                error( mixin_result, 2 )
             end
         end
     end
@@ -483,7 +482,7 @@ function Hook:call( ... )
         local is_successful_observation, error_message = pcall( observers[ i ], provide_value, ... )
         if not is_successful_observation then
             hook_cancel( self )
-            raw_error( error_message, 2 )
+            error( error_message, 2 )
         end
     end
 

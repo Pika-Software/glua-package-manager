@@ -17,6 +17,9 @@ local raw = std.raw
 local raw_pairs = raw.pairs
 local raw_get, raw_set = raw.get, raw.set
 
+local error = std.error
+
+
 --- [SHARED AND MENU]
 ---
 --- A library for creating classes, implementing inheritance, and working with the object model in Lua.

@@ -13,29 +13,6 @@ local dreamwork_logger = dreamwork.Logger
 local engine_hookCatch = engine.hookCatch
 local engine_hookCall = engine.hookCall
 
-local LUA_CLIENT, LUA_SERVER, LUA_MENU = std.LUA_CLIENT, std.LUA_SERVER, std.LUA_MENU
-local setmetatable = std.setmetatable
-local tostring = std.tostring
-
-local Future = std.Future
-
-local glua_file = _G.file
-local file_Time = glua_file.Time
-local file_Find = glua_file.Find
-local file_Size = glua_file.Size
-local file_Open = glua_file.Open
-local file_IsDir = glua_file.IsDir
-local file_Exists = glua_file.Exists
-local file_Delete = glua_file.Delete
-local file_CreateDir = glua_file.CreateDir
-
-local FILE = std.debug.findmetatable( "File" )
----@cast FILE File
-
-local FILE_Read, FILE_Write = FILE.Read, FILE.Write
-local FILE_Close = FILE.Close
-local FILE_Size = FILE.Size
-
 local gc_setTableRules = std.gc.setTableRules
 local debug_fempty = std.debug.fempty
 
@@ -61,6 +38,33 @@ local path = std.path
 local path_split = path.split
 local path_resolve = path.resolve
 local path_getExtension = path.getExtension
+
+local LUA_CLIENT, LUA_SERVER, LUA_MENU = std.LUA_CLIENT, std.LUA_SERVER, std.LUA_MENU
+local setmetatable = std.setmetatable
+local tostring = std.tostring
+local error = std.error
+
+local Future = std.Future
+
+
+local glua_file = _G.file
+local file_Time = glua_file.Time
+local file_Find = glua_file.Find
+local file_Size = glua_file.Size
+local file_Open = glua_file.Open
+local file_IsDir = glua_file.IsDir
+local file_Exists = glua_file.Exists
+local file_Delete = glua_file.Delete
+local file_CreateDir = glua_file.CreateDir
+
+
+local FILE = std.debug.findmetatable( "File" )
+---@cast FILE File
+
+local FILE_Read, FILE_Write = FILE.Read, FILE.Write
+local FILE_Close = FILE.Close
+local FILE_Size = FILE.Size
+
 
 ---@type table<string, boolean>
 local reserved_names = {

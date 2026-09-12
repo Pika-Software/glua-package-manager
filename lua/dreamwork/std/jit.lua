@@ -3,11 +3,15 @@ local glua_jit = jit
 ---@class dreamwork.std
 local std = dreamwork.std
 
-local raw_type = std.raw.type
+local raw = std.raw
+local raw_type = raw.type
 
 local debug = std.debug
 local debug_fempty = debug.fempty
 local debug_getfmain = debug.getfmain
+
+local error = std.error
+
 
 -- TODO: docs
 

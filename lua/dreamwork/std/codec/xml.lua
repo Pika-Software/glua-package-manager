@@ -22,7 +22,7 @@ local table = std.table
 local table_concat = table.concat
 
 local string = std.string
-local string_repByte = string.repByte
+local string_byteRep = string.byteRep
 local string_sub, string_len = string.sub, string.len
 local string_char, string_byte = string.char, string.byte
 local string_gsub, string_match = string.gsub, string.match
@@ -745,7 +745,7 @@ do
         line_count = line_count + 1
 
         if pretty then
-            lines[ line_count ] = string_format( "%s<%s>%s</%s>", string_repByte( 0x20, level * 2 ), name, value, name )
+            lines[ line_count ] = string_format( "%s<%s>%s</%s>", string_byteRep( 0x20, level * 2 ), name, value, name )
         else
             lines[ line_count ] = string_format( "<%s>%s</%s>", name, value, name )
         end
@@ -764,7 +764,7 @@ do
 
         local indent
         if pretty then
-            indent = string_repByte( 0x20, level * 2 )
+            indent = string_byteRep( 0x20, level * 2 )
         else
             indent = ""
         end

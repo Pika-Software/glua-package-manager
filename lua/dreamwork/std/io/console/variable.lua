@@ -1,12 +1,13 @@
 local std = dreamwork.std
 
----@alias dreamwork.std.console.VariableType "boolean" | "string" | "integer" | "float" | "number"
+---@alias dreamwork.std.console.VariableType "boolean" | "string" | "integer" | "number"
 ---@alias dreamwork.std.console.VariableValue boolean | number | string | integer
 
 ---@class dreamwork.std.console
 local console = std.console
 
 local engine = dreamwork.engine
+local engine_hookCall = engine.hookCall
 local engine_consoleCommandRun = engine.consoleCommandRun
 local engine_consoleVariableGet = engine.consoleVariableGet
 local engine_consoleVariableCreate = engine.consoleVariableCreate
@@ -16,23 +17,36 @@ local LUA_SERVER = std.LUA_SERVER
 local debug = std.debug
 local debug_fempty = debug.fempty
 
+local raw = std.raw
+local raw_type = raw.type
+local raw_index = raw.index
+local raw_tonumber = raw.tonumber
+
+local math = std.math
+local math_floor = math.floor
+
 local gc = std.gc
 local gc_setTableRules = gc.setTableRules
-
-local table = std.table
-local table_removeByRange = table.removeByRange
 
 local string = std.string
 local string_format = string.format
 
-local bit = std.bit
-local bit_band = bit.band
+local table = std.table
+local table_removeByRange = table.removeByRange
+
+local rbit = raw.bit
+local rbit_band = rbit.band
+
+local class = std.class
 
 local toboolean = std.toboolean
 local tostring = std.tostring
-local arg = std.arg
+local xpcall = std.xpcall
+local error = std.error
+local type = std.type
 
 local Future = std.Future
+
 
 ---@diagnostic disable-next-line: undefined-doc-class
 ---@class dreamwork.GModConVar : ConVar
@@ -56,15 +70,6 @@ local GModConVar_getString = GModConVar.GetString
 local GModConVar_getDefault = GModConVar.GetDefault
 local GModConVar_getMin, GModConVar_getMax = GModConVar.GetMin, GModConVar.GetMax
 
-local math = std.math
-local math_floor = math.floor
-
-local raw = std.raw
-local raw_type = raw.type
-local raw_index = raw.index
-local raw_tonumber = raw.tonumber
-
-local class = std.class
 
 ---@type table<dreamwork.std.console.Variable, dreamwork.GModConVar>
 local variable_to_gmodconvar = {}
@@ -145,8 +150,7 @@ do
         boolean = true,
         integer = true,
         number = true,
-        string = true,
-        float = true
+        string = true
     }
 
     setmetatable( types, {
@@ -186,13 +190,6 @@ do
 
 end
 
----@type table<string, boolean>
-local number_types = {
-    integer = true,
-    number = true,
-    float = true
-}
-
 ---@type table<dreamwork.std.console.Variable, dreamwork.std.console.VariableValue>
 local gmodconvar_defaults = {}
 
@@ -202,7 +199,7 @@ setmetatable( gmodconvar_defaults, {
 
         local cvar = variable_to_gmodconvar[ variable ]
         if cvar == nil then
-            if number_types[ cvar_type ] then
+            if cvar_type == "integer" or cvar_type == "number" then
                 return 0
             elseif cvar_type == "boolean" then
                 return false
@@ -212,7 +209,8 @@ setmetatable( gmodconvar_defaults, {
         end
 
         local str_default = GModConVar_getDefault( cvar )
-        if number_types[ cvar_type ] then
+
+        if cvar_type == "integer" or cvar_type == "number" then
             local float_default = raw_tonumber( str_default, 10 ) or 0
 
             if cvar_type == "integer" then
@@ -243,24 +241,25 @@ setmetatable( values, {
             return gmodconvar_defaults[ variable ]
         end
 
-        local type = types[ variable ]
-        if type == "float" or type == "number" then
+        local type_str = types[ variable ]
+
+        if type_str == "number" then
             local float_value = GModConVar_getFloat( cvar )
             values[ variable ] = float_value
             return float_value
-        elseif type == "integer" then
+        elseif type_str == "integer" then
             local integer_value = GModConVar_getInt( cvar )
             values[ variable ] = integer_value
             return integer_value
-        elseif type == "boolean" then
+        elseif type_str == "boolean" then
             local bool_value = GModConVar_getBool( cvar )
             values[ variable ] = bool_value
             return bool_value
-        else
-            local str_value = GModConVar_getString( cvar )
-            values[ variable ] = str_value
-            return str_value
         end
+
+        local str_value = GModConVar_getString( cvar )
+        values[ variable ] = str_value
+        return str_value
     end,
     __mode = "k"
 } )
@@ -316,7 +315,7 @@ gc_setTableRules( callbacks, true, false )
 ---@class dreamwork.std.console.Variable<T> : dreamwork.std.Object
 ---@field __class dreamwork.std.console.Variable
 ---@field value T The value of the variable.
----@field type dreamwork.std.console.VariableType The type of the variable (e.g., "int", "float", "string").
+---@field type dreamwork.std.console.VariableType The type of the variable (e.g., "int", "string").
 ---@field name string The name of the variable.
 ---@field description string The description of the variable.
 ---@field flags integer The flags of the variable.
@@ -325,6 +324,8 @@ gc_setTableRules( callbacks, true, false )
 ---@field max T | nil The maximum value of the variable (if applicable).
 local Variable = class.base( "console.Variable", true )
 
+---@param str_key string
+---@return any
 ---@protected
 function Variable:__index( str_key )
     if str_key == "type" then
@@ -350,9 +351,11 @@ function Variable:__index( str_key )
         return raw_index( Variable, str_key )
     end
 
-    return bit_band( gmodconvar_flags[ self ], int32_flag ) ~= 0
+    return rbit_band( gmodconvar_flags[ self ], int32_flag ) ~= 0
 end
 
+---@param str_key string
+---@param value any
 ---@protected
 function Variable:__newindex( str_key, value )
     if str_key == "value" then
@@ -361,9 +364,8 @@ function Variable:__newindex( str_key, value )
             local bool_value = toboolean( value )
             engine_consoleCommandRun( gmodconvar_names[ self ], bool_value and "1" or "0" )
             values[ self ] = bool_value
-        elseif number_types[ cvar_type ] then
+        elseif cvar_type == "integer" or cvar_type == "number" then
             local float_value = raw_tonumber( value, 10 ) or 0.0
-
             if cvar_type == "integer" then
                 float_value = math_floor( float_value )
             end
@@ -401,23 +403,24 @@ function Variable:__init( options )
         if str_default == nil then
             if cvar_type == "boolean" then
                 str_default = false
-            elseif number_types[ cvar_type ] then
+            elseif cvar_type == "integer" or cvar_type == "number" then
                 str_default = 0
             else
                 str_default = ""
             end
         end
 
-        local ok, error_msg = arg( str_default, "default", number_types[ cvar_type ] and "number" or cvar_type )
-
-        if not ok then
-            error( error_msg, 3 )
+        local default_type = type( str_default )
+        if default_type ~= cvar_type then
+            error( string_format( "default type (%s) does not match variable type (%s)", default_type, cvar_type ), 3 )
         end
 
         if cvar_type == "boolean" then
             str_default = str_default and "1" or "0"
-        elseif number_types[ cvar_type ] then
+        elseif cvar_type == "integer" or cvar_type == "number" then
             str_default = tostring( str_default ) or "0"
+        else
+            str_default = tostring( str_default ) or ""
         end
 
         ---@cast str_default string
@@ -494,10 +497,9 @@ VariableClass.exists = engine_consoleVariableExists
 ---@param cvar_type dreamwork.std.console.VariableType The type of the console variable.
 ---@return dreamwork.std.console.Variable | nil variable The `console.Variable` object.
 ---@overload fun( str_name: string, cvar_type: "boolean"): dreamwork.std.console.Variable<boolean> | nil
----@overload fun( str_name: string, cvar_type: "string"): dreamwork.std.console.Variable<string> | nil
----@overload fun( str_name: string, cvar_type: "number"): dreamwork.std.console.Variable<number> | nil
----@overload fun( str_name: string, cvar_type: "float"): dreamwork.std.console.Variable<number> | nil
 ---@overload fun( str_name: string, cvar_type: "integer"): dreamwork.std.console.Variable<integer> | nil
+---@overload fun( str_name: string, cvar_type: "number"): dreamwork.std.console.Variable<number> | nil
+---@overload fun( str_name: string, cvar_type: "string"): dreamwork.std.console.Variable<string> | nil
 function VariableClass.get( str_name, cvar_type )
     local variable = variables[ str_name ]
     if variable == nil then
@@ -505,11 +507,20 @@ function VariableClass.get( str_name, cvar_type )
             return nil
         end
 
-        return VariableClass( {
+        local params = {
             name = str_name,
-            type = cvar_type,
-            default = (cvar_type == "boolean" or number_types[ cvar_type ]) and 0 or "",
-        } )
+            type = cvar_type
+        }
+
+        if cvar_type == "boolean" then
+            params.default = false
+        elseif cvar_type == "number" or cvar_type == "integer" then
+            params.default = 0
+        else
+            params.default = ""
+        end
+
+        return VariableClass( params )
     end
 
     variable.type = cvar_type
@@ -671,7 +682,7 @@ do
     ---@param name string The name of the console variable.
     ---@param value dreamwork.std.console.VariableValue The value to set.
     function VariableClass.set( name, value )
-        if bit_band( getFlags( name ), 8192 ) ~= 0 and not LUA_SERVER then
+        if rbit_band( getFlags( name ), 8192 ) ~= 0 and not LUA_SERVER then
             error( "replicated convar is cannot be changed by client.", 2 )
         end
 
@@ -694,7 +705,7 @@ do
             end
         end
 
-        error( "invalid value type, must be boolean, string, integer, float or number.", 2 )
+        error( "invalid value type, must be boolean, string, integer or number.", 2 )
     end
 
 end
@@ -900,7 +911,7 @@ engine.hookCatch( "dreamwork.console.variable.change", "variable.change", functi
 
     if cvar_type == "boolean" then
         old_value, new_value = str_old == "1", str_new == "1"
-    elseif number_types[ cvar_type ] then
+    elseif cvar_type == "integer" or cvar_type == "number" then
         old_value, new_value = raw_tonumber( str_old, 10 ) or 0, raw_tonumber( str_new, 10 ) or 0
     else
         old_value, new_value = str_old, str_new
@@ -913,12 +924,11 @@ engine.hookCatch( "dreamwork.console.variable.change", "variable.change", functi
     if lst ~= nil then
         for i = #lst - 1, 1, -3 do
             if in_call[ variable ] then
-                local success, err_msg = pcall( lst[ i ], variable, new_value )
-                if not success then
-                    -- TODO: add error display here
-                    std.printf( "[DreamWork] console variable callback error: %s", err_msg )
-                    table_removeByRange( lst, i - 1, i + 1 )
-                elseif lst[ i + 1 ] then
+                xpcall( lst[ i ], function( error_message )
+                    return engine_hookCall( "dreamwork.lua.error", error_message, 2 )
+                end, variable, new_value )
+
+                if lst[ i + 1 ] then
                     table_removeByRange( lst, i - 1, i + 1 )
                 end
             else

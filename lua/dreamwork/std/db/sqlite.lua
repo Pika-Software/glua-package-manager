@@ -1,3 +1,7 @@
+---@class dreamwork.GModSQLLib
+---@field Query fun( sql: string ): dreamwork.std.sqlite.QueryRow[] | false | nil
+---@field m_strError string | nil
+---@diagnostic disable-next-line: undefined-global
 local glua_sql = sql
 local sql_Query = glua_sql.Query
 
@@ -6,21 +10,23 @@ local dreamwork_Logger = dreamwork.Logger
 ---@class dreamwork.std
 local std = dreamwork.std
 
-local isBoolean = std.isBoolean
-local isNumber = std.isNumber
-local isString = std.isString
-
-local raw_next = std.raw.next
-
-local tostring = std.tostring
-local pcall = std.pcall
-local type = std.type
+local raw = std.raw
+local raw_next = raw.next
 
 local string = std.string
 local string_match = string.match
 local string_lower = string.lower
 local string_replace = string.replace
 local string_interpolateByte = string.interpolateByte
+
+local isBoolean = std.isBoolean
+local isNumber = std.isNumber
+local isString = std.isString
+
+local tostring = std.tostring
+local pcall = std.pcall
+local error = std.error
+local type = std.type
 
 --- [SHARED AND MENU]
 ---

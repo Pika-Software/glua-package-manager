@@ -1,14 +1,9 @@
 local glua_coroutine = coroutine
-
-local coroutine_yield = glua_coroutine.yield
 local coroutine_status = glua_coroutine.status
 local coroutine_running = glua_coroutine.running
 
 ---@class dreamwork.std
 local std = dreamwork.std
-
-local time = std.time
-local time_elapsed = time.elapsed
 
 --- [SHARED AND MENU]
 ---
@@ -28,7 +23,7 @@ local coroutine = {
 
     status = coroutine_status,
     wrap = glua_coroutine.wrap,
-    yield = coroutine_yield,
+    yield = glua_coroutine.yield,
 
     ---@diagnostic disable-next-line: deprecated
     isyieldable = glua_coroutine.isyieldable,
@@ -36,8 +31,7 @@ local coroutine = {
 
 std.coroutine = coroutine
 
----@diagnostic disable-next-line: deprecated
-if glua_coroutine.isyieldable == nil then
+if coroutine.isyieldable == nil then
 
     --- [SHARED AND MENU]
     ---
@@ -53,20 +47,4 @@ if glua_coroutine.isyieldable == nil then
         return co ~= nil and coroutine_status( co ) == "running"
     end
 
-end
-
---- [SHARED AND MENU]
----
---- Repeatedly yields the coroutine for the given duration before continuing.
----
----@param seconds number
----@async
-function coroutine.wait( seconds )
-    local end_time = time_elapsed() + seconds
-    ::coroutine_wait::
-
-    if end_time >= time_elapsed() then
-        coroutine_yield()
-        goto coroutine_wait
-    end
 end

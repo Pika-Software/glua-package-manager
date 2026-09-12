@@ -8,7 +8,11 @@
 ---@class dreamwork.std
 local std = dreamwork.std
 
--- local assert = std.assert
+local raw = std.raw
+local raw_pairs = raw.pairs
+
+local math = std.math
+local math_max = math.max
 
 local table = std.table
 local table_sort = table.sort
@@ -21,9 +25,11 @@ local string_find = string.find
 local string_gsub, string_sub = string.gsub, string.sub
 local string_byte, string_char = string.byte, string.char
 
-local Adler32_digest = std.Adler32.digest
-local raw_pairs = std.raw.pairs
-local math_max = std.math.max
+local Adler32 = std.Adler32
+local Adler32_digest = Adler32.digest
+
+local error = std.error
+
 
 --- [SHARED AND MENU]
 ---

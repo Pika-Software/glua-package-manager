@@ -116,14 +116,17 @@ function ipv4.parse( ipv4_str, start_position, end_position, str_length )
         end_position = math_min( end_position, str_length )
     end
 
+    ---@type { [ 1 ]: integer, [ 2 ]: integer, [ 3 ]: integer, [ 4 ]: integer }
     local octets = { 0, 0, 0, 0 }
+
+    ---@type integer
     local octet_index = 1
 
-    local cdir_position = string_findByte( ipv4_str, 0x2F --[[ / ]], start_position, end_position, end_position )
+    local cdir_position = string_findByte( ipv4_str, 0x2F --[[ / ]], start_position, end_position )
 
     ::parse_octet::
 
-    local octet_position = string_findByte( ipv4_str, 0x2E --[[ . ]], start_position, end_position, end_position )
+    local octet_position = string_findByte( ipv4_str, 0x2E --[[ . ]], start_position, end_position )
 
     local octet_length
     if octet_position == nil then

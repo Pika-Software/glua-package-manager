@@ -7,8 +7,10 @@ local std = dreamwork.std
 local raw = std.raw
 local raw_get = raw.get
 
-local pcall = std.pcall
 local xpcall = std.xpcall
+local pcall = std.pcall
+local error = std.error
+
 
 --- [SHARED AND MENU]
 ---

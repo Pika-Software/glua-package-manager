@@ -547,17 +547,16 @@ do
         if value == 0 then
             self.sign = math_isNegative( value )
             self.bytes[ 0 ] = 0
-            return self
-        end
-
-        if math_isNegative( value ) then
-            self.sign = true
-            value = -value
         else
-            self.sign = false
-        end
+            if math_isNegative( value ) then
+                self.sign = true
+                value = -value
+            else
+                self.sign = false
+            end
 
-        self.bytes = bytes_copy( byte_cache[ value ] )
+            self.bytes = bytes_copy( byte_cache[ value ] )
+        end
 
         return self
     end
@@ -574,12 +573,9 @@ do
     ---@param base? integer The numerical base of the digits in the input value. Can be any integer between 2 and 36, inclusive. By default: `10`
     ---@param start_position? integer The start position to read from.
     ---@param end_position? integer The end position to read to.
-    ---@param str_length? integer The length of the string. Optionally, it should be used to speed up calculations.
     ---@return dreamwork.std.BigInteger self
-    function BigInteger:fromString( str, base, start_position, end_position, str_length )
-        if str_length == nil then
-            str_length = string_len( str )
-        end
+    function BigInteger:fromString( str, base, start_position, end_position )
+        local str_length = string_len( str )
 
         if start_position == nil then
             start_position = 1
@@ -755,6 +751,9 @@ do
         end
 
         local obj = class_new( BigInteger )
+        obj.bytes = { [ 0 ] = 0 }
+        obj.sign = false
+
         fromAny( obj, value, base, 2 )
         return obj
     end
@@ -1090,6 +1089,21 @@ do
 
 end
 
+---@param writer dreamwork.std.BinaryWriter
+function BigInteger:__serialize( writer )
+    local bytes = self.bytes
+    local byte_count = bytes[ 0 ]
+    writer:writeBoolean( self.sign )
+    writer:writeCountedString( string.char( table_unpack( self.bytes, 1, byte_count ) ), 48 )
+end
+
+---@param reader dreamwork.std.BinaryReader
+function BigInteger:__deserialize( reader )
+    self.sign = reader:readBoolean()
+    local bytes, byte_count = reader:readCountedString( 48 )
+    self.bytes = { [ 0 ] = byte_count, string_byte( bytes, 1, byte_count ) }
+end
+
 local BigInteger_negate = BigInteger.negate
 local BigInteger_copy = BigInteger.copy
 
@@ -1395,7 +1409,7 @@ local BigInteger_mul = BigInteger.mul
 ---@return dreamwork.std.BigInteger new_object
 ---@protected
 function BigInteger:__mul( value )
-    return BigInteger_mul( BigIntegerClass( self ), value )
+    return BigInteger_mul( BigInteger_copy( self ), value )
 end
 
 --- [SHARED AND MENU]
@@ -1541,7 +1555,7 @@ do
     ---@return dreamwork.std.BigInteger new_object
     ---@protected
     function BigInteger:__pow( value )
-        return BigInteger_pow( BigIntegerClass( self ), value )
+        return BigInteger_pow( BigInteger_copy( self ), value )
     end
 
 end
@@ -1736,7 +1750,7 @@ do
     ---@return dreamwork.std.BigInteger quotient
     ---@protected
     function BigInteger:__div( value )
-        return (BigInteger_div( BigIntegerClass( self ), value ))
+        return (BigInteger_div( BigInteger_copy( self ), value ))
     end
 
     BigInteger.__idiv = BigInteger.__div
@@ -1921,8 +1935,8 @@ do
     function BigInteger:__bor( ... )
         local object = BigInteger_copy( self )
 
-        for i = 1, raw_select( '#', ... ), 1 do
-            BigInteger_bor( object, toBigInteger( raw_select( i, ... ), nil ) )
+        for i = 1, raw_select( "#", ... ), 1 do
+            BigInteger_bor( object, (raw_select( i, ... )) )
         end
 
         return object
@@ -1945,7 +1959,6 @@ function BigInteger:band( value )
     end
 
     local b = toBigInteger( value )
-
     local b_bytes = b.bytes
 
     local b_byte_count = b_bytes[ 0 ]
@@ -1981,8 +1994,8 @@ do
     function BigInteger:__band( ... )
         local object = BigInteger_copy( self )
 
-        for i = 1, raw_select( '#', ... ), 1 do
-            BigInteger_band( object, toBigInteger( raw_select( i, ... ), nil ) )
+        for i = 1, raw_select( "#", ... ), 1 do
+            BigInteger_band( object, (raw_select( i, ... )) )
         end
 
         return object

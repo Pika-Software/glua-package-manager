@@ -4,7 +4,7 @@ local std = dreamwork.std
 local setmetatable = std.setmetatable
 
 local math = std.math
-local math_ispositive = math.ispositive
+local math_isPositive = math.isPositive
 local math_clamp, math_floor = math.clamp, math.floor
 local math_frexp, math_ldexp = math.frexp, math.ldexp
 local math_huge, math_tiny, math_nan = math.huge, math.tiny, math.nan
@@ -13,6 +13,9 @@ local bit = std.bit
 local bit_band, bit_bor = bit.band, bit.bor
 local bit_sign, bit_unsign = bit.sign, bit.unsign
 local bit_lshift, bit_rshift = bit.lshift, bit.rshift
+
+local error = std.error
+
 
 -- TODO: ffi/holylib support?
 
@@ -937,7 +940,7 @@ do
     ---@return integer uint8_6 The sixth byte.
     ---@return integer uint8_7 The seventh byte.
     function bytepack.writeInt56BE( value )
-        return math_ispositive( value ) and 0 or 0xFF,
+        return math_isPositive( value ) and 0 or 0xFF,
             math_floor( value / 0x10000000000 ) % 0x100,
             math_floor( value / 0x100000000 ) % 0x100,
             math_floor( value / 0x1000000 ) % 0x100,
@@ -1045,7 +1048,7 @@ do
             math_floor( value / 0x1000000 ) % 0x100,
             math_floor( value / 0x100000000 ) % 0x100,
             math_floor( value / 0x10000000000 ) % 0x100,
-            math_ispositive( value ) and 0 or 0xFF
+            math_isPositive( value ) and 0 or 0xFF
     end
 
 end
@@ -1150,7 +1153,7 @@ do
     ---@return integer uint8_7 The seventh byte.
     ---@return integer uint8_8 The eighth byte.
     function bytepack.writeInt64BE( value )
-        return math_ispositive( value ) and 0 or 0xFF,
+        return math_isPositive( value ) and 0 or 0xFF,
             math_floor( value / 0x1000000000000 ) % 0x100,
             math_floor( value / 0x10000000000 ) % 0x100,
             math_floor( value / 0x100000000 ) % 0x100,
@@ -1270,7 +1273,7 @@ do
             math_floor( value / 0x100000000 ) % 0x100,
             math_floor( value / 0x10000000000 ) % 0x100,
             math_floor( value / 0x1000000000000 ) % 0x100,
-            math_ispositive( value ) and 0 or 0xFF
+            math_isPositive( value ) and 0 or 0xFF
     end
 
 end

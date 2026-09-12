@@ -22,7 +22,11 @@ local math_ceil, math_floor = math.ceil, math.floor
 local bytepack = std.bytepack
 local bytepack_readHex8 = bytepack.readHex8
 
+local error = std.error
+
+
 local DIV255_CONST = 1 / 255
+
 
 ---@alias dreamwork.std.Color integer
 

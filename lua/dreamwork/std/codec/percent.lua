@@ -70,9 +70,8 @@ do
     ---@param raw_str string The string to encode.
     ---@param whitelist? table The character whitelist, optional.
     ---@param ignore_spaces? boolean Ignore spaces, optional.
-    ---@param str_length? integer The length of the string. Optionally, it should be used to speed up calculations.
     ---@return string percent_str The encoded string.
-    function percent.encode( raw_str, whitelist, ignore_spaces, str_length )
+    function percent.encode( raw_str, whitelist, ignore_spaces )
         local segments, segment_count = {}, 0
 
         if whitelist == nil then
@@ -83,7 +82,7 @@ do
 
         local uint8_last
 
-        for i = 1, str_length or string_len( raw_str ), 1 do
+        for i = 1, string_len( raw_str ), 1 do
             local uint8 = string_byte( raw_str, i, i )
 
             if whitelist[ uint8 ] then

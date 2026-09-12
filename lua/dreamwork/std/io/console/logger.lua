@@ -109,12 +109,7 @@ function Logger:__init( options )
         self.text_color = text_color
     end
 
-    local interpolation = options.interpolation
-    if interpolation == nil then
-        self.interpolation = false
-    else
-        self.interpolation = interpolation == true
-    end
+    self.interpolation = options.interpolation == true
 
     local debug_fn = options.debug
     if debug_fn == nil then

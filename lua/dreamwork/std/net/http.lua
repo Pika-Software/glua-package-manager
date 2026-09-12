@@ -1,21 +1,38 @@
 local _G = _G
 
-local dreamwork = _G.dreamwork
+local http_storage = dreamwork.storage.http
 local Logger = dreamwork.Logger
 
 ---@class dreamwork.std
 local std = dreamwork.std
 
-local isNumber, isString = std.isNumber, std.isString
-local futures_Future = std.futures.Future
+local raw = std.raw
+local raw_tonumber = raw.tonumber
+
+local string = std.string
+local string_gmatch = string.gmatch
+
+local time = std.time
+local time_elapsed = time.elapsed
+
+local json = std.json
+local json_serialize = json.serialize
+
+local isNumber = std.isNumber
+local isString = std.isString
+
 local setTimeout = std.setTimeout
+local error = std.error
+
+local Future = std.Future
+
 
 local http_client, client_name
 if std.loadbinary( "reqwest" ) then
     ---@diagnostic disable-next-line: undefined-field
     local reqwest = _G.reqwest
 
-    local user_agent = "DreamWork/" .. dreamwork.Version .. " - Garry's Mod/" .. _G.VERSIONSTR
+    local user_agent = "DreamWork/" .. dreamwork.Version .. " - Garry's Mod/" .. std.GAME_VERSION
     local default_headers = { [ "User-Agent" ] = user_agent }
 
     function http_client( parameters )
@@ -167,13 +184,6 @@ do
 
 end
 
-local http_storage = dreamwork.storage.http
-
-local json_serialize = std.encoding.json.serialize
-local string_gmatch = std.string.gmatch
-local raw_tonumber = std.raw.tonumber
-local time_elapsed = std.time.elapsed
-
 do
 
     -- TODO: make cookies
@@ -279,7 +289,7 @@ local function request( options )
     -- TODO: add package logger searching
     Logger:debug( "%s HTTP request to '%s', using '%s', with timeout %f seconds.", method, url, client_name, timeout )
 
-    local f = futures_Future()
+    local f = Future()
 
     ---@diagnostic disable-next-line: inject-field
     function options.success( status, body, headers )
@@ -452,8 +462,10 @@ end
 
 if std.LUA_MENU then
 
-    local json_deserialize = std.encoding.json.deserialize
     local glua_GetAPIManifest = _G.GetAPIManifest
+    local json_deserialize = std.encoding.json.deserialize
+
+    -- TODO: move into separate file http.facepunch.getManifest
 
     --- [MENU]
     ---
@@ -463,7 +475,7 @@ if std.LUA_MENU then
     ---@return table data The data returned from the API.
     ---@async
     function http.getFacepunchManifest( timeout )
-        local f = futures_Future()
+        local f = Future()
 
         glua_GetAPIManifest( function( json )
             if json == nil then

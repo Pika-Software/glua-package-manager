@@ -4,16 +4,26 @@ local std = dreamwork.std
 local http = std.http
 local http_request = http.request
 
-local json_deserialize = std.encoding.json.deserialize
-local base64_decode = std.encoding.base64.decode
+local json = std.json
+local json_deserialize = json.deserialize
 
-local raw_tonumber = std.raw.tonumber
-local string_gsub = std.string.gsub
+local base64 = std.base64
+local base64_decode = base64.decode
+
+local raw = std.raw
+local raw_tonumber = raw.tonumber
+
+local string = std.string
+local string_gsub = string.gsub
+
+local time = std.time
+local time_now = time.now
+local time_elapsed = time.elapsed
+
 local tostring = std.tostring
+local error = std.error
 local sleep = std.sleep
 
-local time_elapsed = std.time.elapsed
-local time_now = std.time.now
 
 ---@type string
 local api_token

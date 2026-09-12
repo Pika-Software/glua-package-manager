@@ -7,16 +7,20 @@ local string = std.string
 
 local setTimeout = std.setTimeout
 local isString = std.isString
+local error = std.error
+
 local Future = std.Future
 
+
 -- TODO: https://wiki.facepunch.com/gmod/resource.AddWorkshop
+-- TODO: https://holylib.raphaelit7.com/addonsystem
 
 --- [SHARED AND MENU]
 ---
 --- Steam API library.
 ---
 ---@class dreamwork.std.steam
-local steam = std.steam or {}
+local steam = {}
 std.steam = steam
 
 if glua_system ~= nil then
