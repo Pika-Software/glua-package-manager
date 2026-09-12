@@ -1,14 +1,15 @@
 ---@class dreamwork.std
----@field TZ integer Time zone offset in hours. WARNING: Changing this GLOBAL will affect the operation of all `time` library functions.
----@field DST_TZ integer The DST timezone offset. **READ ONLY**
----@field DST boolean `true` if the current date is in DST, `false` if not. **READ ONLY**
 local std = dreamwork.std
 
 local raw = std.raw
+local raw_get = raw.get
 local raw_tonumber = raw.tonumber
 
+local rbit = raw.bit
+local rbit_bor = rbit.bor
+local rbit_lshift = rbit.lshift
+
 local math = std.math
-local math_min = math.min
 local math_floor = math.floor
 
 local os = std.os
@@ -19,9 +20,13 @@ local table = std.table
 local table_concat = table.concat
 
 local string = std.string
+local string_byte = string.byte
 local string_format = string.format
-local string_len, string_sub = string.len, string.sub
-local string_byte, string_char = string.byte, string.char
+local string_gmatch = string.gmatch
+local string_byteSplit = string.byteSplit
+local string_interpolate = string.interpolate
+
+local error = std.error
 
 
 --- [SHARED AND MENU]
@@ -29,25 +34,21 @@ local string_byte, string_char = string.byte, string.char
 --- A library for working with time and date.
 ---
 ---@class dreamwork.std.time
+---@field zone integer The timezone offset from UTC.
+---@field dst boolean Whether the timezone is currently in daylight saving time.
+---@field zone_dst integer The timezone offset from UTC during daylight saving time.
 local time = {}
 std.time = time
 
--- based on https://github.com/Nak2/NikNaks/blob/c0686a65a3bd4b30e0c683b07a9822a11fd54d83/lua/niknaks/modules/sh_datetime.lua#L9-L21
-do
-
-    local timezone = raw_tonumber( os_date( "%H", 0 ) ) - raw_tonumber( os_date( "!%H", 0 ) )
-    if (os_date( "%d", 0 ) - os_date( "!%d", 0 )) == 30 then
-        timezone = timezone - 24
-    end
-
-    local is_dst = ((raw_tonumber( os_date( "%z" ) ) * 0.01) - timezone) ~= 0
-    std.DST_TZ = timezone + (is_dst and 1 or 0)
-    std.TZ = timezone
-    std.DST = is_dst
-
+---@type integer
+local zone = raw_tonumber( os_date( "%H", 0 ) ) - raw_tonumber( os_date( "!%H", 0 ) )
+if (os_date( "%d", 0 ) - os_date( "!%d", 0 )) == 30 then
+    zone = zone - 24
 end
 
-local basic_timezone = std.TZ
+time.zone = zone
+time.dst = ((raw_tonumber( os_date( "%z" ) ) * 0.01) - zone) ~= 0
+time.zone_dst = zone + (time.dst and 1 or 0)
 
 ---@alias dreamwork.std.time.Unit
 ---| "ns" Nanoseconds
@@ -211,9 +212,6 @@ do
 
     end
 
-    local bit_lshift = bit.lshift
-    local bit_bor = bit.bor
-
     --- [SHARED AND MENU]
     ---
     --- Transforms a timestamp from one unit to another.
@@ -251,19 +249,19 @@ do
 
             if target_uint8_1 == nil then
                 error( "target cannot be empty string", (error_level or 1) + 1 )
-            end
-
-            if target_uint8_2 == nil then
+            elseif target_uint8_2 == nil then
                 target_uint8_2 = 0x0
             end
 
         end
 
+        ---@cast target_uint8_1 integer
+
         if unit_uint8_1 ~= target_uint8_1 or unit_uint8_2 ~= target_uint8_2 then
-            local transform_fn = transformation_map[ bit_bor(
-                bit_lshift( target_uint8_2, 24 ),
-                bit_lshift( target_uint8_1, 16 ),
-                bit_lshift( unit_uint8_2, 8 ),
+            local transform_fn = transformation_map[ rbit_bor(
+                rbit_lshift( target_uint8_2, 24 ),
+                rbit_lshift( target_uint8_1, 16 ),
+                rbit_lshift( unit_uint8_2, 8 ),
                 unit_uint8_1
             ) ]
 
@@ -271,14 +269,15 @@ do
                 error( "unknown transformation from '" .. unit .. "' to '" .. target .. "'", (error_level or 1) + 1 )
             end
 
+            ---@cast transform_fn fun( ts: number ): number
             timestamp = transform_fn( timestamp )
         end
 
         if as_float then
             return timestamp
-        else
-            return math_floor( timestamp )
         end
+
+        return math_floor( timestamp )
     end
 
 end
@@ -335,13 +334,14 @@ function time.elapsed( unit, as_float )
         else
             return math_floor( float )
         end
-    else
-        return transform( milliseconds_elapsed(), "s", unit, as_float ~= false, 2 )
     end
+
+    return transform( milliseconds_elapsed(), "s", unit, as_float ~= false, 2 )
 end
 
 do
 
+    ---@type number
     local previous = 0
 
     --- [SHARED AND MENU]
@@ -372,9 +372,9 @@ end
 local function now( unit, as_float )
     local timestamp = os_time()
 
-    local current_timezone = std.TZ
-    if current_timezone ~= basic_timezone then
-        timestamp = timestamp + (current_timezone - basic_timezone) * 3600
+    local current_timezone = time.zone
+    if current_timezone ~= zone then
+        timestamp = timestamp + (current_timezone - zone) * 3600
     end
 
     if not as_float and (unit == nil or unit == "s") then
@@ -440,8 +440,6 @@ do
 end
 
 do
-
-    local string_gmatch = string.gmatch
 
     ---@param duration_str dreamwork.std.time.Duration The duration string to convert.
     ---@param unit? dreamwork.std.time.Unit The unit to convert the duration to, 's' by default.
@@ -527,7 +525,8 @@ do
     ---
     --- Adds a duration to a timestamp.
     ---
-    --- The duration string can have the following units: `ns`, `us`, `ms`, `s`, `m`, `h`, `d`, `w`, `y`.
+    --- The duration string can have the following units:
+    --- `ns`, `us`, `ms`, `s`, `m`, `h`, `d`, `w`, `y`.
     ---
     --- | Suffix | Name         | Value                         |
     --- |--------|--------------|-------------------------------|
@@ -581,400 +580,342 @@ do
 
 end
 
+--- [SHARED AND MENU]
+---
+--- Splits a timestamp into seconds, milliseconds, microseconds and nanoseconds.
+---
+---@param timestamp integer
+---@param unit? dreamwork.std.time.Unit
+---@param error_level? integer
+---@return integer seconds
+---@return integer milliseconds
+---@return integer microseconds
+---@return integer nanoseconds
+local function split( timestamp, unit, error_level )
+    error_level = (error_level or 1) + 1
+
+    local seconds = transform( timestamp, unit, "s", false, error_level )
+    timestamp = timestamp - transform( seconds, "s", unit, true, error_level )
+
+    local milliseconds = transform( timestamp, unit, "ms", false, error_level )
+    timestamp = timestamp - transform( milliseconds, "ms", unit, true, error_level )
+
+    local microseconds = transform( timestamp, unit, "us", false, error_level )
+    timestamp = timestamp - transform( microseconds, "us", unit, true, error_level )
+
+    return seconds, milliseconds, microseconds, transform( timestamp, unit, "ns", false, error_level )
+end
+
+--- [SHARED AND MENU]
+---
+--- Represents a date and time.
+---
+---@class dreamwork.std.time.Date
+---@field is_dst boolean Is the date in summer time (daylight saving)?
+---@field week_day integer The day of the week.
+---@field milliseconds integer The number of milliseconds.
+---@field microseconds integer The number of microseconds.
+---@field nanoseconds integer The number of nanoseconds.
+---@field hours12 integer The number of hours in 12-hour format.
+---@field hours integer The number of hours.
+---@field minutes integer The number of minutes.
+---@field seconds integer The number of seconds.
+---@field period "AM" | "PM" The period of the day.
+---@field day integer The day of the month.
+---@field month integer The month of the year.
+---@field year integer The year.
+---@field year_day integer The day of the year.
+---@field year_week integer The week number of the year.
+
 do
 
     --- [SHARED AND MENU]
     ---
-    --- Splits a timestamp into seconds, milliseconds, microseconds and nanoseconds.
+    --- Returns a table with the date and time components.
     ---
-    ---@param timestamp integer
-    ---@param unit? dreamwork.std.time.Unit
-    ---@param error_level? integer
-    ---@return integer seconds
-    ---@return integer milliseconds
-    ---@return integer microseconds
-    ---@return integer nanoseconds
-    local function split( timestamp, unit, error_level )
-        error_level = (error_level or 1) + 1
-
-        local seconds = transform( timestamp, unit, "s", false, error_level )
-        timestamp = timestamp - transform( seconds, "s", unit, true, error_level )
-
-        local milliseconds = transform( timestamp, unit, "ms", false, error_level )
-        timestamp = timestamp - transform( milliseconds, "ms", unit, true, error_level )
-
-        local microseconds = transform( timestamp, unit, "us", false, error_level )
-        timestamp = timestamp - transform( microseconds, "us", unit, true, error_level )
-
-        return seconds, milliseconds, microseconds, transform( timestamp, unit, "ns", false, error_level )
-    end
-
-    --- [SHARED AND MENU]
-    ---
-    --- Represents a date and time.
-    ---
-    ---@class dreamwork.std.time.Date
-    ---@field is_dst boolean Is the date in summer time (daylight saving)?
-    ---@field week_day integer The day of the week.
-    ---@field milliseconds integer The number of milliseconds.
-    ---@field microseconds integer The number of microseconds.
-    ---@field nanoseconds integer The number of nanoseconds.
-    ---@field hours12 integer The number of hours in 12-hour format.
-    ---@field hours integer The number of hours.
-    ---@field minutes integer The number of minutes.
-    ---@field seconds integer The number of seconds.
-    ---@field period "AM" | "PM" The period of the day.
-    ---@field day integer The day of the month.
-    ---@field month integer The month of the year.
-    ---@field year integer The year.
-    ---@field year_day integer The day of the year.
-    ---@field year_week integer The week number of the year.
-
-    do
-
-        local string_byteSplit = string.byteSplit
-
-        --- [SHARED AND MENU]
-        ---
-        --- Returns a table with the date and time components.
-        ---
-        ---@param timestamp? integer The timestamp to parse.
-        ---@param unit? dreamwork.std.time.Unit The unit to parse the timestamp from, 's' by default.
-        ---@param in_utc? boolean Whether the timestamp is in UTC, `false` by default.
-        ---@return dreamwork.std.time.Date date_tbl The date and time components.
-        function time.parse( timestamp, unit, in_utc )
-            local seconds, milliseconds, microseconds, nanoseconds = split( timestamp or now( unit, true ), unit, 2 )
-            in_utc = in_utc == true
-
-            local tbl = os_date( in_utc and "!*t" or "*t", seconds )
-            ---@cast tbl table
-
-            tbl.is_dst = tbl.isdst
-            tbl.isdst = nil
-
-            tbl.week_day = (tbl.wday + 5) % 7 + 1
-            tbl.wday = nil
-
-            tbl.year_day = tbl.yday
-            tbl.yday = nil
-
-            tbl.milliseconds = milliseconds or 0
-            tbl.microseconds = microseconds or 0
-            tbl.nanoseconds = nanoseconds or 0
-
-            tbl.hours = tbl.hour
-            tbl.hour = nil
-
-            tbl.minutes = tbl.min
-            tbl.min = nil
-
-            tbl.seconds = tbl.sec
-            tbl.sec = nil
-
-            ---@diagnostic disable-next-line: param-type-mismatch
-            local values = string_byteSplit( os_date( in_utc and "!%I;%p;%W" or "%I;%p;%W", seconds ), 0x3B --[[ ";" ]] )
-
-            tbl.hours12 = tonumber( values[ 1 ], 10 ) or 0
-            tbl.period = values[ 2 ] or "AM"
-
-            tbl.year_week = (tonumber( values[ 3 ], 10 ) or 0) + 1
-
-            return tbl
-        end
-
-    end
-
-
-    local duration_units = {
-        { 31536000, "y" },
-        { 2592000,  "mo" },
-        { 604800,   "w" },
-        { 86400,    "d" },
-        { 3600,     "h" },
-        { 60,       "m" }
-    }
-
-    --- [SHARED AND MENU]
-    ---
-    --- Converts a number of seconds to a duration string.
-    ---
-    --- The duration string can have the following units: `ns`, `us`, `ms`, `s`, `m`, `h`, `d`, `w`, `y`.
-    ---
-    --- | Suffix | Name         | Value                         |
-    --- |--------|--------------|-------------------------------|
-    --- | `ns`     | Nanosecond   | 1 / 1,000,000,000 seconds     |
-    --- | `us`     | Microsecond  | 1 / 1,000,000 seconds         |
-    --- | `ms`     | Millisecond  | 1 / 1,000 seconds             |
-    --- | `s`      | Second       | 1 second                      |
-    --- | `m`      | Minute       | 60 seconds                    |
-    --- | `h`      | Hour         | 60 minutes                    |
-    --- | `d`      | Day          | 24 hours                      |
-    --- | `w`      | Week         | 7 days                        |
-    --- | `mo`     | Month        | ~30 days                      |
-    --- | `y`      | Year         | 365 days                      |
-    ---
-    ---@param timestamp integer The timestamp to convert.
-    ---@param unit? dreamwork.std.time.Unit The unit to convert the timestamp to, 's' by default.
-    ---@return string duration_str The duration string.
-    function time.toDuration( timestamp, unit )
-        local seconds, milliseconds, microseconds, nanoseconds = split( timestamp, unit, 2 )
-        local segments, segment_count = {}, 0
-
-        if seconds ~= 0 then
-
-            for i = 1, 6, 1 do
-                local lst = duration_units[ i ]
-
-                local value = lst[ 1 ]
-                if seconds >= value then
-                    local count = math_floor( seconds / value )
-                    seconds = seconds - (count * value)
-
-                    segment_count = segment_count + 1
-                    segments[ segment_count ] = string_format( "%d%s", count, lst[ 2 ] )
-                end
-
-                if seconds <= 0 then
-                    break
-                end
-            end
-
-        end
-
-        if seconds ~= 0 then
-            local second_count = math_floor( seconds )
-            if second_count > 0 then
-                seconds = seconds - second_count
-
-                segment_count = segment_count + 1
-                segments[ segment_count ] = string_format( "%ds", second_count )
-            end
-        end
-
-        if milliseconds ~= 0 then
-            segment_count = segment_count + 1
-            segments[ segment_count ] = string_format( "%03dms", milliseconds )
-        end
-
-        if microseconds ~= 0 then
-            segment_count = segment_count + 1
-            segments[ segment_count ] = string_format( "%03dus", microseconds )
-        end
-
-        if nanoseconds ~= 0 then
-            segment_count = segment_count + 1
-            segments[ segment_count ] = string_format( "%03dns", nanoseconds )
-        end
-
-        if segment_count == 0 then
-            return "0s"
-        else
-            return table_concat( segments, " ", 1, segment_count )
-        end
-    end
-
-    ---@type table<string, string>
-    local keys = {
-        -- %d	Day of the month [01-31]	16
-        day = "%d",
-        -- %m	Month [01-12]	09
-        month = "%m",
-        -- %B	Full month name	September
-        month_name = "%B",
-        -- %b	Abbreviated month name	Sep
-        month_short_name = "%b",
-
-        -- %Y	Full year	1998
-        year = "%Y",
-        -- %y	Two-digit year [00-99]	98
-        year_short = "%y",
-        -- %W	Week of the year [00-53]	37
-        year_week = "%W",
-        -- %j	Day of the year [001-365]	259
-        year_day = "%j",
-
-        -- %H	Hour, using a 24-hour clock [00-23]	23
-        hours = "%H",
-        -- %M	Minute [00-59]	48
-        minutes = "%M",
-        -- %S	Second [00-60]	10
-        seconds = "%S",
-
-        -- %I	Hour, using a 12-hour clock [01-12]	11
-        hours12 = "%I",
-        -- %p	Either am or pm	pm
-        period = "%p",
-
-        -- %w	Weekday [0-6 = Sunday-Saturday]	3
-        week_day = "%w",
-        -- %A	Full weekday name	Wednesday
-        week_day_name = "%A",
-        -- %a	Abbreviated weekday name	Wed
-        week_day_short_name = "%a",
-
-        -- %z	Timezone	-0300
-        timezone = "%z",
-
-        -- %X	Time (Same as %H:%M:%S)	23:48:10
-        time = "%X",
-        -- %x	Date (Same as %m/%d/%y)	09/16/98
-        date = "%x",
-
-        -- %c	Locale-appropriate date and time	Varies by platform and language settings
-        date_time = "%c"
-    }
-
-    --- [SHARED AND MENU]
-    ---
-    --- Converts a timestamp to a formatted string.
-    ---
-    --- ### Format Keys
-    --- | Key                     | Description                                            | Example                    |
-    --- |-------------------------|--------------------------------------------------------|----------------------------|
-    --- | `{day}`                 | Day of the month [01–31]                               | `16`                       |
-    --- | `{week_day}`            | Weekday number [0–6, Sunday = 0]                       | `3`                        |
-    --- | `{week_day_name}`       | Full weekday name                                      | `Wednesday`                |
-    --- | `{week_day_short_name}` | Abbreviated weekday name                               | `Wed`                      |
-    --- | `{month}`               | Month number [01–12]                                   | `09`                       |
-    --- | `{month_name}`          | Full month name                                        | `September`                |
-    --- | `{month_short_name}`    | Abbreviated month name                                 | `Sep`                      |
-    --- | `{year}`                | Full year                                              | `1998`                     |
-    --- | `{year_day}`            | Day of the year [001–365]                              | `259`                      |
-    --- | `{year_week}`           | Week number of the year [00–53]                        | `37`                       |
-    --- | `{year_short}`          | Two-digit year [00–99]                                 | `98`                       |
-    --- | `{hours}`               | Hour in 24-hour format [00–23]                         | `23`                       |
-    --- | `{minutes}`             | Minute [00–59]                                         | `48`                       |
-    --- | `{seconds}`             | Second [00–60] (leap second included)                  | `10`                       |
-    --- | `{milliseconds}`        | Millisecond [000–999]                                  | `010`                      |
-    --- | `{microseconds}`        | Microsecond [000–999]                                  | `010`                      |
-    --- | `{nanoseconds}`         | Nanosecond [000–999]                                   | `010`                      |
-    --- | `{hours12}`             | Hour in 12-hour format [01–12]                         | `11`                       |
-    --- | `{period}`              | AM or PM                                               | `pm`                       |
-    --- | `{date}`                | Localized date (same as `{month}/{day}/{year}`)  | `09/16/98`                 |
-    --- | `{time}`                | Localized time (same as `{hours}:{minutes}:{seconds}`) | `23:48:10`                 |
-    --- | `{date_time}`           | Localized full date and time                           | `Wed Sep 16 23:48:10 1998` |
-    --- | `{timezone}`            | Timezone offset                                        | `-0300`                    |
-    ---
-    ---@param fmt string The format string.
-    ---@param timestamp? integer The timestamp to format.
-    ---@param unit? dreamwork.std.time.Unit The timestamp unit, 's' by default.
-    ---@param in_utc? boolean Use UTC instead of local timezone, `false` by default.
-    ---@return string str The formatted string.
-    function time.format( fmt, timestamp, unit, in_utc )
+    ---@param timestamp? integer The timestamp to parse.
+    ---@param unit? dreamwork.std.time.Unit The unit to parse the timestamp from, 's' by default.
+    ---@param in_utc? boolean Whether the timestamp is in UTC, `false` by default.
+    ---@return dreamwork.std.time.Date date_tbl The date and time components.
+    function time.parse( timestamp, unit, in_utc )
         local seconds, milliseconds, microseconds, nanoseconds = split( timestamp or now( unit, true ), unit, 2 )
+        in_utc = in_utc == true
 
-        -- TODO: string.interpolate( fmt, {} )
+        local tbl = os_date( in_utc and "!*t" or "*t", seconds )
+        ---@cast tbl table
 
-        ---@type string[]
-        local segments = {}
+        tbl.is_dst = tbl.isdst
+        tbl.isdst = nil
 
-        ---@type integer
-        local segment_count = 0
+        tbl.week_day = (tbl.wday + 5) % 7 + 1
+        tbl.wday = nil
 
-        ---@type integer
-        local fmt_length = string_len( fmt ) + 1
+        tbl.year_day = tbl.yday
+        tbl.yday = nil
 
-        ---@type integer
-        local position = 1
+        tbl.milliseconds = milliseconds or 0
+        tbl.microseconds = microseconds or 0
+        tbl.nanoseconds = nanoseconds or 0
 
-        while position ~= fmt_length do
-            local uint8 = string_byte( fmt, position, position )
-            if uint8 == nil then
-                break
-            elseif uint8 == 0x25 --[[ "%" ]] then
+        tbl.hours = tbl.hour
+        tbl.hour = nil
+
+        tbl.minutes = tbl.min
+        tbl.min = nil
+
+        tbl.seconds = tbl.sec
+        tbl.sec = nil
+
+        ---@diagnostic disable-next-line: param-type-mismatch
+        local values = string_byteSplit( os_date( in_utc and "!%I;%p;%W" or "%I;%p;%W", seconds ), 0x3B --[[ ";" ]] )
+
+        tbl.hours12 = tonumber( values[ 1 ], 10 ) or 0
+        tbl.period = values[ 2 ] or "AM"
+
+        tbl.year_week = (tonumber( values[ 3 ], 10 ) or 0) + 1
+
+        return tbl
+    end
+
+end
+
+
+local duration_units = {
+    { 31536000, "y" },
+    { 2592000,  "mo" },
+    { 604800,   "w" },
+    { 86400,    "d" },
+    { 3600,     "h" },
+    { 60,       "m" }
+}
+
+--- [SHARED AND MENU]
+---
+--- Converts a number of seconds to a duration string.
+---
+--- The duration string can have the following units: `ns`, `us`, `ms`, `s`, `m`, `h`, `d`, `w`, `y`.
+---
+--- | Suffix | Name         | Value                         |
+--- |--------|--------------|-------------------------------|
+--- | `ns`     | Nanosecond   | 1 / 1,000,000,000 seconds     |
+--- | `us`     | Microsecond  | 1 / 1,000,000 seconds         |
+--- | `ms`     | Millisecond  | 1 / 1,000 seconds             |
+--- | `s`      | Second       | 1 second                      |
+--- | `m`      | Minute       | 60 seconds                    |
+--- | `h`      | Hour         | 60 minutes                    |
+--- | `d`      | Day          | 24 hours                      |
+--- | `w`      | Week         | 7 days                        |
+--- | `mo`     | Month        | ~30 days                      |
+--- | `y`      | Year         | 365 days                      |
+---
+---@param timestamp integer The timestamp to convert.
+---@param unit? dreamwork.std.time.Unit The unit to convert the timestamp to, 's' by default.
+---@return string duration_str The duration string.
+function time.toDuration( timestamp, unit )
+    local seconds, milliseconds, microseconds, nanoseconds = split( timestamp, unit, 2 )
+    local segments, segment_count = {}, 0
+
+    if seconds ~= 0 then
+
+        for i = 1, 6, 1 do
+            local lst = duration_units[ i ]
+
+            local value = lst[ 1 ]
+            if seconds >= value then
+                local count = math_floor( seconds / value )
+                seconds = seconds - (count * value)
+
                 segment_count = segment_count + 1
-                segments[ segment_count ] = string_sub( fmt, position, position + 1 )
-                position = math_min( position + 2, fmt_length )
-            elseif uint8 == 0x7B --[[ "{" ]] then
+                segments[ segment_count ] = string_format( "%d%s", count, lst[ 2 ] )
+            end
 
-                ---@type integer?
-                local bracket_position
-
-                for i = position + 1, fmt_length, 1 do
-                    if string_byte( fmt, i, i ) == 0x7D --[[ "}" ]] then
-                        bracket_position = i
-                        break
-                    end
-                end
-
-                if bracket_position == nil then
-                    error( string_format( "missing '}' at position %d", position ), 2 )
-                end
-
-                ---@type string
-                local key = string_sub( fmt, position + 1, bracket_position - 1 )
-
-                if key == "nanoseconds" then
-                    segment_count = segment_count + 1
-                    segments[ segment_count ] = string_format( "%03d", nanoseconds )
-                elseif key == "microseconds" then
-                    segment_count = segment_count + 1
-                    segments[ segment_count ] = string_format( "%03d", microseconds )
-                elseif key == "milliseconds" then
-                    segment_count = segment_count + 1
-                    segments[ segment_count ] = string_format( "%03d", milliseconds )
-                elseif key == "timezone" then
-                    segment_count = segment_count + 1
-
-                    local timezone = std.TZ * 0x64
-                    if timezone < 0 then
-                        segments[ segment_count ] = string_format( "-%04d", -timezone )
-                    else
-                        segments[ segment_count ] = string_format( "+%04d", timezone )
-                    end
-                else
-
-                    local pattern_str = keys[ key ]
-                    if pattern_str == nil then
-                        error( string_format( "unknown value name - '%s'", key ), 2 )
-                    end
-
-                    segment_count = segment_count + 1
-
-                    if in_utc then
-                        ---@diagnostic disable-next-line: assign-type-mismatch
-                        segments[ segment_count ] = os_date( "!" .. pattern_str, seconds )
-                    else
-                        ---@diagnostic disable-next-line: assign-type-mismatch
-                        segments[ segment_count ] = os_date( pattern_str, seconds )
-                    end
-
-                end
-
-                position = math_min( bracket_position + 1, fmt_length )
-            else
-
-                ---@type integer?
-                local bracket_position
-
-                for i = position + 1, fmt_length, 1 do
-                    if string_byte( fmt, i, i ) == 0x7B --[[ "{" ]] then
-                        bracket_position = i
-                        break
-                    end
-                end
-
-                if bracket_position == nil then
-                    bracket_position = fmt_length
-                end
-
-                bracket_position = bracket_position - 1
-
-                if position == bracket_position then
-                    position = position + 1
-                    segment_count = segment_count + 1
-                    segments[ segment_count ] = string_char( uint8 )
-                else
-                    segment_count = segment_count + 1
-                    segments[ segment_count ] = string_sub( fmt, position, bracket_position )
-                    position = math_min( bracket_position + 2, fmt_length )
-                end
+            if seconds <= 0 then
+                break
             end
         end
 
-        return table_concat( segments, "", 1, segment_count )
     end
 
+    if seconds ~= 0 then
+        local second_count = math_floor( seconds )
+        if second_count > 0 then
+            seconds = seconds - second_count
+
+            segment_count = segment_count + 1
+            segments[ segment_count ] = string_format( "%ds", second_count )
+        end
+    end
+
+    if milliseconds ~= 0 then
+        segment_count = segment_count + 1
+        segments[ segment_count ] = string_format( "%03dms", milliseconds )
+    end
+
+    if microseconds ~= 0 then
+        segment_count = segment_count + 1
+        segments[ segment_count ] = string_format( "%03dus", microseconds )
+    end
+
+    if nanoseconds ~= 0 then
+        segment_count = segment_count + 1
+        segments[ segment_count ] = string_format( "%03dns", nanoseconds )
+    end
+
+    if segment_count == 0 then
+        return "0s"
+    else
+        return table_concat( segments, " ", 1, segment_count )
+    end
+end
+
+---@type table<string, string>
+local keys = {
+    -- %d	Day of the month [01-31]	16
+    day = "%d",
+    -- %m	Month [01-12]	09
+    month = "%m",
+    -- %B	Full month name	September
+    month_name = "%B",
+    -- %b	Abbreviated month name	Sep
+    month_short_name = "%b",
+
+    -- %Y	Full year	1998
+    year = "%Y",
+    -- %y	Two-digit year [00-99]	98
+    year_short = "%y",
+    -- %W	Week of the year [00-53]	37
+    year_week = "%W",
+    -- %j	Day of the year [001-365]	259
+    year_day = "%j",
+
+    -- %H	Hour, using a 24-hour clock [00-23]	23
+    hours = "%H",
+    -- %M	Minute [00-59]	48
+    minutes = "%M",
+    -- %S	Second [00-60]	10
+    seconds = "%S",
+
+    -- %I	Hour, using a 12-hour clock [01-12]	11
+    hours12 = "%I",
+    -- %p	Either am or pm	pm
+    period = "%p",
+
+    -- %w	Weekday [0-6 = Sunday-Saturday]	3
+    week_day = "%w",
+    -- %A	Full weekday name	Wednesday
+    week_day_name = "%A",
+    -- %a	Abbreviated weekday name	Wed
+    week_day_short_name = "%a",
+
+    -- %z	Timezone	-0300
+    timezone = "%z",
+
+    -- %X	Time (Same as %H:%M:%S)	23:48:10
+    time = "%X",
+    -- %x	Date (Same as %m/%d/%y)	09/16/98
+    date = "%x",
+
+    -- %c	Locale-appropriate date and time	Varies by platform and language settings
+    date_time = "%c"
+}
+
+---@class dreamwork.std.time.FormatBuffer : dreamwork.std.Metatable
+---@field [ 1 ] integer seconds
+---@field seconds string
+---@field [ 2 ] integer milliseconds
+---@field milliseconds string
+---@field [ 3 ] integer microseconds
+---@field microseconds string
+---@field [ 4 ] integer nanoseconds
+---@field nanoseconds string
+---@field timezone string
+local FormatBuffer = {}
+
+---@type table<string, integer>
+local key_to_index = {
+    milliseconds = 2,
+    microseconds = 3,
+    nanoseconds = 4
+}
+
+function FormatBuffer:__index( key )
+    if key == "milliseconds" or key == "microseconds" or key == "nanoseconds" then
+        local value = string_format( "%03d", raw_get( self, key_to_index[ key ] ) or 0 )
+        ---@diagnostic disable-next-line: assign-type-mismatch
+        self[ key ] = value
+        return value
+    end
+
+    if key == "timezone" then
+        local timezone
+
+        local value = time.zone * 0x64
+        if value < 0 then
+            timezone = string_format( "-%04d", -value )
+        else
+            timezone = string_format( "+%04d", value )
+        end
+
+        self.timezone = timezone
+        return timezone
+    end
+
+    local pattern_str = keys[ key ]
+    if pattern_str == nil then
+        error( string_format( "unknown value name - '%s'", key ), 4 )
+    end
+
+    local value
+
+    if raw_get( self, 0 ) --[[ in_utc ]] then
+        value = os_date( "!" .. pattern_str, raw_get( self, 1 ) )
+    else
+        value = os_date( pattern_str, raw_get( self, 1 ) )
+    end
+
+    ---@diagnostic disable-next-line: assign-type-mismatch
+    self[ key ] = value
+    return value
+end
+
+--- [SHARED AND MENU]
+---
+--- Converts a timestamp to a formatted string.
+---
+--- ### Format Keys
+--- | Key                     | Description                                            | Example                    |
+--- |-------------------------|--------------------------------------------------------|----------------------------|
+--- | `{day}`                 | Day of the month [01–31]                               | `16`                       |
+--- | `{week_day}`            | Weekday number [0–6, Sunday = 0]                       | `3`                        |
+--- | `{week_day_name}`       | Full weekday name                                      | `Wednesday`                |
+--- | `{week_day_short_name}` | Abbreviated weekday name                               | `Wed`                      |
+--- | `{month}`               | Month number [01–12]                                   | `09`                       |
+--- | `{month_name}`          | Full month name                                        | `September`                |
+--- | `{month_short_name}`    | Abbreviated month name                                 | `Sep`                      |
+--- | `{year}`                | Full year                                              | `1998`                     |
+--- | `{year_day}`            | Day of the year [001–365]                              | `259`                      |
+--- | `{year_week}`           | Week number of the year [00–53]                        | `37`                       |
+--- | `{year_short}`          | Two-digit year [00–99]                                 | `98`                       |
+--- | `{hours}`               | Hour in 24-hour format [00–23]                         | `23`                       |
+--- | `{minutes}`             | Minute [00–59]                                         | `48`                       |
+--- | `{seconds}`             | Second [00–60] (leap second included)                  | `10`                       |
+--- | `{milliseconds}`        | Millisecond [000–999]                                  | `010`                      |
+--- | `{microseconds}`        | Microsecond [000–999]                                  | `010`                      |
+--- | `{nanoseconds}`         | Nanosecond [000–999]                                   | `010`                      |
+--- | `{hours12}`             | Hour in 12-hour format [01–12]                         | `11`                       |
+--- | `{period}`              | AM or PM                                               | `pm`                       |
+--- | `{date}`                | Localized date (same as `{month}/{day}/{year}`)  | `09/16/98`                 |
+--- | `{time}`                | Localized time (same as `{hours}:{minutes}:{seconds}`) | `23:48:10`                 |
+--- | `{date_time}`           | Localized full date and time                           | `Wed Sep 16 23:48:10 1998` |
+--- | `{timezone}`            | Timezone offset                                        | `-0300`                    |
+---
+---@param fmt string The format string.
+---@param timestamp? integer The timestamp to format.
+---@param unit? dreamwork.std.time.Unit The timestamp unit, 's' by default.
+---@param in_utc? boolean Use UTC instead of local timezone, `false` by default.
+---@return string str The formatted string.
+function time.format( fmt, timestamp, unit, in_utc )
+    return string_interpolate( fmt, setmetatable( { [ 0 ] = in_utc, split( timestamp or now( unit, true ), unit, 2 ) }, FormatBuffer ) )
 end
 
 -- TODO: add JS like data to/from string functions for compability
