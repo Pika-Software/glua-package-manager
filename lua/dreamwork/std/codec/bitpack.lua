@@ -10,7 +10,9 @@ local math = std.math
 local math_ceil = math.ceil
 local math_floor = math.floor
 
+local error = std.error
 local len = std.len
+
 
 --- [SHARED AND MENU]
 ---

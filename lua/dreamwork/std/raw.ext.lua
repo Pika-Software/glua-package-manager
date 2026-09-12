@@ -10,22 +10,22 @@ local math_floor = math.floor
 local string = std.string
 local string_format = string.format
 
-local pcall = std.pcall
-local error = std.error
 local loadstring = std.loadstring
+local pcall = std.pcall
 
 --- [SHARED AND MENU]
 ---
 --- Native **32-bit integer only** bit library.
 ---
 ---@class dreamwork.std.raw.bit
+---@field operators boolean Whether the bit operators are available.
 local rbit = raw.bit or {}
 raw.bit = rbit
 
-if std.LUA_VERSION == 5.3 then
+local operators = loadstring( "return ~0xFF", "bitwise.test", {} ) ~= nil
+if operators then
 
-    local fn, error_msg = loadstring( [[
-        local raw = std.raw
+    local fn = loadstring( [[
         local rbit = raw.bit
         local raw_select = raw.select
 
@@ -66,16 +66,15 @@ if std.LUA_VERSION == 5.3 then
         end
     ]], "dreamwork.std.raw.bit", std )
 
-    if fn == nil then
-        error( "bitwise operators compile failed, " .. error_msg )
-    else
-        local status, result = pcall( fn )
-        if not status then
-            error( "bitwise operators compile failed, " .. result )
-        end
+    if fn == nil or not pcall( fn ) then
+        operators = false
     end
 
-else
+end
+
+rbit.operators = operators
+
+if not operators then
 
     ---@class dreamwork.GModBitLib : bitlib
     ---@field bshift fun( x: integer, disp: integer ): integer

@@ -3,15 +3,21 @@
 ---@class dreamwork.std
 local std = dreamwork.std
 
+local raw = std.raw
+
 local string = std.string
 local string_len = string.len
 local string_byte, string_char = string.byte, string.char
 
-local bit = std.bit
-local bit_band, bit_bor = bit.band, bit.bor
-local bit_lshift, bit_rshift = bit.lshift, bit.rshift
+local table = std.table
+local table_concat = table.concat
 
-local table_concat = std.table.concat
+local rbit = raw.bit
+local rbit_band, rbit_bor = rbit.band, rbit.bor
+local rbit_lshift, rbit_rshift = rbit.lshift, rbit.rshift
+
+local error = std.error
+
 
 --- [SHARED AND MENU]
 ---
@@ -87,12 +93,12 @@ local function block_encode( encode_map, segments, segment_count, do_padding, ui
     end
 
     segment_count = segment_count + 1
-    segments[ segment_count ] = encode_map[ bit_band( bit_rshift( uint8_1, 3 ), 0x1f ) ]
+    segments[ segment_count ] = encode_map[ rbit_band( rbit_rshift( uint8_1, 3 ), 0x1f ) ]
 
     segment_count = segment_count + 1
 
     if uint8_2 == nil then
-        segments[ segment_count ] = encode_map[ bit_band( bit_lshift( uint8_1, 2 ), 0x1f ) ]
+        segments[ segment_count ] = encode_map[ rbit_band( rbit_lshift( uint8_1, 2 ), 0x1f ) ]
 
         if do_padding then
             segment_count = segment_count + 1
@@ -102,15 +108,15 @@ local function block_encode( encode_map, segments, segment_count, do_padding, ui
         return segment_count
     end
 
-    segments[ segment_count ] = encode_map[ bit_band( bit_bor( bit_band( bit_lshift( uint8_1, 2 ), 0x1c ), bit_band( bit_rshift( uint8_2, 6 ), 0x03 ) ), 0x1f ) ]
+    segments[ segment_count ] = encode_map[ rbit_band( rbit_bor( rbit_band( rbit_lshift( uint8_1, 2 ), 0x1c ), rbit_band( rbit_rshift( uint8_2, 6 ), 0x03 ) ), 0x1f ) ]
 
     segment_count = segment_count + 1
-    segments[ segment_count ] = encode_map[ bit_band( bit_rshift( uint8_2, 1 ), 0x1f ) ]
+    segments[ segment_count ] = encode_map[ rbit_band( rbit_rshift( uint8_2, 1 ), 0x1f ) ]
 
     segment_count = segment_count + 1
 
     if uint8_3 == nil then
-        segments[ segment_count ] = encode_map[ bit_band( bit_lshift( uint8_2, 4 ), 0x1f ) ]
+        segments[ segment_count ] = encode_map[ rbit_band( rbit_lshift( uint8_2, 4 ), 0x1f ) ]
 
         if do_padding then
             segment_count = segment_count + 1
@@ -120,12 +126,12 @@ local function block_encode( encode_map, segments, segment_count, do_padding, ui
         return segment_count
     end
 
-    segments[ segment_count ] = encode_map[ bit_band( bit_bor( bit_band( bit_lshift( uint8_2, 4 ), 0x10 ), bit_band( bit_rshift( uint8_3, 4 ), 0x0f ) ), 0x1f ) ]
+    segments[ segment_count ] = encode_map[ rbit_band( rbit_bor( rbit_band( rbit_lshift( uint8_2, 4 ), 0x10 ), rbit_band( rbit_rshift( uint8_3, 4 ), 0x0f ) ), 0x1f ) ]
 
     segment_count = segment_count + 1
 
     if uint8_4 == nil then
-        segments[ segment_count ] = encode_map[ bit_band( bit_lshift( uint8_3, 1 ), 0x1f ) ]
+        segments[ segment_count ] = encode_map[ rbit_band( rbit_lshift( uint8_3, 1 ), 0x1f ) ]
 
         if do_padding then
             segment_count = segment_count + 1
@@ -135,15 +141,15 @@ local function block_encode( encode_map, segments, segment_count, do_padding, ui
         return segment_count
     end
 
-    segments[ segment_count ] = encode_map[ bit_band( bit_bor( bit_band( bit_lshift( uint8_3, 1 ), 0x1e ), bit_band( bit_rshift( uint8_4, 7 ), 0x01 ) ), 0x1f ) ]
+    segments[ segment_count ] = encode_map[ rbit_band( rbit_bor( rbit_band( rbit_lshift( uint8_3, 1 ), 0x1e ), rbit_band( rbit_rshift( uint8_4, 7 ), 0x01 ) ), 0x1f ) ]
 
     segment_count = segment_count + 1
-    segments[ segment_count ] = encode_map[ bit_band( bit_rshift( uint8_4, 2 ), 0x1f ) ]
+    segments[ segment_count ] = encode_map[ rbit_band( rbit_rshift( uint8_4, 2 ), 0x1f ) ]
 
     segment_count = segment_count + 1
 
     if uint8_5 == nil then
-        segments[ segment_count ] = encode_map[ bit_band( bit_lshift( uint8_4, 3 ), 0x1f ) ]
+        segments[ segment_count ] = encode_map[ rbit_band( rbit_lshift( uint8_4, 3 ), 0x1f ) ]
 
         if do_padding then
             segment_count = segment_count + 1
@@ -153,10 +159,10 @@ local function block_encode( encode_map, segments, segment_count, do_padding, ui
         return segment_count
     end
 
-    segments[ segment_count ] = encode_map[ bit_band( bit_bor( bit_band( bit_lshift( uint8_4, 3 ), 0x18 ), bit_band( bit_rshift( uint8_5, 5 ), 0x07 ) ), 0x1f ) ]
+    segments[ segment_count ] = encode_map[ rbit_band( rbit_bor( rbit_band( rbit_lshift( uint8_4, 3 ), 0x18 ), rbit_band( rbit_rshift( uint8_5, 5 ), 0x07 ) ), 0x1f ) ]
 
     segment_count = segment_count + 1
-    segments[ segment_count ] = encode_map[ bit_band( uint8_5, 0x1f ) ]
+    segments[ segment_count ] = encode_map[ rbit_band( uint8_5, 0x1f ) ]
 
     return segment_count
 end
@@ -215,33 +221,33 @@ local function block_decode( decode_map, uint8_1, uint8_2, uint8_3, uint8_4, uin
 
     if uint8_2 == nil then
         return string_char(
-            bit_band( bit_lshift( decode_map[ uint8_1 ], 3 ), 0xf8 )
+            rbit_band( rbit_lshift( decode_map[ uint8_1 ], 3 ), 0xf8 )
         )
     end
 
-    local a = bit_bor( bit_band( bit_lshift( decode_map[ uint8_1 ], 3 ), 0xf8 ), bit_band( bit_rshift( decode_map[ uint8_2 ], 2 ), 0x07 ) )
+    local a = rbit_bor( rbit_band( rbit_lshift( decode_map[ uint8_1 ], 3 ), 0xf8 ), rbit_band( rbit_rshift( decode_map[ uint8_2 ], 2 ), 0x07 ) )
 
     if uint8_3 == nil then
         return string_char( a,
-            bit_band( bit_lshift( decode_map[ uint8_2 ], 6 ), 0xc0 )
+            rbit_band( rbit_lshift( decode_map[ uint8_2 ], 6 ), 0xc0 )
         )
     end
 
     if uint8_4 == nil then
         return string_char( a,
-            bit_bor( bit_band( bit_lshift( decode_map[ uint8_2 ], 6 ), 0xc0 ), bit_band( bit_lshift( decode_map[ uint8_3 ], 1 ), 0x3e ) )
+            rbit_bor( rbit_band( rbit_lshift( decode_map[ uint8_2 ], 6 ), 0xc0 ), rbit_band( rbit_lshift( decode_map[ uint8_3 ], 1 ), 0x3e ) )
         )
     end
 
-    local b = bit_bor( bit_band( bit_lshift( decode_map[ uint8_2 ], 6 ), 0xc0 ), bit_band( bit_lshift( decode_map[ uint8_3 ], 1 ), 0x3e ), bit_band( bit_rshift( decode_map[ uint8_4 ], 4 ), 0x01 ) )
+    local b = rbit_bor( rbit_band( rbit_lshift( decode_map[ uint8_2 ], 6 ), 0xc0 ), rbit_band( rbit_lshift( decode_map[ uint8_3 ], 1 ), 0x3e ), rbit_band( rbit_rshift( decode_map[ uint8_4 ], 4 ), 0x01 ) )
 
     if uint8_5 == nil then
         return string_char( a, b,
-            bit_band( bit_lshift( decode_map[ uint8_4 ], 4 ), 0xf0 )
+            rbit_band( rbit_lshift( decode_map[ uint8_4 ], 4 ), 0xf0 )
         )
     end
 
-    local c = bit_bor( bit_band( bit_lshift( decode_map[ uint8_4 ], 4 ), 0xf0 ), bit_band( bit_rshift( decode_map[ uint8_5 ], 1 ), 0x0f ) )
+    local c = rbit_bor( rbit_band( rbit_lshift( decode_map[ uint8_4 ], 4 ), 0xf0 ), rbit_band( rbit_rshift( decode_map[ uint8_5 ], 1 ), 0x0f ) )
 
     if uint8_6 == nil then
         return string_char( a, b, c )
@@ -249,20 +255,20 @@ local function block_decode( decode_map, uint8_1, uint8_2, uint8_3, uint8_4, uin
 
     if uint8_7 == nil then
         return string_char( a, b, c,
-            bit_bor( bit_band( bit_lshift( decode_map[ uint8_5 ], 7 ), 0x80 ), bit_band( bit_lshift( decode_map[ uint8_6 ], 2 ), 0x7c ) )
+            rbit_bor( rbit_band( rbit_lshift( decode_map[ uint8_5 ], 7 ), 0x80 ), rbit_band( rbit_lshift( decode_map[ uint8_6 ], 2 ), 0x7c ) )
         )
     end
 
-    local d = bit_bor( bit_band( bit_lshift( decode_map[ uint8_5 ], 7 ), 0x80 ), bit_band( bit_lshift( decode_map[ uint8_6 ], 2 ), 0x7c ), bit_band( bit_rshift( decode_map[ uint8_7 ], 3 ), 0x03 ) )
+    local d = rbit_bor( rbit_band( rbit_lshift( decode_map[ uint8_5 ], 7 ), 0x80 ), rbit_band( rbit_lshift( decode_map[ uint8_6 ], 2 ), 0x7c ), rbit_band( rbit_rshift( decode_map[ uint8_7 ], 3 ), 0x03 ) )
 
     if uint8_8 == nil then
         return string_char( a, b, c, d,
-            bit_band( bit_lshift( decode_map[ uint8_7 ], 5 ), 0xe0 )
+            rbit_band( rbit_lshift( decode_map[ uint8_7 ], 5 ), 0xe0 )
         )
     end
 
     return string_char( a, b, c, d,
-        bit_bor( bit_band( bit_lshift( decode_map[ uint8_7 ], 5 ), 0xe0 ), bit_band( decode_map[ uint8_8 ], 0x1f ) )
+        rbit_bor( rbit_band( rbit_lshift( decode_map[ uint8_7 ], 5 ), 0xe0 ), rbit_band( decode_map[ uint8_8 ], 0x1f ) )
     )
 end
 

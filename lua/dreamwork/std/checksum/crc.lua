@@ -9,17 +9,18 @@ local std = dreamwork.std
 local raw = std.raw
 local raw_tonumber = raw.tonumber
 
-local bit = std.bit
-local bit_bxor = bit.bxor
-local bit_reverse = bit.reverse
-local bit_band, bit_bor = bit.band, bit.bor
-local bit_lshift, bit_rshift = bit.lshift, bit.rshift
+local rbit = raw.bit
+local rbit_bxor = rbit.bxor
+local rbit_reverse = rbit.reverse
+local rbit_band, rbit_bor = rbit.band, rbit.bor
+local rbit_lshift, rbit_rshift = rbit.lshift, rbit.rshift
 
 local string = std.string
 local string_len = string.len
 local string_byte = string.byte
 
 local class = std.class
+
 
 --- [SHARED AND MENU]
 ---
@@ -91,14 +92,14 @@ do
                 local value = i
 
                 for _ = 1, 8, 1 do
-                    if bit_band( value, 0x80 ) == 0x00 then
-                        value = bit_lshift( value, 0x01 )
+                    if rbit_band( value, 0x80 ) == 0x00 then
+                        value = rbit_lshift( value, 0x01 )
                     else
-                        value = bit_bxor( bit_lshift( value, 0x01 ), poly )
+                        value = rbit_bxor( rbit_lshift( value, 0x01 ), poly )
                     end
                 end
 
-                hash_map[ i ] = bit_band( value, 0xFF )
+                hash_map[ i ] = rbit_band( value, 0xFF )
             end
 
             self[ poly ] = hash_map
@@ -119,9 +120,9 @@ do
 
         for index = 1, string_len( raw_str ), 1 do
             if ref_in then
-                value = hash_map[ bit_bxor( value, bit_reverse( string_byte( raw_str, index, index ), 0x08 ) ) ]
+                value = hash_map[ rbit_bxor( value, rbit_reverse( string_byte( raw_str, index, index ), 0x08 ) ) ]
             else
-                value = hash_map[ bit_bxor( value, string_byte( raw_str, index, index ) ) ]
+                value = hash_map[ rbit_bxor( value, string_byte( raw_str, index, index ) ) ]
             end
         end
 
@@ -140,15 +141,15 @@ function CRC8:digest()
     local value = self.value
 
     if self.ref_out then
-        value = bit_reverse( value, 0x08 )
+        value = rbit_reverse( value, 0x08 )
     end
 
     local xor_out = self.xor_out
     if xor_out ~= nil then
-        value = bit_bxor( value, xor_out )
+        value = rbit_bxor( value, xor_out )
     end
 
-    return bit_band( value, 0xFF )
+    return rbit_band( value, 0xFF )
 end
 
 --- [SHARED AND MENU]
@@ -246,7 +247,7 @@ function CRC16:__init( poly, init, ref_in, ref_out, xor_out )
         self.xor_out = xor_out % 0x10000
     end
 
-    self.hash_key = bit_bor(
+    self.hash_key = rbit_bor(
         self.poly,
         self.ref_in and 0x10000 or 0x00,
         self.ref_out and 0x20000 or 0x00
@@ -262,9 +263,9 @@ do
 
     setmetatable( crc16_lookup, {
         __index = function( self, uint17 )
-            local ref_out = bit_band( uint17, 0x20000 ) ~= 0x00
-            local ref_in = bit_band( uint17, 0x10000 ) ~= 0x00
-            local poly = bit_band( uint17, 0xFFFF )
+            local ref_out = rbit_band( uint17, 0x20000 ) ~= 0x00
+            local ref_in = rbit_band( uint17, 0x10000 ) ~= 0x00
+            local poly = rbit_band( uint17, 0xFFFF )
 
             ---@type table<integer, integer>
             local hash_map = {}
@@ -273,25 +274,25 @@ do
                 local value
 
                 if ref_in then
-                    value = bit_reverse( i, 0x08 )
+                    value = rbit_reverse( i, 0x08 )
                 else
                     value = i
                 end
 
-                value = bit_lshift( value, 0x08 )
+                value = rbit_lshift( value, 0x08 )
 
                 for _ = 1, 8, 1 do
-                    if bit_band( value, 0x8000 ) == 0x00 then
-                        value = bit_lshift( value, 0x01 )
+                    if rbit_band( value, 0x8000 ) == 0x00 then
+                        value = rbit_lshift( value, 0x01 )
                     else
-                        value = bit_bxor( bit_lshift( value, 0x01 ), poly )
+                        value = rbit_bxor( rbit_lshift( value, 0x01 ), poly )
                     end
                 end
 
-                value = bit_band( value, 0xFFFF )
+                value = rbit_band( value, 0xFFFF )
 
                 if ref_out then
-                    value = bit_reverse( value, 0x10 )
+                    value = rbit_reverse( value, 0x10 )
                 end
 
                 hash_map[ i ] = value
@@ -315,9 +316,9 @@ do
 
         for index = 1, string_len( raw_str ), 1 do
             if ref_in then
-                value = bit_bxor( bit_rshift( value, 0x08 ), hash_map[ bit_band( bit_bxor( value, string_byte( raw_str, index, index ) ), 0xFF ) ] )
+                value = rbit_bxor( rbit_rshift( value, 0x08 ), hash_map[ rbit_band( rbit_bxor( value, string_byte( raw_str, index, index ) ), 0xFF ) ] )
             else
-                value = bit_bxor( bit_lshift( value, 0x08 ), hash_map[ bit_band( bit_bxor( bit_rshift( value, 0x08 ), string_byte( raw_str, index, index ) ), 0xFF ) ] )
+                value = rbit_bxor( rbit_lshift( value, 0x08 ), hash_map[ rbit_band( rbit_bxor( rbit_rshift( value, 0x08 ), string_byte( raw_str, index, index ) ), 0xFF ) ] )
             end
         end
 
@@ -337,10 +338,10 @@ function CRC16:digest()
 
     local xor_out = self.xor_out
     if xor_out ~= nil then
-        value = bit_bxor( value, xor_out )
+        value = rbit_bxor( value, xor_out )
     end
 
-    return bit_band( value, 0xFFFF )
+    return rbit_band( value, 0xFFFF )
 end
 
 --- [SHARED AND MENU]
@@ -440,7 +441,7 @@ function CRC32:__init( poly, init, ref_in, ref_out, xor_out )
         self.xor_out = xor_out % 0x100000000
     end
 
-    -- self.hash_key = bit_bor(
+    -- self.hash_key = rbit_bor(
     --     self.poly,
     --     self.ref_in and 0x10000 or 0x00,
     --     self.ref_out and 0x20000 or 0x00
@@ -459,13 +460,13 @@ do
             local hash_map = {}
 
             for i = 0, 255, 1 do
-                local value = bit_lshift( i, 0x18 )
+                local value = rbit_lshift( i, 0x18 )
 
                 for _ = 1, 8, 1 do
-                    if bit_band( value, 0x80000000 ) == 0 then
-                        value = bit_lshift( value, 1 )
+                    if rbit_band( value, 0x80000000 ) == 0 then
+                        value = rbit_lshift( value, 1 )
                     else
-                        value = bit_bxor( bit_lshift( value, 1 ), poly )
+                        value = rbit_bxor( rbit_lshift( value, 1 ), poly )
                     end
                 end
 
@@ -490,9 +491,9 @@ do
 
         for index = 1, string_len( raw_str ), 1 do
             if ref_in then
-                value = bit_bxor( bit_lshift( value, 8 ), hash_map[ bit_band( bit_bxor( bit_band( bit_rshift( value, 24 ), 0xFF ), bit_reverse( string_byte( raw_str, index, index ), 8 ) ), 0xFF ) ] )
+                value = rbit_bxor( rbit_lshift( value, 8 ), hash_map[ rbit_band( rbit_bxor( rbit_band( rbit_rshift( value, 24 ), 0xFF ), rbit_reverse( string_byte( raw_str, index, index ), 8 ) ), 0xFF ) ] )
             else
-                value = bit_bxor( bit_lshift( value, 8 ), hash_map[ bit_band( bit_bxor( bit_band( bit_rshift( value, 24 ), 0xFF ), string_byte( raw_str, index, index ) ), 0xFF ) ] )
+                value = rbit_bxor( rbit_lshift( value, 8 ), hash_map[ rbit_band( rbit_bxor( rbit_band( rbit_rshift( value, 24 ), 0xFF ), string_byte( raw_str, index, index ) ), 0xFF ) ] )
             end
         end
 
@@ -512,12 +513,12 @@ function CRC32:digest()
 
     local ref_out = self.ref_out
     if ref_out then
-        value = bit_reverse( value, 0x20 )
+        value = rbit_reverse( value, 0x20 )
     end
 
     local xor_out = self.xor_out
     if xor_out ~= nil then
-        value = bit_bxor( value, xor_out )
+        value = rbit_bxor( value, xor_out )
     end
 
     return value % 0x100000000

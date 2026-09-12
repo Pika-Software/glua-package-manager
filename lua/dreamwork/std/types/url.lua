@@ -1,50 +1,51 @@
 ---@class dreamwork.std
-local std                      = dreamwork.std
+local std                        = dreamwork.std
 
-local tostring                 = std.tostring
+local tostring                   = std.tostring
 
-local isString                 = std.isString
-local isNumber                 = std.isNumber
-local isTable                  = std.isTable
+local isString                   = std.isString
+local isNumber                   = std.isNumber
+local isTable                    = std.isTable
 
-local raw                      = std.raw
-local raw_pairs                = raw.pairs
-local raw_tonumber             = raw.tonumber
-local raw_get, raw_set         = raw.get, raw.set
+local raw                        = std.raw
+local raw_pairs                  = raw.pairs
+local raw_tonumber               = raw.tonumber
+local raw_get, raw_set           = raw.get, raw.set
 
-local math                     = std.math
-local math_floor               = math.floor
+local math                       = std.math
+local math_floor                 = math.floor
 
-local table                    = std.table
-local table_concat             = table.concat
-local table_remove             = table.remove
+local table                      = std.table
+local table_concat               = table.concat
+local table_remove               = table.remove
 
-local ascii                    = std.ascii
-local ascii_isLower            = ascii.isLower
-local ascii_isUpper            = ascii.isUpper
-local ascii_isAlpha            = ascii.isAlpha
-local ascii_isDigit            = ascii.isDigit
-local ascii_isHexDigit         = ascii.isHexDigit
+local ascii                      = std.ascii
+local ascii_isLower              = ascii.isLower
+local ascii_isUpper              = ascii.isUpper
+local ascii_isAlpha              = ascii.isAlpha
+local ascii_isDigit              = ascii.isDigit
+local ascii_isHexDigit           = ascii.isHexDigit
 
-local string                   = std.string
-local string_format            = string.format
-local string_containsBytes     = string.containsBytes
-local string_sub, string_gsub  = string.sub, string.gsub
-local string_len, string_lower = string.len, string.lower
-local string_byte, string_char = string.byte, string.char
+local string                     = std.string
+local string_format              = string.format
+local string_containsBytes       = string.containsBytes
+local string_sub, string_gsub    = string.sub, string.gsub
+local string_len                 = string.len
+local string_lower, string_upper = string.lower, string.upper
+local string_byte, string_char   = string.byte, string.char
 
-local bit                      = std.bit
-local bit_band, bit_bor        = bit.band, bit.bor
-local bit_rshift, bit_lshift   = bit.rshift, bit.lshift
+local rbit                       = raw.bit
+-- local rbit_band, rbit_bor        = rbit.band, rbit.bor
+local rbit_rshift, rbit_lshift   = rbit.rshift, rbit.lshift
 
-local utf8                     = std.utf8
+local utf8                       = std.utf8
 
-local ipv4                     = std.ipv4
-local ipv4_parse               = ipv4.parse
+local ipv4                       = std.ipv4
+local ipv4_parse                 = ipv4.parse
 
-local class                    = std.class
+local class                      = std.class
 
-local percent                  = std.percent
+local percent                    = std.percent
 
 
 --- [SHARED AND MENU]
@@ -168,17 +169,17 @@ local FILE_OTHERWISE_CODE_POINTS = string.byteMap(
 local DECODE_LOOKUP_TABLE = {}
 
 for i = 0x00, 0xFF do
-    local hex = bit.tohex( i, 2 )
+    local hex = rbit.tohex( i, 2 )
     DECODE_LOOKUP_TABLE[ hex ] = string_char( i )
-    DECODE_LOOKUP_TABLE[ hex:upper() ] = string_char( i )
+    DECODE_LOOKUP_TABLE[ string_upper( hex ) ] = string_char( i )
 end
 
 local URI_DECODE_SET = table.shallowCopy( DECODE_LOOKUP_TABLE )
 
 for _, i in raw.ipairs( { 0x2D, 0x2E, 0x21, 0x7E, 0x2A, 0x27, 0x28, 0x29 } ) do
-    local hex = bit.tohex( i, 2 )
+    local hex = rbit.tohex( i, 2 )
     URI_DECODE_SET[ hex ] = nil
-    URI_DECODE_SET[ string.upper( hex ) ] = nil
+    URI_DECODE_SET[ string_upper( hex ) ] = nil
 end
 
 ---@param str string
@@ -218,10 +219,10 @@ local function compilePercentEncodeSet( encodeSet, ... )
         end
 
         if isNumber( ch ) then
-            encodeSet[ string_char( ch ) ] = "%" .. bit.tohex( ch, 2 ):upper()
+            encodeSet[ string_char( ch ) ] = string_format( "%%%02X", ch )
         elseif isTable( ch ) then
             for i = isString( ch[ 1 ] ) and string_byte( ch[ 1 ] ) or ch[ 1 ], isString( ch[ 2 ] ) and string_byte( ch[ 2 ] ) or ch[ 2 ], 1 do
-                encodeSet[ string_char( i ) ] = "%" .. bit.tohex( i, 2 ):upper()
+                encodeSet[ string_char( i ) ] = string_format( "%%%02X", i )
             end
         end
     end
@@ -457,7 +458,7 @@ local function punycodeEncode( str, startPos, endPos )
                 output[ out ] = string_char( q + 22 + (q < 26 and 75 or 0) )
                 k = 0
 
-                delta = h == b and math_floor( delta / damp ) or bit_rshift( delta, 1 )
+                delta = h == b and math_floor( delta / damp ) or rbit_rshift( delta, 1 )
                 delta = delta + math_floor( delta / (h + 1) )
                 while delta > ((base - tMin) * tMax) / 2 do
                     delta = math_floor( delta / (base - tMin) )
@@ -481,14 +482,22 @@ local function parseIPv4InIPv6( str, pointer, endPos, address, pieceIndex )
     local numbersSeen = 0
     while pointer <= endPos do
         local ipv4Piece = nil
+
+        ---@type integer | nil
         local ch = string_byte( str, pointer )
+
         if numbersSeen > 0 then
             if not (ch == 0x2E and numbersSeen < 4) then
                 error( "Invalid URL: IPv4 in IPv6 invalid code point" )
             end
 
             pointer = pointer + 1
-            ch = pointer <= endPos and string_byte( str, pointer )
+
+            if pointer > endPos then
+                ch = nil
+            else
+                ch = string_byte( str, pointer )
+            end
         end
 
         while ch and ascii_isDigit( ch ) do
@@ -506,7 +515,12 @@ local function parseIPv4InIPv6( str, pointer, endPos, address, pieceIndex )
             end
 
             pointer = pointer + 1
-            ch = pointer <= endPos and string_byte( str, pointer )
+
+            if pointer > endPos then
+                ch = nil
+            else
+                ch = string_byte( str, pointer )
+            end
         end
 
         if not ipv4Piece then
@@ -549,7 +563,9 @@ local function parseIPv6( str, startPos, endPos )
             error( "Invalid URL: IPv6 too many pieces" )
         end
 
+        ---@type integer | nil
         local ch = string_byte( str, pointer )
+
         if ch == 0x3A then
             if compress then
                 error( "Invalid URL: IPv6 multiple compression" )
@@ -563,11 +579,18 @@ local function parseIPv6( str, startPos, endPos )
 
         local value = 0
         local length = 0
+
         while length < 4 and ch and ascii_isHexDigit( ch ) do
             value = value * 0x10 + hexToDec( ch )
+
             pointer = pointer + 1
             length = length + 1
-            ch = pointer <= endPos and string_byte( str, pointer )
+
+            if pointer > endPos then
+                ch = nil
+            else
+                ch = string_byte( str, pointer )
+            end
         end
 
         if ch == 0x2E then

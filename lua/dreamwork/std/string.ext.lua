@@ -1,5 +1,11 @@
 local std = dreamwork.std
 
+local raw = std.raw
+
+local rbit = raw.bit
+local rbit_bxor = rbit.bxor
+local rbit_lshift = rbit.lshift
+
 local math = std.math
 local math_min = math.min
 local math_relative = math.relative
@@ -13,10 +19,6 @@ local string_sub = string.sub
 local string_len = string.len
 local string_char = string.char
 local string_byte = string.byte
-
-local bit = std.bit
-local bit_bxor = bit.bxor
-local bit_lshift = bit.lshift
 
 local bytepack = std.bytepack
 local bytepack_readHex8 = bytepack.readHex8
@@ -226,8 +228,8 @@ function string.fnv0( str )
     local hash_int = 0
 
     for index = 1, string_len( str ), 1 do
-        hash_int = hash_int + bit_lshift( hash_int, 1 ) + bit_lshift( hash_int, 4 ) + bit_lshift( hash_int, 7 ) + bit_lshift( hash_int, 8 ) + bit_lshift( hash_int, 24 )
-        hash_int = bit_bxor( hash_int, string_byte( str, index, index ) )
+        hash_int = hash_int + rbit_lshift( hash_int, 1 ) + rbit_lshift( hash_int, 4 ) + rbit_lshift( hash_int, 7 ) + rbit_lshift( hash_int, 8 ) + rbit_lshift( hash_int, 24 )
+        hash_int = rbit_bxor( hash_int, string_byte( str, index, index ) )
     end
 
     return hash_int % 0xFFFFFFFF
@@ -245,8 +247,8 @@ function string.fnv1( str )
     local hash_int = 0x811c9dc5
 
     for index = 1, string_len( str ), 1 do
-        hash_int = hash_int + bit_lshift( hash_int, 1 ) + bit_lshift( hash_int, 4 ) + bit_lshift( hash_int, 7 ) + bit_lshift( hash_int, 8 ) + bit_lshift( hash_int, 24 )
-        hash_int = bit_bxor( hash_int, string_byte( str, index, index ) )
+        hash_int = hash_int + rbit_lshift( hash_int, 1 ) + rbit_lshift( hash_int, 4 ) + rbit_lshift( hash_int, 7 ) + rbit_lshift( hash_int, 8 ) + rbit_lshift( hash_int, 24 )
+        hash_int = rbit_bxor( hash_int, string_byte( str, index, index ) )
     end
 
     return hash_int % 0xFFFFFFFF
@@ -264,8 +266,8 @@ function string.fnv1a( str )
     local hash_int = 0x811c9dc5
 
     for index = 1, string_len( str ), 1 do
-        hash_int = bit_bxor( hash_int, string_byte( str, index, index ) )
-        hash_int = hash_int + bit_lshift( hash_int, 1 ) + bit_lshift( hash_int, 4 ) + bit_lshift( hash_int, 7 ) + bit_lshift( hash_int, 8 ) + bit_lshift( hash_int, 24 )
+        hash_int = rbit_bxor( hash_int, string_byte( str, index, index ) )
+        hash_int = hash_int + rbit_lshift( hash_int, 1 ) + rbit_lshift( hash_int, 4 ) + rbit_lshift( hash_int, 7 ) + rbit_lshift( hash_int, 8 ) + rbit_lshift( hash_int, 24 )
     end
 
     return hash_int % 0xFFFFFFFF

@@ -9,6 +9,8 @@ local glue_decode = glua_util ~= nil and glua_util.Base64Decode
 ---@class dreamwork.std
 local std = dreamwork.std
 
+local raw = std.raw
+
 local math = std.math
 local math_floor = math.floor
 
@@ -22,8 +24,11 @@ local string_sub = string.sub
 local string_char = string.char
 local string_byte = string.byte
 
-local bit = std.bit
-local bit_extract = bit.extract
+local rbit = raw.bit
+local rbit_extract = rbit.extract
+
+local error = std.error
+
 
 --- [SHARED AND MENU]
 ---
@@ -200,21 +205,21 @@ local function block_encode( encode_map, do_cache, cache_map, uint8_1, uint8_2, 
 
     if uint8_2 == nil then
         str_block = string_char(
-            encode_map[ bit_extract( bit_sum, 18, 6 ) ],
-            encode_map[ bit_extract( bit_sum, 12, 6 ) ]
+            encode_map[ rbit_extract( bit_sum, 18, 6 ) ],
+            encode_map[ rbit_extract( bit_sum, 12, 6 ) ]
         )
     elseif uint8_3 == nil then
         str_block = string_char(
-            encode_map[ bit_extract( bit_sum, 18, 6 ) ],
-            encode_map[ bit_extract( bit_sum, 12, 6 ) ],
-            encode_map[ bit_extract( bit_sum, 6, 6 ) ]
+            encode_map[ rbit_extract( bit_sum, 18, 6 ) ],
+            encode_map[ rbit_extract( bit_sum, 12, 6 ) ],
+            encode_map[ rbit_extract( bit_sum, 6, 6 ) ]
         )
     else
         str_block = string_char(
-            encode_map[ bit_extract( bit_sum, 18, 6 ) ],
-            encode_map[ bit_extract( bit_sum, 12, 6 ) ],
-            encode_map[ bit_extract( bit_sum, 6, 6 ) ],
-            encode_map[ bit_extract( bit_sum, 0, 6 ) ]
+            encode_map[ rbit_extract( bit_sum, 18, 6 ) ],
+            encode_map[ rbit_extract( bit_sum, 12, 6 ) ],
+            encode_map[ rbit_extract( bit_sum, 6, 6 ) ],
+            encode_map[ rbit_extract( bit_sum, 0, 6 ) ]
         )
     end
 
@@ -252,7 +257,11 @@ function base64.encode( raw_str, options )
     local str_length = string_len( raw_str )
     local remainder = str_length % 3
 
-    local blocks, block_count = {}, 0
+    ---@type string[]
+    local blocks = {}
+
+    ---@type integer
+    local block_count = 0
 
     local cache_map
 
@@ -299,9 +308,9 @@ function base64.encode( raw_str, options )
         end
 
         return table_concat( segments, options.eol, 1, segment_count )
-    else
-        return str_base64
     end
+
+    return str_base64
 end
 
 ---@param decode_map table<integer, integer>
@@ -315,7 +324,7 @@ local function block_decode( decode_map, cache_map, uint8_1, uint8_2, uint8_3, u
     if cache_map == nil then
         if uint8_3 == nil then
             return string_char(
-                bit_extract(
+                rbit_extract(
                     (decode_map[ uint8_1 ] * 0x40000) +
                     (decode_map[ uint8_2 ] * 0x1000),
                     16, 8 )
@@ -328,8 +337,8 @@ local function block_decode( decode_map, cache_map, uint8_1, uint8_2, uint8_3, u
                 (decode_map[ uint8_3 ] * 0x40)
 
             return string_char(
-                bit_extract( bit_sum, 16, 8 ),
-                bit_extract( bit_sum, 8, 8 )
+                rbit_extract( bit_sum, 16, 8 ),
+                rbit_extract( bit_sum, 8, 8 )
             )
         end
 
@@ -339,9 +348,9 @@ local function block_decode( decode_map, cache_map, uint8_1, uint8_2, uint8_3, u
             decode_map[ uint8_4 ]
 
         return string_char(
-            bit_extract( bit_sum, 16, 8 ),
-            bit_extract( bit_sum, 8, 8 ),
-            bit_extract( bit_sum, 0, 8 )
+            rbit_extract( bit_sum, 16, 8 ),
+            rbit_extract( bit_sum, 8, 8 ),
+            rbit_extract( bit_sum, 0, 8 )
         )
     end
 

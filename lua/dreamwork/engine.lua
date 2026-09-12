@@ -4,6 +4,8 @@ local _G = _G
 local dreamwork = dreamwork
 if dreamwork.engine ~= nil then return end
 
+local detour = dreamwork.detour
+
 ---@class dreamwork.std
 local std = dreamwork.std
 
@@ -23,16 +25,20 @@ local string_format = string.format
 
 local table = std.table
 local table_sort = table.sort
+local table_concat = table.concat
 local table_removeByValue = table.removeByValue
 
 local raw = std.raw
 local raw_pairs = raw.pairs
 local raw_select = raw.select
 
+local rbit = raw.bit
+local rbit_band = rbit.band
+
 local setmetatable = std.setmetatable
+local error = std.error
 local is = std.is
 
-local detour = dreamwork.detour
 
 ---@class Entity : dreamwork.std.Metatable
 ---@field EntIndex fun( self: Entity ): integer
@@ -1852,10 +1858,8 @@ if engine.loadMaterial == nil then
 
     if c_material_fn == nil then
 
-        local table_concat = table.concat
-        local bit_band = std.bit.band
-
-        local bit2params = {
+        ---@type { [ 1 ]: number, [ 2 ]: string }[]
+        local bit_to_param = {
             { 1,  "vertexlitgeneric" },
             { 2,  "nocull" },
             { 4,  "alphatest" },
@@ -1865,7 +1869,7 @@ if engine.loadMaterial == nil then
             { 64, "ignorez" }
         }
 
-        local bit2param_count = #bit2params
+        bit_to_param[ 0 ] = #bit_to_param
 
         --- [SHARED AND MENU]
         ---
@@ -1880,23 +1884,27 @@ if engine.loadMaterial == nil then
                 return glua_Material( file_path )
             end
 
-            local params, param_count = {}, 0
+            ---@type string[]
+            local gparams = {}
 
-            for i = 1, bit2param_count, 1 do
-                local data = bit2params[ i ]
-                if bit_band( parameters, data[ 2 ] ) ~= 0 then
-                    param_count = param_count + 1
-                    params[ param_count ] = data[ 1 ]
+            ---@type integer
+            local gparam_count = 0
+
+            for i = 1, bit_to_param[ 0 ], 1 do
+                local data = bit_to_param[ i ]
+                if rbit_band( parameters, data[ 1 ] ) ~= 0 then
+                    gparam_count = gparam_count + 1
+                    gparams[ gparam_count ] = data[ 2 ]
                 end
             end
 
-            if param_count == 0 then
+            if gparam_count == 0 then
                 return glua_Material( file_path )
-            elseif param_count == 1 then
-                return glua_Material( file_path, params[ 1 ] )
-            else
-                return glua_Material( file_path, table_concat( params, " ", 1, param_count ) )
+            elseif gparam_count == 1 then
+                return glua_Material( file_path, gparams[ 1 ] )
             end
+
+            return glua_Material( file_path, table_concat( gparams, " ", 1, gparam_count ) )
         end
 
     else
@@ -1912,9 +1920,9 @@ if engine.loadMaterial == nil then
         function engine.loadMaterial( file_path, parameters )
             if parameters == nil then
                 return c_material_fn( file_path )
-            else
-                return c_material_fn( file_path, bitpack_toString( bitpack_writeUInt( parameters, 8 ), 8, false ) )
             end
+
+            return c_material_fn( file_path, bitpack_toString( bitpack_writeUInt( parameters, 8 ), 8, false ) )
         end
 
     end

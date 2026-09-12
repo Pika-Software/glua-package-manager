@@ -110,6 +110,7 @@ function string.byteMap( ... )
 
     for i = 1, select( "#", ... ), 1 do
         local value = select( i, ... )
+
         if isTable( value ) then
             for j = string_byte( value.leading_byte ), string_byte( value.trailing_byte ), (value.step_size or 1) do
                 byte_map[ j ] = true

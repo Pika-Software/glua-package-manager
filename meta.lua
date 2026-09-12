@@ -225,8 +225,8 @@ metatable.__bnot = nil
 ---
 --- Used by `bit.lshift( a, b )` function.
 ---
----@generic K, V
----@type fun(self: table<K, V>, bit_count: integer): table<K, V>
+---@generic T
+---@type fun( self: T, bit_count: integer ): T
 metatable.__shl = nil
 
 ---
@@ -234,9 +234,57 @@ metatable.__shl = nil
 ---
 --- Used by `bit.rshift( a, b )` function.
 ---
----@generic K, V
----@type fun(self: table<K, V>, bit_count: integer): table<K, V>
+---@generic T
+---@type fun( self: T, bit_count: integer ): T
 metatable.__shr = nil
+
+---
+--- The arithmetic right shift operation.
+---
+--- Like `__shr`, but the vacated high-order bits are filled with copies of the sign bit
+--- instead of zeros, so the sign of the value is preserved.
+---
+--- Used by `bit.arshift( a, b )` function.
+---
+---@generic T
+---@type fun( self: T, bit_count: integer ): T
+metatable.__shar = nil
+
+---
+--- The bit rotate left operation.
+---
+--- Rotates bits to the left; bits shifted out of the top are wrapped around and shifted
+--- back in at the bottom, so no bits are lost.
+---
+--- Used by `bit.rol( a, b )` function.
+---
+---@generic T
+---@type fun( self: T, bit_count: integer ): T
+metatable.__brol = nil
+
+---
+--- The bit rotate right operation.
+---
+--- Rotates bits to the right; bits shifted out of the bottom are wrapped around and shifted
+--- back in at the top, so no bits are lost.
+---
+--- Used by `bit.ror( a, b )` function.
+---
+---@generic T
+---@type fun( self: T, bit_count: integer ): T
+metatable.__bror = nil
+
+---
+--- The byte swap operation.
+---
+--- Reverses the byte order (endianness) of a 32-bit integer, swapping its four
+--- constituent bytes end-to-end.
+---
+--- Used by `bit.bswap( a )` function.
+---
+---@generic T
+---@type fun( self: T ): T
+metatable.__bswp = nil
 
 ---
 --- The concatenation `..` operation.
