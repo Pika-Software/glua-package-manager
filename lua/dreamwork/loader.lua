@@ -363,8 +363,6 @@ function std.equal( a, b )
         local b__eq = debug_getmetavalue( b, "__eq" )
         if b__eq == nil then
             return a == b
-        else
-            return b__eq( b, a )
         end
 
         return b__eq( b, a )
