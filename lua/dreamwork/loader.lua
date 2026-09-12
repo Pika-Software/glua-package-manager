@@ -797,13 +797,49 @@ do
 
 end
 
--- table library ( extension )
-dofile( "dreamwork/std/table.ext.lua" )
-sendfile( "dreamwork/std/table.ext.lua" )
+do
 
--- bit library
-dofile( "dreamwork/std/bit.lua" )
-sendfile( "dreamwork/std/bit.lua" )
+    local string_byteRep = string.byteRep
+
+    --- [SHARED AND MENU]
+    ---
+    --- Returns a hexadecimal string identifying the given value.
+    ---
+    --- If `value`'s metatable defines a `__hash` metamethod, that function is called on `value`
+    --- and its integer result is formatted as hex. Otherwise the value's raw memory address is
+    --- used (via `%p`), which is stable for the lifetime of the value but has no meaning beyond
+    --- identifying it — this is mainly useful for tables, functions, threads, and userdata.
+    ---
+    --- If `desired_length` is given, the resulting string is padded with leading zeros to reach
+    --- that length, or truncated from the left if it's already longer.
+    ---
+    ---@param value any The value to get a hexadecimal identifier for.
+    ---@param desired_length integer? The exact length the returned string should be. If omitted, the natural length is used.
+    ---@return string hex_str The hexadecimal identifier of `value`, optionally padded or truncated to `desired_length`.
+    function std.tohex( value, desired_length )
+        local hex_str
+
+        ---@type fun( value: any ): integer
+        local fn = debug_getmetavalue( value, "__hash" )
+        if fn == nil then
+            hex_str = string_sub( string_format( "%p", value ), 3 )
+        else
+            hex_str = string_format( "%x", fn( value ) )
+        end
+
+        if desired_length ~= nil then
+            local length = string_len( hex_str )
+            if length < desired_length then
+                return string_byteRep( 0x30, desired_length - length ) .. string_sub( hex_str, 1, length )
+            elseif length > desired_length then
+                return string_sub( hex_str, 1, desired_length )
+            end
+        end
+
+        return hex_str
+    end
+
+end
 
 -- symbols
 dofile( "dreamwork/std/types/symbol.lua" )
