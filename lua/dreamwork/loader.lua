@@ -792,25 +792,9 @@ do
 
 end
 
--- bitpack library
-dofile( "dreamwork/std/codec/bitpack.lua" )
-sendfile( "dreamwork/std/codec/bitpack.lua" )
-
--- bytepack library
-dofile( "dreamwork/std/codec/bytepack.lua" )
-sendfile( "dreamwork/std/codec/bytepack.lua" )
-
--- string library ( extension )
-dofile( "dreamwork/std/string.ext.lua" )
-sendfile( "dreamwork/std/string.ext.lua" )
-
--- ipv4 library
-dofile( "dreamwork/std/ipv4.lua" )
-sendfile( "dreamwork/std/ipv4.lua" )
-
--- ipv6 class
-dofile( "dreamwork/std/ipv6.lua" )
-sendfile( "dreamwork/std/ipv6.lua" )
+-- coroutine library
+dofile( "dreamwork/std/coroutine.lua" )
+sendfile( "dreamwork/std/coroutine.lua" )
 
 -- stack class
 dofile( "dreamwork/std/types/stack.lua" )
@@ -823,80 +807,6 @@ sendfile( "dreamwork/std/types/queue.lua" )
 -- node class
 dofile( "dreamwork/std/types/node.lua" )
 sendfile( "dreamwork/std/types/node.lua" )
-
--- version class
-dofile( "dreamwork/std/types/version.lua" )
-sendfile( "dreamwork/std/types/version.lua" )
-
--- crc checksum clases
-dofile( "dreamwork/std/checksum/crc.lua" )
-sendfile( "dreamwork/std/checksum/crc.lua" )
-
--- adler checksum classes
-dofile( "dreamwork/std/checksum/adler.lua" )
-sendfile( "dreamwork/std/checksum/adler.lua" )
-
--- fletcher checksum library
-dofile( "dreamwork/std/checksum/fletcher.lua" )
-sendfile( "dreamwork/std/checksum/fletcher.lua" )
-
--- base16 encoding library
-dofile( "dreamwork/std/codec/base16.lua" )
-sendfile( "dreamwork/std/codec/base16.lua" )
-
--- base32 encoding library
-dofile( "dreamwork/std/codec/base32.lua" )
-sendfile( "dreamwork/std/codec/base32.lua" )
-
--- base64 encoding library
-dofile( "dreamwork/std/codec/base64.lua" )
-sendfile( "dreamwork/std/codec/base64.lua" )
-
--- utf8 encoding library
-dofile( "dreamwork/std/codec/utf8.lua" )
-sendfile( "dreamwork/std/codec/utf8.lua" )
-
--- utf16 encoding library
-dofile( "dreamwork/std/codec/utf16.lua" )
-sendfile( "dreamwork/std/codec/utf16.lua" )
-
--- utf32 encoding library
-dofile( "dreamwork/std/codec/utf32.lua" )
-sendfile( "dreamwork/std/codec/utf32.lua" )
-
--- unicode encoding library
-dofile( "dreamwork/std/codec/unicode.lua" )
-sendfile( "dreamwork/std/codec/unicode.lua" )
-
--- percent encoding library
-dofile( "dreamwork/std/codec/percent.lua" )
-sendfile( "dreamwork/std/codec/percent.lua" )
-
--- punycode encoding library
-dofile( "dreamwork/std/codec/punycode.lua" )
-sendfile( "dreamwork/std/codec/punycode.lua" )
-
--- time library
-dofile( "dreamwork/std/time.lua" )
-sendfile( "dreamwork/std/time.lua" )
-
-local time = std.time
-
-if math.randomseed == 0 then
-    math.randomseed = time.now( "ms", false )
-end
-
--- coroutine library
-dofile( "dreamwork/std/coroutine.lua" )
-sendfile( "dreamwork/std/coroutine.lua" )
-
--- debug stack class
-dofile( "dreamwork/std/types/debug_stack.lua" )
-sendfile( "dreamwork/std/types/debug_stack.lua" )
-
--- buffer library
-dofile( "dreamwork/std/codec/buffer.lua" )
-sendfile( "dreamwork/std/codec/buffer.lua" )
 
 do
 
@@ -964,44 +874,6 @@ do
     std.SYSTEM_X32 = SYSTEM_X32
 
     std.SYSTEM_NAME = ({ "osx64", "osx", "linux64", "linux", "win64", "win32" })[ (SYSTEM_WINDOWS and 4 or 0) + (SYSTEM_LINUX and 2 or 0) + (SYSTEM_X32 and 1 or 0) + 1 ]
-
-end
-
-do
-
-    --- [SHARED AND MENU]
-    ---
-    --- Runs a benchmark on the given function, measuring the time it takes to execute a specified number of iterations.
-    ---
-    ---@param name string The name of the benchmark.
-    ---@param fn function The function to benchmark.
-    ---@param iterations? integer The number of iterations to run.
-    function dreamwork.bench( name, fn, iterations )
-        if iterations == nil then
-            iterations = 1000
-        end
-
-        local warmup = math.min( iterations / 100, 100 )
-
-        for _ = 1, warmup do
-            fn()
-        end
-
-        gc.stop()
-        time.tick()
-
-        for _ = 1, iterations do
-            fn()
-        end
-
-        local time_took = time.tick()
-        gc.restart()
-
-        local avg = time_took / iterations
-        raw.print( string.format( "[DW] Benchmark `%s` - iter: %d / avg: %f / exp: %s / total: %f sec.", name, iterations, avg, time.transform( math.ceil( time.transform( avg, "s", "ms", true ) * iterations ), "ms", "s", true ), time_took ) )
-
-        return time_took
-    end
 
 end
 
@@ -1346,6 +1218,187 @@ do
 
 end
 
+do
+
+    ---@diagnostic disable-next-line: undefined-field
+    local CompileString = _G.CompileString
+
+    local getfenv = std.getfenv
+    local setfenv = std.setfenv
+
+    --- [SHARED AND MENU]
+    ---
+    --- Loads a string as
+    --- a lua code chunk in the specified environment
+    --- and returns function as a compile result.
+    ---
+    ---@param lua_code string The lua code chunk.
+    ---@param chunk_name string | nil The lua code chunk name.
+    ---@param env table | nil The environment of compiled function.
+    ---@return function | nil fn The compiled function.
+    ---@return string | nil msg The error message.
+    function std.loadstring( lua_code, chunk_name, env )
+        local fn = CompileString( lua_code, chunk_name or "=(loadstring)", false )
+        if fn == nil then
+            return nil, "lua code compilation failed"
+        end
+
+        if isString( fn ) then
+            ---@diagnostic disable-next-line: cast-type-mismatch
+            ---@cast fn string
+            return nil, fn
+        end
+
+        setfenv( fn, env or getfenv( 2 ) )
+        return fn
+    end
+
+end
+
+-- raw library ( extension )
+dofile( "dreamwork/std/raw.ext.lua" )
+sendfile( "dreamwork/std/raw.ext.lua" )
+
+-- time library
+dofile( "dreamwork/std/time.lua" )
+sendfile( "dreamwork/std/time.lua" )
+
+local time = std.time
+
+if math.randomseed == 0 then
+    math.randomseed = time.now( "ms", false )
+end
+
+do
+
+    --- [SHARED AND MENU]
+    ---
+    --- Runs a benchmark on the given function, measuring the time it takes to execute a specified number of iterations.
+    ---
+    ---@param name string The name of the benchmark.
+    ---@param fn function The function to benchmark.
+    ---@param iterations? integer The number of iterations to run.
+    function dreamwork.bench( name, fn, iterations )
+        if iterations == nil then
+            iterations = 1000
+        end
+
+        local warmup = math.min( iterations / 100, 100 )
+
+        for _ = 1, warmup do
+            fn()
+        end
+
+        gc.stop()
+        time.tick()
+
+        for _ = 1, iterations do
+            fn()
+        end
+
+        local time_took = time.tick()
+        gc.restart()
+
+        local avg = time_took / iterations
+        raw.print( string.format( "[DW] Benchmark `%s` - iter: %d / avg: %f / exp: %s / total: %f sec.", name, iterations, avg, time.transform( math.ceil( time.transform( avg, "s", "ms", true ) * iterations ), "ms", "s", true ), time_took ) )
+
+        return time_took
+    end
+
+end
+
+-- bit library
+dofile( "dreamwork/std/bit.lua" )
+sendfile( "dreamwork/std/bit.lua" )
+
+-- bitpack library
+dofile( "dreamwork/std/codec/bitpack.lua" )
+sendfile( "dreamwork/std/codec/bitpack.lua" )
+
+-- bytepack library
+dofile( "dreamwork/std/codec/bytepack.lua" )
+sendfile( "dreamwork/std/codec/bytepack.lua" )
+
+-- string library ( extension )
+dofile( "dreamwork/std/string.ext.lua" )
+sendfile( "dreamwork/std/string.ext.lua" )
+
+-- table library ( extension )
+dofile( "dreamwork/std/table.ext.lua" )
+sendfile( "dreamwork/std/table.ext.lua" )
+
+-- coroutine library ( extension )
+dofile( "dreamwork/std/coroutine.ext.lua" )
+sendfile( "dreamwork/std/coroutine.ext.lua" )
+
+-- ipv4 library
+dofile( "dreamwork/std/ipv4.lua" )
+sendfile( "dreamwork/std/ipv4.lua" )
+
+-- ipv6 class
+dofile( "dreamwork/std/ipv6.lua" )
+sendfile( "dreamwork/std/ipv6.lua" )
+
+-- version class
+-- dofile( "dreamwork/std/types/version.lua" )
+-- sendfile( "dreamwork/std/types/version.lua" )
+
+-- crc checksum clases
+dofile( "dreamwork/std/checksum/crc.lua" )
+sendfile( "dreamwork/std/checksum/crc.lua" )
+
+-- adler checksum classes
+dofile( "dreamwork/std/checksum/adler.lua" )
+sendfile( "dreamwork/std/checksum/adler.lua" )
+
+-- fletcher checksum library
+dofile( "dreamwork/std/checksum/fletcher.lua" )
+sendfile( "dreamwork/std/checksum/fletcher.lua" )
+
+-- base16 encoding library
+dofile( "dreamwork/std/codec/base16.lua" )
+sendfile( "dreamwork/std/codec/base16.lua" )
+
+-- base32 encoding library
+dofile( "dreamwork/std/codec/base32.lua" )
+sendfile( "dreamwork/std/codec/base32.lua" )
+
+-- base64 encoding library
+dofile( "dreamwork/std/codec/base64.lua" )
+sendfile( "dreamwork/std/codec/base64.lua" )
+
+-- utf8 encoding library
+dofile( "dreamwork/std/codec/utf8.lua" )
+sendfile( "dreamwork/std/codec/utf8.lua" )
+
+-- utf16 encoding library
+dofile( "dreamwork/std/codec/utf16.lua" )
+sendfile( "dreamwork/std/codec/utf16.lua" )
+
+-- utf32 encoding library
+dofile( "dreamwork/std/codec/utf32.lua" )
+sendfile( "dreamwork/std/codec/utf32.lua" )
+
+-- unicode encoding library
+dofile( "dreamwork/std/codec/unicode.lua" )
+sendfile( "dreamwork/std/codec/unicode.lua" )
+
+-- percent encoding library
+dofile( "dreamwork/std/codec/percent.lua" )
+sendfile( "dreamwork/std/codec/percent.lua" )
+
+-- punycode encoding library
+dofile( "dreamwork/std/codec/punycode.lua" )
+sendfile( "dreamwork/std/codec/punycode.lua" )
+
+-- debug stack class
+dofile( "dreamwork/std/types/debug_stack.lua" )
+sendfile( "dreamwork/std/types/debug_stack.lua" )
+
+-- buffer library
+dofile( "dreamwork/std/codec/buffer.lua" )
+sendfile( "dreamwork/std/codec/buffer.lua" )
+
 local represent = std.represent
 local type = std.type
 local len = std.len
@@ -1507,39 +1560,6 @@ do
         end
 
         return raw_get( tbl, key )
-    end
-
-end
-
-do
-
-    ---@diagnostic disable-next-line: undefined-field
-    local CompileString = _G.CompileString
-    local getfenv, setfenv = std.getfenv, std.setfenv
-
-    --- [SHARED AND MENU]
-    ---
-    --- Loads a string as
-    --- a lua code chunk in the specified environment
-    --- and returns function as a compile result.
-    ---
-    ---@param lua_code string The lua code chunk.
-    ---@param chunk_name string | nil The lua code chunk name.
-    ---@param env table | nil The environment of compiled function.
-    ---@return function | nil fn The compiled function.
-    ---@return string | nil msg The error message.
-    function std.loadstring( lua_code, chunk_name, env )
-        local fn = CompileString( lua_code, chunk_name or "=(loadstring)", false )
-        if fn == nil then
-            return nil, "lua code compilation failed"
-        elseif isString( fn ) then
-            ---@diagnostic disable-next-line: cast-type-mismatch
-            ---@cast fn string
-            return nil, fn
-        else
-            setfenv( fn, env or getfenv( 2 ) )
-            return fn
-        end
     end
 
 end
