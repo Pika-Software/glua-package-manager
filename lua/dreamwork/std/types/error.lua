@@ -12,6 +12,9 @@ local string_format = string.format
 
 local utf8 = std.utf8
 
+local time = std.time
+local time_format = time.format
+
 local color = std.color
 local color_Scheme = color.Scheme
 
@@ -150,7 +153,9 @@ do
     --- the console instead of building and returning a string.
     ---
     function Error:display()
-        engine_consoleMessageColored( "\n[", COLOR_WHITE_SMOKE )
+        engine_consoleMessageColored( time_format( "\n┌> {day}-{month}-{year} - {hours}:{minutes}:{seconds}.{milliseconds}\n" ), COLOR_SUVA_GRAY )
+
+        engine_consoleMessageColored( "[", COLOR_WHITE_SMOKE )
         engine_consoleMessageColored( realm_name, COLOR_ERROR )
         engine_consoleMessageColored( "/", COLOR_SUVA_GRAY )
         engine_consoleMessageColored( type( self ), COLOR_MONA_LISA )
